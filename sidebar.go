@@ -24,6 +24,8 @@ type row struct {
 	worktree *Worktree
 	// The space's own row, which opens its main worktree.
 	main bool
+	// A session that belongs to no space, see otherSessions.
+	other bool
 }
 
 type snapshot struct {
@@ -49,18 +51,25 @@ type sidebar struct {
 	width  int
 	height int
 	err    error
-	// Whether kitty has given the sidebar keyboard focus. The cursor is only drawn then, since a dock
-	// started with --dock-skip-focus is driven by the mouse alone.
+	// Whether kitty has given the sidebar keyboard focus. The cursor is only drawn then.
 	focused bool
 }
 
+// Colors are terminal palette indexes rather than fixed colors, so the sidebar follows the kitty theme.
 var (
-	titleStyle   = lipgloss.NewStyle().Bold(true).Faint(true)
-	spaceStyle   = lipgloss.NewStyle().Bold(true)
+	muted  = lipgloss.Color("8")
+	accent = lipgloss.Color("4")
+
+	titleStyle   = lipgloss.NewStyle().Bold(true).Foreground(muted)
+	spaceStyle   = lipgloss.NewStyle().Bold(true).Foreground(accent)
+	otherStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
 	closedStyle  = lipgloss.NewStyle().Faint(true)
-	branchStyle  = lipgloss.NewStyle().Faint(true)
-	currentStyle = lipgloss.NewStyle().Reverse(true)
+	branchStyle  = lipgloss.NewStyle().Foreground(muted)
+	openStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	currentStyle = lipgloss.NewStyle().Background(muted).Foreground(lipgloss.Color("15")).Bold(true)
+	cursorStyle  = lipgloss.NewStyle().Reverse(true)
+	borderStyle  = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, true, false, false)
 )
 
 // load reads the config on every refresh, so edits show up without restarting every dock, and a broken
@@ -112,7 +121,14 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 	case tea.FocusMsg:
+		// Start from the session the sidebar is in, which is where keyboard navigation usually begins.
 		m.focused = true
+		for i, r := range m.rows {
+			if r.worktree != nil && r.worktree.Session == m.kitty.Current {
+				m.cursor = i
+			}
+		}
+		m.scrollToCursor()
 	case tea.BlurMsg:
 		m.focused = false
 	case tickMsg:
@@ -140,11 +156,17 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "j", "down":
-			m.cursor = min(m.cursor+1, max(len(m.rows)-1, 0))
+			m.moveCursor(1)
 		case "k", "up":
-			m.cursor = max(m.cursor-1, 0)
-		case "enter":
+			m.moveCursor(-1)
+		case "g", "home":
+			m.cursor = 0
+		case "G", "end":
+			m.cursor = max(len(m.rows)-1, 0)
+		case "enter", "l":
 			return m, m.open(m.cursor)
+		case "esc", "q":
+			return m, m.leave()
 		case "r":
 			return m, m.refresh()
 		case "ctrl+c":
@@ -159,6 +181,11 @@ func (m *sidebar) listHeight() int {
 	return max(m.height-headerRows-1, 1)
 }
 
+// contentWidth leaves the last column for the border against the window the sidebar is docked to.
+func (m *sidebar) contentWidth() int {
+	return max(m.width-1, 1)
+}
+
 func (m *sidebar) scrollToCursor() {
 	if m.cursor < m.offset {
 		m.offset = m.cursor
@@ -167,12 +194,36 @@ func (m *sidebar) scrollToCursor() {
 	}
 }
 
+// moveCursor moves by delta rows, stepping over the blank row between groups.
+func (m *sidebar) moveCursor(delta int) {
+	for i := m.cursor + delta; i >= 0 && i < len(m.rows); i += delta {
+		if m.rows[i].space != nil {
+			m.cursor = i
+			return
+		}
+	}
+}
+
+// leave gives keyboard focus back to the window the sidebar took it from.
+func (m *sidebar) leave() tea.Cmd {
+	home := m.kitty.Home
+	if home == 0 {
+		return nil
+	}
+	return func() tea.Msg {
+		if err := focusWindow(home); err != nil {
+			return snapshot{err: err}
+		}
+		return nil
+	}
+}
+
 // buildRows lists the sessions that belong to no space first, then each space followed by its linked
 // worktrees, with a blank row between the two groups. A space's own row opens its main worktree.
 func buildRows(others, spaces []Space) []row {
 	var rows []row
 	for i := range others {
-		rows = append(rows, row{space: &others[i], worktree: &others[i].Worktrees[0], main: true})
+		rows = append(rows, row{space: &others[i], worktree: &others[i].Worktrees[0], main: true, other: true})
 	}
 	if len(rows) > 0 && len(spaces) > 0 {
 		rows = append(rows, row{})
@@ -248,7 +299,7 @@ func truncate(s string, width int) string {
 }
 
 func (m *sidebar) renderRow(i int) string {
-	r, width := m.rows[i], max(m.width, 1)
+	r, width := m.rows[i], m.contentWidth()
 	if r.space == nil {
 		return strings.Repeat(" ", width)
 	}
@@ -258,36 +309,40 @@ func (m *sidebar) renderRow(i int) string {
 	}
 	current := r.worktree != nil && r.worktree.Session == m.kitty.Current
 	open := r.worktree != nil && m.isOpen(r.worktree)
-	marker := "  "
+	marker, markerStyle := "  ", openStyle
 	switch {
 	case r.worktree == nil:
-		marker = "! "
+		marker, markerStyle = "! ", errorStyle
 	case current:
 		marker = "> "
 	case open:
 		marker = "* "
 	}
-	text := truncate(marker+label, width)
+	label = truncate(label, max(width-len(marker), 0))
 	branch := ""
-	if rest := width - len([]rune(text)); r.worktree != nil && r.worktree.Branch != "" && rest > 2 {
+	if rest := width - len(marker) - len([]rune(label)); r.worktree != nil && r.worktree.Branch != "" && rest > 2 {
 		branch = " " + truncate(r.worktree.Branch, rest-1)
 	}
-	pad := strings.Repeat(" ", max(width-len([]rune(text))-len([]rune(branch)), 0))
+	pad := strings.Repeat(" ", max(width-len(marker)-len([]rune(label))-len([]rune(branch)), 0))
 
-	if current {
-		return currentStyle.Render(text + branch + pad)
+	// A highlighted row is drawn in one style across its whole width, so it reads as one bar.
+	switch {
+	case i == m.cursor && m.focused:
+		return cursorStyle.Render(marker + label + branch + pad)
+	case current:
+		return currentStyle.Render(marker + label + branch + pad)
 	}
-	style, bstyle := lipgloss.NewStyle(), branchStyle
-	if r.main {
-		style = spaceStyle
+	labelStyle := lipgloss.NewStyle()
+	switch {
+	case r.other:
+		labelStyle = otherStyle
+	case r.main:
+		labelStyle = spaceStyle
 	}
 	if !open {
-		style = style.Inherit(closedStyle)
+		labelStyle = labelStyle.Inherit(closedStyle)
 	}
-	if i == m.cursor && m.focused {
-		style, bstyle = style.Underline(true), bstyle.Underline(true)
-	}
-	return style.Render(text) + bstyle.Render(branch) + pad
+	return markerStyle.Render(marker) + labelStyle.Render(label) + branchStyle.Render(branch) + pad
 }
 
 func (m *sidebar) isOpen(wt *Worktree) bool {
@@ -296,18 +351,26 @@ func (m *sidebar) isOpen(wt *Worktree) bool {
 }
 
 func (m *sidebar) View() string {
-	var b strings.Builder
-	b.WriteString(titleStyle.Render(truncate("SPACES", max(m.width, 1))))
-	b.WriteString("\n\n")
+	width := m.contentWidth()
+	lines := []string{titleStyle.Render(truncate("SPACES", width)), ""}
 	end := min(m.offset+m.listHeight(), len(m.rows))
 	for i := m.offset; i < end; i++ {
-		b.WriteString(m.renderRow(i))
-		b.WriteByte('\n')
+		lines = append(lines, m.renderRow(i))
 	}
+	// Fill the height so the border runs the full length of the dock, with errors on the last line.
+	for len(lines) < m.height-1 {
+		lines = append(lines, "")
+	}
+	status := ""
 	if m.err != nil {
-		b.WriteString(errorStyle.Render(truncate(m.err.Error(), max(m.width, 1))))
+		status = errorStyle.Render(truncate(m.err.Error(), width))
 	}
-	return b.String()
+	lines = append(lines, status)
+	border := muted
+	if m.focused {
+		border = accent
+	}
+	return borderStyle.BorderForeground(border).Width(width).Render(strings.Join(lines, "\n"))
 }
 
 func runSidebar() error {

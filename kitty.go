@@ -61,6 +61,9 @@ type KittyState struct {
 	Sessions map[string]int
 	// The session of the tab the sidebar runs in, empty when it belongs to none.
 	Current string
+	// The window focused most recently in the sidebar's tab, not counting docks. Leaving the sidebar returns
+	// focus to it. Zero when unknown.
+	Home int
 }
 
 func loadKittyState(selfWindowID int) (KittyState, error) {
@@ -81,11 +84,18 @@ func kittyStateFrom(data []lsOSWindow, selfWindowID int) KittyState {
 	for _, osw := range data {
 		for _, tab := range osw.Tabs {
 			hasSelf, session := false, ""
+			home, homeAt := 0, 0.0
 			for _, w := range tab.Windows {
 				if w.ID == selfWindowID {
 					hasSelf = true
 				}
-				if _, isDock := w.UserVars[dockVar]; isDock || w.SessionName == "" {
+				if _, isDock := w.UserVars[dockVar]; isDock {
+					continue
+				}
+				if home == 0 || w.LastFocusedAt > homeAt {
+					home, homeAt = w.ID, w.LastFocusedAt
+				}
+				if w.SessionName == "" {
 					continue
 				}
 				session = w.SessionName
@@ -95,7 +105,7 @@ func kittyStateFrom(data []lsOSWindow, selfWindowID int) KittyState {
 				}
 			}
 			if hasSelf {
-				st.Current = session
+				st.Current, st.Home = session, home
 			}
 		}
 	}
@@ -110,12 +120,20 @@ func selfWindowID() int {
 	return id
 }
 
+func focusWindow(id int) error {
+	_, err := kitten("focus-window", "--match", fmt.Sprintf("id:%d", id))
+	return err
+}
+
 // openWorktree switches to the worktree's session. When it has no windows, the session is restored from its
 // saved file if there is one, and otherwise created with one tab in the worktree.
 func openWorktree(cfg Config, st KittyState, wt Worktree) error {
+	// The sidebar's own session: stay in this tab rather than jumping to wherever the session was last used.
+	if wt.Session == st.Current && st.Home != 0 {
+		return focusWindow(st.Home)
+	}
 	if id, ok := st.Sessions[wt.Session]; ok {
-		_, err := kitten("focus-window", "--match", fmt.Sprintf("id:%d", id))
-		return err
+		return focusWindow(id)
 	}
 	if cfg.SessionsDir != "" {
 		path := filepath.Join(cfg.SessionsDir, wt.Session+".kitty-session")

@@ -72,14 +72,15 @@ func TestKittyStateFrom(t *testing.T) {
 	}}}
 
 	got := kittyStateFrom(data, 12)
-	want := KittyState{Sessions: map[string]int{"gr": 11, "kitty@docks": 21}, Current: "gr"}
+	// Home is the tab's most recently focused window that is not a dock.
+	want := KittyState{Sessions: map[string]int{"gr": 11, "kitty@docks": 21}, Current: "gr", Home: 11}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}
 
 	// A sidebar in a tab with no session highlights nothing.
 	got = kittyStateFrom(data, 30)
-	want.Current = ""
+	want.Current, want.Home = "", 30
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}

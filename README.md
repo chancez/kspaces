@@ -66,7 +66,8 @@ kspaces list        every space's worktrees with their session names
 kspaces open PATH   switch to the session of the worktree at PATH, creating it if needed
 ```
 
-The sidebar is driven by the mouse when the dock is started with `--dock-skip-focus`. When it has focus,
-`j`/`k` move, `enter` opens and `r` refreshes. It refreshes every two seconds on its own.
+Clicking a row opens it. When the sidebar has keyboard focus, which needs a dock that is not started with
+`--dock-skip-focus`, `j`/`k` move, `g`/`G` jump to the first and last row, `enter` or `l` opens, `esc` or
+`q` returns focus to the window it came from and `r` refreshes. It refreshes every two seconds on its own.
 
 Remote control has to be enabled in kitty (`allow_remote_control` and `listen_on`).
