@@ -114,3 +114,22 @@ sessions ~/.local/share/kitty/sessions
 		t.Fatal("an unknown key was accepted")
 	}
 }
+
+func TestOtherSessions(t *testing.T) {
+	spaces := []Space{{Name: "gr", Worktrees: []Worktree{
+		{Path: "/src/gr", Session: "gr"},
+		{Path: "/src/gr/.worktrees/dev", Session: "gr@dev"},
+	}}}
+	open := map[string]int{"gr": 1, "default": 2, "scratch": 3}
+	saved := []string{"default", "gr@dev", "old"}
+
+	got := otherSessions(spaces, open, saved)
+	want := []Space{
+		{Name: "default", Worktrees: []Worktree{{Session: "default"}}},
+		{Name: "old", Worktrees: []Worktree{{Session: "old"}}},
+		{Name: "scratch", Worktrees: []Worktree{{Session: "scratch"}}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+}

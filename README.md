@@ -7,6 +7,8 @@ time.
 ```
 SPACES
 
+* default
+
 * gr pr/chancez/dev
 > docs-reference main
 *   release-caveats pr/ch...
@@ -14,6 +16,9 @@ SPACES
 
 `>` marks the session of the tab the sidebar is in, `*` a session with windows open, and faint rows
 worktrees with no session yet. `!` means the space's worktrees could not be listed.
+
+Sessions that are open or saved (see `sessions` below) but are not any worktree's, such as the one kitty
+starts with, are listed above the spaces.
 
 ## How it fits into kitty
 

@@ -124,6 +124,9 @@ func openWorktree(cfg Config, st KittyState, wt Worktree) error {
 			return err
 		}
 	}
+	if wt.Path == "" {
+		return fmt.Errorf("session %s has no windows and no saved file", wt.Session)
+	}
 	args := append([]string{"action"}, cfg.NewTab...)
 	args = append(args, "--cwd="+wt.Path, "--add-to-session="+wt.Session)
 	_, err := kitten(args...)

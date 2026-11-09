@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -15,6 +17,7 @@ const refreshEvery = 2 * time.Second
 // headerRows is how many rows the title takes above the list, so a click can be mapped to an entry.
 const headerRows = 2
 
+// row is one line of the list. The zero row is the blank line between groups.
 type row struct {
 	space *Space
 	// Nil when the space's worktrees could not be listed.
@@ -27,6 +30,8 @@ type snapshot struct {
 	// Nil when nothing was loaded, for example because opening a worktree failed.
 	cfg    *Config
 	spaces []Space
+	// Sessions that belong to no space, see otherSessions.
+	others []Space
 	kitty  KittyState
 	err    error
 }
@@ -71,7 +76,8 @@ func load(self int) snapshot {
 		spaces = append(spaces, loadSpace(root))
 	}
 	st, err := loadKittyState(self)
-	return snapshot{cfg: &cfg, spaces: spaces, kitty: st, err: err}
+	others := otherSessions(spaces, st.Sessions, savedSessions(cfg.SessionsDir))
+	return snapshot{cfg: &cfg, spaces: spaces, others: others, kitty: st, err: err}
 }
 
 func (m *sidebar) refresh() tea.Cmd {
@@ -115,7 +121,7 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = msg.err
 		if msg.cfg != nil {
 			m.cfg, m.spaces, m.kitty = *msg.cfg, msg.spaces, msg.kitty
-			m.rows = buildRows(m.spaces)
+			m.rows = buildRows(msg.others, m.spaces)
 			m.cursor = min(m.cursor, max(len(m.rows)-1, 0))
 		}
 	case tea.MouseMsg:
@@ -161,10 +167,16 @@ func (m *sidebar) scrollToCursor() {
 	}
 }
 
-// buildRows lays the spaces out one row each, followed by their linked worktrees. A space's own row opens
-// its main worktree.
-func buildRows(spaces []Space) []row {
+// buildRows lists the sessions that belong to no space first, then each space followed by its linked
+// worktrees, with a blank row between the two groups. A space's own row opens its main worktree.
+func buildRows(others, spaces []Space) []row {
 	var rows []row
+	for i := range others {
+		rows = append(rows, row{space: &others[i], worktree: &others[i].Worktrees[0], main: true})
+	}
+	if len(rows) > 0 && len(spaces) > 0 {
+		rows = append(rows, row{})
+	}
 	for i := range spaces {
 		s := &spaces[i]
 		r := row{space: s, main: true}
@@ -177,6 +189,51 @@ func buildRows(spaces []Space) []row {
 		}
 	}
 	return rows
+}
+
+// otherSessions are the sessions that are open or have a saved file but belong to no worktree, such as the
+// one kitty starts with. Each is a space of its own with one worktree that has no path, so it can only be
+// switched to or restored, never created.
+func otherSessions(spaces []Space, open map[string]int, saved []string) []Space {
+	inSpace := map[string]bool{}
+	for _, s := range spaces {
+		for _, wt := range s.Worktrees {
+			inSpace[wt.Session] = true
+		}
+	}
+	names := map[string]bool{}
+	for name := range open {
+		names[name] = true
+	}
+	for _, name := range saved {
+		names[name] = true
+	}
+	var ans []Space
+	for name := range names {
+		if !inSpace[name] {
+			ans = append(ans, Space{Name: name, Worktrees: []Worktree{{Session: name}}})
+		}
+	}
+	slices.SortFunc(ans, func(a, b Space) int { return strings.Compare(a.Name, b.Name) })
+	return ans
+}
+
+// savedSessions names the session files in dir. An unreadable or missing directory has none.
+func savedSessions(dir string) []string {
+	if dir == "" {
+		return nil
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var ans []string
+	for _, e := range entries {
+		if name, ok := strings.CutSuffix(e.Name(), ".kitty-session"); ok && !e.IsDir() {
+			ans = append(ans, name)
+		}
+	}
+	return ans
 }
 
 func truncate(s string, width int) string {
@@ -192,6 +249,9 @@ func truncate(s string, width int) string {
 
 func (m *sidebar) renderRow(i int) string {
 	r, width := m.rows[i], max(m.width, 1)
+	if r.space == nil {
+		return strings.Repeat(" ", width)
+	}
 	label := r.space.Name
 	if !r.main {
 		label = "  " + filepath.Base(r.worktree.Path)
