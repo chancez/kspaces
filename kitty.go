@@ -110,12 +110,19 @@ func selfWindowID() int {
 	return id
 }
 
-// openWorktree switches to the worktree's session, creating it with one tab in the worktree when it has
-// no windows yet.
+// openWorktree switches to the worktree's session. When it has no windows, the session is restored from its
+// saved file if there is one, and otherwise created with one tab in the worktree.
 func openWorktree(cfg Config, st KittyState, wt Worktree) error {
 	if id, ok := st.Sessions[wt.Session]; ok {
 		_, err := kitten("focus-window", "--match", fmt.Sprintf("id:%d", id))
 		return err
+	}
+	if cfg.SessionsDir != "" {
+		path := filepath.Join(cfg.SessionsDir, wt.Session+".kitty-session")
+		if _, err := os.Stat(path); err == nil {
+			_, err := kitten("action", "goto_session", path)
+			return err
+		}
 	}
 	args := append([]string{"action"}, cfg.NewTab...)
 	args = append(args, "--cwd="+wt.Path, "--add-to-session="+wt.Session)

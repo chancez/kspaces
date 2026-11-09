@@ -24,6 +24,8 @@ type row struct {
 }
 
 type snapshot struct {
+	// Nil when nothing was loaded, for example because opening a worktree failed.
+	cfg    *Config
 	spaces []Space
 	kitty  KittyState
 	err    error
@@ -56,18 +58,25 @@ var (
 	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
 )
 
-func load(cfg Config, self int) snapshot {
+// load reads the config on every refresh, so edits show up without restarting every dock, and a broken
+// config is shown in the sidebar rather than making it exit. kspaces_watcher.py would otherwise keep
+// replacing a dock that exits the moment it starts.
+func load(self int) snapshot {
+	cfg, err := loadConfig()
+	if err != nil {
+		return snapshot{err: err}
+	}
 	spaces := make([]Space, 0, len(cfg.Spaces))
 	for _, root := range cfg.Spaces {
 		spaces = append(spaces, loadSpace(root))
 	}
 	st, err := loadKittyState(self)
-	return snapshot{spaces: spaces, kitty: st, err: err}
+	return snapshot{cfg: &cfg, spaces: spaces, kitty: st, err: err}
 }
 
 func (m *sidebar) refresh() tea.Cmd {
-	cfg, self := m.cfg, m.self
-	return func() tea.Msg { return load(cfg, self) }
+	self := m.self
+	return func() tea.Msg { return load(self) }
 }
 
 func tick() tea.Cmd {
@@ -88,7 +97,7 @@ func (m *sidebar) open(i int) tea.Cmd {
 		if err := openWorktree(cfg, st, wt); err != nil {
 			return snapshot{err: err}
 		}
-		return load(cfg, self)
+		return load(self)
 	}
 }
 
@@ -104,8 +113,8 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.refresh(), tick())
 	case snapshot:
 		m.err = msg.err
-		if msg.spaces != nil {
-			m.spaces, m.kitty = msg.spaces, msg.kitty
+		if msg.cfg != nil {
+			m.cfg, m.spaces, m.kitty = *msg.cfg, msg.spaces, msg.kitty
 			m.rows = buildRows(m.spaces)
 			m.cursor = min(m.cursor, max(len(m.rows)-1, 0))
 		}
@@ -241,8 +250,8 @@ func (m *sidebar) View() string {
 	return b.String()
 }
 
-func runSidebar(cfg Config) error {
-	m := &sidebar{cfg: cfg, self: selfWindowID()}
+func runSidebar() error {
+	m := &sidebar{self: selfWindowID()}
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus())
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("running the sidebar: %w", err)

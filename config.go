@@ -15,6 +15,10 @@ type Config struct {
 	// The kitty action that opens the first tab of a worktree's session, split into words. kspaces appends
 	// --cwd and --add-to-session to it.
 	NewTab []string
+	// Where kitty session files are saved, named SESSION.kitty-session. A worktree whose session has no
+	// windows but has a file here is restored from it rather than opened with NewTab. Empty to always use
+	// NewTab.
+	SessionsDir string
 }
 
 var defaultNewTab = []string{"launch", "--type=tab"}
@@ -51,6 +55,7 @@ func loadConfig() (Config, error) {
 //
 //	space ~/projects/gr
 //	new_tab kitten cm_launch.py --type=tab
+//	sessions ~/.local/share/kitty/sessions
 func parseConfig(sc *bufio.Scanner) (Config, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -67,14 +72,16 @@ func parseConfig(sc *bufio.Scanner) (Config, error) {
 		if value == "" {
 			return Config{}, fmt.Errorf("line %d: %q has no value", n, key)
 		}
+		if rest, ok := strings.CutPrefix(value, "~/"); ok && key != "new_tab" {
+			value = filepath.Join(home, rest)
+		}
 		switch key {
 		case "space":
-			if rest, ok := strings.CutPrefix(value, "~/"); ok {
-				value = filepath.Join(home, rest)
-			}
 			cfg.Spaces = append(cfg.Spaces, value)
 		case "new_tab":
 			cfg.NewTab = strings.Fields(value)
+		case "sessions":
+			cfg.SessionsDir = value
 		default:
 			return Config{}, fmt.Errorf("line %d: unknown key %q", n, key)
 		}

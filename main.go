@@ -32,13 +32,15 @@ func run(args []string) error {
 		fmt.Print(usage)
 		return nil
 	}
+	// The sidebar loads the config itself, on every refresh.
+	if cmd == "sidebar" {
+		return runSidebar()
+	}
 	cfg, err := loadConfig()
 	if err != nil {
 		return err
 	}
 	switch cmd {
-	case "sidebar":
-		return runSidebar(cfg)
 	case "list":
 		return list(cfg)
 	case "open":

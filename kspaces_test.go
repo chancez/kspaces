@@ -95,14 +95,16 @@ space ~/projects/gr
 space /src/kitty
 
 new_tab kitten cm_launch.py --type=tab
+sessions ~/.local/share/kitty/sessions
 `
 	got, err := parseConfig(bufio.NewScanner(strings.NewReader(in)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := Config{
-		Spaces: []string{filepath.Join(home, "projects/gr"), "/src/kitty"},
-		NewTab: []string{"kitten", "cm_launch.py", "--type=tab"},
+		Spaces:      []string{filepath.Join(home, "projects/gr"), "/src/kitty"},
+		NewTab:      []string{"kitten", "cm_launch.py", "--type=tab"},
+		SessionsDir: filepath.Join(home, ".local/share/kitty/sessions"),
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)

@@ -21,8 +21,9 @@ worktrees with no session yet. `!` means the space's worktrees could not be list
   ones show up without configuring them.
 - A worktree's session is named after the space for the main worktree (`gr`), and `SPACE@DIR` for the
   others (`gr@dev`), so two repositories with a worktree of the same name do not share a session.
-- Opening a worktree whose session has windows focuses the most recently focused one. Otherwise kspaces
-  runs the configured `new_tab` action with `--cwd=WORKTREE --add-to-session=SESSION` appended.
+- Opening a worktree whose session has windows focuses the most recently focused one. Otherwise, if
+  `sessions` is set and has a `SESSION.kitty-session` file, kspaces loads it with `goto_session`. Failing
+  both, it runs the configured `new_tab` action with `--cwd=WORKTREE --add-to-session=SESSION` appended.
 - Set `tab_bar_filter session:~ or session:^$` in kitty.conf so the tab bar only shows the current
   session's tabs.
 - kitty can only dock a window to a single tab, so a sidebar in every tab is one `kspaces sidebar` dock per
@@ -46,6 +47,10 @@ space ~/projects/kitty
 
 # The kitty action that opens a worktree's first tab, split on spaces. Defaults to `launch --type=tab`.
 new_tab launch --type=tab
+
+# Where kitty session files are saved, one per session named SESSION.kitty-session. Unset by default,
+# which never restores from a file.
+sessions ~/.local/share/kitty/sessions
 ```
 
 ## Commands
