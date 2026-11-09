@@ -128,9 +128,16 @@ func focusWindow(id int) error {
 // openWorktree switches to the worktree's session. When it has no windows, the session is restored from its
 // saved file if there is one, and otherwise created with one tab in the worktree.
 func openWorktree(cfg Config, st KittyState, wt Worktree) error {
-	// The sidebar's own session: stay in this tab rather than jumping to wherever the session was last used.
-	if wt.Session == st.Current && st.Home != 0 {
-		return focusWindow(st.Home)
+	if st.Home != 0 {
+		// Hand this tab's focus back to its own window before leaving, so coming back to the tab lands
+		// there rather than in the sidebar, which took focus when it was clicked or focused to pick.
+		if err := focusWindow(st.Home); err != nil {
+			return err
+		}
+		// The sidebar's own session: stay in this tab rather than jumping to wherever it was last used.
+		if wt.Session == st.Current {
+			return nil
+		}
 	}
 	if id, ok := st.Sessions[wt.Session]; ok {
 		return focusWindow(id)
