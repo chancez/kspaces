@@ -1,0 +1,114 @@
+package main
+
+import (
+	"bufio"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+)
+
+func TestParseWorktrees(t *testing.T) {
+	porcelain := `worktree /src/gr
+HEAD 1111111111111111111111111111111111111111
+branch refs/heads/main
+
+worktree /src/gr/.worktrees/dev
+HEAD 2222222222222222222222222222222222222222
+branch refs/heads/pr/chancez/dev
+
+worktree /src/gr/.worktrees/gone
+HEAD 3333333333333333333333333333333333333333
+branch refs/heads/old
+prunable gitdir file points to non-existent location
+
+worktree /src/gr/.worktrees/bisect
+HEAD 4444444444444444444444444444444444444444
+detached
+`
+	got := parseWorktrees("gr", porcelain)
+	want := []Worktree{
+		{Path: "/src/gr", Branch: "main", Session: "gr"},
+		{Path: "/src/gr/.worktrees/dev", Branch: "pr/chancez/dev", Session: "gr@dev"},
+		{Path: "/src/gr/.worktrees/bisect", Branch: "", Session: "gr@bisect"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+}
+
+// A bare repository has no files to open, so its first checked out worktree is the space's main one.
+func TestParseWorktreesBare(t *testing.T) {
+	porcelain := `worktree /src/gr.git
+bare
+
+worktree /src/gr/main
+HEAD 1111111111111111111111111111111111111111
+branch refs/heads/main
+`
+	got := parseWorktrees("gr", porcelain)
+	want := []Worktree{{Path: "/src/gr/main", Branch: "main", Session: "gr"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+}
+
+func TestKittyStateFrom(t *testing.T) {
+	dock := map[string]string{dockVar: "1"}
+	data := []lsOSWindow{{Tabs: []lsTab{
+		{ID: 1, Windows: []lsWindow{
+			{ID: 10, SessionName: "gr", LastFocusedAt: 5},
+			{ID: 11, SessionName: "gr", LastFocusedAt: 9},
+			{ID: 12, UserVars: dock},
+		}},
+		{ID: 2, Windows: []lsWindow{
+			{ID: 20, SessionName: "gr", LastFocusedAt: 7},
+			{ID: 21, SessionName: "kitty@docks", LastFocusedAt: 1},
+			// A dock never counts as a session's window, even if it was saved with one.
+			{ID: 22, SessionName: "kitty@docks", LastFocusedAt: 99, UserVars: dock},
+		}},
+		{ID: 3, Windows: []lsWindow{{ID: 30}}},
+	}}}
+
+	got := kittyStateFrom(data, 12)
+	want := KittyState{Sessions: map[string]int{"gr": 11, "kitty@docks": 21}, Current: "gr"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+
+	// A sidebar in a tab with no session highlights nothing.
+	got = kittyStateFrom(data, 30)
+	want.Current = ""
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+}
+
+func TestParseConfig(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := `# spaces
+space ~/projects/gr
+space /src/kitty
+
+new_tab kitten cm_launch.py --type=tab
+`
+	got, err := parseConfig(bufio.NewScanner(strings.NewReader(in)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Config{
+		Spaces: []string{filepath.Join(home, "projects/gr"), "/src/kitty"},
+		NewTab: []string{"kitten", "cm_launch.py", "--type=tab"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+
+	if _, err := parseConfig(bufio.NewScanner(strings.NewReader("spaces ~/x\n"))); err == nil {
+		t.Fatal("an unknown key was accepted")
+	}
+}
