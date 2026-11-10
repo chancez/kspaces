@@ -94,7 +94,7 @@ in. Anything that writes OSC 7501 to its terminal shows up, an agent or a build 
 ## Install
 
 ```sh
-go build -o ~/.local/bin/kspaces .
+go build -o ~/.local/bin/kspaces ./cmd/kspaces
 ```
 
 ## Config

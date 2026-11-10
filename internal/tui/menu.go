@@ -1,9 +1,11 @@
-package main
+package tui
 
 import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/chancez/kspaces/internal/spaces"
 )
 
 type menuAction int
@@ -28,30 +30,30 @@ type contextMenu struct {
 	// The screen row of the rule above the items.
 	top int
 	// What the items act on: the row's worktree, if it has one, and its space's root.
-	wt   *Worktree
+	wt   *spaces.Worktree
 	root string
 }
 
 // menuFor lists what can be done with row i, nil when nothing can.
 func (m *sidebar) menuFor(i int) *contextMenu {
-	if i < 0 || i >= len(m.rows) || m.rows[i].space == nil {
+	if i < 0 || i >= len(m.rows) || m.rows[i].Space == nil {
 		return nil
 	}
 	r := m.rows[i]
-	menu := &contextMenu{root: r.space.Root}
-	if r.worktree != nil {
-		wt := *r.worktree
+	menu := &contextMenu{root: r.Space.Root}
+	if r.Worktree != nil {
+		wt := *r.Worktree
 		menu.wt = &wt
 		menu.items = append(menu.items, menuItem{"Open", menuOpen})
 	}
-	if !r.other && len(r.space.Worktrees) > 1 {
+	if !r.Other && len(r.Space.Worktrees) > 1 {
 		label := "Fold worktrees"
-		if m.folded[r.space.Root] {
+		if m.folded[r.Space.Root] {
 			label = "Unfold worktrees"
 		}
 		menu.items = append(menu.items, menuItem{label, menuFold})
 	}
-	if !r.other && r.space.Err == nil {
+	if !r.Other && r.Space.Err == nil {
 		menu.items = append(menu.items, menuItem{"New worktree...", menuNewWorktree})
 	}
 	if len(menu.items) == 0 {
@@ -170,12 +172,12 @@ func (m *sidebar) drawMenu(lines []string) {
 // toggleFold hides or shows the linked worktrees of the space at root, in every sidebar.
 func (m *sidebar) toggleFold(root string) {
 	m.folded[root] = !m.folded[root]
-	if err := saveFolded(m.folded); err != nil {
+	if err := spaces.SaveFolded(m.folded); err != nil {
 		m.err = err
 	}
-	m.rows = buildRows(m.others, m.spaces, m.folded)
+	m.rows = spaces.BuildRows(m.others, m.spaces, m.folded)
 	for i, r := range m.rows {
-		if r.main && r.space.Root == root {
+		if r.Main && r.Space.Root == root {
 			m.cursor = i
 		}
 	}
@@ -187,8 +189,8 @@ func (m *sidebar) toggleFold(root string) {
 func (m *sidebar) newWorktree(root string) tea.Cmd {
 	st := m.kitty
 	return func() tea.Msg {
-		if err := launchNewWorktree(st, root); err != nil {
-			return snapshot{err: err}
+		if err := spaces.NewWorktree(st, root); err != nil {
+			return spaces.Snapshot{Err: err}
 		}
 		return nil
 	}

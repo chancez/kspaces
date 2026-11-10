@@ -1,0 +1,92 @@
+// Package git shells out to git for a repository's worktrees and branches.
+package git
+
+import (
+	"bufio"
+	"fmt"
+	"os/exec"
+	"path/filepath"
+	"strings"
+)
+
+// Worktree is one checkout of a repository.
+type Worktree struct {
+	Path string
+	// Branch without refs/heads/, or empty when HEAD is detached.
+	Branch string
+}
+
+// ListWorktrees lists the worktrees of the repository at root, the main one first. The error is git's
+// own message, for example when root is not a repository.
+func ListWorktrees(root string) ([]Worktree, error) {
+	out, err := exec.Command("git", "-C", root, "worktree", "list", "--porcelain").Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
+			err = fmt.Errorf("%s", strings.TrimSpace(string(ee.Stderr)))
+		}
+		return nil, err
+	}
+	return ParseWorktrees(string(out)), nil
+}
+
+// ParseWorktrees reads `git worktree list --porcelain`. Bare and prunable worktrees are skipped: the first
+// has no files to open a tab in, the second no longer exists on disk.
+func ParseWorktrees(porcelain string) []Worktree {
+	var (
+		ans  []Worktree
+		cur  Worktree
+		skip bool
+	)
+	flush := func() {
+		if cur.Path != "" && !skip {
+			ans = append(ans, cur)
+		}
+		cur, skip = Worktree{}, false
+	}
+	sc := bufio.NewScanner(strings.NewReader(porcelain))
+	for sc.Scan() {
+		key, value, _ := strings.Cut(sc.Text(), " ")
+		switch key {
+		case "":
+			flush()
+		case "worktree":
+			cur.Path = value
+		case "branch":
+			cur.Branch = strings.TrimPrefix(value, "refs/heads/")
+		case "bare", "prunable":
+			skip = true
+		}
+	}
+	flush()
+	return ans
+}
+
+// AddWorktree adds a worktree at dir to the repository at root, on branch, and returns its path as git
+// reports it. It checks out the branch when it exists and otherwise creates it from what the main
+// worktree has checked out.
+func AddWorktree(root, branch, dir string) (string, error) {
+	branch = strings.TrimSpace(branch)
+	switch {
+	case branch == "" || strings.HasSuffix(branch, "/"):
+		return "", fmt.Errorf("the branch needs a name")
+	case strings.ContainsAny(branch, " \t"):
+		return "", fmt.Errorf("a branch name cannot contain spaces")
+	}
+	args := []string{"-C", root, "worktree", "add", dir, branch}
+	if !BranchExists(root, branch) {
+		args = []string{"-C", root, "worktree", "add", "-b", branch, dir}
+	}
+	if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+		return "", fmt.Errorf("%s", strings.TrimSpace(string(out)))
+	}
+	// git reports worktree paths with symlinks resolved, and sessions are matched by those paths.
+	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+		dir = resolved
+	}
+	return dir, nil
+}
+
+// BranchExists reports whether the repository at root has a local branch named branch.
+func BranchExists(root, branch string) bool {
+	return exec.Command("git", "-C", root, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch).Run() == nil
+}

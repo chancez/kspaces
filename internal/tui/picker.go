@@ -1,6 +1,7 @@
-package main
+package tui
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,10 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/sahilm/fuzzy"
+
+	"github.com/chancez/kspaces/internal/kitty"
+	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/status"
 )
 
 // pickItem is one thing the picker can switch to: a worktree's session, or a window reporting a status.
@@ -20,8 +25,8 @@ type pickItem struct {
 	icon    string
 	style   lipgloss.Style
 
-	worktree *Worktree
-	status   *Status
+	worktree *spaces.Worktree
+	status   *status.Status
 }
 
 type pickItems []pickItem
@@ -31,10 +36,10 @@ func (p pickItems) Len() int            { return len(p) }
 
 // pickItemsFrom lists the windows that report a status first, most urgent first, then every session and
 // worktree in sidebar order.
-func pickItemsFrom(snap snapshot) pickItems {
+func pickItemsFrom(snap spaces.Snapshot) pickItems {
 	var items pickItems
-	for i := range snap.kitty.Statuses {
-		s := &snap.kitty.Statuses[i]
+	for i := range snap.Kitty.Statuses {
+		s := &snap.Kitty.Statuses[i]
 		name := s.Session
 		if name == "" {
 			name = s.WindowTitle
@@ -49,25 +54,25 @@ func pickItemsFrom(snap snapshot) pickItems {
 		icon, style := stateMarker(s.State)
 		items = append(items, pickItem{text: joinDetail(name, detail), nameLen: len(name), icon: icon, style: style, status: s})
 	}
-	for _, r := range buildRows(snap.others, snap.spaces, nil) {
-		if r.worktree == nil {
+	for _, r := range spaces.BuildRows(snap.Others, snap.Spaces, nil) {
+		if r.Worktree == nil {
 			continue
 		}
-		name := r.space.Name
-		if !r.main {
-			name += " / " + filepath.Base(r.worktree.Path)
+		name := r.Space.Name
+		if !r.Main {
+			name += " / " + filepath.Base(r.Worktree.Path)
 		}
 		icon, style := noMarker, lipgloss.NewStyle()
 		switch {
-		case sessionStatus(snap.kitty.Statuses, r.worktree.Session) != "":
-			icon, style = stateMarker(sessionStatus(snap.kitty.Statuses, r.worktree.Session))
-		case r.worktree.Session == snap.kitty.Current:
+		case status.OfSession(snap.Kitty.Statuses, r.Worktree.Session) != "":
+			icon, style = stateMarker(status.OfSession(snap.Kitty.Statuses, r.Worktree.Session))
+		case r.Worktree.Session == snap.Kitty.Current:
 			icon = marker(iconCurrent)
-		case snap.kitty.Sessions[r.worktree.Session] != 0:
+		case snap.Kitty.Sessions[r.Worktree.Session] != 0:
 			icon, style = marker(iconOpen), openStyle
 		}
 		items = append(items, pickItem{
-			text: joinDetail(name, r.worktree.Branch), nameLen: len(name), icon: icon, style: style, worktree: r.worktree,
+			text: joinDetail(name, r.Worktree.Branch), nameLen: len(name), icon: icon, style: style, worktree: r.Worktree,
 		})
 	}
 	return items
@@ -82,7 +87,7 @@ func joinDetail(name, detail string) string {
 
 type picker struct {
 	self    int
-	snap    snapshot
+	snap    spaces.Snapshot
 	items   pickItems
 	matches fuzzy.Matches
 	input   textinput.Model
@@ -94,7 +99,7 @@ type picker struct {
 
 func (m *picker) Init() tea.Cmd {
 	self := m.self
-	return tea.Batch(textinput.Blink, func() tea.Msg { return load(self) })
+	return tea.Batch(textinput.Blink, func() tea.Msg { return spaces.Load(self) })
 }
 
 // filter ranks the items against the query. An empty query keeps the items in their own order.
@@ -113,25 +118,25 @@ func (m *picker) filter() {
 
 // choose switches to the chosen item and exits, which closes the overlay the picker runs in.
 func (m *picker) choose() tea.Cmd {
-	if m.cursor >= len(m.matches) || m.snap.cfg == nil {
+	if m.cursor >= len(m.matches) || m.snap.Config == nil {
 		return nil
 	}
-	it, cfg, st := m.items[m.matches[m.cursor].Index], *m.snap.cfg, m.snap.kitty
+	it, cfg, st := m.items[m.matches[m.cursor].Index], *m.snap.Config, m.snap.Kitty
+	// The overlay is the window that has focus, so there is no window of the tab to hand back to: the
+	// tab's own window gets focus again when the overlay closes.
+	st.Home = 0
 	return func() tea.Msg {
 		var err error
 		switch {
 		case it.status != nil:
-			err = focusWindow(it.status.Window)
+			err = spaces.OpenWindow(st, it.status.Window)
 		case it.worktree.Session == st.Current:
 			// Already here: closing the picker is all there is to do.
 		default:
-			// The overlay is the window that has focus, so there is no window of the tab to hand back to:
-			// the tab's own window gets focus again when the overlay closes.
-			st.Home = 0
-			err = openWorktree(cfg, st, *it.worktree)
+			err = spaces.OpenWorktree(cfg, st, *it.worktree)
 		}
 		if err != nil {
-			return snapshot{err: err}
+			return spaces.Snapshot{Err: err}
 		}
 		return tea.QuitMsg{}
 	}
@@ -142,9 +147,9 @@ func (m *picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		return m, nil
-	case snapshot:
-		m.err = msg.err
-		if msg.cfg != nil {
+	case spaces.Snapshot:
+		m.err = msg.Err
+		if msg.Config != nil {
 			m.snap, m.items = msg, pickItemsFrom(msg)
 			m.filter()
 		}
@@ -214,7 +219,7 @@ func (m *picker) View() string {
 	for i := start; i < min(start+list, len(m.matches)); i++ {
 		lines = append(lines, m.renderMatch(i, width))
 	}
-	if len(m.matches) == 0 && m.snap.cfg != nil {
+	if len(m.matches) == 0 && m.snap.Config != nil {
 		lines = append(lines, closedStyle.Render("No matches"))
 	}
 	for len(lines) < m.height-1 {
@@ -227,13 +232,14 @@ func (m *picker) View() string {
 	return strings.Join(append(lines, status), "\n")
 }
 
-func runPicker() error {
+// RunPicker runs the picker, meant for a kitty overlay, until something is chosen or it is left.
+func RunPicker(ctx context.Context) error {
 	input := textinput.New()
 	input.Prompt = "\uf002  " // search
 	input.Placeholder = "space, worktree or status"
 	input.Focus()
-	m := &picker{self: selfWindowID(), input: input}
-	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
+	m := &picker{self: kitty.SelfWindowID(), input: input}
+	if _, err := tea.NewProgram(m, tea.WithContext(ctx), tea.WithAltScreen()).Run(); err != nil {
 		return fmt.Errorf("running the picker: %w", err)
 	}
 	return nil

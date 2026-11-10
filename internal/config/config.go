@@ -1,4 +1,5 @@
-package main
+// Package config reads kspaces' config file.
+package config
 
 import (
 	"fmt"
@@ -43,7 +44,7 @@ var defaultNewTab = []string{"launch", "--type=tab"}
 
 const defaultWorktreeDir = ".worktrees"
 
-func configPath() (string, error) {
+func filePath() (string, error) {
 	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
 		return filepath.Join(dir, "kspaces", "config.toml"), nil
 	}
@@ -54,8 +55,9 @@ func configPath() (string, error) {
 	return filepath.Join(home, ".config", "kspaces", "config.toml"), nil
 }
 
-func loadConfig() (Config, error) {
-	path, err := configPath()
+// Load reads $XDG_CONFIG_HOME/kspaces/config.toml, by default ~/.config/kspaces/config.toml.
+func Load() (Config, error) {
+	path, err := filePath()
 	if err != nil {
 		return Config{}, err
 	}
@@ -63,16 +65,16 @@ func loadConfig() (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("reading the config: %w", err)
 	}
-	cfg, err := parseConfig(string(data))
+	cfg, err := Parse(string(data))
 	if err != nil {
 		return Config{}, fmt.Errorf("%s: %w", path, err)
 	}
 	return cfg, nil
 }
 
-// parseConfig reads the config, filling in defaults and expanding a leading ~/ in paths. A key it does not
+// Parse reads the config, filling in defaults and expanding a leading ~/ in paths. A key it does not
 // know is an error, so a typo is not silently ignored.
-func parseConfig(data string) (Config, error) {
+func Parse(data string) (Config, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return Config{}, fmt.Errorf("finding the home directory: %w", err)

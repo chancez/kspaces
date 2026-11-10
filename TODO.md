@@ -37,5 +37,3 @@ Not until the idea has proven worth it:
 
 - Add new spaces from the sidebar.
 - mise tasks for building and installing, like cm.
-- A proper package structure.
-- cobra/pflag for commands.

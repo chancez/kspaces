@@ -1,15 +1,20 @@
-package main
+// Package tui is kspaces' terminal UI: the sidebar, the picker and the new worktree form.
+package tui
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/kitty"
+	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/status"
 )
 
 const refreshEvery = 2 * time.Second
@@ -17,41 +22,16 @@ const refreshEvery = 2 * time.Second
 // headerRows is how many rows the title takes above the list, so a click can be mapped to an entry.
 const headerRows = 2
 
-// row is one line of the list. The zero row is the blank line between groups.
-type row struct {
-	space *Space
-	// Nil when the space's worktrees could not be listed.
-	worktree *Worktree
-	// The space's own row, which opens its main worktree.
-	main bool
-	// A session that belongs to no space, see otherSessions.
-	other bool
-	// On a space's own row: its linked worktrees are hidden.
-	folded bool
-}
-
-type snapshot struct {
-	// Nil when nothing was loaded, for example because opening a worktree failed.
-	cfg    *Config
-	spaces []Space
-	// Sessions that belong to no space, see otherSessions.
-	others []Space
-	// Roots of the spaces whose linked worktrees are hidden.
-	folded map[string]bool
-	kitty  KittyState
-	err    error
-}
-
 type tickMsg struct{}
 
 type sidebar struct {
-	cfg    Config
+	cfg    config.Config
 	self   int
-	spaces []Space
-	others []Space
+	spaces []spaces.Space
+	others []spaces.Space
 	folded map[string]bool
-	kitty  KittyState
-	rows   []row
+	kitty  kitty.State
+	rows   []spaces.Row
 	// The context menu, nil when closed.
 	menu   *contextMenu
 	cursor int
@@ -89,7 +69,7 @@ func (m *sidebar) navigating() bool {
 // its space when the space is folded.
 func (m *sidebar) cursorToCurrent() {
 	for i, r := range m.rows {
-		if r.worktree != nil && r.worktree.Session == m.kitty.Current || r.folded && m.rowHolds(r, m.kitty.Current) {
+		if r.Worktree != nil && r.Worktree.Session == m.kitty.Current || r.Folded && m.rowHolds(r, m.kitty.Current) {
 			m.cursor = i
 		}
 	}
@@ -97,17 +77,17 @@ func (m *sidebar) cursorToCurrent() {
 }
 
 // rowSessions are the worktrees a row stands for: its own, and for a folded space all of the space's.
-func rowSessions(r row) []Worktree {
+func rowSessions(r spaces.Row) []spaces.Worktree {
 	switch {
-	case r.folded:
-		return r.space.Worktrees
-	case r.worktree != nil:
-		return []Worktree{*r.worktree}
+	case r.Folded:
+		return r.Space.Worktrees
+	case r.Worktree != nil:
+		return []spaces.Worktree{*r.Worktree}
 	}
 	return nil
 }
 
-func (m *sidebar) rowHolds(r row, session string) bool {
+func (m *sidebar) rowHolds(r spaces.Row, session string) bool {
 	for _, wt := range rowSessions(r) {
 		if wt.Session == session {
 			return true
@@ -136,26 +116,9 @@ var (
 	borderStyle    = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, true, false, false)
 )
 
-// load reads the config on every refresh, so edits show up without restarting every dock, and a broken
-// config is shown in the sidebar rather than making it exit. kspaces_watcher.py would otherwise keep
-// replacing a dock that exits the moment it starts.
-func load(self int) snapshot {
-	cfg, err := loadConfig()
-	if err != nil {
-		return snapshot{err: err}
-	}
-	spaces := make([]Space, 0, len(cfg.Spaces))
-	for _, root := range cfg.Spaces {
-		spaces = append(spaces, loadSpace(root))
-	}
-	st, err := loadKittyState(self)
-	others := otherSessions(spaces, st.Sessions, savedSessions(cfg.SessionsDir))
-	return snapshot{cfg: &cfg, spaces: spaces, others: others, folded: loadFolded(), kitty: st, err: err}
-}
-
 func (m *sidebar) refresh() tea.Cmd {
 	self := m.self
-	return func() tea.Msg { return load(self) }
+	return func() tea.Msg { return spaces.Load(self) }
 }
 
 func tick() tea.Cmd {
@@ -178,24 +141,24 @@ func (m *sidebar) open(i int) tea.Cmd {
 	case i >= len(m.rows) && i < m.numEntries():
 		id := st.Statuses[i-len(m.rows)].Window
 		return func() tea.Msg {
-			if err := openWindow(st, id); err != nil {
-				return snapshot{err: err}
+			if err := spaces.OpenWindow(st, id); err != nil {
+				return spaces.Snapshot{Err: err}
 			}
-			return load(self)
+			return spaces.Load(self)
 		}
-	case i < 0 || i >= len(m.rows) || m.rows[i].worktree == nil:
+	case i < 0 || i >= len(m.rows) || m.rows[i].Worktree == nil:
 		return nil
 	}
-	return m.openWorktreeCmd(*m.rows[i].worktree)
+	return m.openWorktreeCmd(*m.rows[i].Worktree)
 }
 
-func (m *sidebar) openWorktreeCmd(wt Worktree) tea.Cmd {
+func (m *sidebar) openWorktreeCmd(wt spaces.Worktree) tea.Cmd {
 	cfg, st, self := m.cfg, m.kitty, m.self
 	return func() tea.Msg {
-		if err := openWorktree(cfg, st, wt); err != nil {
-			return snapshot{err: err}
+		if err := spaces.OpenWorktree(cfg, st, wt); err != nil {
+			return spaces.Snapshot{Err: err}
 		}
-		return load(self)
+		return spaces.Load(self)
 	}
 }
 
@@ -230,11 +193,11 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.hover = 0
 		}
 		return m, tea.Batch(m.refresh(), tick())
-	case snapshot:
-		m.err = msg.err
-		if msg.cfg != nil {
-			m.cfg, m.spaces, m.others, m.folded, m.kitty = *msg.cfg, msg.spaces, msg.others, msg.folded, msg.kitty
-			m.rows = buildRows(m.others, m.spaces, m.folded)
+	case spaces.Snapshot:
+		m.err = msg.Err
+		if msg.Config != nil {
+			m.cfg, m.spaces, m.others, m.folded, m.kitty = *msg.Config, msg.Spaces, msg.Others, msg.Folded, msg.Kitty
+			m.rows = spaces.BuildRows(m.others, m.spaces, m.folded)
 			m.cursor = min(m.cursor, max(m.numEntries()-1, 0))
 			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))
 		}
@@ -261,9 +224,9 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.hover = 0
 			if i, ok := m.entryAt(msg.Y); ok {
 				m.cursor = i
-				if i < len(m.rows) && m.rows[i].main && !m.rows[i].other && len(m.rows[i].space.Worktrees) > 1 &&
+				if i < len(m.rows) && m.rows[i].Main && !m.rows[i].Other && len(m.rows[i].Space.Worktrees) > 1 &&
 					msg.X >= caretFrom && msg.X < caretTo {
-					m.toggleFold(m.rows[i].space.Root)
+					m.toggleFold(m.rows[i].Space.Root)
 					return m, nil
 				}
 				return m, m.open(i)
@@ -321,14 +284,14 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case " ", "space":
-			if m.cursor < len(m.rows) && m.rows[m.cursor].space != nil && !m.rows[m.cursor].other {
-				m.toggleFold(m.rows[m.cursor].space.Root)
+			if m.cursor < len(m.rows) && m.rows[m.cursor].Space != nil && !m.rows[m.cursor].Other {
+				m.toggleFold(m.rows[m.cursor].Space.Root)
 			}
 			return m, nil
 		case "n":
-			if m.cursor < len(m.rows) && m.rows[m.cursor].space != nil && !m.rows[m.cursor].other {
+			if m.cursor < len(m.rows) && m.rows[m.cursor].Space != nil && !m.rows[m.cursor].Other {
 				m.remote = false
-				return m, m.newWorktree(m.rows[m.cursor].space.Root)
+				return m, m.newWorktree(m.rows[m.cursor].Space.Root)
 			}
 		case "ctrl+c":
 			return m, tea.Quit
@@ -362,7 +325,7 @@ func (m *sidebar) entryAt(y int) (int, bool) {
 	l := m.layout()
 	if y >= headerRows && y < headerRows+l.spaces {
 		i := y - headerRows + m.offset
-		return i, i < len(m.rows) && m.rows[i].space != nil
+		return i, i < len(m.rows) && m.rows[i].Space != nil
 	}
 	if l.status > 0 && y >= l.statusTop && y < l.statusTop+l.status {
 		// Entries take several rows each, and some have a group title above, so walk them down to the one
@@ -407,7 +370,7 @@ func (m *sidebar) scrollToCursor() {
 // moveCursor moves by delta entries, stepping over the blank row between groups of spaces.
 func (m *sidebar) moveCursor(delta int) {
 	for i := m.cursor + delta; i >= 0 && i < m.numEntries(); i += delta {
-		if i >= len(m.rows) || m.rows[i].space != nil {
+		if i >= len(m.rows) || m.rows[i].Space != nil {
 			m.cursor = i
 			return
 		}
@@ -416,89 +379,16 @@ func (m *sidebar) moveCursor(delta int) {
 
 // leave gives keyboard focus back to the window the sidebar took it from.
 func (m *sidebar) leave() tea.Cmd {
-	home := m.kitty.Home
-	if home == 0 {
+	st := m.kitty
+	if st.Home == 0 {
 		return nil
 	}
 	return func() tea.Msg {
-		if err := focusWindow(home); err != nil {
-			return snapshot{err: err}
+		if err := spaces.Leave(st); err != nil {
+			return spaces.Snapshot{Err: err}
 		}
 		return nil
 	}
-}
-
-// buildRows lists the sessions that belong to no space first, then each space followed by its linked
-// worktrees, with a blank row between groups and between spaces. A space's own row opens its main worktree.
-// The linked worktrees of a space whose root is in folded are left out.
-func buildRows(others, spaces []Space, folded map[string]bool) []row {
-	var rows []row
-	for i := range others {
-		rows = append(rows, row{space: &others[i], worktree: &others[i].Worktrees[0], main: true, other: true})
-	}
-	for i := range spaces {
-		if len(rows) > 0 {
-			rows = append(rows, row{})
-		}
-		s := &spaces[i]
-		r := row{space: s, main: true, folded: folded[s.Root] && len(s.Worktrees) > 1}
-		if len(s.Worktrees) > 0 {
-			r.worktree = &s.Worktrees[0]
-		}
-		rows = append(rows, r)
-		if r.folded {
-			continue
-		}
-		for j := 1; j < len(s.Worktrees); j++ {
-			rows = append(rows, row{space: s, worktree: &s.Worktrees[j]})
-		}
-	}
-	return rows
-}
-
-// otherSessions are the sessions that are open or have a saved file but belong to no worktree, such as the
-// one kitty starts with. Each is a space of its own with one worktree that has no path, so it can only be
-// switched to or restored, never created.
-func otherSessions(spaces []Space, open map[string]int, saved []string) []Space {
-	inSpace := map[string]bool{}
-	for _, s := range spaces {
-		for _, wt := range s.Worktrees {
-			inSpace[wt.Session] = true
-		}
-	}
-	names := map[string]bool{}
-	for name := range open {
-		names[name] = true
-	}
-	for _, name := range saved {
-		names[name] = true
-	}
-	var ans []Space
-	for name := range names {
-		if !inSpace[name] {
-			ans = append(ans, Space{Name: name, Worktrees: []Worktree{{Session: name}}})
-		}
-	}
-	slices.SortFunc(ans, func(a, b Space) int { return strings.Compare(a.Name, b.Name) })
-	return ans
-}
-
-// savedSessions names the session files in dir. An unreadable or missing directory has none.
-func savedSessions(dir string) []string {
-	if dir == "" {
-		return nil
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil
-	}
-	var ans []string
-	for _, e := range entries {
-		if name, ok := strings.CutSuffix(e.Name(), ".kitty-session"); ok && !e.IsDir() {
-			ans = append(ans, name)
-		}
-	}
-	return ans
 }
 
 func truncate(s string, width int) string {
@@ -542,17 +432,17 @@ func cells(s string) int {
 
 func (m *sidebar) renderRow(i int) string {
 	r, width := m.rows[i], m.contentWidth()
-	if r.space == nil {
+	if r.Space == nil {
 		return strings.Repeat(" ", width)
 	}
 	// The caret column folds a space's linked worktrees, and indents those worktrees under its name.
-	caret, label := noCaret, r.space.Name
+	caret, label := noCaret, r.Space.Name
 	switch {
-	case !r.main:
-		label = marker(iconWorktree) + filepath.Base(r.worktree.Path)
-	case r.folded:
+	case !r.Main:
+		label = marker(iconWorktree) + filepath.Base(r.Worktree.Path)
+	case r.Folded:
 		caret = caretFolded
-	case !r.other && len(r.space.Worktrees) > 1:
+	case !r.Other && len(r.Space.Worktrees) > 1:
 		caret = caretOpen
 	}
 	// A folded space stands for all its worktrees: it is current, open or in a state if any of them is.
@@ -560,13 +450,13 @@ func (m *sidebar) renderRow(i int) string {
 	for _, wt := range rowSessions(r) {
 		current = current || wt.Session == m.kitty.Current
 		open = open || m.isOpen(&wt)
-		if s := sessionStatus(m.kitty.Statuses, wt.Session); urgency[s] > urgency[state] {
+		if s := status.OfSession(m.kitty.Statuses, wt.Session); status.Urgency(s) > status.Urgency(state) {
 			state = s
 		}
 	}
 	mark, markStyle := noMarker, openStyle
 	switch {
-	case r.worktree == nil:
+	case r.Worktree == nil:
 		mark, markStyle = marker(iconBroken), errorStyle
 	case state != "":
 		// The most urgent status of the session's windows, which the status list below details.
@@ -578,8 +468,8 @@ func (m *sidebar) renderRow(i int) string {
 	}
 	label = truncate(label, max(width-cells(mark)-cells(caret), 0))
 	branch := ""
-	if rest := width - cells(mark) - cells(caret) - cells(label); r.worktree != nil && r.worktree.Branch != "" && rest > 2 {
-		branch = " " + truncate(r.worktree.Branch, rest-1)
+	if rest := width - cells(mark) - cells(caret) - cells(label); r.Worktree != nil && r.Worktree.Branch != "" && rest > 2 {
+		branch = " " + truncate(r.Worktree.Branch, rest-1)
 	}
 	pad := strings.Repeat(" ", max(width-cells(mark)-cells(caret)-cells(label)-cells(branch), 0))
 
@@ -592,9 +482,9 @@ func (m *sidebar) renderRow(i int) string {
 	}
 	labelStyle := lipgloss.NewStyle()
 	switch {
-	case r.other:
+	case r.Other:
 		labelStyle = otherStyle
-	case r.main:
+	case r.Main:
 		labelStyle = spaceStyle
 	}
 	if !open {
@@ -660,7 +550,7 @@ var kindLabel = map[string]string{"permission": "wants permission", "question": 
 
 // summary is the one line that best says what a program is up to: its progress, its title, its message,
 // or what it is blocked on, after the program's name.
-func summary(r programRecord, width int) string {
+func summary(r status.Record, width int) string {
 	text := r.Title
 	switch {
 	case r.Progress != nil:
@@ -691,7 +581,7 @@ func (m *sidebar) statusEntry(j int) []string {
 	if expanded {
 		return append(lines, statusDetails(s, inner, 3, 6)...)
 	}
-	if sum := truncate(summary(s.programRecord, inner), inner); sum != "" {
+	if sum := truncate(summary(s.Record, inner), inner); sum != "" {
 		lines = append(lines, noMarker+branchStyle.Render(sum)+strings.Repeat(" ", max(inner-cells(sum), 0)))
 	}
 	return lines
@@ -710,7 +600,7 @@ func (m *sidebar) statusHeader(j int, highlighted bool) string {
 	if label == "" {
 		label = s.WindowTitle
 	}
-	right := age(s.Since, time.Now())
+	right := status.Age(s.Since, time.Now())
 	if len(s.Others) > 0 {
 		right = strings.TrimSpace(fmt.Sprintf("+%d %s", len(s.Others), right))
 	}
@@ -728,7 +618,7 @@ func (m *sidebar) statusHeader(j int, highlighted bool) string {
 // statusDetails is everything a status entry has to say, indented under its label and wrapped to inner
 // columns: the program, what a blocked one waits for, the title, progress, the message, the record's id
 // and the window's other records. Title and message are cut at titleRows and msgRows, 0 for no limit.
-func statusDetails(s Status, inner, titleRows, msgRows int) []string {
+func statusDetails(s status.Status, inner, titleRows, msgRows int) []string {
 	var lines []string
 	add := func(style lipgloss.Style, text string, maxRows int) {
 		for i, l := range wrap(text, inner) {
@@ -757,7 +647,7 @@ func statusDetails(s Status, inner, titleRows, msgRows int) []string {
 		if name == "" {
 			name = o.App
 		}
-		add(branchStyle, strings.Join(strings.Fields(strings.Join([]string{o.State, name, age(o.Since, now), o.Title}, " ")), " "), 1)
+		add(branchStyle, strings.Join(strings.Fields(strings.Join([]string{o.State, name, status.Age(o.Since, now), o.Title}, " ")), " "), 1)
 	}
 	return lines
 }
@@ -832,7 +722,7 @@ func wrap(text string, width int) []string {
 	return rows
 }
 
-func (m *sidebar) isOpen(wt *Worktree) bool {
+func (m *sidebar) isOpen(wt *spaces.Worktree) bool {
 	_, ok := m.kitty.Sessions[wt.Session]
 	return ok
 }
@@ -880,10 +770,11 @@ func (m *sidebar) View() string {
 	return borderStyle.BorderForeground(border).Width(width).Render(strings.Join(lines, "\n"))
 }
 
-func runSidebar() error {
-	m := &sidebar{self: selfWindowID()}
+// RunSidebar runs the sidebar, meant for a kitty dock, until it is quit.
+func RunSidebar(ctx context.Context) error {
+	m := &sidebar{self: kitty.SelfWindowID()}
 	// All motion, not just drags, so resting the mouse on a status entry can show it in full.
-	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseAllMotion(), tea.WithReportFocus())
+	p := tea.NewProgram(m, tea.WithContext(ctx), tea.WithAltScreen(), tea.WithMouseAllMotion(), tea.WithReportFocus())
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("running the sidebar: %w", err)
 	}

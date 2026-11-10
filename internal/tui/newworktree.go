@@ -1,24 +1,27 @@
-package main
+package tui
 
 import (
+	"context"
 	"fmt"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/spaces"
 )
 
 // newWorktreeForm asks for a branch and, optionally, where its worktree goes, shows what it will do,
 // creates the worktree and switches to its session. It is meant for a kitty overlay, as the sidebar is too
 // narrow to type a name and read back the path in.
 type newWorktreeForm struct {
-	cfg    Config
-	space  Space
+	cfg    config.Config
+	space  spaces.Space
 	branch textinput.Model
-	// Empty for the default, which worktreeDir derives from the branch and the placeholder shows.
+	// Empty for the default, which spaces.WorktreeDir derives from the branch and the placeholder shows.
 	dir   textinput.Model
 	busy  bool
 	err   error
@@ -34,25 +37,18 @@ func (f *newWorktreeForm) Init() tea.Cmd {
 // plan is the branch and directory the form would create now.
 func (f *newWorktreeForm) plan() (branch, dir string) {
 	branch = strings.TrimSpace(f.branch.Value())
-	return branch, worktreeDir(f.cfg, f.space.Root, branch, f.dir.Value())
+	return branch, spaces.WorktreeDir(f.cfg, f.space.Root, branch, f.dir.Value())
 }
 
 func (f *newWorktreeForm) create() tea.Cmd {
 	cfg, space := f.cfg, f.space
 	branch, dir := f.plan()
 	return func() tea.Msg {
-		wt, err := createWorktree(space, branch, dir)
+		wt, err := spaces.CreateWorktree(space, branch, dir)
 		if err != nil {
 			return createdMsg{err}
 		}
-		st, err := loadKittyState(selfWindowID())
-		if err != nil {
-			return createdMsg{err}
-		}
-		// The form is an overlay with focus, so there is no window of the tab to hand back to: the tab's
-		// own window gets focus again when the overlay closes.
-		st.Home = 0
-		return createdMsg{openWorktree(cfg, st, wt)}
+		return createdMsg{spaces.OpenFromOverlay(cfg, wt)}
 	}
 }
 
@@ -104,15 +100,11 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // followBranch makes the directory's placeholder the default for the current branch, so the form always
 // shows where the worktree would go.
 func (f *newWorktreeForm) followBranch() {
-	dir := worktreeDir(f.cfg, f.space.Root, strings.TrimSpace(f.branch.Value()), "")
+	dir := spaces.WorktreeDir(f.cfg, f.space.Root, strings.TrimSpace(f.branch.Value()), "")
 	if rel, err := filepath.Rel(f.space.Root, dir); err == nil {
 		dir = rel
 	}
 	f.dir.Placeholder = dir
-}
-
-func branchExists(root, branch string) bool {
-	return exec.Command("git", "-C", root, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch).Run() == nil
 }
 
 func (f *newWorktreeForm) View() string {
@@ -128,7 +120,7 @@ func (f *newWorktreeForm) View() string {
 	switch {
 	case branch == "" || strings.HasSuffix(branch, "/"):
 		lines = append(lines, branchStyle.Render("Name the branch to create or check out"))
-	case branchExists(f.space.Root, branch):
+	case f.space.HasBranch(branch):
 		lines = append(lines, branchStyle.Render(truncate("Checks out the existing branch "+branch, width)))
 	case len(f.space.Worktrees) > 0 && f.space.Worktrees[0].Branch != "":
 		lines = append(lines, branchStyle.Render(truncate("Creates "+branch+" from "+f.space.Worktrees[0].Branch, width)))
@@ -149,58 +141,21 @@ func (f *newWorktreeForm) View() string {
 	return lipgloss.NewStyle().Padding(1, 2).Render(strings.Join(lines, "\n"))
 }
 
-// findSpace is the space given by root or name, or, with an empty query, the space of the session of the
-// window that has the keyboard.
-func findSpace(cfg Config, query string) (Space, error) {
-	var current string
-	if query == "" {
-		st, err := loadKittyState(focusedWindow)
-		if err != nil {
-			return Space{}, err
-		}
-		current = st.Current
-	}
-	abs, _ := filepath.Abs(query)
-	for _, root := range cfg.Spaces {
-		s := loadSpace(root)
-		switch {
-		case query != "" && (root == abs || s.Name == query):
-			return s, s.Err
-		case query == "":
-			for _, wt := range s.Worktrees {
-				if wt.Session == current {
-					return s, nil
-				}
-			}
-		}
-	}
-	if query == "" {
-		return Space{}, fmt.Errorf("the current window is not in a space")
-	}
-	return Space{}, fmt.Errorf("%s is not a configured space", query)
-}
-
-func runNewWorktree(query string) error {
-	cfg, err := loadConfig()
-	if err != nil {
-		return err
-	}
-	space, err := findSpace(cfg, query)
-	if err != nil {
-		return err
-	}
+// RunNewWorktree runs the new worktree form for space, meant for a kitty overlay, until the worktree is
+// created and opened or the form is left.
+func RunNewWorktree(ctx context.Context, cfg config.Config, space spaces.Space) error {
 	// The branch starts with the configured prefix, so typing just the name gives PREFIX/NAME; deleting
 	// it makes a branch without one.
 	branch := textinput.New()
 	branch.Prompt = ""
-	branch.SetValue(branchStart(cfg))
+	branch.SetValue(spaces.BranchStart(cfg))
 	branch.CursorEnd()
 	branch.Focus()
 	dir := textinput.New()
 	dir.Prompt = ""
 	f := &newWorktreeForm{cfg: cfg, space: space, branch: branch, dir: dir}
 	f.followBranch()
-	if _, err := tea.NewProgram(f, tea.WithAltScreen()).Run(); err != nil {
+	if _, err := tea.NewProgram(f, tea.WithContext(ctx), tea.WithAltScreen()).Run(); err != nil {
 		return fmt.Errorf("running the new worktree form: %w", err)
 	}
 	return nil

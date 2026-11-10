@@ -1,4 +1,4 @@
-package main
+package spaces
 
 import (
 	"bufio"
@@ -23,8 +23,8 @@ func foldedPath() (string, error) {
 	return filepath.Join(dir, "kspaces", "folded"), nil
 }
 
-// loadFolded reads the folded spaces. A missing file folds none.
-func loadFolded() map[string]bool {
+// LoadFolded reads the folded spaces. A missing file folds none.
+func LoadFolded() map[string]bool {
 	ans := map[string]bool{}
 	path, err := foldedPath()
 	if err != nil {
@@ -44,8 +44,8 @@ func loadFolded() map[string]bool {
 	return ans
 }
 
-// saveFolded writes the folded spaces, replacing the file so a sidebar reading it never sees half of it.
-func saveFolded(folded map[string]bool) error {
+// SaveFolded writes the folded spaces, replacing the file so a sidebar reading it never sees half of it.
+func SaveFolded(folded map[string]bool) error {
 	path, err := foldedPath()
 	if err != nil {
 		return err
