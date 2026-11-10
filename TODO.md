@@ -40,6 +40,16 @@ It knows nothing about what produced a record. Open questions:
 - kitty's own dock border can sit next to the sidebar's, which may look like a double line.
 - The dotfiles' `cm_reap.py` kills a multiplexer session when one of two windows showing it closes.
 
+## kitty changes, deferred
+
+To make in kitty later, together, rather than while kspaces is still settling:
+
+- Fix the two session bugs above, and drop the workarounds.
+- Resizable docks: drag a dock's border, as borders between layout windows already can be
+  (`Boss.drag_resize_start` only targets layout windows), and a command to resize one. The watcher then
+  keeps a dragged width for every sidebar instead of setting `DockSpec.size` itself.
+- A dock for the whole OS window, the fix for the first known issue.
+
 ## After the MVP
 
 Not until the idea has proven worth it:
