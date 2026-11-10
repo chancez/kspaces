@@ -1,6 +1,8 @@
 package look
 
 import (
+	"strings"
+
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -44,6 +46,46 @@ func (t *Theme) Cut(width int, spans ...Span) []Span {
 // on lands on.
 func (t *Theme) DrawZone(id string, s Surface, width int, spans ...Span) string {
 	return markZone(id, t.Draw(s, width, spans...))
+}
+
+// Wrapped is s broken into rows of at most width cells, each drawn as s is, by WrapWords.
+func (s Span) Wrapped(width int) []Span {
+	var rows []Span
+	for _, text := range WrapWords(s.text, width) {
+		r := s
+		r.text = text
+		rows = append(rows, r)
+	}
+	return rows
+}
+
+// WrapWords breaks text into rows of at most width cells at spaces, and inside words longer than a row.
+func WrapWords(text string, width int) []string {
+	var rows []string
+	for _, para := range strings.Split(text, "\n") {
+		row := ""
+		for _, word := range strings.Fields(para) {
+			for ansi.StringWidth(word) > width {
+				if row != "" {
+					rows, row = append(rows, row), ""
+				}
+				r := []rune(word)
+				rows, word = append(rows, string(r[:width])), string(r[width:])
+			}
+			switch {
+			case row == "":
+				row = word
+			case ansi.StringWidth(row)+1+ansi.StringWidth(word) <= width:
+				row += " " + word
+			default:
+				rows, row = append(rows, row), word
+			}
+		}
+		if row != "" {
+			rows = append(rows, row)
+		}
+	}
+	return rows
 }
 
 // InputStyles are a text input's styles in the theme: the terminal's own colors, a muted placeholder, and

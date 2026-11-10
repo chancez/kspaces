@@ -8,12 +8,13 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/sahilm/fuzzy"
 
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/status"
+	"github.com/chancez/kspaces/internal/tui/look"
 )
 
 // pickItem is one thing the picker can switch to: a worktree's session, or a window reporting a status.
@@ -22,8 +23,7 @@ type pickItem struct {
 	text string
 	// Where text stops being the name and becomes the faint detail after it, such as a branch.
 	nameLen int
-	icon    string
-	style   lipgloss.Style
+	icon    []look.Span
 
 	worktree *spaces.Worktree
 	status   *status.Status
@@ -51,8 +51,7 @@ func pickItemsFrom(snap spaces.Snapshot) pickItems {
 		if detail == "" {
 			detail = s.App
 		}
-		icon, style := stateMarker(s.State)
-		items = append(items, pickItem{text: joinDetail(name, detail), nameLen: len(name), icon: icon, style: style, status: s})
+		items = append(items, pickItem{text: joinDetail(name, detail), nameLen: len(name), icon: look.StateMarker(s.State), status: s})
 	}
 	for _, r := range spaces.BuildRows(snap.Others, snap.Spaces, nil) {
 		if r.Worktree == nil {
@@ -62,18 +61,16 @@ func pickItemsFrom(snap spaces.Snapshot) pickItems {
 		if !r.Main {
 			name += " / " + filepath.Base(r.Worktree.Path)
 		}
-		icon, style := noMarker, lipgloss.NewStyle()
-		switch {
-		case status.OfSession(snap.Kitty.Statuses, r.Worktree.Session) != "":
-			icon, style = stateMarker(status.OfSession(snap.Kitty.Statuses, r.Worktree.Session))
+		icon := []look.Span{look.NoMarker()}
+		switch state := status.OfSession(snap.Kitty.Statuses, r.Worktree.Session); {
+		case state != "":
+			icon = look.StateMarker(state)
 		case r.Worktree.Session == snap.Kitty.Current:
-			icon = marker(iconCurrent)
+			icon = look.CurrentMarker()
 		case snap.Kitty.Sessions[r.Worktree.Session] != 0:
-			icon, style = marker(iconOpen), openStyle
+			icon = look.SessionMarker()
 		}
-		items = append(items, pickItem{
-			text: joinDetail(name, r.Worktree.Branch), nameLen: len(name), icon: icon, style: style, worktree: r.Worktree,
-		})
+		items = append(items, pickItem{text: joinDetail(name, r.Worktree.Branch), nameLen: len(name), icon: icon, worktree: r.Worktree})
 	}
 	return items
 }
@@ -86,6 +83,7 @@ func joinDetail(name, detail string) string {
 }
 
 type picker struct {
+	th      *look.Theme
 	self    int
 	snap    spaces.Snapshot
 	items   pickItems
@@ -95,6 +93,14 @@ type picker struct {
 	width   int
 	height  int
 	err     error
+}
+
+func newPicker(self int) *picker {
+	th := look.New(true)
+	input := newInput(th, th.SearchPrompt())
+	input.Placeholder = "space, worktree or status"
+	input.Focus()
+	return &picker{th: th, self: self, input: input}
 }
 
 func (m *picker) Init() tea.Cmd {
@@ -148,7 +154,7 @@ func (m *picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		// bubbles v2 draws only the first character of a placeholder without a width, and the cursor
 		// takes a cell past the text.
-		m.input.SetWidth(max(m.width-lipgloss.Width(m.input.Prompt)-1, 1))
+		m.input.SetWidth(max(m.width-ansi.StringWidth(m.input.Prompt)-1, 1))
 		return m, nil
 	case spaces.Snapshot:
 		m.err = msg.Err
@@ -158,19 +164,11 @@ func (m *picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "esc", "ctrl+c":
-			return m, tea.Quit
-		case "enter":
-			return m, m.choose()
-		case "down", "ctrl+n", "ctrl+j":
-			m.cursor = min(m.cursor+1, max(len(m.matches)-1, 0))
-			return m, nil
-		case "up", "ctrl+p", "ctrl+k":
-			m.cursor = max(m.cursor-1, 0)
-			return m, nil
+		if cmd, ok := runOn(m, msg, thePicker.Target(pickerSubject{})); ok {
+			return m, cmd
 		}
 	}
+	// Everything else is typing the query.
 	var cmd tea.Cmd
 	before := m.input.Value()
 	m.input, cmd = m.input.Update(msg)
@@ -181,37 +179,30 @@ func (m *picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-var matchStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("3"))
-
-// renderMatch draws an item with the characters the query matched highlighted.
+// renderMatch draws an item with the characters the query matched highlighted, and its detail muted.
 func (m *picker) renderMatch(i int, width int) string {
-	match := m.matches[i]
+	th, match := m.th, m.matches[i]
 	it := m.items[match.Index]
+	if i == m.cursor {
+		text := th.Cut(max(width-th.Width(it.icon...), 0), look.Text(it.text))
+		return th.Draw(look.Cursor, width, append(append([]look.Span{}, it.icon...), text...)...)
+	}
 	matched := map[int]bool{}
 	for _, b := range match.MatchedIndexes {
 		matched[b] = true
 	}
-	var b strings.Builder
-	n := cells(it.icon)
+	spans := append([]look.Span{}, it.icon...)
 	for off, r := range it.text {
-		if n >= width {
-			break
+		switch {
+		case matched[off]:
+			spans = append(spans, look.Match(string(r)))
+		case off >= it.nameLen:
+			spans = append(spans, look.Muted(string(r)))
+		default:
+			spans = append(spans, look.Text(string(r)))
 		}
-		style := lipgloss.NewStyle()
-		if off >= it.nameLen {
-			style = branchStyle
-		}
-		if matched[off] {
-			style = matchStyle
-		}
-		b.WriteString(style.Render(string(r)))
-		n++
 	}
-	pad := strings.Repeat(" ", max(width-n, 0))
-	if i == m.cursor {
-		return cursorStyle.Render(it.icon + truncate(it.text, max(width-cells(it.icon), 0)) + pad)
-	}
-	return it.style.Render(it.icon) + b.String() + pad
+	return th.Draw(look.Plain, width, spans...)
 }
 
 func (m *picker) View() tea.View {
@@ -221,51 +212,38 @@ func (m *picker) View() tea.View {
 }
 
 func (m *picker) render() string {
-	width := max(m.width, 1)
-	lines := []string{m.input.View(), separatorStyle.Render(strings.Repeat("\u2500", width))}
+	th, width := m.th, max(m.width, 1)
+	lines := []string{m.input.View(), th.Render(look.Plain, look.Rule(width, false))}
 	list := max(m.height-3, 1)
 	start := max(m.cursor-list+1, 0)
 	for i := start; i < min(start+list, len(m.matches)); i++ {
 		lines = append(lines, m.renderMatch(i, width))
 	}
 	if len(m.matches) == 0 && m.snap.Config != nil {
-		lines = append(lines, closedStyle.Render("No matches"))
+		lines = append(lines, th.Render(look.Plain, look.Text("No matches").With(look.Dim)))
 	}
 	for len(lines) < m.height-1 {
 		lines = append(lines, "")
 	}
-	status := branchStyle.Render(truncate(fmt.Sprintf("%d/%d", len(m.matches), len(m.items)), width))
+	status := th.Render(look.Plain, th.Cut(width, look.Muted(fmt.Sprintf("%d/%d", len(m.matches), len(m.items))))...)
 	if m.err != nil {
-		status = errorStyle.Render(truncate(m.err.Error(), width))
+		status = th.Render(look.Plain, th.Cut(width, look.Error(m.err.Error()))...)
 	}
 	return strings.Join(append(lines, status), "\n")
 }
 
 // RunPicker runs the picker, meant for a kitty overlay, until something is chosen or it is left.
 func RunPicker(ctx context.Context) error {
-	input := newInput("\uf002  ") // search
-	input.Placeholder = "space, worktree or status"
-	input.Focus()
-	m := &picker{self: kitty.SelfWindowID(), input: input}
-	if _, err := tea.NewProgram(m, tea.WithContext(ctx)).Run(); err != nil {
+	if _, err := tea.NewProgram(newPicker(kitty.SelfWindowID()), tea.WithContext(ctx)).Run(); err != nil {
 		return fmt.Errorf("running the picker: %w", err)
 	}
 	return nil
 }
 
-// newInput is a text input after prompt, drawn in the terminal's own colors, with a muted placeholder and
-// a block cursor in reverse video.
-func newInput(prompt string) textinput.Model {
+// newInput is a text input after prompt, in th's styles.
+func newInput(th *look.Theme, prompt string) textinput.Model {
 	in := textinput.New()
 	in.Prompt = prompt
-	state := textinput.StyleState{
-		Placeholder: lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		Suggestion:  lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-	}
-	in.SetStyles(textinput.Styles{
-		Focused: state,
-		Blurred: state,
-		Cursor:  textinput.CursorStyle{Color: lipgloss.NoColor{}, Shape: tea.CursorBlock, Blink: true},
-	})
+	in.SetStyles(th.InputStyles())
 	return in
 }

@@ -103,3 +103,11 @@ func TestZones(t *testing.T) {
 		t.Errorf("zones = %+v, want %+v", zones, want)
 	}
 }
+
+func TestWrapWords(t *testing.T) {
+	got := WrapWords("run the full test suite\nthen deploy supercalifragilistic", 10)
+	want := []string{"run the", "full test", "suite", "then", "deploy", "supercalif", "ragilistic"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q\nwant %q", got, want)
+	}
+}

@@ -1,108 +1,59 @@
 package tui
 
 import (
-	"strings"
+	"fmt"
 
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/tui/interact"
+	"github.com/chancez/kspaces/internal/tui/look"
 )
 
-type menuAction int
-
-const (
-	menuOpen menuAction = iota
-	menuFold
-	menuNewWorktree
-)
-
-type menuItem struct {
-	label  string
-	action menuAction
-}
-
-// contextMenu is the menu a right click, or `m`, opens on a row of the spaces list. It is drawn over the
-// rows below the one it was opened on, or above when it would run off the bottom. It keeps what it acts on
-// rather than the row's index, as a refresh can rebuild the rows while it is open.
+// contextMenu is the menu a right click, or `m`, opens on a row of the spaces list: the actions of the
+// row's entry that apply, from the registry. It is drawn over the rows below the one it was opened on, or
+// above when it would run off the bottom. Its actions are bound to the entry as it was, rather than to the
+// row's index, as a refresh can rebuild the rows while it is open.
 type contextMenu struct {
-	items []menuItem
+	items []interact.Bound[*sidebar]
 	sel   int
 	// The screen row of the rule above the items.
 	top int
-	// What the items act on: the row's worktree, if it has one, and its space's root.
-	wt   *spaces.Worktree
-	root string
 }
 
-// menuFor lists what can be done with row i, nil when nothing can.
-func (m *sidebar) menuFor(i int) *contextMenu {
-	if i < 0 || i >= len(m.rows) || m.rows[i].Space == nil {
-		return nil
+// openMenu opens the menu of t, drawn from screen row y.
+func (m *sidebar) openMenu(t interact.Target[*sidebar], y int) {
+	var items []interact.Bound[*sidebar]
+	for _, g := range t.Groups(m) {
+		items = append(items, g.Actions...)
 	}
-	r := m.rows[i]
-	menu := &contextMenu{root: r.Space.Root}
-	if r.Worktree != nil {
-		wt := *r.Worktree
-		menu.wt = &wt
-		menu.items = append(menu.items, menuItem{"Open", menuOpen})
-	}
-	if !r.Other && len(r.Space.Worktrees) > 1 {
-		label := "Fold worktrees"
-		if m.folded[r.Space.Root] {
-			label = "Unfold worktrees"
-		}
-		menu.items = append(menu.items, menuItem{label, menuFold})
-	}
-	if !r.Other && r.Space.Err == nil {
-		menu.items = append(menu.items, menuItem{"New worktree...", menuNewWorktree})
-	}
-	if len(menu.items) == 0 {
-		return nil
-	}
-	return menu
-}
-
-// openMenu opens the menu of row i, drawn from screen row y.
-func (m *sidebar) openMenu(i, y int) {
-	menu := m.menuFor(i)
-	if menu == nil {
+	if len(items) == 0 {
 		return
 	}
-	menu.top = y + 1
-	if menu.top+len(menu.items)+2 > m.height-1 {
-		menu.top = max(y-len(menu.items)-2, 0)
+	menu := &contextMenu{items: items, top: y + 1}
+	if menu.top+len(items)+2 > m.height-1 {
+		menu.top = max(y-len(items)-2, 0)
 	}
 	m.menu, m.hover = menu, 0
 }
 
-// menuItemAt is the item drawn at screen row y, or -1.
-func (m *sidebar) menuItemAt(y int) int {
-	if m.menu == nil {
-		return -1
+// menuAtCursor opens the menu of the spaces row under the cursor, when it is on screen.
+func (m *sidebar) menuAtCursor() {
+	if m.cursor >= len(m.rows) || m.cursor < m.offset {
+		return
 	}
-	if i := y - m.menu.top - 1; i >= 0 && i < len(m.menu.items) {
-		return i
+	if t, ok := m.entryTarget(m.cursor); ok {
+		m.openMenu(t, headerRows+m.cursor-m.offset)
 	}
-	return -1
 }
 
 func (m *sidebar) runMenuItem(i int) tea.Cmd {
 	menu := m.menu
 	m.menu = nil
-	if menu == nil || i < 0 || i >= len(menu.items) {
+	if menu == nil || i < 0 || i >= len(menu.items) || !menu.items[i].Applies(m) {
 		return nil
 	}
-	switch menu.items[i].action {
-	case menuOpen:
-		m.remote = false
-		return m.openWorktreeCmd(*menu.wt)
-	case menuFold:
-		m.toggleFold(menu.root)
-	case menuNewWorktree:
-		m.remote = false
-		return m.newWorktree(menu.root)
-	}
-	return nil
+	return menu.items[i].Run(m)
 }
 
 // updateMenu handles input while the menu is open. It reports false for what should reach the sidebar as
@@ -110,13 +61,13 @@ func (m *sidebar) runMenuItem(i int) tea.Cmd {
 func (m *sidebar) updateMenu(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case tea.MouseMotionMsg:
-		if i := m.menuItemAt(msg.Y); i >= 0 {
+		if i, ok := m.menuItemAt(msg.X, msg.Y); ok {
 			m.menu.sel = i
 		}
 		return nil, true
 	case tea.MouseClickMsg:
 		if msg.Button == tea.MouseLeft {
-			if i := m.menuItemAt(msg.Y); i >= 0 {
+			if i, ok := m.menuItemAt(msg.X, msg.Y); ok {
 				return m.runMenuItem(i), true
 			}
 			m.menu = nil
@@ -128,38 +79,38 @@ func (m *sidebar) updateMenu(msg tea.Msg) (tea.Cmd, bool) {
 		m.menu = nil
 		return nil, false
 	case tea.KeyPressMsg:
-		switch msg.String() {
-		case "j", "down":
-			m.menu.sel = min(m.menu.sel+1, len(m.menu.items)-1)
-		case "k", "up":
-			m.menu.sel = max(m.menu.sel-1, 0)
-		case "enter", "l":
-			return m.runMenuItem(m.menu.sel), true
-		case "esc", "q", "m":
-			m.menu = nil
-		case "ctrl+c":
-			return tea.Quit, true
-		}
-		return nil, true
+		// Keys the menu does not take do nothing while it is open.
+		cmd, _ := runOn(m, msg, theMenu.Target(menuSubject{}))
+		return cmd, true
 	}
 	return nil, false
 }
 
-// drawMenu draws the open menu over lines.
+// menuItemAt is the menu item drawn at x, y in the last frame.
+func (m *sidebar) menuItemAt(x, y int) (int, bool) {
+	for i := range m.menu.items {
+		if m.inZone(fmt.Sprintf(menuZone, i), x, y) {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+// drawMenu draws the open menu over lines, each item marked so the mouse finds it.
 func (m *sidebar) drawMenu(lines []string) {
 	if m.menu == nil {
 		return
 	}
-	width := m.contentWidth()
-	rule := workingStyle.Render(strings.Repeat("\u2500", width))
+	th, width := m.th, m.contentWidth()
+	rule := th.Render(look.Plain, look.Rule(width, true))
 	drawn := []string{rule}
 	for i, it := range m.menu.items {
-		text := " " + truncate(it.label, width-1)
-		text += strings.Repeat(" ", max(width-cells(text), 0))
+		surface := look.Plain
 		if i == m.menu.sel {
-			text = cursorStyle.Render(text)
+			surface = look.Cursor
 		}
-		drawn = append(drawn, text)
+		label := th.Cut(width-1, look.Text(it.Title))
+		drawn = append(drawn, th.DrawZone(fmt.Sprintf(menuZone, i), surface, width, append([]look.Span{look.Text(" ")}, label...)...))
 	}
 	drawn = append(drawn, rule)
 	for i, l := range drawn {
