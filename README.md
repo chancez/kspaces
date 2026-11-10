@@ -43,7 +43,9 @@ no session, `+N` when the window has N more records, and how long ago the record
 Below it is one row with the program's name and what it said: a progress bar when it reports progress,
 otherwise its title, otherwise its message. With the sidebar's cursor on an entry, the entry opens up to
 show all of it: what a blocked program waits for (permission, a question or a sign-in), the title,
-progress, up to six rows of the message, the record's id and the window's other records.
+progress, up to six rows of the message, the record's id and the window's other records. Resting the
+mouse on an entry shows the same in full, with no limit on the title and message, drawn over the entries
+below it so the list does not move.
 
 kitty does not say when a record changed, so the kitty watcher that adds the sidebars also notes it, in
 the window's `program_status_at` user variable. With the watcher not loaded, entries show no age.
@@ -95,8 +97,18 @@ sessions ~/.local/share/kitty/sessions
 
 ```
 kspaces [sidebar]   the sidebar, meant to run in a kitty dock
+kspaces pick        a fuzzy picker over sessions, worktrees and status entries, for a kitty overlay
 kspaces list        every space's worktrees with their session names
 kspaces open PATH   switch to the session of the worktree at PATH, creating it if needed
+kspaces next, prev  switch to the next or previous session with windows open, in sidebar order
+```
+
+`next` and `prev` act on the window that has the keyboard, so they suit a kitty mapping. A background
+process needs `--allow-remote-control` to reach kitty:
+
+```conf
+map cmd+alt+[ launch --type=background --allow-remote-control kspaces prev
+map cmd+alt+] launch --type=background --allow-remote-control kspaces next
 ```
 
 Clicking a row opens it. When the sidebar has keyboard focus, which needs a dock that is not started with
