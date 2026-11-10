@@ -12,6 +12,7 @@ const usage = `usage: kspaces [command]
 
 Commands:
   sidebar      Show the spaces sidebar (the default)
+  pick         Pick a space, worktree or status entry to switch to, meant for a kitty overlay
   list         Print every space, its worktrees and their session names
   open PATH    Switch to the session of the worktree at PATH, creating it if needed
 `
@@ -32,9 +33,12 @@ func run(args []string) error {
 		fmt.Print(usage)
 		return nil
 	}
-	// The sidebar loads the config itself, on every refresh.
-	if cmd == "sidebar" {
+	// The sidebar and the picker load the config themselves, so an error shows in their UI.
+	switch cmd {
+	case "sidebar":
 		return runSidebar()
+	case "pick":
+		return runPicker()
 	}
 	cfg, err := loadConfig()
 	if err != nil {
