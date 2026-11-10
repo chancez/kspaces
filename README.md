@@ -59,9 +59,10 @@ given by root or name, or the current one.
 
 Close session, or `c`, opens a form that says how many windows close, and its Close button, or `y`,
 closes them all, the way closing them by hand does, so whatever kitty.conf runs when a window closes, such
-as ending a multiplexer session, runs for each. The session's saved file is kept, so opening the worktree
-again restores its tabs. `kspaces close [SESSION]` opens the same form, for the current session by
-default; `--yes` closes without asking, for a kitty mapping.
+as ending a multiplexer session, runs for each. Opening the worktree again restores whatever its saved
+file holds; kspaces leaves that file alone, and a kitty watcher that saves sessions as their windows close
+removes it with the last one, so the worktree opens afresh. `kspaces close [SESSION]` opens the same form,
+for the current session by default; `--yes` closes without asking, for a kitty mapping.
 
 Remove worktree, or `x` on a linked worktree, opens another form. It shows the worktree's directory, that
 its branch is kept, how many of its session's windows close, and how many files it has that are not

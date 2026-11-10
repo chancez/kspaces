@@ -74,7 +74,6 @@ func (f *closeSessionForm) render() string {
 	lines := []string{
 		line(look.Heading("Close session " + f.session)), "",
 		line(th.Cut(width, look.Text(closesWhat(f.windows)))...),
-		line(th.Cut(width, look.Muted("Its saved file is kept, so opening it again restores its tabs."))...),
 		"",
 	}
 	switch {

@@ -225,7 +225,6 @@ func TestCloseSessionForm(t *testing.T) {
 		"  Close session gr@dev",
 		"",
 		"  Closes its 3 windows, and what runs in them.",
-		"  Its saved file is kept, so opening it again restores its tabs.",
 		"",
 		"   Close y    Cancel n",
 		"",
