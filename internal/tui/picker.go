@@ -146,6 +146,9 @@ func (m *picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		// bubbles v2 draws only the first character of a placeholder without a width, and the cursor
+		// takes a cell past the text.
+		m.input.SetWidth(max(m.width-lipgloss.Width(m.input.Prompt)-1, 1))
 		return m, nil
 	case spaces.Snapshot:
 		m.err = msg.Err

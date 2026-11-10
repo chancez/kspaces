@@ -66,6 +66,10 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		f.width = msg.Width
+		// bubbles v2 draws only the first character of a placeholder without a width. The fields start
+		// after the padding and their labels, and the cursor takes a cell past the text.
+		f.branch.SetWidth(max(f.width-4-11-1, 1))
+		f.dir.SetWidth(max(f.width-4-11-1, 1))
 		return f, nil
 	case createdMsg:
 		f.busy, f.err = false, msg.err
