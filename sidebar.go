@@ -62,18 +62,19 @@ var (
 	muted  = lipgloss.Color("8")
 	accent = lipgloss.Color("4")
 
-	titleStyle   = lipgloss.NewStyle().Bold(true).Foreground(muted)
-	spaceStyle   = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	otherStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
-	closedStyle  = lipgloss.NewStyle().Faint(true)
-	branchStyle  = lipgloss.NewStyle().Foreground(muted)
-	openStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	blockedStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("3"))
-	workingStyle = lipgloss.NewStyle().Foreground(accent)
-	currentStyle = lipgloss.NewStyle().Background(muted).Foreground(lipgloss.Color("15")).Bold(true)
-	cursorStyle  = lipgloss.NewStyle().Reverse(true)
-	borderStyle  = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, true, false, false)
+	titleStyle     = lipgloss.NewStyle().Bold(true).Foreground(muted)
+	spaceStyle     = lipgloss.NewStyle().Bold(true).Foreground(accent)
+	otherStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("6"))
+	closedStyle    = lipgloss.NewStyle().Faint(true)
+	branchStyle    = lipgloss.NewStyle().Foreground(muted)
+	openStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	errorStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	blockedStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("3"))
+	workingStyle   = lipgloss.NewStyle().Foreground(accent)
+	separatorStyle = lipgloss.NewStyle().Foreground(muted)
+	currentStyle   = lipgloss.NewStyle().Background(muted).Foreground(lipgloss.Color("15")).Bold(true)
+	cursorStyle    = lipgloss.NewStyle().Reverse(true)
+	borderStyle    = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, true, false, false)
 )
 
 // load reads the config on every refresh, so edits show up without restarting every dock, and a broken
@@ -202,23 +203,22 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// layout splits the height between the two lists. The status list sits at the bottom and takes what its
-// entries need, up to about half; the spaces list gets the rest.
+// statusAt is where the status list starts, as a share of the rows below the SPACES title, so it stays put
+// as entries come and go rather than growing up from the bottom.
+const statusAt = 0.55
+
+// layout splits the height between the two lists: spaces above, status below a separator and its title.
 type layout struct {
 	spaces int
 	status int
-	// The screen row of the first status entry, below a blank row and the STATUS title.
+	// The screen row of the first status entry, below the separator and the STATUS title.
 	statusTop int
 }
 
 func (m *sidebar) layout() layout {
 	avail := max(m.height-headerRows-1, 1)
-	n := len(m.kitty.Statuses)
-	if n == 0 {
-		return layout{spaces: avail}
-	}
-	status := min(n, max(avail/2-2, 1))
-	spaces := max(avail-status-2, 1)
+	spaces := max(int(float64(avail)*statusAt), 1)
+	status := max(avail-spaces-2, 1)
 	return layout{spaces: spaces, status: status, statusTop: headerRows + spaces + 2}
 }
 
@@ -502,15 +502,15 @@ func (m *sidebar) View() string {
 	for i := m.offset; i < min(m.offset+l.spaces, len(m.rows)); i++ {
 		lines = append(lines, m.renderRow(i))
 	}
-	if l.status > 0 {
-		// Pinned to the bottom: pad the spaces list out to its share first.
-		for len(lines) < l.statusTop-2 {
-			lines = append(lines, "")
-		}
-		lines = append(lines, "", titleStyle.Render(truncate("STATUS", width)))
-		for j := m.statusOffset; j < min(m.statusOffset+l.status, len(m.kitty.Statuses)); j++ {
-			lines = append(lines, m.renderStatus(j))
-		}
+	for len(lines) < l.statusTop-2 {
+		lines = append(lines, "")
+	}
+	lines = append(lines, separatorStyle.Render(strings.Repeat("\u2500", width)), titleStyle.Render(truncate("STATUS", width)))
+	if len(m.kitty.Statuses) == 0 {
+		lines = append(lines, closedStyle.Render(truncate("Nothing to report", width)))
+	}
+	for j := m.statusOffset; j < min(m.statusOffset+l.status, len(m.kitty.Statuses)); j++ {
+		lines = append(lines, m.renderStatus(j))
 	}
 	// Fill the height so the border runs the full length of the dock, with errors on the last line.
 	for len(lines) < m.height-1 {

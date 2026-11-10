@@ -13,8 +13,7 @@ SPACES
   docs-reference main
     release-caveats pr/ch...
 
-...
-
+---------------------------
 STATUS
   gr claude
   default make
@@ -30,7 +29,8 @@ starts with, are listed above the spaces.
 
 ## Status
 
-The STATUS list at the bottom shows every window whose program reports a status with the program status
+The STATUS list starts a little over halfway down the sidebar, below a separator, and stays there with
+"Nothing to report" when it is empty. It shows every window whose program reports a status with the program status
 protocol (OSC 7501), most urgent first, with kitty's icons for tab.program_status: a warning sign for
 blocked on you, an error sign for failed, a check for done and a spinner for working. The worktree rows
 show the most urgent state of their session in place of the dot. Clicking an entry, or `enter` on it,
