@@ -23,6 +23,9 @@ type closeSessionForm struct {
 	busy    bool
 	err     error
 	width   int
+	// zones and buttons are where the last frame drew its buttons, and what each runs, for a click.
+	zones   map[string][]look.Zone
+	buttons controls[*closeSessionForm]
 }
 
 type closedMsg struct{ err error }
@@ -50,13 +53,20 @@ func (f *closeSessionForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd, ok := runOn(f, msg, theCloseForm.Target(closeSubject{})); ok {
 			return f, cmd
 		}
+	case tea.MouseClickMsg:
+		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
+			return f, cmd
+		}
 	}
 	return f, nil
 }
 
 func (f *closeSessionForm) View() tea.View {
-	v := tea.NewView(f.render())
+	frame, zones := look.Scan(f.render())
+	f.zones = zones
+	v := tea.NewView(frame)
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
@@ -78,7 +88,10 @@ func (f *closeSessionForm) render() string {
 		}
 		lines = append(lines, "")
 	}
-	lines = append(lines, line(look.Key("y"), look.KeyDesc(" close  "), look.Key("n/esc"), look.KeyDesc(" cancel")))
+	f.buttons = controls[*closeSessionForm]{}
+	lines = append(lines, line(f.buttons.draw(f, theCloseForm.Target(closeSubject{}),
+		control{action: actClose, label: "Close", danger: true},
+		control{action: actCloseCancel, label: "Cancel"})...))
 	inner := 0
 	for _, l := range lines {
 		inner = max(inner, ansi.StringWidth(l))

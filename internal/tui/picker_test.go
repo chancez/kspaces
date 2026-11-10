@@ -169,7 +169,7 @@ func TestRemoveWorktreeForm(t *testing.T) {
 		"  session    2 windows closed",
 		"  changes    3 files not committed, lost",
 		"",
-		"  y remove  n/esc cancel",
+		"   Remove y    Cancel n",
 		"",
 	}
 	if got := screen(f); !reflect.DeepEqual(got, want) {
@@ -227,7 +227,7 @@ func TestCloseSessionForm(t *testing.T) {
 		"  Closes its 3 windows, and what runs in them.",
 		"  Its saved file is kept, so opening it again restores its tabs.",
 		"",
-		"  y close  n/esc cancel",
+		"   Close y    Cancel n",
 		"",
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -239,5 +239,64 @@ func TestCloseSessionForm(t *testing.T) {
 	// The command closes kitty windows, so it is not run here.
 	if _, cmd := f.Update(tea.KeyPressMsg{Code: 'y', Text: "y"}); cmd == nil || !f.busy {
 		t.Errorf("y: cmd %v, busy %v", cmd != nil, f.busy)
+	}
+}
+
+// clickOn clicks the first cell of label on the form's screen, as the last View drew it.
+func clickOn(t *testing.T, f tea.Model, label string) tea.Cmd {
+	t.Helper()
+	frame := f.View().Content
+	for y, l := range strings.Split(ansi.Strip(frame), "\n") {
+		if x := strings.Index(l, label); x >= 0 {
+			_, cmd := f.Update(tea.MouseClickMsg{X: ansi.StringWidth(l[:x]), Y: y, Button: tea.MouseLeft})
+			return cmd
+		}
+	}
+	t.Fatalf("no %q on screen:\n%s", label, ansi.Strip(frame))
+	return nil
+}
+
+// A click on a form's button does what its key does, and a greyed one does nothing.
+func TestFormButtons(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	space := spaces.Space{Name: "gr", Root: root, Worktrees: []spaces.Worktree{
+		{Path: root, Branch: "main", Session: "gr"},
+		{Path: filepath.Join(root, "dev"), Branch: "dev", Session: "gr@dev"},
+	}}
+	remove := func(locked bool) *removeWorktreeForm {
+		wt := space.Worktrees[1]
+		wt.Locked = locked
+		f := &removeWorktreeForm{th: look.New(true), space: space, wt: wt}
+		f.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+		return f
+	}
+	type result struct {
+		Cmd  bool
+		Busy bool
+	}
+	f := remove(false)
+	cmd := clickOn(t, f, "Cancel")
+	if got, want := (result{cmd != nil, f.busy}), (result{true, false}); got != want {
+		t.Errorf("Cancel: %+v, want %+v", got, want)
+	}
+	// The command launches kitty's background process, so it is not run here.
+	cmd = clickOn(t, f, "Remove y")
+	if got, want := (result{cmd != nil, f.busy}), (result{true, true}); got != want {
+		t.Errorf("Remove: %+v, want %+v", got, want)
+	}
+	f = remove(true)
+	cmd = clickOn(t, f, "Remove")
+	if got, want := (result{cmd != nil, f.busy}), (result{false, false}); got != want {
+		t.Errorf("Remove on a locked worktree: %+v, want %+v", got, want)
+	}
+
+	c := &closeSessionForm{th: look.New(true), session: "gr@dev", windows: 1}
+	c.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	cmd = clickOn(t, c, "Close y")
+	if got, want := (result{cmd != nil, c.busy}), (result{true, true}); got != want {
+		t.Errorf("Close: %+v, want %+v", got, want)
 	}
 }

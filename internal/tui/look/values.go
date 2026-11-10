@@ -225,3 +225,38 @@ func Border(s string, active bool) Span {
 	}
 	return sp(elBorder, s)
 }
+
+// chip draws spans on the Control surface, whatever they sit on.
+func chip(spans ...Span) []Span {
+	out := make([]Span, len(spans))
+	for i, x := range spans {
+		x.chip = true
+		out[i] = x
+	}
+	return out
+}
+
+// Button is a control: its label, and the key that does the same, on a chip of its own.
+func Button(label, key string) []Span {
+	out := []Span{sp(elDefault, " "), sp(elButton, label)}
+	if key != "" {
+		out = append(out, sp(elDefault, " "), sp(elMuted, key))
+	}
+	return chip(append(out, sp(elDefault, " "))...)
+}
+
+// DisabledButton is a Button greyed, for one there is nothing to click on. It has no chip: the chip is
+// reversed, which would draw it as bright as one that works.
+func DisabledButton(label string) []Span {
+	return []Span{sp(elDefault, " "), sp(elMuted, label).With(Dim), sp(elDefault, " ")}
+}
+
+// DangerButton is a Button for what loses work, such as closing what runs or removing a worktree, drawn
+// to stand out from the button that cancels it.
+func DangerButton(label, key string) []Span {
+	out := Button(label, key)
+	for i := range out {
+		out[i].solid = true
+	}
+	return out
+}

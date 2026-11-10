@@ -52,20 +52,21 @@ in. It has two fields, and `tab` moves between them:
 `enter` creates the worktree and switches to its session; git's error stays in the form if it refuses.
 `kspaces new [SPACE]` opens the same form, for the space given by root or name, or the current one.
 
-Close session, or `c`, opens a form that says how many windows close, and `y` closes them all, the way
-closing them by hand does, so whatever kitty.conf runs when a window closes, such as ending a multiplexer
-session, runs for each. The session's saved file is kept, so opening the worktree again restores its
-tabs. `kspaces close [SESSION]` opens the same form, for the current session by default; `--yes` closes
-without asking, for a kitty mapping.
+Close session, or `c`, opens a form that says how many windows close, and its Close button, or `y`,
+closes them all, the way closing them by hand does, so whatever kitty.conf runs when a window closes, such
+as ending a multiplexer session, runs for each. The session's saved file is kept, so opening the worktree
+again restores its tabs. `kspaces close [SESSION]` opens the same form, for the current session by
+default; `--yes` closes without asking, for a kitty mapping.
 
 Remove worktree, or `x` on a linked worktree, opens another form. It shows the worktree's directory, that
 its branch is kept, how many of its session's windows close, and how many files it has that are not
-committed. `y` closes the session first, waiting until its windows are gone, so nothing still runs in the
-directory, then deletes the session's saved file and runs `git worktree remove`, forced when there are
-such files, as the form has said they are lost. The form may be over one of the windows that close, so
-the removal runs as a kitty background process, which shows an error in kitty if it fails. What git
-would refuse, such as a locked worktree, the form says before `y`. `kspaces remove PATH` opens the same
-form; `--yes` removes without asking.
+committed. Its Remove button, or `y`, closes the session first, waiting until its windows are gone, so
+nothing still runs in the directory, then deletes the session's saved file and runs `git worktree remove`,
+forced when there are such files, as the form has said they are lost. The form may be over one of the
+windows that close, so the removal runs as a kitty background process, which shows an error in kitty if
+it fails. What git would refuse, such as a locked worktree, the form says up front, with Remove greyed.
+Cancel, `n` or `esc` leaves either form. `kspaces remove PATH` opens the same form; `--yes` removes
+without asking.
 
 ## Status
 

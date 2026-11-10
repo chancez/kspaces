@@ -82,6 +82,8 @@ const (
 	elError
 	elBorder
 	elBorderActive
+	// elButton is a control's label.
+	elButton
 	numElements
 )
 
@@ -113,6 +115,7 @@ var elementNames = [numElements]string{
 	elError:        "error",
 	elBorder:       "border",
 	elBorderActive: "border.active",
+	elButton:       "button",
 }
 
 // Prop is an option a place asks an element for. The theme defines what each does.
@@ -202,13 +205,16 @@ func New(isDark bool) *Theme {
 		elError:        fg(p.danger),
 		elBorder:       fg(p.muted),
 		elBorderActive: fg(p.accent),
+		elButton:       lipgloss.NewStyle().Bold(true),
 	}
 	t.surfaces = [numSurfaces]surfaceStyle{
-		Plain:        {},
-		Cursor:       {solid: true, reverse: true},
-		Current:      {bg: p.muted, solid: true, fg: p.onSolid, bold: true},
-		Control:      {solid: true, reverse: true},
-		ControlSolid: {bg: p.accent, solid: true, fg: p.onSolid, bold: true},
+		Plain:   {},
+		Cursor:  {solid: true, reverse: true},
+		Current: {bg: p.muted, solid: true, fg: p.onSolid, bold: true},
+		Control: {solid: true, reverse: true},
+		// kspaces' only solid controls confirm closing and removing, which lose what runs or is not
+		// committed, so they are drawn in danger's color.
+		ControlSolid: {bg: p.danger, solid: true, fg: p.onSolid, bold: true},
 	}
 	return t
 }

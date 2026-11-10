@@ -28,9 +28,12 @@ type removeWorktreeForm struct {
 	// windows is how many windows the worktree's session has open, which removing it closes.
 	windows int
 	busy    bool
-	// err is why the worktree cannot be removed, from the start when git would refuse it.
+	// err is why starting the removal failed.
 	err   error
 	width int
+	// zones and buttons are where the last frame drew its buttons, and what each runs, for a click.
+	zones   map[string][]look.Zone
+	buttons controls[*removeWorktreeForm]
 }
 
 type removedMsg struct{ err error }
@@ -41,10 +44,7 @@ func (f *removeWorktreeForm) Init() tea.Cmd { return nil }
 // first, and this form may be over one of them. git is forced when the worktree has changes, as the form
 // has said they are lost; the background process shows anything else that goes wrong in kitty.
 func (f *removeWorktreeForm) remove() tea.Cmd {
-	if f.err = spaces.CanRemove(f.space, f.wt); f.err != nil {
-		return nil
-	}
-	f.busy = true
+	f.busy, f.err = true, nil
 	path, force := f.wt.Path, f.changes > 0
 	return func() tea.Msg { return removedMsg{spaces.RemoveInBackground(path, force)} }
 }
@@ -62,13 +62,20 @@ func (f *removeWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd, ok := runOn(f, msg, theRemoveForm.Target(removeSubject{})); ok {
 			return f, cmd
 		}
+	case tea.MouseClickMsg:
+		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
+			return f, cmd
+		}
 	}
 	return f, nil
 }
 
 func (f *removeWorktreeForm) View() tea.View {
-	v := tea.NewView(f.render())
+	frame, zones := look.Scan(f.render())
+	f.zones = zones
+	v := tea.NewView(frame)
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
@@ -106,16 +113,25 @@ func (f *removeWorktreeForm) render() string {
 		field("changes", changes),
 		"",
 	}
+	// What git would refuse is said before y, as the background process that removes has no screen.
+	refused := spaces.CanRemove(f.space, f.wt)
+	err := f.err
+	if err == nil {
+		err = refused
+	}
 	switch {
 	case f.busy:
 		lines = append(lines, line(look.Busy("Removing...")), "")
-	case f.err != nil:
-		for _, row := range look.Error(f.err.Error()).Wrapped(width) {
+	case err != nil:
+		for _, row := range look.Error(err.Error()).Wrapped(width) {
 			lines = append(lines, line(row))
 		}
 		lines = append(lines, "")
 	}
-	lines = append(lines, line(look.Key("y"), look.KeyDesc(" remove  "), look.Key("n/esc"), look.KeyDesc(" cancel")))
+	f.buttons = controls[*removeWorktreeForm]{}
+	lines = append(lines, line(f.buttons.draw(f, theRemoveForm.Target(removeSubject{}),
+		control{action: actRemove, label: "Remove", danger: true, off: !f.busy && refused != nil},
+		control{action: actRemoveCancel, label: "Cancel"})...))
 	inner := 0
 	for _, l := range lines {
 		inner = max(inner, ansi.StringWidth(l))
@@ -141,10 +157,7 @@ func newRemoveForm(cfg config.Config, space spaces.Space, wt spaces.Worktree, st
 	if err != nil {
 		return nil, fmt.Errorf("checking %s for changes: %w", wt.Path, err)
 	}
-	f := &removeWorktreeForm{th: look.New(true), cfg: cfg, space: space, wt: wt, changes: changes, windows: st.Windows[wt.Session]}
-	// Said before y is pressed, as the background process that removes it has no screen of its own.
-	f.err = spaces.CanRemove(space, wt)
-	return f, nil
+	return &removeWorktreeForm{th: look.New(true), cfg: cfg, space: space, wt: wt, changes: changes, windows: st.Windows[wt.Session]}, nil
 }
 
 // RunRemoveWorktree runs the remove worktree form for the worktree at path, meant for a kitty overlay,

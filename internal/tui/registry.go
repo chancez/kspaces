@@ -209,9 +209,12 @@ var (
 // The remove worktree form's.
 var (
 	actRemove = &interact.Action[*removeWorktreeForm, removeSubject]{
-		Title:   "remove",
-		Applies: func(f *removeWorktreeForm, _ removeSubject) bool { return !f.busy },
-		Run:     cmd[*removeWorktreeForm, removeSubject]((*removeWorktreeForm).remove),
+		Title: "remove",
+		// Not what git would refuse: the background process that removes has no screen to say so.
+		Applies: func(f *removeWorktreeForm, _ removeSubject) bool {
+			return !f.busy && spaces.CanRemove(f.space, f.wt) == nil
+		},
+		Run: cmd[*removeWorktreeForm, removeSubject]((*removeWorktreeForm).remove),
 	}
 	actRemoveCancel = &interact.Action[*removeWorktreeForm, removeSubject]{
 		Title:   "cancel",
