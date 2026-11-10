@@ -36,8 +36,16 @@ tab's sidebar agrees.
 
 Right-clicking a row, or `m` on it, opens a menu: Open, Fold or Unfold worktrees, and New worktree. New
 worktree, or `n`, opens a form in an overlay over the tab's window, as the sidebar is too narrow to type
-in. It shows the directory and branch the name makes, creates the worktree, checking out the branch if it
-exists or branching from what the space's main worktree has checked out, and switches to its session.
+in. It has two fields, and `tab` moves between them:
+
+- **branch**, which starts with `branch_prefix` and a `/` when that is set, so typing `fix` gives
+  `PREFIX/fix`. Delete the prefix for a branch without it. An existing branch is checked out; a new one
+  is created from what the space's main worktree has checked out.
+- **directory**, empty for the default shown in it: `worktree_dir` under the space's root and the branch
+  without the prefix, any `/` turned into `-`. A directory typed in is relative to the space's root unless
+  absolute, and `~` is expanded.
+
+`enter` creates the worktree and switches to its session; git's error stays in the form if it refuses.
 `kspaces new [SPACE]` opens the same form, for the space given by root or name, or the current one.
 
 ## Status
@@ -105,10 +113,10 @@ new_tab launch --type=tab
 # which never restores from a file.
 sessions ~/.local/share/kitty/sessions
 
-# Where new worktrees go, relative to their space's root, and what goes before their name to make the
-# branch name. Default to .worktrees and nothing.
+# The new worktree form's defaults: worktrees go under worktree_dir, relative to their space's root, and
+# new branch names start with branch_prefix and a /. Default to .worktrees and no prefix.
 worktree_dir .worktrees
-branch_prefix pr/me/
+branch_prefix pr/me
 ```
 
 ## Commands

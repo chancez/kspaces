@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -83,20 +84,43 @@ func parseWorktrees(space, porcelain string) []Worktree {
 	return ans
 }
 
-// newWorktreePlan is where a worktree named name goes in a space and which branch it checks out: a
-// directory under the space's WorktreeDir, with any / in the name turned into -, on BranchPrefix + name.
-func newWorktreePlan(cfg Config, root, name string) (dir, branch string) {
-	return filepath.Join(root, cfg.WorktreeDir, strings.ReplaceAll(name, "/", "-")), cfg.BranchPrefix + name
+// branchStart is what a new branch's name starts with: the configured prefix and a /, or nothing.
+func branchStart(cfg Config) string {
+	if p := strings.Trim(cfg.BranchPrefix, "/"); p != "" {
+		return p + "/"
+	}
+	return ""
 }
 
-// createWorktree adds a worktree named name to the space at root. It checks out the branch when it exists
-// and otherwise creates it from what the space's main worktree has checked out.
-func createWorktree(cfg Config, space Space, name string) (Worktree, error) {
-	name = strings.TrimSpace(name)
-	if name == "" || strings.ContainsAny(name, " \t") {
-		return Worktree{}, fmt.Errorf("a worktree name cannot be empty or contain spaces")
+// worktreeDir is where the worktree of branch goes in the space at root. A given dir is used as is when
+// absolute, ~ expanded, and relative to root otherwise. Without one it is WorktreeDir, under root, and the
+// branch without the configured prefix, any / turned into -: `pr/me/fix/x` goes in `.worktrees/fix-x`.
+func worktreeDir(cfg Config, root, branch, dir string) string {
+	if dir = strings.TrimSpace(dir); dir != "" {
+		if rest, ok := strings.CutPrefix(dir, "~/"); ok {
+			if home, err := os.UserHomeDir(); err == nil {
+				dir = filepath.Join(home, rest)
+			}
+		}
+		if filepath.IsAbs(dir) {
+			return filepath.Clean(dir)
+		}
+		return filepath.Join(root, dir)
 	}
-	dir, branch := newWorktreePlan(cfg, space.Root, name)
+	name := strings.TrimPrefix(branch, branchStart(cfg))
+	return filepath.Join(root, cfg.WorktreeDir, strings.ReplaceAll(name, "/", "-"))
+}
+
+// createWorktree adds a worktree at dir to the space, on branch. It checks out the branch when it exists
+// and otherwise creates it from what the space's main worktree has checked out.
+func createWorktree(space Space, branch, dir string) (Worktree, error) {
+	branch = strings.TrimSpace(branch)
+	switch {
+	case branch == "" || strings.HasSuffix(branch, "/"):
+		return Worktree{}, fmt.Errorf("the branch needs a name")
+	case strings.ContainsAny(branch, " \t"):
+		return Worktree{}, fmt.Errorf("a branch name cannot contain spaces")
+	}
 	args := []string{"-C", space.Root, "worktree", "add", dir, branch}
 	if !branchExists(space.Root, branch) {
 		args = []string{"-C", space.Root, "worktree", "add", "-b", branch, dir}

@@ -11,13 +11,15 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// newWorktreeForm asks for a worktree's name, shows where it will go and which branch it will check out,
-// creates it and switches to its session. It is meant for a kitty overlay, as the sidebar is too narrow to
-// type a name and read back the path in.
+// newWorktreeForm asks for a branch and, optionally, where its worktree goes, shows what it will do,
+// creates the worktree and switches to its session. It is meant for a kitty overlay, as the sidebar is too
+// narrow to type a name and read back the path in.
 type newWorktreeForm struct {
-	cfg   Config
-	space Space
-	input textinput.Model
+	cfg    Config
+	space  Space
+	branch textinput.Model
+	// Empty for the default, which worktreeDir derives from the branch and the placeholder shows.
+	dir   textinput.Model
 	busy  bool
 	err   error
 	width int
@@ -29,10 +31,17 @@ func (f *newWorktreeForm) Init() tea.Cmd {
 	return textinput.Blink
 }
 
+// plan is the branch and directory the form would create now.
+func (f *newWorktreeForm) plan() (branch, dir string) {
+	branch = strings.TrimSpace(f.branch.Value())
+	return branch, worktreeDir(f.cfg, f.space.Root, branch, f.dir.Value())
+}
+
 func (f *newWorktreeForm) create() tea.Cmd {
-	cfg, space, name := f.cfg, f.space, f.input.Value()
+	cfg, space := f.cfg, f.space
+	branch, dir := f.plan()
 	return func() tea.Msg {
-		wt, err := createWorktree(cfg, space, name)
+		wt, err := createWorktree(space, branch, dir)
 		if err != nil {
 			return createdMsg{err}
 		}
@@ -45,6 +54,16 @@ func (f *newWorktreeForm) create() tea.Cmd {
 		st.Home = 0
 		return createdMsg{openWorktree(cfg, st, wt)}
 	}
+}
+
+// switchField moves typing between the branch and the directory.
+func (f *newWorktreeForm) switchField() tea.Cmd {
+	if f.branch.Focused() {
+		f.branch.Blur()
+		return f.dir.Focus()
+	}
+	f.dir.Blur()
+	return f.branch.Focus()
 }
 
 func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -62,8 +81,10 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "esc", "ctrl+c":
 			return f, tea.Quit
+		case "tab", "shift+tab", "up", "down":
+			return f, f.switchField()
 		case "enter":
-			if f.busy || strings.TrimSpace(f.input.Value()) == "" {
+			if f.busy {
 				return f, nil
 			}
 			f.busy, f.err = true, nil
@@ -71,8 +92,23 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	var cmd tea.Cmd
-	f.input, cmd = f.input.Update(msg)
+	if f.branch.Focused() {
+		f.branch, cmd = f.branch.Update(msg)
+	} else {
+		f.dir, cmd = f.dir.Update(msg)
+	}
+	f.followBranch()
 	return f, cmd
+}
+
+// followBranch makes the directory's placeholder the default for the current branch, so the form always
+// shows where the worktree would go.
+func (f *newWorktreeForm) followBranch() {
+	dir := worktreeDir(f.cfg, f.space.Root, strings.TrimSpace(f.branch.Value()), "")
+	if rel, err := filepath.Rel(f.space.Root, dir); err == nil {
+		dir = rel
+	}
+	f.dir.Placeholder = dir
 }
 
 func branchExists(root, branch string) bool {
@@ -80,37 +116,36 @@ func branchExists(root, branch string) bool {
 }
 
 func (f *newWorktreeForm) View() string {
-	width := max(f.width, 20)
+	width := max(f.width-4, 20)
 	key := lipgloss.NewStyle().Foreground(muted).Width(11)
-	lines := []string{spaceStyle.Render("New worktree in " + f.space.Name), "", f.input.View(), ""}
-	if name := strings.TrimSpace(f.input.Value()); name != "" {
-		dir, branch := newWorktreePlan(f.cfg, f.space.Root, name)
-		if rel, err := filepath.Rel(f.space.Root, dir); err == nil {
-			dir = rel
-		}
-		lines = append(lines, key.Render("directory")+truncate(dir, width-11))
-		switch {
-		case branchExists(f.space.Root, branch):
-			lines = append(lines, key.Render("branch")+truncate(branch, width-22)+branchStyle.Render(" (existing)"))
-		case len(f.space.Worktrees) > 0 && f.space.Worktrees[0].Branch != "":
-			lines = append(lines, key.Render("branch")+truncate(branch, width-17)+branchStyle.Render(" (new)"))
-			lines = append(lines, key.Render("from")+truncate(f.space.Worktrees[0].Branch, width-11))
-		default:
-			lines = append(lines, key.Render("branch")+truncate(branch, width-17)+branchStyle.Render(" (new)"))
-		}
-	} else {
-		lines = append(lines, branchStyle.Render(truncate(fmt.Sprintf("Goes in %s/, on %s<name>", f.cfg.WorktreeDir, f.cfg.BranchPrefix), width)))
+	branch, _ := f.plan()
+	lines := []string{
+		spaceStyle.Render("New worktree in " + f.space.Name), "",
+		key.Render("branch") + f.branch.View(),
+		key.Render("directory") + f.dir.View(),
+		"",
+	}
+	switch {
+	case branch == "" || strings.HasSuffix(branch, "/"):
+		lines = append(lines, branchStyle.Render("Name the branch to create or check out"))
+	case branchExists(f.space.Root, branch):
+		lines = append(lines, branchStyle.Render(truncate("Checks out the existing branch "+branch, width)))
+	case len(f.space.Worktrees) > 0 && f.space.Worktrees[0].Branch != "":
+		lines = append(lines, branchStyle.Render(truncate("Creates "+branch+" from "+f.space.Worktrees[0].Branch, width)))
+	default:
+		lines = append(lines, branchStyle.Render(truncate("Creates "+branch, width)))
 	}
 	lines = append(lines, "")
 	switch {
 	case f.busy:
-		lines = append(lines, workingStyle.Render("Creating..."))
+		lines = append(lines, workingStyle.Render("Creating..."), "")
 	case f.err != nil:
 		for _, l := range wrap(f.err.Error(), width) {
 			lines = append(lines, errorStyle.Render(l))
 		}
+		lines = append(lines, "")
 	}
-	lines = append(lines, branchStyle.Render("enter create  esc cancel"))
+	lines = append(lines, branchStyle.Render("tab next field  enter create  esc cancel"))
 	return lipgloss.NewStyle().Padding(1, 2).Render(strings.Join(lines, "\n"))
 }
 
@@ -154,11 +189,17 @@ func runNewWorktree(query string) error {
 	if err != nil {
 		return err
 	}
-	input := textinput.New()
-	input.Prompt = "\uf126  " // code-fork
-	input.Placeholder = "worktree name"
-	input.Focus()
-	f := &newWorktreeForm{cfg: cfg, space: space, input: input}
+	// The branch starts with the configured prefix, so typing just the name gives PREFIX/NAME; deleting
+	// it makes a branch without one.
+	branch := textinput.New()
+	branch.Prompt = ""
+	branch.SetValue(branchStart(cfg))
+	branch.CursorEnd()
+	branch.Focus()
+	dir := textinput.New()
+	dir.Prompt = ""
+	f := &newWorktreeForm{cfg: cfg, space: space, branch: branch, dir: dir}
+	f.followBranch()
 	if _, err := tea.NewProgram(f, tea.WithAltScreen()).Run(); err != nil {
 		return fmt.Errorf("running the new worktree form: %w", err)
 	}

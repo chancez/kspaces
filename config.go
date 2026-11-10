@@ -21,7 +21,7 @@ type Config struct {
 	SessionsDir string
 	// Where new worktrees go, relative to their space's root.
 	WorktreeDir string
-	// Put before a new worktree's name to make its branch name, such as `pr/me/`.
+	// What new branch names start with, followed by a /, such as `pr/me`. Empty for nothing.
 	BranchPrefix string
 }
 
@@ -63,7 +63,7 @@ func loadConfig() (Config, error) {
 //	new_tab launch --type=tab --hold
 //	sessions ~/.local/share/kitty/sessions
 //	worktree_dir .worktrees
-//	branch_prefix pr/me/
+//	branch_prefix pr/me
 func parseConfig(sc *bufio.Scanner) (Config, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

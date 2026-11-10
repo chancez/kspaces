@@ -153,6 +153,33 @@ func TestBuildRows(t *testing.T) {
 	}
 }
 
+func TestWorktreeDir(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := Config{WorktreeDir: ".worktrees", BranchPrefix: "pr/me"}
+	got := []string{
+		// The default drops the prefix and turns / into -.
+		worktreeDir(cfg, "/src/gr", "pr/me/fix/bug", ""),
+		// A branch without the prefix keeps all of its name.
+		worktreeDir(cfg, "/src/gr", "release/1.0", ""),
+		// A given directory: relative to the space, absolute, or under the home directory.
+		worktreeDir(cfg, "/src/gr", "pr/me/x", "../gr-x"),
+		worktreeDir(cfg, "/src/gr", "pr/me/x", "/tmp/x/"),
+		worktreeDir(cfg, "/src/gr", "pr/me/x", "~/wt/x"),
+	}
+	want := []string{"/src/gr/.worktrees/fix-bug", "/src/gr/.worktrees/release-1.0", "/src/gr-x", "/tmp/x", filepath.Join(home, "wt/x")}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q\nwant %q", got, want)
+	}
+	// A trailing / in the prefix is the same prefix.
+	starts := []string{branchStart(cfg), branchStart(Config{BranchPrefix: "pr/me/"}), branchStart(Config{})}
+	if want := []string{"pr/me/", "pr/me/", ""}; !reflect.DeepEqual(starts, want) {
+		t.Fatalf("got %q, want %q", starts, want)
+	}
+}
+
 func TestCreateWorktree(t *testing.T) {
 	git := func(dir string, args ...string) {
 		t.Helper()
@@ -169,35 +196,36 @@ func TestCreateWorktree(t *testing.T) {
 	}
 	git(root, "init", "-q", "-b", "main")
 	git(root, "commit", "-q", "--allow-empty", "-m", "first")
-	git(root, "branch", "pr/me/old")
-	cfg := Config{WorktreeDir: ".worktrees", BranchPrefix: "pr/me/"}
+	git(root, "branch", "old")
 	space := Space{Name: "repo", Root: root}
 
-	// A new branch, and a / in the name kept in the branch but not in the directory.
-	got, err := createWorktree(cfg, space, "fix/bug")
+	// A new branch.
+	got, err := createWorktree(space, "pr/me/fix", filepath.Join(root, ".worktrees", "fix"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Worktree{Path: filepath.Join(root, ".worktrees", "fix-bug"), Branch: "pr/me/fix/bug", Session: "repo@fix-bug"}
+	want := Worktree{Path: filepath.Join(root, ".worktrees", "fix"), Branch: "pr/me/fix", Session: "repo@fix"}
 	if got != want {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}
-	// An existing branch is checked out rather than created.
-	if got, err = createWorktree(cfg, space, "old"); err != nil {
+	// An existing branch is checked out rather than created, wherever it is put.
+	if got, err = createWorktree(space, "old", filepath.Join(root, "elsewhere")); err != nil {
 		t.Fatal(err)
 	}
-	if want := (Worktree{Path: filepath.Join(root, ".worktrees", "old"), Branch: "pr/me/old", Session: "repo@old"}); got != want {
+	if want := (Worktree{Path: filepath.Join(root, "elsewhere"), Branch: "old", Session: "repo@elsewhere"}); got != want {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}
-	if ws := loadSpace(root).Worktrees; len(ws) != 3 || ws[1].Branch != "pr/me/fix/bug" || ws[2].Branch != "pr/me/old" {
+	if ws := loadSpace(root).Worktrees; len(ws) != 3 || ws[1].Branch != "pr/me/fix" || ws[2].Branch != "old" {
 		t.Fatalf("git lists %#v", ws)
 	}
 	// git's own refusal comes back as the error: the directory is taken.
-	if _, err := createWorktree(cfg, space, "old"); err == nil {
+	if _, err := createWorktree(space, "new", filepath.Join(root, "elsewhere")); err == nil {
 		t.Fatal("a second worktree in the same directory was created")
 	}
-	if _, err := createWorktree(cfg, space, "two words"); err == nil {
-		t.Fatal("a name with a space was accepted")
+	for _, branch := range []string{"two words", "pr/me/", " "} {
+		if _, err := createWorktree(space, branch, filepath.Join(root, "bad")); err == nil {
+			t.Fatalf("branch %q was accepted", branch)
+		}
 	}
 }
 
