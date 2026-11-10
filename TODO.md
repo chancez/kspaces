@@ -28,12 +28,23 @@ It knows nothing about what produced a record. Open questions:
 - One `kspaces sidebar` per tab, because kitty can only dock to one tab. Each polls `kitten @ ls` and runs
   `git worktree list` per space every two seconds. A dock for the whole OS window, or one process feeding
   all of them, would fix both.
-- Two kitty bugs, worked around in the dotfiles until fixed in kitty:
+- Three kitty bugs, worked around in the dotfiles until fixed in kitty:
   - `save_as_session --match` writes `new_os_window` before a space's file depending on which OS window had
     focus, so with several OS windows each space was restored in a window of its own. `save_sessions.py`
     serializes with the bug fixed instead.
+  - `save_as_session --match` writes `focus_tab` as the OS window's active tab's index among all its tabs,
+    while loading counts only the tabs the file creates, so a space came back on the wrong tab.
+    `save_sessions.py` writes the index among the saved tabs, of the one focused last.
   - Moving a tab to another OS window (`detach_tab`) drops the tab's session name, so the tab bar filter
     shows the moved tab in every session. `kspaces_watcher.py` puts it back from the tab's windows.
+- `save_sessions.py` saves a session when one of its windows closes or takes focus, and removes its file
+  with its last window, but kitty's watchers miss some changes:
+  - Nothing says an OS window is closing as a whole, so its windows' closes are told from a user closing
+    them only by the OS window being gone, and skipped. A space alone in its own OS window keeps a stale
+    file when its last tab closes, as that closes the OS window too.
+  - Nothing says a window's directory changed, so a `cd` is saved only at the next focus change, close or
+    quit.
+- Quitting with no window in the default session writes an empty `startup_session` file.
 - Windows outside spaces are saved into `default` and come back labelled `default`. Left as is for now.
 - kitty's own dock border can sit next to the sidebar's, which may look like a double line.
 - The dotfiles' `cm_reap.py` kills a multiplexer session when one of two windows showing it closes.
@@ -42,7 +53,9 @@ It knows nothing about what produced a record. Open questions:
 
 To make in kitty later, together, rather than while kspaces is still settling:
 
-- Fix the two session bugs above, and drop the workarounds.
+- Fix the three session bugs above, and drop the workarounds.
+- Watcher events for an OS window closing, or a flag on `on_close` for windows closed with their OS
+  window or by quitting, and for a window's directory changing, so `save_sessions.py` misses nothing.
 - Resizable docks: drag a dock's border, as borders between layout windows already can be
   (`Boss.drag_resize_start` only targets layout windows), and a command to resize one. The watcher then
   keeps a dragged width for every sidebar instead of setting `DockSpec.size` itself.
