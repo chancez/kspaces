@@ -13,6 +13,7 @@ import (
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/status"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
@@ -101,10 +102,10 @@ func (m *sidebar) numEntries() int {
 	return len(m.rows) + len(m.kitty.Statuses)
 }
 
-func (m *sidebar) openWindowCmd(id int) tea.Cmd {
-	st, self := m.kitty, m.self
+func (m *sidebar) openWindowCmd(s status.Status) tea.Cmd {
+	cfg, st, self := m.cfg, m.kitty, m.self
 	return func() tea.Msg {
-		if err := spaces.OpenWindow(st, id); err != nil {
+		if err := spaces.OpenWindow(cfg, st, s.Window, s.Session); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
 		return spaces.Load(self)

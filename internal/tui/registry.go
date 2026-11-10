@@ -92,7 +92,7 @@ var actOpenWindow = &interact.Action[*sidebar, statusSubject]{
 	Title: "Open",
 	Run: func(m *sidebar, s statusSubject) tea.Cmd {
 		m.remote = false
-		return m.openWindowCmd(s.status.Window)
+		return m.openWindowCmd(s.status)
 	},
 }
 

@@ -135,7 +135,7 @@ func (m *picker) choose() tea.Cmd {
 		var err error
 		switch {
 		case it.status != nil:
-			err = spaces.OpenWindow(st, it.status.Window)
+			err = spaces.OpenWindow(cfg, st, it.status.Window, it.status.Session)
 		case it.worktree.Session == st.Current:
 			// Already here: closing the picker is all there is to do.
 		default:

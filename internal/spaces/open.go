@@ -23,28 +23,54 @@ func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree) error {
 			return nil
 		}
 	}
-	if id, ok := st.Sessions[wt.Session]; ok {
-		return kitty.FocusWindow(id)
+	path := sessionFile(cfg, wt.Session)
+	if _, open := st.Sessions[wt.Session]; open {
+		return gotoSession(path)
 	}
-	if cfg.SessionsDir != "" {
-		path := filepath.Join(cfg.SessionsDir, wt.Session+".kitty-session")
-		if _, err := os.Stat(path); err == nil {
-			return kitty.Action("goto_session", path)
-		}
+	if _, err := os.Stat(path); err == nil && cfg.SessionsDir != "" {
+		return gotoSession(path)
 	}
 	if wt.Path == "" {
 		return fmt.Errorf("session %s has no windows and no saved file", wt.Session)
 	}
 	args := append([]string{}, cfg.NewTab...)
 	args = append(args, "--cwd="+wt.Path, "--add-to-session="+wt.Session)
-	return kitty.Action(args...)
+	if err := kitty.Action(args...); err != nil {
+		return err
+	}
+	// The new tab is the session's only window, so this only records the switch, see gotoSession.
+	return gotoSession(path)
+}
+
+// sessionFile is where a session would be saved. kitty names a session after its file, so this is also how
+// goto_session is told which open session to switch to; without a sessions directory the file need not
+// exist, as kitty reads it only for a session with no windows.
+func sessionFile(cfg config.Config, session string) string {
+	if cfg.SessionsDir == "" {
+		return session + ".kitty-session"
+	}
+	return filepath.Join(cfg.SessionsDir, session+".kitty-session")
+}
+
+// gotoSession switches to a session with goto_session, which focuses its most recently used window. Not
+// with focus-window: goto_session is what kitty counts as switching sessions, so the tab bar's
+// `session:~` keeps showing this session's tabs while a window in no session, such as another OS window,
+// has focus.
+func gotoSession(path string) error {
+	return kitty.Action("goto_session", path)
 }
 
 // OpenWindow focuses one window, handing this tab's focus back to its own window first, as OpenWorktree
-// does, so coming back to the tab does not land in the sidebar.
-func OpenWindow(st kitty.State, id int) error {
+// does, so coming back to the tab does not land in the sidebar. A window in a session is reached through
+// its session first, for the same reason as gotoSession.
+func OpenWindow(cfg config.Config, st kitty.State, id int, session string) error {
 	if st.Home != 0 && st.Home != id {
 		if err := kitty.FocusWindow(st.Home); err != nil {
+			return err
+		}
+	}
+	if _, open := st.Sessions[session]; open && session != st.Current {
+		if err := gotoSession(sessionFile(cfg, session)); err != nil {
 			return err
 		}
 	}
