@@ -17,7 +17,7 @@ import (
 )
 
 // removeWorktreeForm shows what removing a linked worktree does, its changes and its session's windows,
-// and removes it when confirmed. It is meant for a kitty overlay, like the new worktree form.
+// and starts removing it when confirmed. It is meant for a kitty overlay, like the new worktree form.
 type removeWorktreeForm struct {
 	th    *look.Theme
 	cfg   config.Config
@@ -28,19 +28,25 @@ type removeWorktreeForm struct {
 	// windows is how many windows the worktree's session has open, which removing it closes.
 	windows int
 	busy    bool
-	err     error
-	width   int
+	// err is why the worktree cannot be removed, from the start when git would refuse it.
+	err   error
+	width int
 }
 
 type removedMsg struct{ err error }
 
 func (f *removeWorktreeForm) Init() tea.Cmd { return nil }
 
-// remove removes the worktree, forcing git when it has changes: the form has said they are lost.
+// remove hands the removal to a background process and leaves: removing closes the worktree's windows
+// first, and this form may be over one of them. git is forced when the worktree has changes, as the form
+// has said they are lost; the background process shows anything else that goes wrong in kitty.
 func (f *removeWorktreeForm) remove() tea.Cmd {
-	f.busy, f.err = true, nil
-	cfg, space, wt, force := f.cfg, f.space, f.wt, f.changes > 0
-	return func() tea.Msg { return removedMsg{spaces.RemoveWorktree(cfg, space, wt, force)} }
+	if f.err = spaces.CanRemove(f.space, f.wt); f.err != nil {
+		return nil
+	}
+	f.busy = true
+	path, force := f.wt.Path, f.changes > 0
+	return func() tea.Msg { return removedMsg{spaces.RemoveInBackground(path, force)} }
 }
 
 func (f *removeWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -135,7 +141,10 @@ func newRemoveForm(cfg config.Config, space spaces.Space, wt spaces.Worktree, st
 	if err != nil {
 		return nil, fmt.Errorf("checking %s for changes: %w", wt.Path, err)
 	}
-	return &removeWorktreeForm{th: look.New(true), cfg: cfg, space: space, wt: wt, changes: changes, windows: st.Windows[wt.Session]}, nil
+	f := &removeWorktreeForm{th: look.New(true), cfg: cfg, space: space, wt: wt, changes: changes, windows: st.Windows[wt.Session]}
+	// Said before y is pressed, as the background process that removes it has no screen of its own.
+	f.err = spaces.CanRemove(space, wt)
+	return f, nil
 }
 
 // RunRemoveWorktree runs the remove worktree form for the worktree at path, meant for a kitty overlay,
@@ -146,7 +155,7 @@ func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string) erro
 		return err
 	}
 	if len(space.Worktrees) > 0 && space.Worktrees[0].Path == wt.Path {
-		return fmt.Errorf("%s is the main worktree of %s, which cannot be removed", wt.Path, space.Name)
+		return spaces.CanRemove(space, wt)
 	}
 	st, err := kitty.LoadState(kitty.SelfWindowID())
 	if err != nil {
@@ -160,4 +169,20 @@ func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string) erro
 		return fmt.Errorf("running the remove worktree form: %w", err)
 	}
 	return nil
+}
+
+// RemoveWorktree removes the worktree at path without asking, for the background process the form
+// starts. It has no screen, so a failure is shown in kitty as well as returned.
+func RemoveWorktree(cfg config.Config, path string, force bool) error {
+	err := func() error {
+		space, wt, err := spaces.FindWorktree(cfg, path)
+		if err != nil {
+			return err
+		}
+		return spaces.RemoveWorktree(cfg, space, wt, force)
+	}()
+	if err != nil {
+		_ = kitty.ShowError("Could not remove the worktree", fmt.Sprintf("%s: %v", path, err))
+	}
+	return err
 }

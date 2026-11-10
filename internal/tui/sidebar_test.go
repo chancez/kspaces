@@ -45,6 +45,7 @@ func fixture(now time.Time) spaces.Snapshot {
 		Folded: map[string]bool{"/src/docs": true},
 		Kitty: kitty.State{
 			Sessions: map[string]int{"gr": 10, "gr@dev": 11, "default": 12, "docs@notes": 13},
+			Windows:  map[string]int{"gr": 1, "gr@dev": 2, "default": 1, "docs@notes": 1},
 			Current:  "gr@dev",
 			Home:     11,
 			Statuses: []status.Status{
@@ -347,8 +348,8 @@ func TestRightClickMenu(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	rule := strings.Repeat("\u2500", 29)
-	want := []string{rule, " Open", " Fold worktrees", " New worktree...", " Remove worktree...", rule}
-	if got := e.screen()[y+1 : y+7]; !reflect.DeepEqual(got, want) {
+	want := []string{rule, " Open", " Fold worktrees", " New worktree...", " Close session...", " Remove worktree...", rule}
+	if got := e.screen()[y+1 : y+8]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{" Open"}) {
@@ -365,11 +366,15 @@ func TestRightClickMenu(t *testing.T) {
 		t.Errorf("Fold worktrees did not fold gr onto the cursor:\n%s", strings.Join(e.screen(), "\n"))
 	}
 
-	// What a row offers depends on it: a session in no space can only be opened, and a space that is
-	// not a repository offers nothing, so it has no menu.
+	// What a row offers depends on it: a session in no space can only be opened and closed, and a space
+	// that is not a repository offers nothing, so it has no menu.
 	e.click(fmt.Sprintf(entryZone, e.row("default")), tea.MouseRight)
-	if got := e.m.menu.items; len(got) != 1 || got[0].Title != "Open" {
-		t.Errorf("default's menu has %d items", len(got))
+	var titles []string
+	for _, it := range e.m.menu.items {
+		titles = append(titles, it.Title)
+	}
+	if want := []string{"Open", "Close session..."}; !reflect.DeepEqual(titles, want) {
+		t.Errorf("default's menu = %q, want %q", titles, want)
 	}
 	// A click elsewhere closes it; a right click elsewhere opens that row's instead.
 	e.clickAt(5, 0, tea.MouseLeft)
@@ -387,7 +392,7 @@ func TestRightClickMenu(t *testing.T) {
 func TestMenuKeys(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.FocusMsg{})
-	e.press("m", "j", "j", "j", "j", "k", "k")
+	e.press("m", "j", "j", "j", "j", "j", "k", "k", "k")
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Fold worktrees"}) {
 		t.Errorf("highlighted %q", got)
 	}

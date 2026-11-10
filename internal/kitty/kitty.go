@@ -195,6 +195,22 @@ func LaunchForm(st State, args ...string) error {
 	return err
 }
 
+// LaunchBackground runs this kspaces with args as a kitty background process, with no window, so it
+// outlives the window that started it. It may use remote control.
+func LaunchBackground(args ...string) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	_, err = kitten(append([]string{"launch", "--type=background", "--allow-remote-control", exe}, args...)...)
+	return err
+}
+
+// ShowError shows an error in kitty, for a process with no window of its own to show it in.
+func ShowError(title, msg string) error {
+	return Action("show_error", title, msg)
+}
+
 // CloseSession closes every window of session, as closing them by hand would, so whatever kitty.conf runs
 // when a window closes runs for each, such as ending a multiplexer session.
 func CloseSession(session string) error {

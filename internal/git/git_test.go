@@ -105,3 +105,18 @@ func TestRemoveWorktree(t *testing.T) {
 		t.Fatalf("changes in a clean worktree = %d, %v", n, err)
 	}
 }
+
+// A locked worktree is listed as locked, with or without a reason.
+func TestParseLockedWorktrees(t *testing.T) {
+	porcelain := "worktree /src/gr\nHEAD 1\nbranch refs/heads/main\n\n" +
+		"worktree /src/gr/a\nHEAD 2\nbranch refs/heads/a\nlocked\n\n" +
+		"worktree /src/gr/b\nHEAD 3\nbranch refs/heads/b\nlocked on a usb drive\n"
+	want := []Worktree{
+		{Path: "/src/gr", Branch: "main"},
+		{Path: "/src/gr/a", Branch: "a", Locked: true},
+		{Path: "/src/gr/b", Branch: "b", Locked: true},
+	}
+	if got := ParseWorktrees(porcelain); !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+}

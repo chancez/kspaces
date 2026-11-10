@@ -157,3 +157,14 @@ func (m *sidebar) removeWorktree(path string) tea.Cmd {
 		return nil
 	}
 }
+
+// closeSession opens the form that confirms closing session, in an overlay as newWorktree's.
+func (m *sidebar) closeSession(session string) tea.Cmd {
+	st := m.kitty
+	return func() tea.Msg {
+		if err := spaces.AskCloseSession(st, session); err != nil {
+			return spaces.Snapshot{Err: err}
+		}
+		return nil
+	}
+}

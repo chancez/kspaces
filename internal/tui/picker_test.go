@@ -191,3 +191,53 @@ func TestRemoveWorktreeForm(t *testing.T) {
 		t.Error("n while removing left the form")
 	}
 }
+
+// y on a locked worktree says git would refuse, rather than starting a removal that cannot succeed.
+func TestRemoveLockedWorktree(t *testing.T) {
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	space := spaces.Space{Name: "gr", Root: root, Worktrees: []spaces.Worktree{
+		{Path: root, Branch: "main", Session: "gr"},
+		{Path: filepath.Join(root, "dev"), Branch: "dev", Session: "gr@dev", Locked: true},
+	}}
+	f := &removeWorktreeForm{th: look.New(true), space: space, wt: space.Worktrees[1]}
+	f.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	if _, cmd := f.Update(tea.KeyPressMsg{Code: 'y', Text: "y"}); cmd != nil || f.busy {
+		t.Errorf("y on a locked worktree: cmd %v, busy %v", cmd != nil, f.busy)
+	}
+	if got := ansi.Strip(f.render()); !strings.Contains(got, "is locked; git worktree unlock it first") {
+		t.Errorf("no word of the lock:\n%s", got)
+	}
+}
+
+// The close session form says how many windows close, y closes and n leaves.
+func TestCloseSessionForm(t *testing.T) {
+	f := &closeSessionForm{th: look.New(true), session: "gr@dev", windows: 3}
+	f.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	var got []string
+	for _, l := range strings.Split(ansi.Strip(f.render()), "\n") {
+		got = append(got, strings.TrimRight(l, " "))
+	}
+	want := []string{
+		"",
+		"  Close session gr@dev",
+		"",
+		"  Closes its 3 windows, and what runs in them.",
+		"  Its saved file is kept, so opening it again restores its tabs.",
+		"",
+		"  y close  n/esc cancel",
+		"",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("form:\n%q\nwant\n%q", got, want)
+	}
+	if _, cmd := f.Update(tea.KeyPressMsg{Code: 'n', Text: "n"}); cmd == nil || f.busy {
+		t.Errorf("n: quit %v, busy %v", cmd != nil, f.busy)
+	}
+	// The command closes kitty windows, so it is not run here.
+	if _, cmd := f.Update(tea.KeyPressMsg{Code: 'y', Text: "y"}); cmd == nil || !f.busy {
+		t.Errorf("y: cmd %v, busy %v", cmd != nil, f.busy)
+	}
+}

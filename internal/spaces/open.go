@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/git"
@@ -144,14 +145,54 @@ func AskRemoveWorktree(st kitty.State, path string) error {
 	return kitty.LaunchForm(st, "remove", path)
 }
 
-// RemoveWorktree removes a linked worktree of space, losing its changes if force, and ends its session:
-// its saved file goes, so it is not restored, and its windows close. git goes first, so a worktree git
-// refuses to remove keeps its windows.
-func RemoveWorktree(cfg config.Config, space Space, wt Worktree, force bool) error {
-	if len(space.Worktrees) > 0 && space.Worktrees[0].Path == wt.Path {
-		return fmt.Errorf("%s is the space's main worktree", wt.Path)
+// AskCloseSession opens the form that confirms closing session, in an overlay as NewWorktree's.
+func AskCloseSession(st kitty.State, session string) error {
+	return kitty.LaunchForm(st, "close", session)
+}
+
+// closeWait is how long CloseSession waits for kitty to close a session's windows.
+const closeWait = 10 * time.Second
+
+// CloseSession closes every window of session and waits until kitty has: it closes them after answering,
+// and what kitty.conf runs as each closes, such as ending a multiplexer session, runs then.
+func CloseSession(session string) error {
+	if err := kitty.CloseSession(session); err != nil {
+		return err
 	}
-	if err := git.RemoveWorktree(space.Root, wt.Path, force); err != nil {
+	for deadline := time.Now().Add(closeWait); ; time.Sleep(100 * time.Millisecond) {
+		st, err := kitty.LoadState(0)
+		if err != nil {
+			return err
+		}
+		if st.Windows[session] == 0 {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("kitty still has %d windows of %s open", st.Windows[session], session)
+		}
+	}
+}
+
+// CanRemove says why git would refuse to remove wt, a worktree of space, or nil when it would not. Changes
+// are not a reason: RemoveWorktree can force past them.
+func CanRemove(space Space, wt Worktree) error {
+	switch {
+	case len(space.Worktrees) > 0 && space.Worktrees[0].Path == wt.Path:
+		return fmt.Errorf("%s is the main worktree of %s, which cannot be removed", wt.Path, space.Name)
+	case wt.Locked:
+		return fmt.Errorf("%s is locked; git worktree unlock it first", wt.Path)
+	}
+	return nil
+}
+
+// RemoveWorktree ends the session of wt, a linked worktree of space, then removes the worktree, losing its
+// changes if force. The session goes first so nothing still runs in the directory as it is deleted, and
+// its saved file goes too, so it is not restored. The branch is kept.
+func RemoveWorktree(cfg config.Config, space Space, wt Worktree, force bool) error {
+	if err := CanRemove(space, wt); err != nil {
+		return err
+	}
+	if err := CloseSession(wt.Session); err != nil {
 		return err
 	}
 	if cfg.SessionsDir != "" {
@@ -159,5 +200,15 @@ func RemoveWorktree(cfg config.Config, space Space, wt Worktree, force bool) err
 			return err
 		}
 	}
-	return kitty.CloseSession(wt.Session)
+	return git.RemoveWorktree(space.Root, wt.Path, force)
+}
+
+// RemoveInBackground runs `kspaces remove --yes` for the worktree at path as a kitty background process.
+// Removing closes the worktree's windows, and the form that asked may be over one of them.
+func RemoveInBackground(path string, force bool) error {
+	args := []string{"remove", "--yes"}
+	if force {
+		args = append(args, "--force")
+	}
+	return kitty.LaunchBackground(append(args, path)...)
 }

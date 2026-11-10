@@ -20,6 +20,8 @@ type Worktree struct {
 	Branch string
 	// Session is the name of the kitty session that holds this worktree's tabs.
 	Session string
+	// Locked is set with git worktree lock, which keeps git from removing it.
+	Locked bool
 }
 
 // Space is a repository and its worktrees. The first worktree is the main one.
@@ -57,7 +59,7 @@ func LoadSpace(root string) Space {
 func fromGit(space string, wts []git.Worktree) []Worktree {
 	var ans []Worktree
 	for i, wt := range wts {
-		ans = append(ans, Worktree{Path: wt.Path, Branch: wt.Branch, Session: sessionName(space, i == 0, wt.Path)})
+		ans = append(ans, Worktree{Path: wt.Path, Branch: wt.Branch, Session: sessionName(space, i == 0, wt.Path), Locked: wt.Locked})
 	}
 	return ans
 }

@@ -30,15 +30,15 @@ spaces.
 Sessions that are open or saved (see `sessions` below) but are not any worktree's, such as the one kitty
 starts with, are listed above the spaces.
 
-## Folding, new worktrees and removing them
+## Folding, new worktrees, closing sessions and removing worktrees
 
 A space with linked worktrees has a triangle before its name. Clicking it, or `space` on the space's row,
 hides its linked worktrees; the space's row then stands for all of them, showing the most urgent state and
 the current session of any. Which spaces are folded is kept in `$XDG_STATE_HOME/kspaces/folded`, so every
 tab's sidebar agrees.
 
-Right-clicking a row, or `m` on it, opens a menu: Open, Fold or Unfold worktrees, New worktree, and, on
-a linked worktree, Remove worktree. New
+Right-clicking a row, or `m` on it, opens a menu: Open, Fold or Unfold worktrees, New worktree, Close
+session when its session has windows open, and, on a linked worktree, Remove worktree. New
 worktree, or `n`, opens a form in an overlay over the tab's window, as the sidebar is too narrow to type
 in. It has two fields, and `tab` moves between them:
 
@@ -52,13 +52,20 @@ in. It has two fields, and `tab` moves between them:
 `enter` creates the worktree and switches to its session; git's error stays in the form if it refuses.
 `kspaces new [SPACE]` opens the same form, for the space given by root or name, or the current one.
 
-Remove worktree, or `x` on a linked worktree, opens another form in an overlay. It shows the worktree's
-directory, that its branch is kept, how many of its session's windows close, and how many files it has
-that are not committed. `y` removes it, with `git worktree remove`, forced when there are such files, as
-the form has said they are lost. It then deletes the session's saved file and closes the session's
-windows the way closing them by hand does, so whatever kitty.conf runs when a window closes, such as
-ending a multiplexer session, runs for each. git goes first, so a worktree it refuses to remove, such as a
-locked one, keeps its windows and the error stays in the form. `kspaces remove PATH` opens the same form.
+Close session, or `c`, opens a form that says how many windows close, and `y` closes them all, the way
+closing them by hand does, so whatever kitty.conf runs when a window closes, such as ending a multiplexer
+session, runs for each. The session's saved file is kept, so opening the worktree again restores its
+tabs. `kspaces close [SESSION]` opens the same form, for the current session by default; `--yes` closes
+without asking, for a kitty mapping.
+
+Remove worktree, or `x` on a linked worktree, opens another form. It shows the worktree's directory, that
+its branch is kept, how many of its session's windows close, and how many files it has that are not
+committed. `y` closes the session first, waiting until its windows are gone, so nothing still runs in the
+directory, then deletes the session's saved file and runs `git worktree remove`, forced when there are
+such files, as the form has said they are lost. The form may be over one of the windows that close, so
+the removal runs as a kitty background process, which shows an error in kitty if it fails. What git
+would refuse, such as a locked worktree, the form says before `y`. `kspaces remove PATH` opens the same
+form; `--yes` removes without asking.
 
 ## Status
 
@@ -152,7 +159,8 @@ kspaces list        every space's worktrees with their session names
 kspaces open PATH   switch to the session of the worktree at PATH, creating it if needed
 kspaces next, prev  switch to the next or previous session with windows open, in sidebar order
 kspaces new [SPACE] create a worktree in a form and switch to it, meant for a kitty overlay
-kspaces remove PATH remove a linked worktree and close its session, after confirming in a form
+kspaces remove PATH close the session of a linked worktree and remove it, after confirming in a form
+kspaces close [SESSION] close every window of a session, the current one by default, after confirming
 ```
 
 `kspaces --help` lists them, and `kspaces --version` prints the version.

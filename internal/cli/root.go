@@ -59,6 +59,7 @@ default ~/.config/kspaces/config.toml.`,
 		a.cycleCommand("prev", "Switch to the previous session with windows open, in sidebar order", -1),
 		a.newCommand(),
 		a.removeCommand(),
+		a.closeCommand(),
 	)
 	return root
 }

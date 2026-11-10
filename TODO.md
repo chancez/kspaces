@@ -7,10 +7,6 @@ To consider once the core pieces work:
 - More UX in general, still to investigate.
 - The picker (f5) has no preview of an entry's details, and cannot open a new worktree that has no session
   any differently from the sidebar.
-- Close session in the menu: close every window and tab of a session. Closing has to end the programs,
-  not leave multiplexer sessions running: today kitty's `close_session` closes the windows and the
-  dotfiles' `cm_reap.py` kills each window's cm session on close, so going through kitty's close path
-  (not detaching) is what keeps that working.
 
 ## Status area
 

@@ -14,6 +14,8 @@ type Worktree struct {
 	Path string
 	// Branch without refs/heads/, or empty when HEAD is detached.
 	Branch string
+	// Locked is set with git worktree lock, and git will not remove a locked worktree.
+	Locked bool
 }
 
 // ListWorktrees lists the worktrees of the repository at root, the main one first. The error is git's
@@ -53,6 +55,8 @@ func ParseWorktrees(porcelain string) []Worktree {
 			cur.Path = value
 		case "branch":
 			cur.Branch = strings.TrimPrefix(value, "refs/heads/")
+		case "locked":
+			cur.Locked = true
 		case "bare", "prunable":
 			skip = true
 		}

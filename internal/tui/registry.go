@@ -33,10 +33,12 @@ type paneSubject struct{}
 // menuSubject is the sidebar's open context menu.
 type menuSubject struct{}
 
-// pickerSubject is the picker, formSubject the new worktree form, removeSubject the remove worktree form.
+// pickerSubject is the picker, formSubject the new worktree form, removeSubject the remove worktree form
+// and closeSubject the close session form.
 type pickerSubject struct{}
 type formSubject struct{}
 type removeSubject struct{}
+type closeSubject struct{}
 
 // do adapts a function that changes the model without a command.
 func do[M, S any](f func(m M)) func(M, S) tea.Cmd {
@@ -93,6 +95,16 @@ var (
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			return m.removeWorktree(s.row.Worktree.Path)
+		},
+	}
+	actCloseSession = &interact.Action[*sidebar, entrySubject]{
+		Title: "Close session...",
+		Applies: func(m *sidebar, s entrySubject) bool {
+			return s.row.Worktree != nil && m.kitty.Windows[s.row.Worktree.Session] > 0
+		},
+		Run: func(m *sidebar, s entrySubject) tea.Cmd {
+			m.remote = false
+			return m.closeSession(s.row.Worktree.Session)
 		},
 	}
 )
@@ -209,6 +221,21 @@ var (
 	actRemoveQuit = quit[*removeWorktreeForm, removeSubject]()
 )
 
+// The close session form's.
+var (
+	actClose = &interact.Action[*closeSessionForm, closeSubject]{
+		Title:   "close",
+		Applies: func(f *closeSessionForm, _ closeSubject) bool { return !f.busy },
+		Run:     cmd[*closeSessionForm, closeSubject]((*closeSessionForm).closeSession),
+	}
+	actCloseCancel = &interact.Action[*closeSessionForm, closeSubject]{
+		Title:   "cancel",
+		Applies: func(f *closeSessionForm, _ closeSubject) bool { return !f.busy },
+		Run:     func(*closeSessionForm, closeSubject) tea.Cmd { return tea.Quit },
+	}
+	actCloseQuit = quit[*closeSessionForm, closeSubject]()
+)
+
 var (
 	entryKind  *interact.Kind[*sidebar, entrySubject]
 	statusKind *interact.Kind[*sidebar, statusSubject]
@@ -217,6 +244,7 @@ var (
 	pickerKind *interact.Kind[*picker, pickerSubject]
 	formKind   *interact.Kind[*newWorktreeForm, formSubject]
 	removeKind *interact.Kind[*removeWorktreeForm, removeSubject]
+	closeKind  *interact.Kind[*closeSessionForm, closeSubject]
 
 	spacesList    *interact.Place[*sidebar, entrySubject]
 	statusList    *interact.Place[*sidebar, statusSubject]
@@ -225,15 +253,17 @@ var (
 	thePicker     *interact.Place[*picker, pickerSubject]
 	theForm       *interact.Place[*newWorktreeForm, formSubject]
 	theRemoveForm *interact.Place[*removeWorktreeForm, removeSubject]
+	theCloseForm  *interact.Place[*closeSessionForm, closeSubject]
 )
 
 // Kinds and places are made in init, as their actions run code that reads them.
 func init() {
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actFold, actUnfold, actNewWorktree, actRemoveWorktree)
+		actOpenWorktree, actFold, actUnfold, actNewWorktree, actCloseSession, actRemoveWorktree)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
+	entryKind.Bind(actCloseSession, "c", "close session", "c")
 	entryKind.Bind(actRemoveWorktree, "x", "remove worktree", "x")
 	spacesList = interact.List(entryKind)
 	spacesList.Bind(actOpenWorktree, "enter/l", "open", "enter", "l")
@@ -283,6 +313,12 @@ func init() {
 	removeKind.Bind(actRemoveCancel, "n/esc", "cancel", "n", "esc")
 	removeKind.Bind(actRemoveQuit, "ctrl+c", "quit", "ctrl+c")
 	theRemoveForm = interact.List(removeKind)
+
+	closeKind = interact.NewKind(func(closeSubject) string { return "Close session" }, actClose, actCloseCancel, actCloseQuit)
+	closeKind.Bind(actClose, "y", "close", "y")
+	closeKind.Bind(actCloseCancel, "n/esc", "cancel", "n", "esc")
+	closeKind.Bind(actCloseQuit, "ctrl+c", "quit", "ctrl+c")
+	theCloseForm = interact.List(closeKind)
 }
 
 // Targets: the subjects on screen, each in its place.
