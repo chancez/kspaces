@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseWorktrees(t *testing.T) {
@@ -95,7 +96,7 @@ func TestParseConfig(t *testing.T) {
 space ~/projects/gr
 space /src/kitty
 
-new_tab kitten cm_launch.py --type=tab
+new_tab kitten my_launch.py --type=tab
 sessions ~/.local/share/kitty/sessions
 `
 	got, err := parseConfig(bufio.NewScanner(strings.NewReader(in)))
@@ -104,7 +105,7 @@ sessions ~/.local/share/kitty/sessions
 	}
 	want := Config{
 		Spaces:      []string{filepath.Join(home, "projects/gr"), "/src/kitty"},
-		NewTab:      []string{"kitten", "cm_launch.py", "--type=tab"},
+		NewTab:      []string{"kitten", "my_launch.py", "--type=tab"},
 		SessionsDir: filepath.Join(home, ".local/share/kitty/sessions"),
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -136,31 +137,44 @@ func TestOtherSessions(t *testing.T) {
 }
 
 func TestStatuses(t *testing.T) {
+	at := func(sec int64) time.Time { return time.Unix(sec, 0) }
 	data := []lsOSWindow{{Tabs: []lsTab{
 		{ID: 1, Windows: []lsWindow{
-			// Several records: the most urgent one stands for the window.
-			{ID: 10, SessionName: "gr", ProgramStatus: []programRecord{
-				{ID: "build", State: "working"},
-				{ID: "deploy", State: "blocked", App: "claude", Title: "approve"},
-			}},
-			{ID: 11, SessionName: "gr", ProgramStatus: []programRecord{{State: "idle"}}},
+			// Several records: the most urgent one stands for the window. A noted time counts only for the
+			// state it was noted for: build has changed to working since.
+			{
+				ID: 10, SessionName: "gr",
+				UserVars: map[string]string{statusAtVar: `{"pid": 1, "records": {"deploy": ["blocked", 100], "build": ["blocked", 50]}}`},
+				ProgramStatus: []programRecord{
+					{ID: "build", State: "working"},
+					{ID: "deploy", State: "blocked", App: "claude", Title: "approve"},
+				},
+			},
+			// Idle is listed: the program is waiting for its next task.
+			{ID: 11, SessionName: "gr", ProgramStatus: []programRecord{{State: "idle", App: "claude"}}},
+			// A broken var only loses the times.
+			{ID: 12, SessionName: "gr", UserVars: map[string]string{statusAtVar: "{"}, ProgramStatus: []programRecord{{State: "done", App: "go"}}},
 		}},
 		{ID: 2, Windows: []lsWindow{
-			{ID: 20, SessionName: "kitty", ProgramStatus: []programRecord{{State: "done", App: "make"}}},
+			{ID: 20, SessionName: "kitty", UserVars: map[string]string{statusAtVar: `{"records": {"": ["done", 300]}}`}, ProgramStatus: []programRecord{{State: "done", App: "make"}}},
 			{ID: 21, Title: "scratch", ProgramStatus: []programRecord{{State: "error", Msg: "exit 1"}}},
 			{ID: 22, SessionName: "kitty", UserVars: map[string]string{dockVar: "1"}, ProgramStatus: []programRecord{{State: "blocked"}}},
 		}},
 	}}}
 
 	got := kittyStateFrom(data, 0).Statuses
+	// Grouped by state, most urgent first, and within a state the most recent change first: the done
+	// record noted at 300 comes before the one with no time.
 	want := []Status{
 		{
 			Window: 10, Session: "gr",
-			programRecord: programRecord{ID: "deploy", State: "blocked", App: "claude", Title: "approve"},
+			programRecord: programRecord{ID: "deploy", State: "blocked", App: "claude", Title: "approve", Since: at(100)},
 			Others:        []programRecord{{ID: "build", State: "working"}},
 		},
 		{Window: 21, WindowTitle: "scratch", programRecord: programRecord{State: "error", Msg: "exit 1"}},
-		{Window: 20, Session: "kitty", programRecord: programRecord{State: "done", App: "make"}},
+		{Window: 20, Session: "kitty", programRecord: programRecord{State: "done", App: "make", Since: at(300)}},
+		{Window: 12, Session: "gr", programRecord: programRecord{State: "done", App: "go"}},
+		{Window: 11, Session: "gr", programRecord: programRecord{State: "idle", App: "claude"}},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
@@ -169,6 +183,21 @@ func TestStatuses(t *testing.T) {
 	gotStates := []string{sessionStatus(got, "gr"), sessionStatus(got, "kitty"), sessionStatus(got, "docs")}
 	if wantStates := []string{"blocked", "done", ""}; !reflect.DeepEqual(gotStates, wantStates) {
 		t.Fatalf("session states: got %q, want %q", gotStates, wantStates)
+	}
+}
+
+func TestAge(t *testing.T) {
+	now := time.Unix(1_000_000, 0)
+	got := []string{
+		age(time.Time{}, now),
+		age(now.Add(-59*time.Second), now),
+		age(now.Add(-61*time.Second), now),
+		age(now.Add(-5*time.Hour-59*time.Minute), now),
+		age(now.Add(-49*time.Hour), now),
+	}
+	want := []string{"", "<1m", "1m", "5h", "2d"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q, want %q", got, want)
 	}
 }
 

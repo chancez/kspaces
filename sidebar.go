@@ -263,12 +263,14 @@ func (m *sidebar) entryAt(y int) (int, bool) {
 		return i, i < len(m.rows) && m.rows[i].space != nil
 	}
 	if l.status > 0 && y >= l.statusTop && y < l.statusTop+l.status {
-		// Entries take several rows each, so walk them down to the one drawn at y.
+		// Entries take several rows each, and some have a group title above, so walk them down to the one
+		// drawn at y. A group title opens nothing.
 		top := l.statusTop
 		for j := m.statusOffset; j < len(m.kitty.Statuses); j++ {
-			top += len(m.statusLines(j))
+			title := len(m.statusGroupTitle(j))
+			top += title + len(m.statusEntry(j))
 			if y < top {
-				return len(m.rows) + j, true
+				return len(m.rows) + j, y >= top-len(m.statusEntry(j))
 			}
 		}
 	}
@@ -412,6 +414,7 @@ const (
 	iconError    = "\ue654" // error
 	iconDone     = "\uf00c" // check
 	iconWorking  = "\uf110" // spinner
+	iconIdle     = "\uf10c" // circle outline
 	iconCurrent  = "\uf054" // chevron-right
 	iconOpen     = "\uf444" // dot-fill
 	iconBroken   = "\uf00d" // times
@@ -490,30 +493,80 @@ func stateMarker(state string) (string, lipgloss.Style) {
 		return marker(iconError), errorStyle
 	case "done":
 		return marker(iconDone), openStyle
+	case "idle":
+		return marker(iconIdle), branchStyle
 	default:
 		return marker(iconWorking), workingStyle
 	}
 }
 
-// statusRows is how many rows status entries from through to take.
+// statusRows is how many rows status entries from through to take, with their group titles.
 func (m *sidebar) statusRows(from, to int) int {
 	n := 0
 	for j := from; j <= to; j++ {
-		n += len(m.statusLines(j))
+		n += len(m.statusGroupTitle(j)) + len(m.statusEntry(j))
 	}
 	return n
+}
+
+// stateGroup names the group of entries in a state, in the order the list sorts them.
+var stateGroup = map[string]string{"blocked": "Blocked", "error": "Failed", "done": "Done", "working": "Working", "idle": "Idle"}
+
+// statusGroupTitle is drawn above entry j when it starts a group of entries in one state, or is the first
+// one shown after scrolling, so a scrolled list still says what it shows. Later groups get a blank row
+// above their title.
+func (m *sidebar) statusGroupTitle(j int) []string {
+	all := m.kitty.Statuses
+	if j != m.statusOffset && all[j-1].State == all[j].State {
+		return nil
+	}
+	n := 0
+	for _, s := range all {
+		if s.State == all[j].State {
+			n++
+		}
+	}
+	width := m.contentWidth()
+	_, style := stateMarker(all[j].State)
+	name, count := stateGroup[all[j].State], fmt.Sprintf(" %d", n)
+	title := style.Render(name) + branchStyle.Render(count) + strings.Repeat(" ", max(width-cells(name)-cells(count), 0))
+	if j == m.statusOffset {
+		return []string{title}
+	}
+	return []string{strings.Repeat(" ", width), title}
 }
 
 // kindLabel says what a blocked program is waiting for, from the protocol's kind field.
 var kindLabel = map[string]string{"permission": "wants permission", "question": "has a question", "auth": "needs you to sign in"}
 
-// statusLines draws status entry j. The first row has its state, the session it belongs to, or the window
-// title for a window in no session, and the program's name. Below it is what the program said: its
-// progress, its title or else its message. With the cursor on it, the entry opens up to show all of it:
-// what a blocked program waits for, title, progress, the whole message, the record's id and the window's
-// other records.
-func (m *sidebar) statusLines(j int) []string {
-	s, width := m.kitty.Statuses[j], m.contentWidth()
+// summary is the one line that best says what a program is up to: its progress, its title, its message,
+// or what it is blocked on, after the program's name.
+func summary(r programRecord, width int) string {
+	text := r.Title
+	switch {
+	case r.Progress != nil:
+		text = progressBar(*r.Progress, max(width-cells(r.App)-3, 6))
+	case text == "" && r.Msg != "":
+		text = r.Msg
+	case text == "":
+		text = kindLabel[r.Kind]
+	}
+	switch {
+	case r.App == "":
+		return text
+	case text == "":
+		return r.App
+	}
+	return r.App + " \u00b7 " + text
+}
+
+// statusEntry draws status entry j. The first row has its state icon, the session it belongs to, or the
+// window title for a window in no session, and how long ago the record changed to its state. Below it is
+// the program's name and what it said: its progress, its title or else its message. With the cursor on it,
+// the entry opens up to show all of it: what a blocked program waits for, title, progress, the whole
+// message, the record's id and the window's other records.
+func (m *sidebar) statusEntry(j int) []string {
+	s, width, now := m.kitty.Statuses[j], m.contentWidth(), time.Now()
 	expanded := len(m.rows)+j == m.cursor && m.navigating()
 	mark, markStyle := stateMarker(s.State)
 	// A linked worktree's session is SPACE@DIR; the worktree's name alone fits the narrow dock and is what
@@ -525,20 +578,18 @@ func (m *sidebar) statusLines(j int) []string {
 	if label == "" {
 		label = s.WindowTitle
 	}
-	extra := s.App
+	right := age(s.Since, now)
 	if len(s.Others) > 0 {
-		extra = strings.TrimSpace(fmt.Sprintf("%s +%d", extra, len(s.Others)))
+		right = strings.TrimSpace(fmt.Sprintf("+%d %s", len(s.Others), right))
 	}
-	label = truncate(label, max(width-cells(mark), 0))
-	if rest := width - cells(mark) - cells(label); extra != "" && rest > 2 {
-		extra = " " + truncate(extra, rest-1)
-	} else {
-		extra = ""
+	if right != "" {
+		right = " " + right
 	}
-	pad := strings.Repeat(" ", max(width-cells(mark)-cells(label)-cells(extra), 0))
-	first := markStyle.Render(mark) + label + branchStyle.Render(extra) + pad
+	label = truncate(label, max(width-cells(mark)-cells(right), 0))
+	pad := strings.Repeat(" ", max(width-cells(mark)-cells(label)-cells(right), 0))
+	first := markStyle.Render(mark) + label + pad + branchStyle.Render(right)
 	if expanded {
-		first = cursorStyle.Render(mark + label + extra + pad)
+		first = cursorStyle.Render(mark + label + pad + right)
 	}
 	lines := []string{first}
 
@@ -552,20 +603,14 @@ func (m *sidebar) statusLines(j int) []string {
 			lines = append(lines, indent+style.Render(l)+strings.Repeat(" ", max(inner-cells(l), 0)))
 		}
 	}
-	plain := lipgloss.NewStyle()
 	if !expanded {
-		switch {
-		case s.Progress != nil:
-			add(plain, progressBar(*s.Progress, inner), 1)
-		case s.Title != "":
-			add(plain, s.Title, 1)
-		case s.Msg != "":
-			add(branchStyle, s.Msg, 1)
-		case kindLabel[s.Kind] != "":
-			add(blockedStyle, kindLabel[s.Kind], 1)
+		if sum := truncate(summary(s.programRecord, inner), inner); sum != "" {
+			lines = append(lines, indent+branchStyle.Render(sum)+strings.Repeat(" ", max(inner-cells(sum), 0)))
 		}
 		return lines
 	}
+	plain := lipgloss.NewStyle()
+	add(branchStyle, s.App, 1)
 	if l := kindLabel[s.Kind]; l != "" {
 		add(blockedStyle, l, 1)
 	}
@@ -582,7 +627,7 @@ func (m *sidebar) statusLines(j int) []string {
 		if name == "" {
 			name = o.App
 		}
-		add(branchStyle, strings.TrimSpace(o.State+" "+name+" "+o.Title), 1)
+		add(branchStyle, strings.Join(strings.Fields(strings.Join([]string{o.State, name, age(o.Since, now), o.Title}, " ")), " "), 1)
 	}
 	return lines
 }
@@ -642,7 +687,7 @@ func (m *sidebar) View() string {
 		lines = append(lines, closedStyle.Render(truncate("Nothing to report", width)))
 	}
 	for j := m.statusOffset; j < len(m.kitty.Statuses); j++ {
-		for _, line := range m.statusLines(j) {
+		for _, line := range append(m.statusGroupTitle(j), m.statusEntry(j)...) {
 			if len(lines) >= l.statusTop+l.status {
 				break
 			}

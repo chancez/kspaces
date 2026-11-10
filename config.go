@@ -54,7 +54,7 @@ func loadConfig() (Config, error) {
 // parseConfig reads lines of the form `KEY VALUE`. Blank lines and lines starting with # are ignored.
 //
 //	space ~/projects/gr
-//	new_tab kitten cm_launch.py --type=tab
+//	new_tab launch --type=tab --hold
 //	sessions ~/.local/share/kitty/sessions
 func parseConfig(sc *bufio.Scanner) (Config, error) {
 	home, err := os.UserHomeDir()

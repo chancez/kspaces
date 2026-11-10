@@ -10,13 +10,13 @@ To consider once the core pieces work:
 
 ## Status area
 
-A first version reads OSC 7501 records from `kitten @ ls`. Open questions:
+kspaces reads OSC 7501 records from `kitten @ ls`, and the kitty watcher notes when each changed state.
+It knows nothing about what produced a record. Open questions:
 
-- Windows running under cm: OSC 7501 has to reach kitty for kitty to keep the record. The installed cm
-  (37fe9b6) does not pass it through. cm's ideas.md has "Re-send OSC 7501 to each client", which would
-  also translate its own 25453 reports, so hooks using `cm report` would show up too.
-- kitty loses its records when it restarts or a window reattaches, while cm keeps the session's state.
-- No time in the entries: kitty does not report when a record was set.
+- A program inside a multiplexer reaches kitty only if the multiplexer passes OSC 7501 through.
+- kitty loses its records when it restarts, so the list starts empty after a restart.
+- A record's time is when the watcher saw the state change. A record kitty already had before the watcher
+  was loaded has no time until its state changes again.
 - A collapsed entry shows one row of detail; the rest only shows with the sidebar's cursor on it.
 
 ## Known issues
@@ -29,7 +29,7 @@ A first version reads OSC 7501 records from `kitten @ ls`. Open questions:
   TODO in the dotfiles' `save_sessions.py`.
 - Windows outside spaces are saved into `default` and come back labelled `default`. Left as is for now.
 - kitty's own dock border can sit next to the sidebar's, which may look like a double line.
-- `cm_reap.py` kills a cm session when one of two windows showing it closes.
+- The dotfiles' `cm_reap.py` kills a multiplexer session when one of two windows showing it closes.
 
 ## After the MVP
 
