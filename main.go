@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const usage = `usage: kspaces [command]
@@ -16,6 +17,7 @@ Commands:
   list         Print every space, its worktrees and their session names
   open PATH    Switch to the session of the worktree at PATH, creating it if needed
   next, prev   Switch to the next or previous session with windows open, in sidebar order
+  new [SPACE]  Create a worktree and switch to it, in the space given by root or name, or the current one
 `
 
 func main() {
@@ -44,6 +46,11 @@ func run(args []string) error {
 		return cycle(1)
 	case "prev":
 		return cycle(-1)
+	case "new":
+		if len(args) > 1 {
+			return fmt.Errorf("new takes at most one space\n\n%s", usage)
+		}
+		return runNewWorktree(strings.Join(args, ""))
 	}
 	cfg, err := loadConfig()
 	if err != nil {

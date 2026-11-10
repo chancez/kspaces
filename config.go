@@ -19,9 +19,15 @@ type Config struct {
 	// windows but has a file here is restored from it rather than opened with NewTab. Empty to always use
 	// NewTab.
 	SessionsDir string
+	// Where new worktrees go, relative to their space's root.
+	WorktreeDir string
+	// Put before a new worktree's name to make its branch name, such as `pr/me/`.
+	BranchPrefix string
 }
 
 var defaultNewTab = []string{"launch", "--type=tab"}
+
+const defaultWorktreeDir = ".worktrees"
 
 func configPath() (string, error) {
 	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
@@ -56,12 +62,14 @@ func loadConfig() (Config, error) {
 //	space ~/projects/gr
 //	new_tab launch --type=tab --hold
 //	sessions ~/.local/share/kitty/sessions
+//	worktree_dir .worktrees
+//	branch_prefix pr/me/
 func parseConfig(sc *bufio.Scanner) (Config, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return Config{}, fmt.Errorf("finding the home directory: %w", err)
 	}
-	cfg := Config{NewTab: defaultNewTab}
+	cfg := Config{NewTab: defaultNewTab, WorktreeDir: defaultWorktreeDir}
 	for n := 1; sc.Scan(); n++ {
 		line := strings.TrimSpace(sc.Text())
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -82,6 +90,10 @@ func parseConfig(sc *bufio.Scanner) (Config, error) {
 			cfg.NewTab = strings.Fields(value)
 		case "sessions":
 			cfg.SessionsDir = value
+		case "worktree_dir":
+			cfg.WorktreeDir = value
+		case "branch_prefix":
+			cfg.BranchPrefix = value
 		default:
 			return Config{}, fmt.Errorf("line %d: unknown key %q", n, key)
 		}

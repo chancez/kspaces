@@ -26,6 +26,8 @@ type row struct {
 	main bool
 	// A session that belongs to no space, see otherSessions.
 	other bool
+	// On a space's own row: its linked worktrees are hidden.
+	folded bool
 }
 
 type snapshot struct {
@@ -34,6 +36,8 @@ type snapshot struct {
 	spaces []Space
 	// Sessions that belong to no space, see otherSessions.
 	others []Space
+	// Roots of the spaces whose linked worktrees are hidden.
+	folded map[string]bool
 	kitty  KittyState
 	err    error
 }
@@ -44,8 +48,12 @@ type sidebar struct {
 	cfg    Config
 	self   int
 	spaces []Space
+	others []Space
+	folded map[string]bool
 	kitty  KittyState
 	rows   []row
+	// The context menu, nil when closed.
+	menu   *contextMenu
 	cursor int
 	offset int
 	// The first status entry shown, when there are more than fit.
@@ -77,14 +85,35 @@ func (m *sidebar) navigating() bool {
 	return m.focused || m.remote
 }
 
-// cursorToCurrent puts the cursor on the session the sidebar is in, where navigation usually begins.
+// cursorToCurrent puts the cursor on the session the sidebar is in, where navigation usually begins, or on
+// its space when the space is folded.
 func (m *sidebar) cursorToCurrent() {
 	for i, r := range m.rows {
-		if r.worktree != nil && r.worktree.Session == m.kitty.Current {
+		if r.worktree != nil && r.worktree.Session == m.kitty.Current || r.folded && m.rowHolds(r, m.kitty.Current) {
 			m.cursor = i
 		}
 	}
 	m.scrollToCursor()
+}
+
+// rowSessions are the worktrees a row stands for: its own, and for a folded space all of the space's.
+func rowSessions(r row) []Worktree {
+	switch {
+	case r.folded:
+		return r.space.Worktrees
+	case r.worktree != nil:
+		return []Worktree{*r.worktree}
+	}
+	return nil
+}
+
+func (m *sidebar) rowHolds(r row, session string) bool {
+	for _, wt := range rowSessions(r) {
+		if wt.Session == session {
+			return true
+		}
+	}
+	return false
 }
 
 // Colors are terminal palette indexes rather than fixed colors, so the sidebar follows the kitty theme.
@@ -121,7 +150,7 @@ func load(self int) snapshot {
 	}
 	st, err := loadKittyState(self)
 	others := otherSessions(spaces, st.Sessions, savedSessions(cfg.SessionsDir))
-	return snapshot{cfg: &cfg, spaces: spaces, others: others, kitty: st, err: err}
+	return snapshot{cfg: &cfg, spaces: spaces, others: others, folded: loadFolded(), kitty: st, err: err}
 }
 
 func (m *sidebar) refresh() tea.Cmd {
@@ -144,7 +173,7 @@ func (m *sidebar) numEntries() int {
 }
 
 func (m *sidebar) open(i int) tea.Cmd {
-	cfg, st, self := m.cfg, m.kitty, m.self
+	st, self := m.kitty, m.self
 	switch {
 	case i >= len(m.rows) && i < m.numEntries():
 		id := st.Statuses[i-len(m.rows)].Window
@@ -157,7 +186,11 @@ func (m *sidebar) open(i int) tea.Cmd {
 	case i < 0 || i >= len(m.rows) || m.rows[i].worktree == nil:
 		return nil
 	}
-	wt := *m.rows[i].worktree
+	return m.openWorktreeCmd(*m.rows[i].worktree)
+}
+
+func (m *sidebar) openWorktreeCmd(wt Worktree) tea.Cmd {
+	cfg, st, self := m.cfg, m.kitty, m.self
 	return func() tea.Msg {
 		if err := openWorktree(cfg, st, wt); err != nil {
 			return snapshot{err: err}
@@ -166,7 +199,21 @@ func (m *sidebar) open(i int) tea.Cmd {
 	}
 }
 
+// foldCaret is drawn before a space's name when it has linked worktrees, and toggles them when clicked.
+const (
+	caretOpen   = "\u25be " // small down-pointing triangle
+	caretFolded = "\u25b8 " // small right-pointing triangle
+	noCaret     = "  "
+	// The columns the caret takes on screen, after the marker.
+	caretFrom, caretTo = 3, 5
+)
+
 func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.menu != nil {
+		if cmd, handled := m.updateMenu(msg); handled {
+			return m, cmd
+		}
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
@@ -186,8 +233,8 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case snapshot:
 		m.err = msg.err
 		if msg.cfg != nil {
-			m.cfg, m.spaces, m.kitty = *msg.cfg, msg.spaces, msg.kitty
-			m.rows = buildRows(msg.others, m.spaces)
+			m.cfg, m.spaces, m.others, m.folded, m.kitty = *msg.cfg, msg.spaces, msg.others, msg.folded, msg.kitty
+			m.rows = buildRows(m.others, m.spaces, m.folded)
 			m.cursor = min(m.cursor, max(m.numEntries()-1, 0))
 			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))
 		}
@@ -214,7 +261,17 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.hover = 0
 			if i, ok := m.entryAt(msg.Y); ok {
 				m.cursor = i
+				if i < len(m.rows) && m.rows[i].main && !m.rows[i].other && len(m.rows[i].space.Worktrees) > 1 &&
+					msg.X >= caretFrom && msg.X < caretTo {
+					m.toggleFold(m.rows[i].space.Root)
+					return m, nil
+				}
 				return m, m.open(i)
+			}
+		case msg.Button == tea.MouseButtonRight && msg.Action == tea.MouseActionPress:
+			if i, ok := m.entryAt(msg.Y); ok && i < len(m.rows) {
+				m.cursor = i
+				m.openMenu(i, msg.Y)
 			}
 		case msg.Action == tea.MouseActionMotion:
 			// Moving within the popup keeps it, rather than switching to the entry it covers.
@@ -258,6 +315,21 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.leave()
 		case "r":
 			return m, m.refresh()
+		case "m":
+			if m.cursor < len(m.rows) && m.cursor >= m.offset {
+				m.openMenu(m.cursor, headerRows+m.cursor-m.offset)
+			}
+			return m, nil
+		case " ", "space":
+			if m.cursor < len(m.rows) && m.rows[m.cursor].space != nil && !m.rows[m.cursor].other {
+				m.toggleFold(m.rows[m.cursor].space.Root)
+			}
+			return m, nil
+		case "n":
+			if m.cursor < len(m.rows) && m.rows[m.cursor].space != nil && !m.rows[m.cursor].other {
+				m.remote = false
+				return m, m.newWorktree(m.rows[m.cursor].space.Root)
+			}
 		case "ctrl+c":
 			return m, tea.Quit
 		}
@@ -357,22 +429,26 @@ func (m *sidebar) leave() tea.Cmd {
 }
 
 // buildRows lists the sessions that belong to no space first, then each space followed by its linked
-// worktrees, with a blank row between the two groups. A space's own row opens its main worktree.
-func buildRows(others, spaces []Space) []row {
+// worktrees, with a blank row between groups and between spaces. A space's own row opens its main worktree.
+// The linked worktrees of a space whose root is in folded are left out.
+func buildRows(others, spaces []Space, folded map[string]bool) []row {
 	var rows []row
 	for i := range others {
 		rows = append(rows, row{space: &others[i], worktree: &others[i].Worktrees[0], main: true, other: true})
 	}
-	if len(rows) > 0 && len(spaces) > 0 {
-		rows = append(rows, row{})
-	}
 	for i := range spaces {
+		if len(rows) > 0 {
+			rows = append(rows, row{})
+		}
 		s := &spaces[i]
-		r := row{space: s, main: true}
+		r := row{space: s, main: true, folded: folded[s.Root] && len(s.Worktrees) > 1}
 		if len(s.Worktrees) > 0 {
 			r.worktree = &s.Worktrees[0]
 		}
 		rows = append(rows, r)
+		if r.folded {
+			continue
+		}
 		for j := 1; j < len(s.Worktrees); j++ {
 			rows = append(rows, row{space: s, worktree: &s.Worktrees[j]})
 		}
@@ -469,37 +545,50 @@ func (m *sidebar) renderRow(i int) string {
 	if r.space == nil {
 		return strings.Repeat(" ", width)
 	}
-	label := r.space.Name
-	if !r.main {
+	// The caret column folds a space's linked worktrees, and indents those worktrees under its name.
+	caret, label := noCaret, r.space.Name
+	switch {
+	case !r.main:
 		label = marker(iconWorktree) + filepath.Base(r.worktree.Path)
+	case r.folded:
+		caret = caretFolded
+	case !r.other && len(r.space.Worktrees) > 1:
+		caret = caretOpen
 	}
-	current := r.worktree != nil && r.worktree.Session == m.kitty.Current
-	open := r.worktree != nil && m.isOpen(r.worktree)
+	// A folded space stands for all its worktrees: it is current, open or in a state if any of them is.
+	current, open, state := false, false, ""
+	for _, wt := range rowSessions(r) {
+		current = current || wt.Session == m.kitty.Current
+		open = open || m.isOpen(&wt)
+		if s := sessionStatus(m.kitty.Statuses, wt.Session); urgency[s] > urgency[state] {
+			state = s
+		}
+	}
 	mark, markStyle := noMarker, openStyle
 	switch {
 	case r.worktree == nil:
 		mark, markStyle = marker(iconBroken), errorStyle
-	case sessionStatus(m.kitty.Statuses, r.worktree.Session) != "":
+	case state != "":
 		// The most urgent status of the session's windows, which the status list below details.
-		mark, markStyle = stateMarker(sessionStatus(m.kitty.Statuses, r.worktree.Session))
+		mark, markStyle = stateMarker(state)
 	case current:
 		mark = marker(iconCurrent)
 	case open:
 		mark = marker(iconOpen)
 	}
-	label = truncate(label, max(width-cells(mark), 0))
+	label = truncate(label, max(width-cells(mark)-cells(caret), 0))
 	branch := ""
-	if rest := width - cells(mark) - cells(label); r.worktree != nil && r.worktree.Branch != "" && rest > 2 {
+	if rest := width - cells(mark) - cells(caret) - cells(label); r.worktree != nil && r.worktree.Branch != "" && rest > 2 {
 		branch = " " + truncate(r.worktree.Branch, rest-1)
 	}
-	pad := strings.Repeat(" ", max(width-cells(mark)-cells(label)-cells(branch), 0))
+	pad := strings.Repeat(" ", max(width-cells(mark)-cells(caret)-cells(label)-cells(branch), 0))
 
 	// A highlighted row is drawn in one style across its whole width, so it reads as one bar.
 	switch {
 	case i == m.cursor && m.navigating():
-		return cursorStyle.Render(mark + label + branch + pad)
+		return cursorStyle.Render(mark + caret + label + branch + pad)
 	case current:
-		return currentStyle.Render(mark + label + branch + pad)
+		return currentStyle.Render(mark + caret + label + branch + pad)
 	}
 	labelStyle := lipgloss.NewStyle()
 	switch {
@@ -511,7 +600,7 @@ func (m *sidebar) renderRow(i int) string {
 	if !open {
 		labelStyle = labelStyle.Inherit(closedStyle)
 	}
-	return markStyle.Render(mark) + labelStyle.Render(label) + branchStyle.Render(branch) + pad
+	return markStyle.Render(mark) + branchStyle.Render(caret) + labelStyle.Render(label) + branchStyle.Render(branch) + pad
 }
 
 // stateMarker is the marker and its color for a program status state.
@@ -778,6 +867,7 @@ func (m *sidebar) View() string {
 			copy(lines[top:], popup)
 		}
 	}
+	m.drawMenu(lines)
 	status := ""
 	if m.err != nil {
 		status = errorStyle.Render(truncate(m.err.Error(), width))

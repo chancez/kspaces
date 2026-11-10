@@ -82,3 +82,31 @@ func parseWorktrees(space, porcelain string) []Worktree {
 	flush()
 	return ans
 }
+
+// newWorktreePlan is where a worktree named name goes in a space and which branch it checks out: a
+// directory under the space's WorktreeDir, with any / in the name turned into -, on BranchPrefix + name.
+func newWorktreePlan(cfg Config, root, name string) (dir, branch string) {
+	return filepath.Join(root, cfg.WorktreeDir, strings.ReplaceAll(name, "/", "-")), cfg.BranchPrefix + name
+}
+
+// createWorktree adds a worktree named name to the space at root. It checks out the branch when it exists
+// and otherwise creates it from what the space's main worktree has checked out.
+func createWorktree(cfg Config, space Space, name string) (Worktree, error) {
+	name = strings.TrimSpace(name)
+	if name == "" || strings.ContainsAny(name, " \t") {
+		return Worktree{}, fmt.Errorf("a worktree name cannot be empty or contain spaces")
+	}
+	dir, branch := newWorktreePlan(cfg, space.Root, name)
+	args := []string{"-C", space.Root, "worktree", "add", dir, branch}
+	if !branchExists(space.Root, branch) {
+		args = []string{"-C", space.Root, "worktree", "add", "-b", branch, dir}
+	}
+	if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+		return Worktree{}, fmt.Errorf("%s", strings.TrimSpace(string(out)))
+	}
+	// git reports worktree paths with symlinks resolved, and sessions are matched by those paths.
+	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+		dir = resolved
+	}
+	return Worktree{Path: dir, Branch: branch, Session: sessionName(space.Name, false, dir)}, nil
+}

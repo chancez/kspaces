@@ -49,7 +49,7 @@ func pickItemsFrom(snap snapshot) pickItems {
 		icon, style := stateMarker(s.State)
 		items = append(items, pickItem{text: joinDetail(name, detail), nameLen: len(name), icon: icon, style: style, status: s})
 	}
-	for _, r := range buildRows(snap.others, snap.spaces) {
+	for _, r := range buildRows(snap.others, snap.spaces, nil) {
 		if r.worktree == nil {
 			continue
 		}

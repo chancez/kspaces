@@ -168,6 +168,21 @@ func selfWindowID() int {
 	return id
 }
 
+// launchNewWorktree opens the new worktree form for the space at root in an overlay over the window of
+// the sidebar's tab. The var keeps the overlay out of saved sessions, whose match leaves out var:kspaces.
+func launchNewWorktree(st KittyState, root string) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	args := []string{"launch", "--type=overlay", "--var=kspaces_form=1"}
+	if st.Home != 0 {
+		args = append(args, "--next-to", fmt.Sprintf("id:%d", st.Home))
+	}
+	_, err = kitten(append(args, exe, "new", root)...)
+	return err
+}
+
 func focusWindow(id int) error {
 	_, err := kitten("focus-window", "--match", fmt.Sprintf("id:%d", id))
 	return err

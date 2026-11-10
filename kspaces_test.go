@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -98,15 +99,19 @@ space /src/kitty
 
 new_tab kitten my_launch.py --type=tab
 sessions ~/.local/share/kitty/sessions
+branch_prefix pr/me/
 `
 	got, err := parseConfig(bufio.NewScanner(strings.NewReader(in)))
 	if err != nil {
 		t.Fatal(err)
 	}
+	// worktree_dir is left out, so it has its default.
 	want := Config{
-		Spaces:      []string{filepath.Join(home, "projects/gr"), "/src/kitty"},
-		NewTab:      []string{"kitten", "my_launch.py", "--type=tab"},
-		SessionsDir: filepath.Join(home, ".local/share/kitty/sessions"),
+		Spaces:       []string{filepath.Join(home, "projects/gr"), "/src/kitty"},
+		NewTab:       []string{"kitten", "my_launch.py", "--type=tab"},
+		SessionsDir:  filepath.Join(home, ".local/share/kitty/sessions"),
+		WorktreeDir:  ".worktrees",
+		BranchPrefix: "pr/me/",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
@@ -114,6 +119,85 @@ sessions ~/.local/share/kitty/sessions
 
 	if _, err := parseConfig(bufio.NewScanner(strings.NewReader("spaces ~/x\n"))); err == nil {
 		t.Fatal("an unknown key was accepted")
+	}
+}
+
+// rowNames shows rows as their worktree's session, with "" for the blank rows between groups.
+func rowNames(rows []row) []string {
+	var ans []string
+	for _, r := range rows {
+		switch {
+		case r.space == nil:
+			ans = append(ans, "")
+		case r.folded:
+			ans = append(ans, r.worktree.Session+" (folded)")
+		default:
+			ans = append(ans, r.worktree.Session)
+		}
+	}
+	return ans
+}
+
+func TestBuildRows(t *testing.T) {
+	others := []Space{{Name: "default", Worktrees: []Worktree{{Session: "default"}}}}
+	spaces := []Space{
+		{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Session: "gr"}, {Session: "gr@dev"}, {Session: "gr@fix"}}},
+		{Name: "kitty", Root: "/src/kitty", Worktrees: []Worktree{{Session: "kitty"}}},
+		{Name: "docs", Root: "/src/docs", Worktrees: []Worktree{{Session: "docs"}, {Session: "docs@notes"}}},
+	}
+	// Folding a space with no linked worktrees changes nothing.
+	got := rowNames(buildRows(others, spaces, map[string]bool{"/src/docs": true, "/src/kitty": true}))
+	want := []string{"default", "", "gr", "gr@dev", "gr@fix", "", "kitty", "", "docs (folded)"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q\nwant %q", got, want)
+	}
+}
+
+func TestCreateWorktree(t *testing.T) {
+	git := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	git(root, "init", "-q", "-b", "main")
+	git(root, "commit", "-q", "--allow-empty", "-m", "first")
+	git(root, "branch", "pr/me/old")
+	cfg := Config{WorktreeDir: ".worktrees", BranchPrefix: "pr/me/"}
+	space := Space{Name: "repo", Root: root}
+
+	// A new branch, and a / in the name kept in the branch but not in the directory.
+	got, err := createWorktree(cfg, space, "fix/bug")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := Worktree{Path: filepath.Join(root, ".worktrees", "fix-bug"), Branch: "pr/me/fix/bug", Session: "repo@fix-bug"}
+	if got != want {
+		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+	// An existing branch is checked out rather than created.
+	if got, err = createWorktree(cfg, space, "old"); err != nil {
+		t.Fatal(err)
+	}
+	if want := (Worktree{Path: filepath.Join(root, ".worktrees", "old"), Branch: "pr/me/old", Session: "repo@old"}); got != want {
+		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+	if ws := loadSpace(root).Worktrees; len(ws) != 3 || ws[1].Branch != "pr/me/fix/bug" || ws[2].Branch != "pr/me/old" {
+		t.Fatalf("git lists %#v", ws)
+	}
+	// git's own refusal comes back as the error: the directory is taken.
+	if _, err := createWorktree(cfg, space, "old"); err == nil {
+		t.Fatal("a second worktree in the same directory was created")
+	}
+	if _, err := createWorktree(cfg, space, "two words"); err == nil {
+		t.Fatal("a name with a space was accepted")
 	}
 }
 

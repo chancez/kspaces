@@ -22,10 +22,23 @@ STATUS
 Each row starts with an icon, from the Nerd Fonts symbols kitty ships with: a chevron for the session of
 the tab the sidebar is in, a dot for a session with windows open, and none for a worktree with no session
 yet, which is drawn faint. A cross next to a space means its worktrees could not be listed. Linked
-worktrees have a branch icon before their name.
+worktrees have a branch icon before their name. A blank row separates spaces.
 
 Sessions that are open or saved (see `sessions` below) but are not any worktree's, such as the one kitty
 starts with, are listed above the spaces.
+
+## Folding and new worktrees
+
+A space with linked worktrees has a triangle before its name. Clicking it, or `space` on the space's row,
+hides its linked worktrees; the space's row then stands for all of them, showing the most urgent state and
+the current session of any. Which spaces are folded is kept in `$XDG_STATE_HOME/kspaces/folded`, so every
+tab's sidebar agrees.
+
+Right-clicking a row, or `m` on it, opens a menu: Open, Fold or Unfold worktrees, and New worktree. New
+worktree, or `n`, opens a form in an overlay over the tab's window, as the sidebar is too narrow to type
+in. It shows the directory and branch the name makes, creates the worktree, checking out the branch if it
+exists or branching from what the space's main worktree has checked out, and switches to its session.
+`kspaces new [SPACE]` opens the same form, for the space given by root or name, or the current one.
 
 ## Status
 
@@ -91,6 +104,11 @@ new_tab launch --type=tab
 # Where kitty session files are saved, one per session named SESSION.kitty-session. Unset by default,
 # which never restores from a file.
 sessions ~/.local/share/kitty/sessions
+
+# Where new worktrees go, relative to their space's root, and what goes before their name to make the
+# branch name. Default to .worktrees and nothing.
+worktree_dir .worktrees
+branch_prefix pr/me/
 ```
 
 ## Commands
@@ -101,6 +119,7 @@ kspaces pick        a fuzzy picker over sessions, worktrees and status entries, 
 kspaces list        every space's worktrees with their session names
 kspaces open PATH   switch to the session of the worktree at PATH, creating it if needed
 kspaces next, prev  switch to the next or previous session with windows open, in sidebar order
+kspaces new [SPACE] create a worktree in a form and switch to it, meant for a kitty overlay
 ```
 
 `next` and `prev` act on the window that has the keyboard, so they suit a kitty mapping. A background
