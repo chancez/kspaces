@@ -134,3 +134,36 @@ func TestOtherSessions(t *testing.T) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}
 }
+
+func TestStatuses(t *testing.T) {
+	data := []lsOSWindow{{Tabs: []lsTab{
+		{ID: 1, Windows: []lsWindow{
+			// Several records: the most urgent one stands for the window.
+			{ID: 10, SessionName: "gr", ProgramStatus: []programRecord{
+				{ID: "build", State: "working"},
+				{ID: "deploy", State: "blocked", App: "claude", Title: "approve"},
+			}},
+			{ID: 11, SessionName: "gr", ProgramStatus: []programRecord{{State: "idle"}}},
+		}},
+		{ID: 2, Windows: []lsWindow{
+			{ID: 20, SessionName: "kitty", ProgramStatus: []programRecord{{State: "done", App: "make"}}},
+			{ID: 21, Title: "scratch", ProgramStatus: []programRecord{{State: "error", Msg: "exit 1"}}},
+			{ID: 22, SessionName: "kitty", UserVars: map[string]string{dockVar: "1"}, ProgramStatus: []programRecord{{State: "blocked"}}},
+		}},
+	}}}
+
+	got := kittyStateFrom(data, 0).Statuses
+	want := []Status{
+		{Window: 10, Session: "gr", programRecord: programRecord{ID: "deploy", State: "blocked", App: "claude", Title: "approve"}},
+		{Window: 21, WindowTitle: "scratch", programRecord: programRecord{State: "error", Msg: "exit 1"}},
+		{Window: 20, Session: "kitty", programRecord: programRecord{State: "done", App: "make"}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+
+	gotStates := []string{sessionStatus(got, "gr"), sessionStatus(got, "kitty"), sessionStatus(got, "docs")}
+	if wantStates := []string{"blocked", "done", ""}; !reflect.DeepEqual(gotStates, wantStates) {
+		t.Fatalf("session states: got %q, want %q", gotStates, wantStates)
+	}
+}

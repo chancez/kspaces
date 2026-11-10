@@ -41,9 +41,11 @@ func kitten(args ...string) ([]byte, error) {
 
 type lsWindow struct {
 	ID            int               `json:"id"`
+	Title         string            `json:"title"`
 	SessionName   string            `json:"session_name"`
 	LastFocusedAt float64           `json:"last_focused_at"`
 	UserVars      map[string]string `json:"user_vars"`
+	ProgramStatus []programRecord   `json:"program_status"`
 }
 
 type lsTab struct {
@@ -64,6 +66,8 @@ type KittyState struct {
 	// The window focused most recently in the sidebar's tab, not counting docks. Leaving the sidebar returns
 	// focus to it. Zero when unknown.
 	Home int
+	// Every window that reports a program status other than idle, most urgent first.
+	Statuses []Status
 }
 
 func loadKittyState(selfWindowID int) (KittyState, error) {
@@ -95,6 +99,9 @@ func kittyStateFrom(data []lsOSWindow, selfWindowID int) KittyState {
 				if home == 0 || w.LastFocusedAt > homeAt {
 					home, homeAt = w.ID, w.LastFocusedAt
 				}
+				if s, ok := windowStatus(w); ok {
+					st.Statuses = append(st.Statuses, s)
+				}
 				if w.SessionName == "" {
 					continue
 				}
@@ -109,6 +116,7 @@ func kittyStateFrom(data []lsOSWindow, selfWindowID int) KittyState {
 			}
 		}
 	}
+	sortStatuses(st.Statuses)
 	return st
 }
 
@@ -123,6 +131,17 @@ func selfWindowID() int {
 func focusWindow(id int) error {
 	_, err := kitten("focus-window", "--match", fmt.Sprintf("id:%d", id))
 	return err
+}
+
+// openWindow focuses one window, handing this tab's focus back to its own window first, as openWorktree
+// does, so coming back to the tab does not land in the sidebar.
+func openWindow(st KittyState, id int) error {
+	if st.Home != 0 && st.Home != id {
+		if err := focusWindow(st.Home); err != nil {
+			return err
+		}
+	}
+	return focusWindow(id)
 }
 
 // openWorktree switches to the worktree's session. When it has no windows, the session is restored from its

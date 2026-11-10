@@ -9,16 +9,33 @@ SPACES
 
 * default
 
-* gr pr/chancez/dev
+! gr pr/chancez/dev
 > docs-reference main
 *   release-caveats pr/ch...
+
+...
+
+STATUS
+! gr claude
++ default make
 ```
 
 `>` marks the session of the tab the sidebar is in, `*` a session with windows open, and faint rows
-worktrees with no session yet. `!` means the space's worktrees could not be listed.
+worktrees with no session yet. `!` next to a space means its worktrees could not be listed.
 
 Sessions that are open or saved (see `sessions` below) but are not any worktree's, such as the one kitty
 starts with, are listed above the spaces.
+
+## Status
+
+The STATUS list at the bottom shows every window whose program reports a status with the program status
+protocol (OSC 7501), most urgent first: `!` blocked on you, `x` failed, `+` done, `~` working. The worktree
+rows carry the most urgent state of their session in place of `*`. Clicking an entry, or `enter` on it,
+focuses that window.
+
+kitty keeps the records and applies the protocol's rules, and kspaces reads them from `kitten @ ls`:
+working and blocked end at the next shell prompt, done and failed stay until the window is focused or typed
+in. Anything that writes OSC 7501 to its terminal shows up, an agent or a build alike.
 
 ## How it fits into kitty
 
@@ -29,8 +46,9 @@ starts with, are listed above the spaces.
 - Opening a worktree whose session has windows focuses the most recently focused one. Otherwise, if
   `sessions` is set and has a `SESSION.kitty-session` file, kspaces loads it with `goto_session`. Failing
   both, it runs the configured `new_tab` action with `--cwd=WORKTREE --add-to-session=SESSION` appended.
-- Set `tab_bar_filter session:~ or session:^$` in kitty.conf so the tab bar only shows the current
-  session's tabs.
+- Set `tab_bar_filter session:. or session:^$` in kitty.conf so the tab bar only shows the current
+  session's tabs. `~`, which kitty's docs suggest, also shows the session last switched to with
+  `goto_session`, and kspaces switches by focusing a window.
 - kitty can only dock a window to a single tab, so a sidebar in every tab is one `kspaces sidebar` dock per
   tab. A global watcher in kitty.conf adds them. Docks are marked with the `kspaces` user variable.
 - kitty places docks inside the tab bar, so keep the tab bar at the top or bottom.

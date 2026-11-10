@@ -5,9 +5,18 @@
 To consider once the core pieces work:
 
 - A picker: a fuzzy finder over spaces and worktrees, bound to a key, for switching without the sidebar.
-- A status area: aimed at agents first (state, what each one is waiting on, jump to it), but possibly for
-  more than agents, such as a long build or a failing test run.
 - More UX in general, still to investigate.
+
+## Status area
+
+A first version reads OSC 7501 records from `kitten @ ls`. Open questions:
+
+- Windows running under cm: OSC 7501 has to reach kitty for kitty to keep the record. The installed cm
+  (37fe9b6) does not pass it through. cm's ideas.md has "Re-send OSC 7501 to each client", which would
+  also translate its own 25453 reports, so hooks using `cm report` would show up too.
+- kitty loses its records when it restarts or a window reattaches, while cm keeps the session's state.
+- No time in the entries: kitty does not report when a record was set.
+- Entries are one line, so a long title is cut at the dock's width.
 
 ## Known issues
 

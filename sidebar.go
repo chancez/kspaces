@@ -48,9 +48,11 @@ type sidebar struct {
 	rows   []row
 	cursor int
 	offset int
-	width  int
-	height int
-	err    error
+	// The first status entry shown, when there are more than fit.
+	statusOffset int
+	width        int
+	height       int
+	err          error
 	// Whether kitty has given the sidebar keyboard focus. The cursor is only drawn then.
 	focused bool
 }
@@ -67,6 +69,8 @@ var (
 	branchStyle  = lipgloss.NewStyle().Foreground(muted)
 	openStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
 	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	blockedStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("3"))
+	workingStyle = lipgloss.NewStyle().Foreground(accent)
 	currentStyle = lipgloss.NewStyle().Background(muted).Foreground(lipgloss.Color("15")).Bold(true)
 	cursorStyle  = lipgloss.NewStyle().Reverse(true)
 	borderStyle  = lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, true, false, false)
@@ -102,12 +106,27 @@ func (m *sidebar) Init() tea.Cmd {
 	return tea.Batch(m.refresh(), tick())
 }
 
+// The cursor runs over the spaces rows first, then the status entries: index i is m.rows[i] below
+// len(m.rows), and m.kitty.Statuses[i-len(m.rows)] from there.
+func (m *sidebar) numEntries() int {
+	return len(m.rows) + len(m.kitty.Statuses)
+}
+
 func (m *sidebar) open(i int) tea.Cmd {
-	if i < 0 || i >= len(m.rows) || m.rows[i].worktree == nil {
+	cfg, st, self := m.cfg, m.kitty, m.self
+	switch {
+	case i >= len(m.rows) && i < m.numEntries():
+		id := st.Statuses[i-len(m.rows)].Window
+		return func() tea.Msg {
+			if err := openWindow(st, id); err != nil {
+				return snapshot{err: err}
+			}
+			return load(self)
+		}
+	case i < 0 || i >= len(m.rows) || m.rows[i].worktree == nil:
 		return nil
 	}
-	cfg, st, wt := m.cfg, m.kitty, *m.rows[i].worktree
-	self := m.self
+	wt := *m.rows[i].worktree
 	return func() tea.Msg {
 		if err := openWorktree(cfg, st, wt); err != nil {
 			return snapshot{err: err}
@@ -138,17 +157,23 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.cfg != nil {
 			m.cfg, m.spaces, m.kitty = *msg.cfg, msg.spaces, msg.kitty
 			m.rows = buildRows(msg.others, m.spaces)
-			m.cursor = min(m.cursor, max(len(m.rows)-1, 0))
+			m.cursor = min(m.cursor, max(m.numEntries()-1, 0))
+			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-m.layout().status, 0))
 		}
 	case tea.MouseMsg:
+		l := m.layout()
+		inStatus := l.status > 0 && msg.Y >= l.statusTop
 		switch {
+		case msg.Button == tea.MouseButtonWheelUp && inStatus:
+			m.statusOffset = max(m.statusOffset-1, 0)
+		case msg.Button == tea.MouseButtonWheelDown && inStatus:
+			m.statusOffset = min(m.statusOffset+1, max(len(m.kitty.Statuses)-l.status, 0))
 		case msg.Button == tea.MouseButtonWheelUp:
 			m.offset = max(m.offset-1, 0)
 		case msg.Button == tea.MouseButtonWheelDown:
-			m.offset = min(m.offset+1, max(len(m.rows)-m.listHeight(), 0))
+			m.offset = min(m.offset+1, max(len(m.rows)-l.spaces, 0))
 		case msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress:
-			i := msg.Y - headerRows + m.offset
-			if i >= 0 && i < len(m.rows) {
+			if i, ok := m.entryAt(msg.Y); ok {
 				m.cursor = i
 				return m, m.open(i)
 			}
@@ -162,7 +187,7 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "g", "home":
 			m.cursor = 0
 		case "G", "end":
-			m.cursor = max(len(m.rows)-1, 0)
+			m.cursor = max(m.numEntries()-1, 0)
 		case "enter", "l":
 			return m, m.open(m.cursor)
 		case "esc", "q":
@@ -177,8 +202,38 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *sidebar) listHeight() int {
-	return max(m.height-headerRows-1, 1)
+// layout splits the height between the two lists. The status list sits at the bottom and takes what its
+// entries need, up to about half; the spaces list gets the rest.
+type layout struct {
+	spaces int
+	status int
+	// The screen row of the first status entry, below a blank row and the STATUS title.
+	statusTop int
+}
+
+func (m *sidebar) layout() layout {
+	avail := max(m.height-headerRows-1, 1)
+	n := len(m.kitty.Statuses)
+	if n == 0 {
+		return layout{spaces: avail}
+	}
+	status := min(n, max(avail/2-2, 1))
+	spaces := max(avail-status-2, 1)
+	return layout{spaces: spaces, status: status, statusTop: headerRows + spaces + 2}
+}
+
+// entryAt maps a screen row to a cursor index.
+func (m *sidebar) entryAt(y int) (int, bool) {
+	l := m.layout()
+	if y >= headerRows && y < headerRows+l.spaces {
+		i := y - headerRows + m.offset
+		return i, i < len(m.rows) && m.rows[i].space != nil
+	}
+	if l.status > 0 && y >= l.statusTop && y < l.statusTop+l.status {
+		j := y - l.statusTop + m.statusOffset
+		return len(m.rows) + j, j < len(m.kitty.Statuses)
+	}
+	return 0, false
 }
 
 // contentWidth leaves the last column for the border against the window the sidebar is docked to.
@@ -187,17 +242,27 @@ func (m *sidebar) contentWidth() int {
 }
 
 func (m *sidebar) scrollToCursor() {
+	l := m.layout()
+	if m.cursor >= len(m.rows) {
+		j := m.cursor - len(m.rows)
+		if j < m.statusOffset {
+			m.statusOffset = j
+		} else if j >= m.statusOffset+l.status {
+			m.statusOffset = j - l.status + 1
+		}
+		return
+	}
 	if m.cursor < m.offset {
 		m.offset = m.cursor
-	} else if h := m.listHeight(); m.cursor >= m.offset+h {
-		m.offset = m.cursor - h + 1
+	} else if m.cursor >= m.offset+l.spaces {
+		m.offset = m.cursor - l.spaces + 1
 	}
 }
 
-// moveCursor moves by delta rows, stepping over the blank row between groups.
+// moveCursor moves by delta entries, stepping over the blank row between groups of spaces.
 func (m *sidebar) moveCursor(delta int) {
-	for i := m.cursor + delta; i >= 0 && i < len(m.rows); i += delta {
-		if m.rows[i].space != nil {
+	for i := m.cursor + delta; i >= 0 && i < m.numEntries(); i += delta {
+		if i >= len(m.rows) || m.rows[i].space != nil {
 			m.cursor = i
 			return
 		}
@@ -313,6 +378,9 @@ func (m *sidebar) renderRow(i int) string {
 	switch {
 	case r.worktree == nil:
 		marker, markerStyle = "! ", errorStyle
+	case sessionStatus(m.kitty.Statuses, r.worktree.Session) != "":
+		// The most urgent status of the session's windows, which the status list below details.
+		marker, markerStyle = stateMarker(sessionStatus(m.kitty.Statuses, r.worktree.Session))
 	case current:
 		marker = "> "
 	case open:
@@ -345,17 +413,72 @@ func (m *sidebar) renderRow(i int) string {
 	return markerStyle.Render(marker) + labelStyle.Render(label) + branchStyle.Render(branch) + pad
 }
 
+// stateMarker is the two-column marker and its color for a program status state.
+func stateMarker(state string) (string, lipgloss.Style) {
+	switch state {
+	case "blocked":
+		return "! ", blockedStyle
+	case "error":
+		return "x ", errorStyle
+	case "done":
+		return "+ ", openStyle
+	default:
+		return "~ ", workingStyle
+	}
+}
+
+// renderStatus draws status entry j: its state, the session it belongs to, or the window title for a
+// window in no session, and what the program said.
+func (m *sidebar) renderStatus(j int) string {
+	s, width := m.kitty.Statuses[j], m.contentWidth()
+	marker, markerStyle := stateMarker(s.State)
+	label := s.Session
+	if label == "" {
+		label = s.WindowTitle
+	}
+	detail := s.Title
+	if detail == "" {
+		detail = s.Msg
+	}
+	if detail == "" {
+		detail = s.App
+	}
+	if s.State == "working" && s.Progress != nil {
+		detail = strings.TrimSpace(fmt.Sprintf("%d%% %s", *s.Progress, detail))
+	}
+	label = truncate(label, max(width-len(marker), 0))
+	if rest := width - len(marker) - len([]rune(label)); detail != "" && rest > 2 {
+		detail = " " + truncate(detail, rest-1)
+	} else {
+		detail = ""
+	}
+	pad := strings.Repeat(" ", max(width-len(marker)-len([]rune(label))-len([]rune(detail)), 0))
+	if len(m.rows)+j == m.cursor && m.focused {
+		return cursorStyle.Render(marker + label + detail + pad)
+	}
+	return markerStyle.Render(marker) + label + branchStyle.Render(detail) + pad
+}
+
 func (m *sidebar) isOpen(wt *Worktree) bool {
 	_, ok := m.kitty.Sessions[wt.Session]
 	return ok
 }
 
 func (m *sidebar) View() string {
-	width := m.contentWidth()
+	width, l := m.contentWidth(), m.layout()
 	lines := []string{titleStyle.Render(truncate("SPACES", width)), ""}
-	end := min(m.offset+m.listHeight(), len(m.rows))
-	for i := m.offset; i < end; i++ {
+	for i := m.offset; i < min(m.offset+l.spaces, len(m.rows)); i++ {
 		lines = append(lines, m.renderRow(i))
+	}
+	if l.status > 0 {
+		// Pinned to the bottom: pad the spaces list out to its share first.
+		for len(lines) < l.statusTop-2 {
+			lines = append(lines, "")
+		}
+		lines = append(lines, "", titleStyle.Render(truncate("STATUS", width)))
+		for j := m.statusOffset; j < min(m.statusOffset+l.status, len(m.kitty.Statuses)); j++ {
+			lines = append(lines, m.renderStatus(j))
+		}
 	}
 	// Fill the height so the border runs the full length of the dock, with errors on the last line.
 	for len(lines) < m.height-1 {
