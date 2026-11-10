@@ -22,6 +22,10 @@ import (
 //
 //	[sidebar]
 //	width = 28
+//
+//	[kitty]
+//	auto_install = true
+//	save_sessions = true
 type Config struct {
 	// Roots of the repositories shown as spaces, in the order they are listed.
 	Spaces []string `toml:"spaces"`
@@ -34,6 +38,7 @@ type Config struct {
 	SessionsDir string    `toml:"sessions"`
 	Worktrees   Worktrees `toml:"worktrees"`
 	Sidebar     Sidebar   `toml:"sidebar"`
+	Kitty       Kitty     `toml:"kitty"`
 }
 
 // Sidebar is how the sidebar's dock is laid out. kitty sizes the dock, so kitty.conf's watcher reads this
@@ -41,6 +46,16 @@ type Config struct {
 type Sidebar struct {
 	// The dock's width in columns, the right border included.
 	Width int `toml:"width"`
+}
+
+// Kitty is what `kspaces kitty install` puts in kitty's config directory.
+type Kitty struct {
+	// AutoInstall makes the sidebar rewrite the installed files when they are not what this kspaces would
+	// install, rather than only saying so.
+	AutoInstall bool `toml:"auto_install"`
+	// SaveSessions installs the session saver, which saves each kitty session to its own file in kitty's
+	// sessions directory and restores them at startup.
+	SaveSessions bool `toml:"save_sessions"`
 }
 
 // The sidebar's width when none is set, and the range a width must be in to leave room for names and for

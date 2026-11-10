@@ -49,6 +49,8 @@ type sidebar struct {
 	width        int
 	height       int
 	err          error
+	// notice is what the last line says when there is no error: that the kitty files are out of date.
+	notice *look.Span
 	// Whether kitty has given the sidebar keyboard focus.
 	focused bool
 	// When keys arrive without focus, kitty is sending them from another window: kitty.conf's spaces mode
@@ -95,7 +97,7 @@ func tick() tea.Cmd {
 }
 
 func (m *sidebar) Init() tea.Cmd {
-	return tea.Batch(m.refresh(), tick())
+	return tea.Batch(m.refresh(), tick(), checkGlue)
 }
 
 // The cursor runs over the spaces rows first, then the status entries: index i is m.rows[i] below
@@ -158,6 +160,8 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.hover = 0
 		}
 		return m, tea.Batch(m.refresh(), tick())
+	case glueMsg:
+		m.notice = &msg.notice
 	case spaces.Snapshot:
 		m.err = msg.Err
 		if msg.Config != nil {
@@ -291,8 +295,11 @@ func (m *sidebar) frame() string {
 	}
 	m.drawMenu(lines)
 	status := ""
-	if m.err != nil {
+	switch {
+	case m.err != nil:
 		status = th.Render(look.Plain, th.Cut(width, look.Error(m.err.Error()))...)
+	case m.notice != nil:
+		status = th.Render(look.Plain, th.Cut(width, *m.notice)...)
 	}
 	lines = append(lines, status)
 	// The border against the window the dock is next to, in the accent while keys move the cursor.

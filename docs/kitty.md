@@ -12,11 +12,43 @@ Opening a worktree:
 2. otherwise loads `SESSION.kitty-session` from the `sessions` directory with `goto_session`, if there is one;
 3. otherwise runs the `new_tab` action with `--cwd=WORKTREE --add-to-session=SESSION`.
 
-kspaces never writes session files. Saving them, as the watcher below can, is up to kitty.
+kspaces itself never writes session files. The session saver below, which it can install into kitty, does.
+
+## Installing the kitty files
+
+kitty needs a watcher to dock a sidebar in every tab, and a couple of kittens. They are built into kspaces:
+
+```
+kspaces kitty install
+```
+
+writes them to `kspaces/` in kitty's config directory (`--dir` for elsewhere), with a `kspaces.conf` that
+loads them. Include that from kitty.conf, then restart kitty:
+
+```conf
+include kspaces/kspaces.conf
+```
+
+Installing another kspaces leaves the files as they were. A sidebar notices, and its last line says
+`kitty files out of date`; `kspaces kitty check` names them, and exits 1, for a script to act on. With
+`auto_install` the sidebar rewrites them itself, and says to restart kitty to load them:
+
+```toml
+[kitty]
+# Rewrite the installed kitty files when they are not this kspaces' own. Off by default.
+auto_install = true
+# Install the session saver, below. Off by default.
+save_sessions = true
+```
+
+Changing `[kitty]` changes what install writes, so it makes the files out of date too.
 
 ## kitty.conf
 
 ```conf
+# Before your own mappings, so yours win.
+include kspaces/kspaces.conf
+
 # kspaces talks to kitty over remote control.
 allow_remote_control socket-only
 listen_on unix:/tmp/kitty
@@ -31,46 +63,49 @@ tab_bar_filter session:~ or session:^$
 # Closing a tab focuses its neighbor in the session rather than the last used tab.
 tab_switch_strategy left
 
-# The picker.
-map f5 launch --type=overlay --var=kspaces_picker=1 kspaces pick
-
-# The next and previous session with windows open, in sidebar order. A background process needs
-# --allow-remote-control to reach kitty.
-map cmd+alt+[ launch --type=background --allow-remote-control kspaces prev
-map cmd+alt+] launch --type=background --allow-remote-control kspaces next
+# kspaces.conf's actions.
+map f3 kspaces_focus
+map f4 kspaces_toggle
+map f5 kspaces_pick
+map cmd+alt+[ kspaces_prev
+map cmd+alt+] kspaces_next
 ```
 
-## The watcher
+The watcher and the actions find `kspaces` the way kitty's `launch` does: kitty's `exe_search_path`, its
+own PATH, `~/.local/bin`, then the PATH of kitty.conf's `env` and your login shell. kitty started from the
+Dock has a short PATH, so if kspaces is somewhere else, such as mise's shims, set
+`env PATH=~/.local/share/mise/shims:${PATH}` or `exe_search_path`.
 
-kitty can dock a window to one tab only, so a sidebar in every tab is one `kspaces sidebar` per tab, docked
-by a global watcher in kitty.conf (`watcher kspaces_watcher.py`). It:
+## What the files do
+
+kitty can dock a window to one tab only, so a sidebar in every tab is one `kspaces sidebar` per tab.
+`kspaces_watcher.py`:
 
 - docks `kspaces sidebar` at the left of every tab that belongs to a session, with the `kspaces` user
   variable and `--keep-focus`;
-- sizes the docks to `[sidebar] width` from the config, and resizes them when it changes;
+- sizes the docks to `[sidebar] width`, and resizes them when it changes;
 - notes when each program status record changed state, in the window's `program_status_at` user variable,
   which the status list's ages come from.
 
-The watcher starts `~/.local/bin/kspaces`. The docks, the forms kspaces opens and the picker's overlay carry
-a `kspaces*` user variable, so a session saver can leave them out with `not var:kspaces`.
+`kspaces_toggle.py` hides and shows every sidebar, and `kspaces_focus.py` moves the keyboard into the
+current tab's sidebar and back.
 
-A session saver watcher can save each session to its own file in the `sessions` directory, at quit and as
-windows close, and load them again at startup. Then a space reopens as it was left, and starts afresh once
-its last window has closed.
+`save_sessions.py`, with `save_sessions = true`, saves each session to its own file at quit and as its
+windows close or take focus, and loads the ones that were open at startup. A space then reopens as it was
+left, and afresh once its last window has closed. The files go next to kitty's `startup_session`, so point
+kspaces' `sessions` at that directory. `kspaces_save_sessions` saves them on demand. The docks, the forms
+kspaces opens and the picker carry a `kspaces*` user variable, and are never saved.
 
 ## Keys without focusing the sidebar
 
-The sidebar's keys can be sent from any window with `send-key`. A keyboard mode makes that a set of
-mappings: `f6`, then `j`/`k` move the cursor and `enter` switches.
+The sidebar's keys can be sent from any window with `kspaces_key`, which kspaces.conf defines with
+`send-key`. A keyboard mode makes that a set of mappings: `f6`, then `j`/`k` move the cursor and `enter`
+switches.
 
 ```conf
-action_alias spaces_key remote_control send-key --match "var:^kspaces$ and state:parent_focused"
 map --new-mode spaces --on-unknown passthrough_and_end f6
-map --mode spaces j spaces_key j
-map --mode spaces k spaces_key k
-map --mode spaces enter combine : spaces_key enter : pop_keyboard_mode
-map --mode spaces esc combine : spaces_key esc : pop_keyboard_mode
+map --mode spaces j kspaces_key j
+map --mode spaces k kspaces_key k
+map --mode spaces enter combine : kspaces_key enter : pop_keyboard_mode
+map --mode spaces esc combine : kspaces_key esc : pop_keyboard_mode
 ```
-
-`^kspaces$` rather than `kspaces`, so the picker's overlay, whose variable is `kspaces_picker`, is not sent
-the keys too.

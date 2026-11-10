@@ -22,6 +22,9 @@ branch_prefix = "pr/me"
 
 [sidebar]
 width = 40
+
+[kitty]
+auto_install = true
 `
 	got, err := Parse(in)
 	if err != nil {
@@ -34,6 +37,7 @@ width = 40
 		SessionsDir: filepath.Join(home, ".local/share/kitty/sessions"),
 		Worktrees:   Worktrees{Dir: ".worktrees", BranchPrefix: "pr/me"},
 		Sidebar:     Sidebar{Width: 40},
+		Kitty:       Kitty{AutoInstall: true},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)

@@ -64,8 +64,25 @@ mise run install    # -> ~/.local/bin/kspaces
 
 ## Setup
 
-kspaces needs kitty's remote control, a tab bar filtered to the current session, and a kitty watcher that
-docks a sidebar in every tab. [docs/kitty.md](docs/kitty.md) has the kitty.conf and what the watcher does.
+kitty needs a watcher that docks a sidebar in every tab, which kspaces carries and installs:
+
+```
+kspaces kitty install    # -> ~/.config/kitty/kspaces/
+```
+
+Include its `kspaces.conf` from kitty.conf, with remote control on and the tab bar filtered to the current
+session, then restart kitty:
+
+```conf
+include kspaces/kspaces.conf
+allow_remote_control socket-only
+listen_on unix:/tmp/kitty
+tab_bar_filter session:~ or session:^$
+map f4 kspaces_toggle
+```
+
+[docs/kitty.md](docs/kitty.md) has the rest: the actions to map, keeping the files up to date, and the
+session saver.
 
 Then list your spaces in `~/.config/kspaces/config.toml`:
 
@@ -88,6 +105,11 @@ branch_prefix = "pr/me"
 # The sidebar's width in columns, 12 to 120.
 [sidebar]
 width = 28
+
+# Rewrite the installed kitty files when another kspaces is installed, and install the session saver.
+[kitty]
+auto_install = true
+save_sessions = true
 ```
 
 Every key is optional. An unknown key is an error.
@@ -106,6 +128,7 @@ kspaces next, prev       switch to the next or previous session with windows ope
 kspaces new [SPACE]      create a worktree, in a form
 kspaces close [SESSION]  close every window of a session, after confirming
 kspaces remove PATH      close a linked worktree's session and remove the worktree, after confirming
+kspaces kitty install    install the files kitty needs; kspaces kitty check says if they are current
 ```
 
 ## Development
