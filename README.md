@@ -137,6 +137,8 @@ kspaces next, prev  switch to the next or previous session with windows open, in
 kspaces new [SPACE] create a worktree in a form and switch to it, meant for a kitty overlay
 ```
 
+`kspaces --help` lists them, and `kspaces --version` prints the version.
+
 `next` and `prev` act on the window that has the keyboard, so they suit a kitty mapping. A background
 process needs `--allow-remote-control` to reach kitty:
 
