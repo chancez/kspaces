@@ -1,7 +1,10 @@
 package tui
 
 import (
+	"strings"
+
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/chancez/kspaces/internal/tui/interact"
 	"github.com/chancez/kspaces/internal/tui/look"
@@ -91,4 +94,19 @@ func offered[M any](m M, t interact.Target[M], keys []interact.Key[M], a any) (i
 		}
 	}
 	return interact.Bound[M]{}, "", false
+}
+
+// boxed draws a form's lines with a row of padding above and below, and two columns on either side of the
+// widest line, for the forms kitty shows in an overlay.
+func boxed(lines []string) string {
+	inner := 0
+	for _, l := range lines {
+		inner = max(inner, ansi.StringWidth(l))
+	}
+	blank := strings.Repeat(" ", inner+4)
+	out := []string{blank}
+	for _, l := range lines {
+		out = append(out, "  "+look.Fit(l, inner)+"  ")
+	}
+	return strings.Join(append(out, blank), "\n")
 }

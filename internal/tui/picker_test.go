@@ -104,7 +104,7 @@ func TestNewWorktreeForm(t *testing.T) {
 		"",
 		"  Name the branch to create or check out",
 		"",
-		"  tab next field  enter create  esc cancel",
+		"   Create enter    Cancel esc   tab next field",
 		"",
 	}
 	if got := screen(); !reflect.DeepEqual(got, want) {
@@ -291,6 +291,18 @@ func TestFormButtons(t *testing.T) {
 	cmd = clickOn(t, f, "Remove")
 	if got, want := (result{cmd != nil, f.busy}), (result{false, false}); got != want {
 		t.Errorf("Remove on a locked worktree: %+v, want %+v", got, want)
+	}
+
+	n := newForm(config.Config{}, space)
+	n.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	cmd = clickOn(t, n, "Cancel")
+	if got, want := (result{cmd != nil, n.busy}), (result{true, false}); got != want {
+		t.Errorf("Cancel a new worktree: %+v, want %+v", got, want)
+	}
+	// The command creates a worktree, so it is not run here.
+	cmd = clickOn(t, n, "Create")
+	if got, want := (result{cmd != nil, n.busy}), (result{true, true}); got != want {
+		t.Errorf("Create: %+v, want %+v", got, want)
 	}
 
 	c := &closeSessionForm{th: look.New(true), session: "gr@dev", windows: 1}

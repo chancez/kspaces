@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/git"
@@ -132,16 +131,7 @@ func (f *removeWorktreeForm) render() string {
 	lines = append(lines, line(f.buttons.draw(f, theRemoveForm.Target(removeSubject{}),
 		control{action: actRemove, label: "Remove", danger: true, off: !f.busy && refused != nil},
 		control{action: actRemoveCancel, label: "Cancel"})...))
-	inner := 0
-	for _, l := range lines {
-		inner = max(inner, ansi.StringWidth(l))
-	}
-	blank := strings.Repeat(" ", inner+4)
-	out := []string{blank}
-	for _, l := range lines {
-		out = append(out, "  "+look.Fit(l, inner)+"  ")
-	}
-	return strings.Join(append(out, blank), "\n")
+	return boxed(lines)
 }
 
 func plural(n int, what string) string {

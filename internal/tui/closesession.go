@@ -3,10 +3,8 @@ package tui
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
@@ -92,16 +90,7 @@ func (f *closeSessionForm) render() string {
 	lines = append(lines, line(f.buttons.draw(f, theCloseForm.Target(closeSubject{}),
 		control{action: actClose, label: "Close", danger: true},
 		control{action: actCloseCancel, label: "Cancel"})...))
-	inner := 0
-	for _, l := range lines {
-		inner = max(inner, ansi.StringWidth(l))
-	}
-	blank := strings.Repeat(" ", inner+4)
-	out := []string{blank}
-	for _, l := range lines {
-		out = append(out, "  "+look.Fit(l, inner)+"  ")
-	}
-	return strings.Join(append(out, blank), "\n")
+	return boxed(lines)
 }
 
 // closesWhat says what closing a session with n windows closes.

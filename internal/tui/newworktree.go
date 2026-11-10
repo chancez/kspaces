@@ -8,7 +8,6 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/spaces"
@@ -28,6 +27,9 @@ type newWorktreeForm struct {
 	busy  bool
 	err   error
 	width int
+	// zones and buttons are where the last frame drew its buttons, and what each runs, for a click.
+	zones   map[string][]look.Zone
+	buttons controls[*newWorktreeForm]
 }
 
 // newForm is the form for a worktree in space. The branch starts with the configured prefix, so typing
@@ -97,6 +99,10 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd, ok := runOn(f, msg, theForm.Target(formSubject{})); ok {
 			return f, cmd
 		}
+	case tea.MouseClickMsg:
+		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
+			return f, cmd
+		}
 	}
 	// Everything else is typing in the field that has focus.
 	var cmd tea.Cmd
@@ -120,8 +126,11 @@ func (f *newWorktreeForm) followBranch() {
 }
 
 func (f *newWorktreeForm) View() tea.View {
-	v := tea.NewView(f.render())
+	frame, zones := look.Scan(f.render())
+	f.zones = zones
+	v := tea.NewView(frame)
 	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
 	return v
 }
 
@@ -158,19 +167,12 @@ func (f *newWorktreeForm) render() string {
 		}
 		lines = append(lines, "")
 	}
-	lines = append(lines, line(look.Key("tab"), look.KeyDesc(" next field  "), look.Key("enter"), look.KeyDesc(" create  "),
-		look.Key("esc"), look.KeyDesc(" cancel")))
-	// A row of padding above and below, and two columns on either side of the widest line.
-	inner := 0
-	for _, l := range lines {
-		inner = max(inner, ansi.StringWidth(l))
-	}
-	blank := strings.Repeat(" ", inner+4)
-	out := []string{blank}
-	for _, l := range lines {
-		out = append(out, "  "+look.Fit(l, inner)+"  ")
-	}
-	return strings.Join(append(out, blank), "\n")
+	f.buttons = controls[*newWorktreeForm]{}
+	buttons := f.buttons.draw(f, theForm.Target(formSubject{}),
+		control{action: actCreate, label: "Create"},
+		control{action: actCancel, label: "Cancel"})
+	lines = append(lines, line(append(buttons, look.Text("  "), look.Key("tab"), look.KeyDesc(" next field"))...))
+	return boxed(lines)
 }
 
 // RunNewWorktree runs the new worktree form for space, meant for a kitty overlay, until the worktree is

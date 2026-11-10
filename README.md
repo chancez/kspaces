@@ -49,8 +49,9 @@ in. It has two fields, and `tab` moves between them:
   without the prefix, any `/` turned into `-`. A directory typed in is relative to the space's root unless
   absolute, and `~` is expanded.
 
-`enter` creates the worktree and switches to its session; git's error stays in the form if it refuses.
-`kspaces new [SPACE]` opens the same form, for the space given by root or name, or the current one.
+The Create button, or `enter`, creates the worktree and switches to its session; git's error stays in the
+form if it refuses. Cancel, or `esc`, leaves. `kspaces new [SPACE]` opens the same form, for the space
+given by root or name, or the current one.
 
 Close session, or `c`, opens a form that says how many windows close, and its Close button, or `y`,
 closes them all, the way closing them by hand does, so whatever kitty.conf runs when a window closes, such
