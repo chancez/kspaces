@@ -32,8 +32,14 @@ cp bin/kspaces "$tmp"
 chmod 755 "$tmp"
 mv -f "$tmp" "$bindir/kspaces"
 trap - EXIT
-"$bindir/kspaces" --help >/dev/null
-echo "installed $bindir/kspaces"
+echo "installed $("$bindir/kspaces" --version) to $bindir/kspaces"
+# kitty.conf's watcher starts the sidebars from ~/.local/bin by absolute path, but its mappings run
+# kspaces from PATH, so a different one there would be what they run.
+if ! command -v kspaces >/dev/null 2>&1; then
+  echo "note: kspaces is not on PATH; add $bindir to it" >&2
+elif [ "$(command -v kspaces)" != "$bindir/kspaces" ]; then
+  echo "note: $(command -v kspaces) shadows $bindir/kspaces on PATH" >&2
+fi
 """
 
 [tasks.uninstall]
