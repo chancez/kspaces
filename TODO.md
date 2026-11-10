@@ -44,6 +44,8 @@ It knows nothing about what produced a record. Open questions:
     file when its last tab closes, as that closes the OS window too.
   - Nothing says a window's directory changed, so a `cd` is saved only at the next focus change, close or
     quit.
+  - On macOS kitty keeps timers in a table of 128 (glfw/cocoa_init.m), and `add_timer` returns 0 when it is
+    full, as at startup, without ever calling back. `save_sessions.py` tries again at the next change.
 - Quitting with no window in the default session writes an empty `startup_session` file.
 - Windows outside spaces are saved into `default` and come back labelled `default`. Left as is for now.
 - kitty's own dock border can sit next to the sidebar's, which may look like a double line.
@@ -55,7 +57,8 @@ To make in kitty later, together, rather than while kspaces is still settling:
 
 - Fix the three session bugs above, and drop the workarounds.
 - Watcher events for an OS window closing, or a flag on `on_close` for windows closed with their OS
-  window or by quitting, and for a window's directory changing, so `save_sessions.py` misses nothing.
+  window or by quitting, and for a window's directory changing, so `save_sessions.py` misses nothing. And
+  a timer table that grows, or an error from `add_timer`, rather than a 0 that never calls back.
 - Resizable docks: drag a dock's border, as borders between layout windows already can be
   (`Boss.drag_resize_start` only targets layout windows), and a command to resize one. The watcher then
   keeps a dragged width for every sidebar instead of setting `DockSpec.size` itself.
