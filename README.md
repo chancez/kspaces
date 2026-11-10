@@ -91,7 +91,8 @@ otherwise its title, otherwise its message. With the sidebar's cursor on an entr
 show all of it: what a blocked program waits for (permission, a question or a sign-in), the title,
 progress, up to six rows of the message, the record's id and the window's other records. Resting the
 mouse on an entry shows the same in full, with no limit on the title and message, drawn over the entries
-below it so the list does not move.
+below it so the list does not move. It shows only when the entry has more to say than its two rows do, and
+closes when the mouse leaves the sidebar, which kitty reports in pixel mouse mode, so the sidebar uses that.
 
 kitty does not say when a record changed, so the kitty watcher that adds the sidebars also notes it, in
 the window's `program_status_at` user variable. With the watcher not loaded, entries show no age.

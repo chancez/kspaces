@@ -55,16 +55,18 @@ type sidebar struct {
 	// runs `send-key` to the sidebar. The cursor is drawn then too, until remoteAt is a while ago.
 	remote   bool
 	remoteAt time.Time
-	// The window of the status entry the mouse rests on, drawn in full as a popup, or 0. kitty sends no
-	// event when the mouse leaves the dock, so it also ends hoverIdle after the last move.
+	// The window of the status entry the mouse rests on, drawn in full as a popup, or 0. It ends when the
+	// mouse leaves the dock, which kitty says only in pixel mouse mode, and else hoverIdle after the last
+	// move.
 	hover   int
 	hoverAt time.Time
+	mouse   *pixelMouse
 	// zones are where the last frame drew marked spans, by id, so a click maps back to what was drawn.
 	zones map[string][]look.Zone
 }
 
 func newSidebar(self int) *sidebar {
-	return &sidebar{th: look.New(true), self: self, folded: map[string]bool{}}
+	return &sidebar{th: look.New(true), self: self, folded: map[string]bool{}, mouse: &pixelMouse{}}
 }
 
 // navigating is whether keys are moving the cursor, so it and the entry under it should be drawn.
@@ -123,6 +125,15 @@ func (m *sidebar) openWorktreeCmd(wt spaces.Worktree) tea.Cmd {
 }
 
 func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var start tea.Cmd
+	if _, ok := msg.(tea.MouseMsg); ok {
+		start = m.mouse.start()
+	}
+	_, cmd := m.update(msg)
+	return m, tea.Batch(start, cmd)
+}
+
+func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.menu != nil {
 		if cmd, handled := m.updateMenu(msg); handled {
 			return m, cmd
@@ -131,6 +142,7 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m.mouse.resize()
 		// A shorter list can leave the cursor under an indicator, or out of view.
 		m.scrollToCursor()
 	case tea.FocusMsg:
@@ -160,6 +172,8 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.click(msg)
 	case tea.MouseMotionMsg:
 		m.motion(msg)
+	case mouseLeftMsg:
+		m.hover = 0
 	case tea.KeyPressMsg:
 		if !m.focused {
 			if !m.remote {
@@ -296,7 +310,8 @@ func (m *sidebar) frame() string {
 
 // RunSidebar runs the sidebar, meant for a kitty dock, until it is quit.
 func RunSidebar(ctx context.Context) error {
-	if _, err := tea.NewProgram(newSidebar(kitty.SelfWindowID()), tea.WithContext(ctx)).Run(); err != nil {
+	m := newSidebar(kitty.SelfWindowID())
+	if _, err := tea.NewProgram(m, tea.WithContext(ctx), tea.WithFilter(m.mouse.filter)).Run(); err != nil {
 		return fmt.Errorf("running the sidebar: %w", err)
 	}
 	return nil

@@ -514,11 +514,17 @@ func TestHoverPopup(t *testing.T) {
 			t.Error("the popup stayed 16s after the mouse last moved")
 		}
 
-		// Moving onto a spaces row closes it.
+		// Moving onto a spaces row closes it, and so does the mouse leaving the window.
 		e.hover(fmt.Sprintf(entryZone, e.entry(20)))
 		e.hover(fmt.Sprintf(entryZone, e.row("kitty")))
 		if e.m.hovered() >= 0 {
 			t.Error("the popup stayed with the mouse on a spaces row")
+		}
+		e.hover(fmt.Sprintf(entryZone, e.entry(20)))
+		e.m.Update(mouseLeftMsg{})
+		e.m.render()
+		if e.m.hovered() >= 0 {
+			t.Error("the popup stayed with the mouse out of the window")
 		}
 
 		// An entry whose details its summary already shows has no popup: the failed one's message, the
@@ -642,3 +648,30 @@ func TestErrorOnLastLine(t *testing.T) {
 	}
 }
 
+// In pixel mouse mode, positions are turned into cells, and kitty's event for the mouse leaving the window,
+// which bubbletea reads as motion with the left button, into mouseLeftMsg.
+func TestPixelMouse(t *testing.T) {
+	p := &pixelMouse{on: true, cellW: 10, cellH: 20}
+	got := []tea.Msg{
+		p.filter(nil, tea.MouseMotionMsg{X: 59, Y: 41}),
+		p.filter(nil, tea.MouseClickMsg{X: 60, Y: 40, Button: tea.MouseRight}),
+		p.filter(nil, tea.MouseWheelMsg{X: 5, Y: 399, Button: tea.MouseWheelDown}),
+		p.filter(nil, tea.MouseMotionMsg{X: 3000, Y: 7, Button: tea.MouseLeft}),
+		p.filter(nil, tea.KeyPressMsg{Code: 'j', Text: "j"}),
+	}
+	want := []tea.Msg{
+		tea.MouseMotionMsg{X: 5, Y: 2},
+		tea.MouseClickMsg{X: 6, Y: 2, Button: tea.MouseRight},
+		tea.MouseWheelMsg{X: 0, Y: 19, Button: tea.MouseWheelDown},
+		mouseLeftMsg{},
+		tea.KeyPressMsg{Code: 'j', Text: "j"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("filtered:\n%#v\nwant\n%#v", got, want)
+	}
+	// Off, as before the first mouse event, events pass as they are.
+	p.on = false
+	if got := p.filter(nil, tea.MouseMotionMsg{X: 3, Y: 4, Button: tea.MouseLeft}); got != (tea.MouseMotionMsg{X: 3, Y: 4, Button: tea.MouseLeft}) {
+		t.Errorf("off: %#v", got)
+	}
+}
