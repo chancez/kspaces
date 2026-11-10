@@ -201,8 +201,8 @@ func (m *sidebar) openWorktreeCmd(wt Worktree) tea.Cmd {
 
 // foldCaret is drawn before a space's name when it has linked worktrees, and toggles them when clicked.
 const (
-	caretOpen   = "\u25be " // small down-pointing triangle
-	caretFolded = "\u25b8 " // small right-pointing triangle
+	caretOpen   = "\u25bc " // down-pointing triangle
+	caretFolded = "\u25b6 " // right-pointing triangle
 	noCaret     = "  "
 	// The columns the caret takes on screen, after the marker.
 	caretFrom, caretTo = 3, 5
