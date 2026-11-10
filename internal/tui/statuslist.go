@@ -101,6 +101,25 @@ func (m *sidebar) statusDetails(s status.Status, inner, titleRows, msgRows int) 
 	return lines
 }
 
+// popupAdds reports whether status entry j in full says more than its summary row does, so the popup is
+// worth covering the entries below for: a row of the details the summary does not show, or shows cut. The
+// summary always shows progress, in a bar of its own width.
+func (m *sidebar) popupAdds(j int) bool {
+	th, s := m.th, m.kitty.Statuses[j]
+	inner := max(m.contentWidth()-th.Width(look.NoMarker()), 1)
+	shown := th.TextOf(th.Cut(inner, look.Summary(s.Record, inner))...)
+	for _, row := range m.statusDetails(s, inner, 0, 0) {
+		text := strings.TrimSpace(th.TextOf(row...))
+		if s.Progress != nil && text == look.ProgressBar(*s.Progress, inner) {
+			continue
+		}
+		if !strings.Contains(shown, text) {
+			return true
+		}
+	}
+	return false
+}
+
 // hovered is the index of the status entry under the mouse, or -1. Kept by window rather than by index, as
 // a refresh can reorder the list under a resting mouse.
 func (m *sidebar) hovered() int {

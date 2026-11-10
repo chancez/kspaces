@@ -90,15 +90,16 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 	return nil
 }
 
-// motion shows the status entry the mouse rests on in full. Moving within the popup keeps it, rather than
-// switching to the entry it covers; moving anywhere but a status entry clears it.
+// motion shows the status entry the mouse rests on in full, when that says more than the entry does. Moving
+// within the popup keeps it, rather than switching to the entry it covers; moving anywhere but a status
+// entry clears it.
 func (m *sidebar) motion(msg tea.MouseMotionMsg) {
 	if m.hovered() >= 0 && m.inZone(popupZone, msg.X, msg.Y) {
 		m.hoverAt = time.Now()
 		return
 	}
 	m.hover = 0
-	if i, ok := m.entryAt(msg.X, msg.Y); ok && i >= len(m.rows) {
+	if i, ok := m.entryAt(msg.X, msg.Y); ok && i >= len(m.rows) && m.popupAdds(i-len(m.rows)) {
 		m.hover, m.hoverAt = m.kitty.Statuses[i-len(m.rows)].Window, time.Now()
 	}
 }

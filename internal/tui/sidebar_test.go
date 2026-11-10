@@ -515,10 +515,23 @@ func TestHoverPopup(t *testing.T) {
 		}
 
 		// Moving onto a spaces row closes it.
-		e.hover(fmt.Sprintf(entryZone, e.entry(21)))
+		e.hover(fmt.Sprintf(entryZone, e.entry(20)))
 		e.hover(fmt.Sprintf(entryZone, e.row("kitty")))
 		if e.m.hovered() >= 0 {
 			t.Error("the popup stayed with the mouse on a spaces row")
+		}
+
+		// An entry whose details its summary already shows has no popup: the failed one's message, the
+		// working one's progress, the idle one's program.
+		var popups []int
+		for _, w := range []int{21, 22, 23} {
+			e.hover(fmt.Sprintf(entryZone, e.entry(w)))
+			if e.m.hovered() >= 0 {
+				popups = append(popups, w)
+			}
+		}
+		if popups != nil {
+			t.Errorf("popups for windows %v, which have nothing more to show", popups)
 		}
 
 		// A click on the popup opens its entry, not the one it covers.
@@ -628,3 +641,4 @@ func TestErrorOnLastLine(t *testing.T) {
 		t.Error("the error dropped what was shown")
 	}
 }
+
