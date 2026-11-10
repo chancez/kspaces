@@ -40,10 +40,9 @@ func rowHolds(r spaces.Row, session string) bool {
 	return false
 }
 
-// renderRow draws row i of the spaces list, marked as its entry. The marker says how its sessions are:
-// the most urgent status of their windows, current, open, or none; a cross when the space's worktrees
-// could not be listed. The caret column folds a space's linked worktrees, and indents those worktrees
-// under its name.
+// renderRow draws row i of the spaces list, marked as its entry: the fold caret, or as wide a blank, which
+// indents linked worktrees under their space, then the row's icon and its name. The icon says what the row
+// is, and is replaced by the most urgent status of its sessions' windows; see look.RowIcon.
 func (m *sidebar) renderRow(i int) string {
 	r, width, th := m.rows[i], m.contentWidth(), m.th
 	if r.Space == nil {
@@ -53,14 +52,12 @@ func (m *sidebar) renderRow(i int) string {
 	if r.Main && !r.Other && len(r.Space.Worktrees) > 1 {
 		caret = look.Mark(fmt.Sprintf(caretZone, i), look.Caret(r.Folded)...)
 	}
-	var label []look.Span
+	kind, label := look.RowSpace, look.Space(*r.Space)
 	switch {
 	case !r.Main:
-		label = look.Worktree(*r.Worktree)
+		kind, label = look.RowWorktree, look.Worktree(*r.Worktree)
 	case r.Other:
-		label = []look.Span{look.OtherSession(*r.Space)}
-	default:
-		label = []look.Span{look.Space(*r.Space)}
+		kind, label = look.RowOther, look.OtherSession(*r.Space)
 	}
 	// A folded space stands for all its worktrees: it is current, open or in a state if any of them is.
 	current, open, state := false, false, ""
@@ -71,20 +68,12 @@ func (m *sidebar) renderRow(i int) string {
 			state = s
 		}
 	}
-	mark := []look.Span{look.NoMarker()}
-	switch {
-	case r.Worktree == nil:
-		mark = look.BrokenMarker()
-	case state != "":
-		// The most urgent status of the session's windows, which the status list below details.
-		mark = look.StateMarker(state)
-	case current:
-		mark = look.CurrentMarker()
-	case open:
-		mark = look.SessionMarker()
+	icon := look.RowIcon(kind, state, open, r.Worktree == nil)
+	if state == "" && r.Worktree != nil {
+		icon = look.DimIf(!open, icon...)
 	}
-	label = look.DimIf(!open, th.Cut(max(width-th.Width(mark...)-th.Width(caret...), 0), label...)...)
-	spans := append(append(mark, caret...), label...)
+	head := append(caret, icon...)
+	spans := append(head, look.DimIf(!open, th.Cut(max(width-th.Width(head...), 0), label)...)...)
 	if rest := width - th.Width(spans...); r.Worktree != nil && r.Worktree.Branch != "" && rest > 2 {
 		spans = append(append(spans, look.Muted(" ")), th.Cut(rest-1, look.Branch(*r.Worktree))...)
 	}

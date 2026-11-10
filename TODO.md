@@ -13,11 +13,6 @@ To consider once the core pieces work:
   not leave multiplexer sessions running: today kitty's `close_session` closes the windows and the
   dotfiles' `cm_reap.py` kills each window's cm session on close, so going through kitty's close path
   (not detaching) is what keeps that working.
-- Spaces list wastes width: every row starts with a 3-column marker column (state, current, open), then
-  the 2-column fold caret, then worktrees indent another branch icon. Instead, put the marker in the icon
-  slot itself: a worktree's status replaces its branch icon, and a space's own row gets an icon of its
-  own (a repo icon) that its status replaces the same way. Rows then start at the left edge; the caret
-  and indent stay for worktrees. Saves 2-3 columns on every row of a 28-column dock.
 
 ## Status area
 

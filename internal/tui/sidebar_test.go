@@ -208,29 +208,34 @@ func (e *sidebarEnv) folded() string {
 	return string(data)
 }
 
+// Row icons, each with the two spaces a marker takes.
 const (
-	open, blocked = "\uf444  ", "\uf071  "
-	branchIcon    = "\ue725  "
+	open       = "\uf444  "
+	blocked    = "\uf071  "
+	repoIcon   = "\uf401  "
+	branchIcon = "\ue725  "
+	termIcon   = "\uf120  "
 )
 
-// The spaces list: sessions in no space, then each space and its linked worktrees, with markers for the
-// most urgent state, the current session, open sessions, and a broken space.
+// The spaces list: sessions in no space, then each space and its linked worktrees. A row starts with
+// the fold caret, or as wide a blank, then its icon: what the row is, or the most urgent state of its
+// sessions, or a cross for a broken space.
 func TestSpacesList(t *testing.T) {
 	e := newSidebarEnv(t)
 	want := []string{
 		"SPACES",
 		"",
-		open + "  default",
+		"  " + termIcon + "default",
 		"",
-		open + "\u25bc gr main",
-		blocked + "  " + branchIcon + "dev pr/me/dev",
-		"     " + branchIcon + "fix fix",
+		"\u25bc " + repoIcon + "gr main",
+		"  " + blocked + "dev pr/me/dev",
+		"  " + branchIcon + "fix fix",
 		"",
-		"     kitty master",
+		"  " + repoIcon + "kitty master",
 		"",
-		"\uf110  \u25b6 docs main",
+		"\u25b6 \uf110  docs main",
 		"",
-		"\uf00d    broken",
+		"  \uf00d  broken",
 	}
 	if got := e.screen()[:len(want)]; !reflect.DeepEqual(got, want) {
 		t.Errorf("spaces list:\n%q\nwant\n%q", got, want)
@@ -296,14 +301,14 @@ func TestFoldCaretClick(t *testing.T) {
 		t.Error("the caret opened the space as well as folding it")
 	}
 	// gr@dev is the current session, so the folded row stands for it: its state and its bar.
-	if !e.has(blocked+"\u25b6 gr main") || e.has(blocked+"  "+branchIcon+"dev pr/me/dev") {
+	if !e.has("\u25b6 "+blocked+"gr main") || e.has("  "+blocked+"dev pr/me/dev") {
 		t.Errorf("gr is not folded:\n%s", strings.Join(e.screen(), "\n"))
 	}
 	if got, want := e.folded(), "/src/docs\n/src/gr\n"; got != want && got != "/src/gr\n/src/docs\n" {
 		t.Errorf("folded file = %q, want %q", got, want)
 	}
 	e.click(fmt.Sprintf(caretZone, e.row("gr")), tea.MouseLeft)
-	if !e.has(open+"\u25bc gr main") || !e.has("     "+branchIcon+"fix fix") {
+	if !e.has("\u25bc "+repoIcon+"gr main") || !e.has("  "+branchIcon+"fix fix") {
 		t.Errorf("gr is not unfolded:\n%s", strings.Join(e.screen(), "\n"))
 	}
 	if got := e.folded(); got != "/src/docs\n" {
@@ -315,7 +320,7 @@ func TestFoldCaretClick(t *testing.T) {
 	if cmd := e.clickAt(x+6, y, tea.MouseLeft); cmd == nil || e.m.cursor != e.row("gr") {
 		t.Errorf("clicking gr's name: cursor %d, opened %v", e.m.cursor, cmd != nil)
 	}
-	if !e.has(open + "\u25bc gr main") {
+	if !e.has("\u25bc " + repoIcon + "gr main") {
 		t.Error("clicking the name folded the space")
 	}
 }
@@ -326,11 +331,11 @@ func TestFoldKey(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.FocusMsg{})
 	e.press("space")
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{blocked + "\u25b6 gr main"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"\u25b6 " + blocked + "gr main"}) {
 		t.Errorf("space on gr@dev: cursor on %q", got)
 	}
 	e.press("space", "j", "j", "j", "space")
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"     kitty master"}) || e.folded() != "/src/docs\n" {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + repoIcon + "kitty master"}) || e.folded() != "/src/docs\n" {
 		t.Errorf("space on kitty: cursor on %q, folded %q", got, e.folded())
 	}
 }
@@ -356,7 +361,7 @@ func TestRightClickMenu(t *testing.T) {
 	if cmd := e.click(fmt.Sprintf(menuZone, 1), tea.MouseLeft); cmd != nil || e.m.menu != nil {
 		t.Errorf("running Fold worktrees: cmd %v, menu still open %v", cmd != nil, e.m.menu != nil)
 	}
-	if !e.has(blocked+"\u25b6 gr main") || e.m.cursor != e.row("gr") {
+	if !e.has("\u25b6 "+blocked+"gr main") || e.m.cursor != e.row("gr") {
 		t.Errorf("Fold worktrees did not fold gr onto the cursor:\n%s", strings.Join(e.screen(), "\n"))
 	}
 
@@ -383,7 +388,7 @@ func TestMenuKeys(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.FocusMsg{})
 	e.press("m", "j", "j", "j", "k")
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{blocked + "  " + branchIcon + "dev pr/me/dev", " Fold worktrees"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Fold worktrees"}) {
 		t.Errorf("highlighted %q", got)
 	}
 	e.press("G", "esc")
@@ -391,7 +396,7 @@ func TestMenuKeys(t *testing.T) {
 		t.Errorf("menu open %v, cursor %d", e.m.menu != nil, e.m.cursor)
 	}
 	e.press("m", "j", "enter")
-	if !e.has(blocked + "\u25b6 gr main") {
+	if !e.has("\u25b6 " + blocked + "gr main") {
 		t.Errorf("enter on Fold worktrees did not fold gr:\n%s", strings.Join(e.screen(), "\n"))
 	}
 }
@@ -417,7 +422,7 @@ func TestRemoteNavigation(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		e := newSidebarEnv(t)
 		e.press("j")
-		if got := e.highlighted(); !reflect.DeepEqual(got, []string{"     " + branchIcon + "fix fix"}) {
+		if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + branchIcon + "fix fix"}) {
 			t.Fatalf("after j: cursor on %q", got)
 		}
 		time.Sleep(9 * time.Second)
@@ -459,7 +464,7 @@ func TestFocusFindsTheCurrentSession(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.cursor = 0
 	e.m.Update(tea.FocusMsg{})
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{blocked + "  " + branchIcon + "dev pr/me/dev"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev"}) {
 		t.Errorf("cursor on %q", got)
 	}
 	snap := fixture(time.Now())
@@ -467,7 +472,7 @@ func TestFocusFindsTheCurrentSession(t *testing.T) {
 	e.m.Update(snap)
 	e.m.Update(tea.BlurMsg{})
 	e.m.Update(tea.FocusMsg{})
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{blocked + "\u25b6 gr main"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"\u25b6 " + blocked + "gr main"}) {
 		t.Errorf("cursor on %q with gr folded", got)
 	}
 }
@@ -552,7 +557,7 @@ func TestErrorOnLastLine(t *testing.T) {
 	if got := lines[len(lines)-1]; got != "config.toml: unknown keys:..." {
 		t.Errorf("last line %q", got)
 	}
-	if !e.has(open + "\u25bc gr main") {
+	if !e.has("\u25bc " + repoIcon + "gr main") {
 		t.Error("the error dropped what was shown")
 	}
 }

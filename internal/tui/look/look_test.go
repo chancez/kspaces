@@ -83,7 +83,7 @@ func TestCut(t *testing.T) {
 		{3, "\ue725  "},
 		{2, "\ue725 "},
 	} {
-		if got := th.TextOf(th.Cut(tc.width, Worktree(wt)...)...); got != tc.want {
+		if got := th.TextOf(th.Cut(tc.width, append(RowIcon(RowWorktree, "", true, false), Worktree(wt))...)...); got != tc.want {
 			t.Errorf("cut to %d = %q, want %q", tc.width, got, tc.want)
 		}
 	}

@@ -69,10 +69,37 @@ func Space(s spaces.Space) Span { return sp(elSpace, s.Name) }
 // OtherSession is a session that belongs to no space, by its name.
 func OtherSession(s spaces.Space) Span { return sp(elOther, s.Name) }
 
-// Worktree is a linked worktree, by its directory, after its icon.
-func Worktree(wt spaces.Worktree) []Span {
-	return append(marker(elWorktree, GlyphWorktree), sp(elWorktree, filepath.Base(wt.Path)))
+// RowKind is what a row of the spaces list is, for its icon.
+type RowKind int
+
+const (
+	RowSpace RowKind = iota
+	RowWorktree
+	// RowOther is a session that belongs to no space.
+	RowOther
+)
+
+// RowIcon heads a row of the spaces list with what the row is: a space, a worktree, or a session in no
+// space. A state replaces it with the state's icon, and a cross a space whose worktrees could not be
+// listed. Otherwise it is drawn as a session with windows open is when open; a closed one is dimmed
+// with the rest of the row. The current session needs no icon of its own, as its row is drawn as a bar.
+func RowIcon(kind RowKind, state string, open, broken bool) []Span {
+	switch {
+	case broken:
+		return marker(elBroken, GlyphBroken)
+	case state != "":
+		return StateMarker(state)
+	}
+	el := elMuted
+	if open {
+		el = elSession
+	}
+	g := map[RowKind]Glyph{RowSpace: GlyphSpace, RowWorktree: GlyphWorktree, RowOther: GlyphOther}[kind]
+	return marker(el, g)
 }
+
+// Worktree is a linked worktree, by its directory.
+func Worktree(wt spaces.Worktree) Span { return sp(elWorktree, filepath.Base(wt.Path)) }
 
 // Branch is the branch a worktree has checked out.
 func Branch(wt spaces.Worktree) Span { return sp(elBranch, wt.Branch) }

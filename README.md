@@ -19,10 +19,13 @@ STATUS
   default make
 ```
 
-Each row starts with an icon, from the Nerd Fonts symbols kitty ships with: a chevron for the session of
-the tab the sidebar is in, a dot for a session with windows open, and none for a worktree with no session
-yet, which is drawn faint. A cross next to a space means its worktrees could not be listed. Linked
-worktrees have a branch icon before their name. A blank row separates spaces.
+Each row starts with the fold triangle of a space with linked worktrees, or as wide a blank, which
+indents the worktrees under their space, then an icon for what the row is, from the Nerd Fonts symbols
+kitty ships with: a repository for a space, a branch for a linked worktree, a terminal for a session in
+no space. The most urgent status of the row's sessions replaces the icon, and a cross a space whose
+worktrees could not be listed. The icon is green when the session has windows open, and it and the name
+are faint when it has none; the session of the sidebar's own tab is drawn as a bar. A blank row separates
+spaces.
 
 Sessions that are open or saved (see `sessions` below) but are not any worktree's, such as the one kitty
 starts with, are listed above the spaces.
