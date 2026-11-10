@@ -86,7 +86,7 @@ func parseWorktrees(space, porcelain string) []Worktree {
 
 // branchStart is what a new branch's name starts with: the configured prefix and a /, or nothing.
 func branchStart(cfg Config) string {
-	if p := strings.Trim(cfg.BranchPrefix, "/"); p != "" {
+	if p := strings.Trim(cfg.Worktrees.BranchPrefix, "/"); p != "" {
 		return p + "/"
 	}
 	return ""
@@ -108,7 +108,7 @@ func worktreeDir(cfg Config, root, branch, dir string) string {
 		return filepath.Join(root, dir)
 	}
 	name := strings.TrimPrefix(branch, branchStart(cfg))
-	return filepath.Join(root, cfg.WorktreeDir, strings.ReplaceAll(name, "/", "-"))
+	return filepath.Join(root, cfg.Worktrees.Dir, strings.ReplaceAll(name, "/", "-"))
 }
 
 // createWorktree adds a worktree at dir to the space, on branch. It checks out the branch when it exists

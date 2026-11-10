@@ -38,10 +38,10 @@ Right-clicking a row, or `m` on it, opens a menu: Open, Fold or Unfold worktrees
 worktree, or `n`, opens a form in an overlay over the tab's window, as the sidebar is too narrow to type
 in. It has two fields, and `tab` moves between them:
 
-- **branch**, which starts with `branch_prefix` and a `/` when that is set, so typing `fix` gives
+- **branch**, which starts with `worktrees.branch_prefix` and a `/` when that is set, so typing `fix` gives
   `PREFIX/fix`. Delete the prefix for a branch without it. An existing branch is checked out; a new one
   is created from what the space's main worktree has checked out.
-- **directory**, empty for the default shown in it: `worktree_dir` under the space's root and the branch
+- **directory**, empty for the default shown in it: `worktrees.dir` under the space's root and the branch
   without the prefix, any `/` turned into `-`. A directory typed in is relative to the space's root unless
   absolute, and `~` is expanded.
 
@@ -99,24 +99,24 @@ go build -o ~/.local/bin/kspaces .
 
 ## Config
 
-`~/.config/kspaces/config`, or `$XDG_CONFIG_HOME/kspaces/config`:
+`~/.config/kspaces/config.toml`, or `$XDG_CONFIG_HOME/kspaces/config.toml`. An unknown key is an error.
 
-```
-# One repository per line, in display order. ~ is expanded.
-space ~/projects/gr
-space ~/projects/kitty
+```toml
+# Repositories, in display order. ~/ is expanded.
+spaces = ["~/projects/gr", "~/projects/kitty"]
 
-# The kitty action that opens a worktree's first tab, split on spaces. Defaults to `launch --type=tab`.
-new_tab launch --type=tab
+# The kitty action that opens a worktree's first tab. Defaults to ["launch", "--type=tab"].
+new_tab = ["launch", "--type=tab"]
 
 # Where kitty session files are saved, one per session named SESSION.kitty-session. Unset by default,
 # which never restores from a file.
-sessions ~/.local/share/kitty/sessions
+sessions = "~/.local/share/kitty/sessions"
 
-# The new worktree form's defaults: worktrees go under worktree_dir, relative to their space's root, and
-# new branch names start with branch_prefix and a /. Default to .worktrees and no prefix.
-worktree_dir .worktrees
-branch_prefix pr/me
+# The new worktree form's defaults: worktrees go under dir, relative to their space's root, and new
+# branch names start with branch_prefix and a /. Default to .worktrees and no prefix.
+[worktrees]
+dir = ".worktrees"
+branch_prefix = "pr/me"
 ```
 
 ## Commands

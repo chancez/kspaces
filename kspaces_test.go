@@ -1,12 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 )
@@ -93,32 +91,47 @@ func TestParseConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	in := `# spaces
-space ~/projects/gr
-space /src/kitty
+	in := `
+spaces = ["~/projects/gr", "/src/kitty"]
+new_tab = ["kitten", "my_launch.py", "--type=tab"]
+sessions = "~/.local/share/kitty/sessions"
 
-new_tab kitten my_launch.py --type=tab
-sessions ~/.local/share/kitty/sessions
-branch_prefix pr/me/
+[worktrees]
+branch_prefix = "pr/me"
 `
-	got, err := parseConfig(bufio.NewScanner(strings.NewReader(in)))
+	got, err := parseConfig(in)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// worktree_dir is left out, so it has its default.
+	// worktrees.dir is left out, so it has its default.
 	want := Config{
-		Spaces:       []string{filepath.Join(home, "projects/gr"), "/src/kitty"},
-		NewTab:       []string{"kitten", "my_launch.py", "--type=tab"},
-		SessionsDir:  filepath.Join(home, ".local/share/kitty/sessions"),
-		WorktreeDir:  ".worktrees",
-		BranchPrefix: "pr/me/",
+		Spaces:      []string{filepath.Join(home, "projects/gr"), "/src/kitty"},
+		NewTab:      []string{"kitten", "my_launch.py", "--type=tab"},
+		SessionsDir: filepath.Join(home, ".local/share/kitty/sessions"),
+		Worktrees:   Worktrees{Dir: ".worktrees", BranchPrefix: "pr/me"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}
 
-	if _, err := parseConfig(bufio.NewScanner(strings.NewReader("spaces ~/x\n"))); err == nil {
-		t.Fatal("an unknown key was accepted")
+	// Nothing set gives the defaults.
+	got, err = parseConfig("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (Config{NewTab: defaultNewTab, Worktrees: Worktrees{Dir: ".worktrees"}}); !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+
+	for _, bad := range []string{
+		`space = ["~/x"]`,                 // a typo of spaces
+		"[worktrees]\nprefix = \"pr/me\"", // a typo inside a table
+		`new_tab = []`,
+		`spaces = "~/x"`, // a string, not a list
+	} {
+		if _, err := parseConfig(bad); err == nil {
+			t.Fatalf("%q was accepted", bad)
+		}
 	}
 }
 
@@ -158,7 +171,7 @@ func TestWorktreeDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := Config{WorktreeDir: ".worktrees", BranchPrefix: "pr/me"}
+	cfg := Config{Worktrees: Worktrees{Dir: ".worktrees", BranchPrefix: "pr/me"}}
 	got := []string{
 		// The default drops the prefix and turns / into -.
 		worktreeDir(cfg, "/src/gr", "pr/me/fix/bug", ""),
@@ -174,7 +187,7 @@ func TestWorktreeDir(t *testing.T) {
 		t.Fatalf("got %q\nwant %q", got, want)
 	}
 	// A trailing / in the prefix is the same prefix.
-	starts := []string{branchStart(cfg), branchStart(Config{BranchPrefix: "pr/me/"}), branchStart(Config{})}
+	starts := []string{branchStart(cfg), branchStart(Config{Worktrees: Worktrees{BranchPrefix: "pr/me/"}}), branchStart(Config{})}
 	if want := []string{"pr/me/", "pr/me/", ""}; !reflect.DeepEqual(starts, want) {
 		t.Fatalf("got %q, want %q", starts, want)
 	}
