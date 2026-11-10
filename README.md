@@ -36,12 +36,17 @@ blocked on you, an error sign for failed, a check for done and a spinner for wor
 show the most urgent state of their session in place of the dot. Clicking an entry, or `enter` on it,
 focuses that window.
 
-Each entry's first row has the session, or the window title for a window in no session, the program's
-name, and `+N` when the window has N more records. Below it is one row of what the program said: a
-progress bar when it reports progress, otherwise its title, otherwise its message. With the sidebar's
-cursor on an entry, the entry opens up to show all of it: what a blocked program waits for (permission,
-a question or a sign-in), the title, progress, up to six rows of the message, the record's id and the
-window's other records.
+Entries are grouped by state under a title with the count: Blocked, Failed, Done, Working and Idle, in
+that order, the most recent change first in each group. Idle entries are programs that said they are
+waiting for their next task. Each entry's first row has the session, or the window title for a window in
+no session, `+N` when the window has N more records, and how long ago the record changed to its state.
+Below it is one row with the program's name and what it said: a progress bar when it reports progress,
+otherwise its title, otherwise its message. With the sidebar's cursor on an entry, the entry opens up to
+show all of it: what a blocked program waits for (permission, a question or a sign-in), the title,
+progress, up to six rows of the message, the record's id and the window's other records.
+
+kitty does not say when a record changed, so the kitty watcher that adds the sidebars also notes it, in
+the window's `program_status_at` user variable. With the watcher not loaded, entries show no age.
 
 kitty keeps the records and applies the protocol's rules, and kspaces reads them from `kitten @ ls`:
 working and blocked end at the next shell prompt, done and failed stay until the window is focused or typed
