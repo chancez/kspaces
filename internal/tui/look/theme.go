@@ -175,10 +175,11 @@ func New(isDark bool) *Theme {
 	bold := func(c color.Color) lipgloss.Style { return fg(c).Bold(true) }
 	t := &Theme{isDark: isDark, roles: p, glyphs: GlyphsNerd}
 	t.elements = [numElements]lipgloss.Style{
-		elDefault:      lipgloss.NewStyle(),
-		elText:         lipgloss.NewStyle(),
-		elMuted:        fg(p.muted),
-		elTitle:        bold(p.muted),
+		elDefault: lipgloss.NewStyle(),
+		elText:    lipgloss.NewStyle(),
+		elMuted:   fg(p.muted),
+		// The terminal's own foreground, not muted, which read as disabled.
+		elTitle:        lipgloss.NewStyle().Bold(true),
 		elHeading:      bold(p.accent),
 		elSpace:        bold(p.accent),
 		elOther:        bold(p.other),

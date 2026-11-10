@@ -19,6 +19,9 @@ import (
 //	[worktrees]
 //	dir = ".worktrees"
 //	branch_prefix = "pr/me"
+//
+//	[sidebar]
+//	width = 28
 type Config struct {
 	// Roots of the repositories shown as spaces, in the order they are listed.
 	Spaces []string `toml:"spaces"`
@@ -30,7 +33,23 @@ type Config struct {
 	// NewTab.
 	SessionsDir string    `toml:"sessions"`
 	Worktrees   Worktrees `toml:"worktrees"`
+	Sidebar     Sidebar   `toml:"sidebar"`
 }
+
+// Sidebar is how the sidebar's dock is laid out. kitty sizes the dock, so kitty.conf's watcher reads this
+// rather than kspaces; kspaces checks it with the rest.
+type Sidebar struct {
+	// The dock's width in columns, the right border included.
+	Width int `toml:"width"`
+}
+
+// The sidebar's width when none is set, and the range a width must be in to leave room for names and for
+// the window beside it.
+const (
+	DefaultSidebarWidth = 28
+	MinSidebarWidth     = 12
+	MaxSidebarWidth     = 120
+)
 
 // Worktrees are the defaults of the new worktree form.
 type Worktrees struct {
@@ -79,7 +98,7 @@ func Parse(data string) (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("finding the home directory: %w", err)
 	}
-	cfg := Config{NewTab: defaultNewTab, Worktrees: Worktrees{Dir: defaultWorktreeDir}}
+	cfg := Config{NewTab: defaultNewTab, Worktrees: Worktrees{Dir: defaultWorktreeDir}, Sidebar: Sidebar{Width: DefaultSidebarWidth}}
 	md, err := toml.Decode(data, &cfg)
 	if err != nil {
 		return Config{}, err
@@ -93,6 +112,9 @@ func Parse(data string) (Config, error) {
 	}
 	if len(cfg.NewTab) == 0 {
 		return Config{}, fmt.Errorf("new_tab cannot be empty")
+	}
+	if w := cfg.Sidebar.Width; w < MinSidebarWidth || w > MaxSidebarWidth {
+		return Config{}, fmt.Errorf("sidebar.width is %d, it must be from %d to %d", w, MinSidebarWidth, MaxSidebarWidth)
 	}
 	expand := func(p string) string {
 		if rest, ok := strings.CutPrefix(p, "~/"); ok {

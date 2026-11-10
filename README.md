@@ -127,6 +127,11 @@ sessions = "~/.local/share/kitty/sessions"
 [worktrees]
 dir = ".worktrees"
 branch_prefix = "pr/me"
+
+# The sidebar's width in columns, from 12 to 120, the border included. Defaults to 28. kitty sizes the
+# dock, so the kitty watcher that adds the sidebars reads this, and resizes them all when it changes.
+[sidebar]
+width = 28
 ```
 
 ## Commands
