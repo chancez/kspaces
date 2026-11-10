@@ -7,21 +7,23 @@ time.
 ```
 SPACES
 
-* default
+  default
 
-! gr pr/chancez/dev
-> docs-reference main
-*   release-caveats pr/ch...
+  gr pr/chancez/dev
+  docs-reference main
+    release-caveats pr/ch...
 
 ...
 
 STATUS
-! gr claude
-+ default make
+  gr claude
+  default make
 ```
 
-`>` marks the session of the tab the sidebar is in, `*` a session with windows open, and faint rows
-worktrees with no session yet. `!` next to a space means its worktrees could not be listed.
+Each row starts with an icon, from the Nerd Fonts symbols kitty ships with: a chevron for the session of
+the tab the sidebar is in, a dot for a session with windows open, and none for a worktree with no session
+yet, which is drawn faint. A cross next to a space means its worktrees could not be listed. Linked
+worktrees have a branch icon before their name.
 
 Sessions that are open or saved (see `sessions` below) but are not any worktree's, such as the one kitty
 starts with, are listed above the spaces.
@@ -29,8 +31,9 @@ starts with, are listed above the spaces.
 ## Status
 
 The STATUS list at the bottom shows every window whose program reports a status with the program status
-protocol (OSC 7501), most urgent first: `!` blocked on you, `x` failed, `+` done, `~` working. The worktree
-rows carry the most urgent state of their session in place of `*`. Clicking an entry, or `enter` on it,
+protocol (OSC 7501), most urgent first, with kitty's icons for tab.program_status: a warning sign for
+blocked on you, an error sign for failed, a check for done and a spinner for working. The worktree rows
+show the most urgent state of their session in place of the dot. Clicking an entry, or `enter` on it,
 focuses that window.
 
 kitty keeps the records and applies the protocol's rules, and kspaces reads them from `kitten @ ls`:

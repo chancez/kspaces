@@ -363,6 +363,33 @@ func truncate(s string, width int) string {
 	return string(r[:width-3]) + "..."
 }
 
+// Icons from the Nerd Fonts symbols kitty ships with, so they need no patched font. The state icons are the
+// ones kitty uses for tab.program_status. kitty draws a symbol over two cells when a space follows it, so
+// each is followed by two spaces: one it draws over and one to keep it off the text.
+const (
+	iconBlocked  = "\uf071" // warning
+	iconError    = "\ue654" // error
+	iconDone     = "\uf00c" // check
+	iconWorking  = "\uf110" // spinner
+	iconCurrent  = "\uf054" // chevron-right
+	iconOpen     = "\uf444" // dot-fill
+	iconBroken   = "\uf00d" // times
+	iconWorktree = "\ue725" // git-branch
+)
+
+// noMarker is as wide as a marker: an icon and its two spaces.
+const noMarker = "   "
+
+func marker(icon string) string {
+	return icon + "  "
+}
+
+// cells is how many columns s takes, given one rune per cell: the icons are single runes kitty fits into
+// the cells counted for them, and names are what git and kitty report, rarely anything wide.
+func cells(s string) int {
+	return len([]rune(s))
+}
+
 func (m *sidebar) renderRow(i int) string {
 	r, width := m.rows[i], m.contentWidth()
 	if r.space == nil {
@@ -370,35 +397,35 @@ func (m *sidebar) renderRow(i int) string {
 	}
 	label := r.space.Name
 	if !r.main {
-		label = "  " + filepath.Base(r.worktree.Path)
+		label = marker(iconWorktree) + filepath.Base(r.worktree.Path)
 	}
 	current := r.worktree != nil && r.worktree.Session == m.kitty.Current
 	open := r.worktree != nil && m.isOpen(r.worktree)
-	marker, markerStyle := "  ", openStyle
+	mark, markStyle := noMarker, openStyle
 	switch {
 	case r.worktree == nil:
-		marker, markerStyle = "! ", errorStyle
+		mark, markStyle = marker(iconBroken), errorStyle
 	case sessionStatus(m.kitty.Statuses, r.worktree.Session) != "":
 		// The most urgent status of the session's windows, which the status list below details.
-		marker, markerStyle = stateMarker(sessionStatus(m.kitty.Statuses, r.worktree.Session))
+		mark, markStyle = stateMarker(sessionStatus(m.kitty.Statuses, r.worktree.Session))
 	case current:
-		marker = "> "
+		mark = marker(iconCurrent)
 	case open:
-		marker = "* "
+		mark = marker(iconOpen)
 	}
-	label = truncate(label, max(width-len(marker), 0))
+	label = truncate(label, max(width-cells(mark), 0))
 	branch := ""
-	if rest := width - len(marker) - len([]rune(label)); r.worktree != nil && r.worktree.Branch != "" && rest > 2 {
+	if rest := width - cells(mark) - cells(label); r.worktree != nil && r.worktree.Branch != "" && rest > 2 {
 		branch = " " + truncate(r.worktree.Branch, rest-1)
 	}
-	pad := strings.Repeat(" ", max(width-len(marker)-len([]rune(label))-len([]rune(branch)), 0))
+	pad := strings.Repeat(" ", max(width-cells(mark)-cells(label)-cells(branch), 0))
 
 	// A highlighted row is drawn in one style across its whole width, so it reads as one bar.
 	switch {
 	case i == m.cursor && m.focused:
-		return cursorStyle.Render(marker + label + branch + pad)
+		return cursorStyle.Render(mark + label + branch + pad)
 	case current:
-		return currentStyle.Render(marker + label + branch + pad)
+		return currentStyle.Render(mark + label + branch + pad)
 	}
 	labelStyle := lipgloss.NewStyle()
 	switch {
@@ -410,20 +437,20 @@ func (m *sidebar) renderRow(i int) string {
 	if !open {
 		labelStyle = labelStyle.Inherit(closedStyle)
 	}
-	return markerStyle.Render(marker) + labelStyle.Render(label) + branchStyle.Render(branch) + pad
+	return markStyle.Render(mark) + labelStyle.Render(label) + branchStyle.Render(branch) + pad
 }
 
-// stateMarker is the two-column marker and its color for a program status state.
+// stateMarker is the marker and its color for a program status state.
 func stateMarker(state string) (string, lipgloss.Style) {
 	switch state {
 	case "blocked":
-		return "! ", blockedStyle
+		return marker(iconBlocked), blockedStyle
 	case "error":
-		return "x ", errorStyle
+		return marker(iconError), errorStyle
 	case "done":
-		return "+ ", openStyle
+		return marker(iconDone), openStyle
 	default:
-		return "~ ", workingStyle
+		return marker(iconWorking), workingStyle
 	}
 }
 
@@ -431,8 +458,13 @@ func stateMarker(state string) (string, lipgloss.Style) {
 // window in no session, and what the program said.
 func (m *sidebar) renderStatus(j int) string {
 	s, width := m.kitty.Statuses[j], m.contentWidth()
-	marker, markerStyle := stateMarker(s.State)
+	mark, markStyle := stateMarker(s.State)
+	// A linked worktree's session is SPACE@DIR; the worktree's name alone fits the narrow dock and is what
+	// its row in the spaces list shows.
 	label := s.Session
+	if _, dir, ok := strings.Cut(label, "@"); ok {
+		label = dir
+	}
 	if label == "" {
 		label = s.WindowTitle
 	}
@@ -446,17 +478,17 @@ func (m *sidebar) renderStatus(j int) string {
 	if s.State == "working" && s.Progress != nil {
 		detail = strings.TrimSpace(fmt.Sprintf("%d%% %s", *s.Progress, detail))
 	}
-	label = truncate(label, max(width-len(marker), 0))
-	if rest := width - len(marker) - len([]rune(label)); detail != "" && rest > 2 {
+	label = truncate(label, max(width-cells(mark), 0))
+	if rest := width - cells(mark) - cells(label); detail != "" && rest > 2 {
 		detail = " " + truncate(detail, rest-1)
 	} else {
 		detail = ""
 	}
-	pad := strings.Repeat(" ", max(width-len(marker)-len([]rune(label))-len([]rune(detail)), 0))
+	pad := strings.Repeat(" ", max(width-cells(mark)-cells(label)-cells(detail), 0))
 	if len(m.rows)+j == m.cursor && m.focused {
-		return cursorStyle.Render(marker + label + detail + pad)
+		return cursorStyle.Render(mark + label + detail + pad)
 	}
-	return markerStyle.Render(marker) + label + branchStyle.Render(detail) + pad
+	return markStyle.Render(mark) + label + branchStyle.Render(detail) + pad
 }
 
 func (m *sidebar) isOpen(wt *Worktree) bool {
