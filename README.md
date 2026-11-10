@@ -98,4 +98,19 @@ Clicking a row opens it. When the sidebar has keyboard focus, which needs a dock
 `--dock-skip-focus`, `j`/`k` move, `g`/`G` jump to the first and last row, `enter` or `l` opens, `esc` or
 `q` returns focus to the window it came from and `r` refreshes. It refreshes every two seconds on its own.
 
+The same keys work without focusing the sidebar, sent with kitty's `send-key`. A kitty keyboard mode
+makes that a set of mappings:
+
+```conf
+action_alias spaces_key remote_control send-key --match "var:^kspaces$ and state:parent_focused"
+map --new-mode spaces --on-unknown passthrough_and_end f6
+map --mode spaces j spaces_key j
+map --mode spaces k spaces_key k
+map --mode spaces enter combine : spaces_key enter : pop_keyboard_mode
+map --mode spaces esc combine : spaces_key esc : pop_keyboard_mode
+```
+
+Keys that arrive without focus start from the sidebar's own session and draw the cursor until `enter`
+switches, `esc` stops, or ten seconds pass without a key.
+
 Remote control has to be enabled in kitty (`allow_remote_control` and `listen_on`).

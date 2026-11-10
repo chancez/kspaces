@@ -53,8 +53,31 @@ type sidebar struct {
 	width        int
 	height       int
 	err          error
-	// Whether kitty has given the sidebar keyboard focus. The cursor is only drawn then.
+	// Whether kitty has given the sidebar keyboard focus.
 	focused bool
+	// When keys arrive without focus, kitty is sending them from another window: kitty.conf's spaces mode
+	// runs `send-key` to the sidebar. The cursor is drawn then too, until remoteAt is a while ago.
+	remote   bool
+	remoteAt time.Time
+}
+
+// remoteIdle is how long remote navigation shows the cursor after its last key. It ends sooner on enter or
+// esc; this covers leaving kitty's spaces mode with any other key, which the sidebar never hears about.
+const remoteIdle = 10 * time.Second
+
+// navigating is whether keys are moving the cursor, so it and the entry under it should be drawn.
+func (m *sidebar) navigating() bool {
+	return m.focused || m.remote
+}
+
+// cursorToCurrent puts the cursor on the session the sidebar is in, where navigation usually begins.
+func (m *sidebar) cursorToCurrent() {
+	for i, r := range m.rows {
+		if r.worktree != nil && r.worktree.Session == m.kitty.Current {
+			m.cursor = i
+		}
+	}
+	m.scrollToCursor()
 }
 
 // Colors are terminal palette indexes rather than fixed colors, so the sidebar follows the kitty theme.
@@ -141,17 +164,14 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 	case tea.FocusMsg:
-		// Start from the session the sidebar is in, which is where keyboard navigation usually begins.
-		m.focused = true
-		for i, r := range m.rows {
-			if r.worktree != nil && r.worktree.Session == m.kitty.Current {
-				m.cursor = i
-			}
-		}
-		m.scrollToCursor()
+		m.focused, m.remote = true, false
+		m.cursorToCurrent()
 	case tea.BlurMsg:
 		m.focused = false
 	case tickMsg:
+		if m.remote && time.Since(m.remoteAt) > remoteIdle {
+			m.remote = false
+		}
 		return m, tea.Batch(m.refresh(), tick())
 	case snapshot:
 		m.err = msg.err
@@ -180,6 +200,13 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case tea.KeyMsg:
+		if !m.focused {
+			if !m.remote {
+				m.remote = true
+				m.cursorToCurrent()
+			}
+			m.remoteAt = time.Now()
+		}
 		switch msg.String() {
 		case "j", "down":
 			m.moveCursor(1)
@@ -190,8 +217,14 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "G", "end":
 			m.cursor = max(m.numEntries()-1, 0)
 		case "enter", "l":
+			m.remote = false
 			return m, m.open(m.cursor)
 		case "esc", "q":
+			if m.remote {
+				// Focus never left the window the keys came from, so there is nothing to give back.
+				m.remote = false
+				return m, nil
+			}
 			return m, m.leave()
 		case "r":
 			return m, m.refresh()
@@ -430,7 +463,7 @@ func (m *sidebar) renderRow(i int) string {
 
 	// A highlighted row is drawn in one style across its whole width, so it reads as one bar.
 	switch {
-	case i == m.cursor && m.focused:
+	case i == m.cursor && m.navigating():
 		return cursorStyle.Render(mark + label + branch + pad)
 	case current:
 		return currentStyle.Render(mark + label + branch + pad)
@@ -481,7 +514,7 @@ var kindLabel = map[string]string{"permission": "wants permission", "question": 
 // other records.
 func (m *sidebar) statusLines(j int) []string {
 	s, width := m.kitty.Statuses[j], m.contentWidth()
-	expanded := len(m.rows)+j == m.cursor && m.focused
+	expanded := len(m.rows)+j == m.cursor && m.navigating()
 	mark, markStyle := stateMarker(s.State)
 	// A linked worktree's session is SPACE@DIR; the worktree's name alone fits the narrow dock and is what
 	// its row in the spaces list shows.
@@ -626,7 +659,7 @@ func (m *sidebar) View() string {
 	}
 	lines = append(lines, status)
 	border := muted
-	if m.focused {
+	if m.navigating() {
 		border = accent
 	}
 	return borderStyle.BorderForeground(border).Width(width).Render(strings.Join(lines, "\n"))
