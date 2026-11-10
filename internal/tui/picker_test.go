@@ -203,7 +203,8 @@ func TestRemoveLockedWorktree(t *testing.T) {
 		{Path: filepath.Join(root, "dev"), Branch: "dev", Session: "gr@dev", Locked: true},
 	}}
 	f := &removeWorktreeForm{th: look.New(true), space: space, wt: space.Worktrees[1]}
-	f.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	// Wide enough that the message, which holds the temporary directory's path, is not wrapped.
+	f.Update(tea.WindowSizeMsg{Width: 300, Height: 20})
 	if _, cmd := f.Update(tea.KeyPressMsg{Code: 'y', Text: "y"}); cmd != nil || f.busy {
 		t.Errorf("y on a locked worktree: cmd %v, busy %v", cmd != nil, f.busy)
 	}
