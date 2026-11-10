@@ -93,9 +93,16 @@ in. Anything that writes OSC 7501 to its terminal shows up, an agent or a build 
 
 ## Install
 
+Tools come from mise, which `mise.toml` pins Go with.
+
 ```sh
-go build -o ~/.local/bin/kspaces ./cmd/kspaces
+mise run install      # build, then install to ~/.local/bin/kspaces, or $PREFIX/bin
+mise run build        # bin/kspaces
+mise run check        # go fmt, go vet, go test
 ```
+
+Without mise, `go build -o ~/.local/bin/kspaces ./cmd/kspaces`. The kitty watcher starts
+`~/.local/bin/kspaces sidebar`, so install there or change the watcher.
 
 ## Config
 
