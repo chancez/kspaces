@@ -15,6 +15,7 @@ Commands:
   pick         Pick a space, worktree or status entry to switch to, meant for a kitty overlay
   list         Print every space, its worktrees and their session names
   open PATH    Switch to the session of the worktree at PATH, creating it if needed
+  next, prev   Switch to the next or previous session with windows open, in sidebar order
 `
 
 func main() {
@@ -39,6 +40,10 @@ func run(args []string) error {
 		return runSidebar()
 	case "pick":
 		return runPicker()
+	case "next":
+		return cycle(1)
+	case "prev":
+		return cycle(-1)
 	}
 	cfg, err := loadConfig()
 	if err != nil {

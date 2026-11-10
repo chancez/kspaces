@@ -59,11 +59,18 @@ type sidebar struct {
 	// runs `send-key` to the sidebar. The cursor is drawn then too, until remoteAt is a while ago.
 	remote   bool
 	remoteAt time.Time
+	// The window of the status entry the mouse rests on, drawn in full as a popup, or 0. kitty sends no
+	// event when the mouse leaves the dock, so it also ends hoverIdle after the last move.
+	hover   int
+	hoverAt time.Time
 }
 
 // remoteIdle is how long remote navigation shows the cursor after its last key. It ends sooner on enter or
 // esc; this covers leaving kitty's spaces mode with any other key, which the sidebar never hears about.
 const remoteIdle = 10 * time.Second
+
+// hoverIdle is how long the hover popup stays after the mouse last moved.
+const hoverIdle = 15 * time.Second
 
 // navigating is whether keys are moving the cursor, so it and the entry under it should be drawn.
 func (m *sidebar) navigating() bool {
@@ -172,6 +179,9 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.remote && time.Since(m.remoteAt) > remoteIdle {
 			m.remote = false
 		}
+		if m.hover != 0 && time.Since(m.hoverAt) > hoverIdle {
+			m.hover = 0
+		}
 		return m, tea.Batch(m.refresh(), tick())
 	case snapshot:
 		m.err = msg.err
@@ -194,9 +204,29 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case msg.Button == tea.MouseButtonWheelDown:
 			m.offset = min(m.offset+1, max(len(m.rows)-l.spaces, 0))
 		case msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress:
+			// A click on the popup is a click on its entry, not on the one it covers.
+			if j := m.hovered(); j >= 0 {
+				if popup, top := m.hoverPopup(j); msg.Y >= top && msg.Y < top+len(popup) {
+					m.hover, m.cursor = 0, len(m.rows)+j
+					return m, m.open(m.cursor)
+				}
+			}
+			m.hover = 0
 			if i, ok := m.entryAt(msg.Y); ok {
 				m.cursor = i
 				return m, m.open(i)
+			}
+		case msg.Action == tea.MouseActionMotion:
+			// Moving within the popup keeps it, rather than switching to the entry it covers.
+			if j := m.hovered(); j >= 0 {
+				if popup, top := m.hoverPopup(j); msg.Y >= top && msg.Y < top+len(popup) {
+					m.hoverAt = time.Now()
+					return m, nil
+				}
+			}
+			m.hover = 0
+			if i, ok := m.entryAt(msg.Y); ok && i >= len(m.rows) {
+				m.hover, m.hoverAt = m.kitty.Statuses[i-len(m.rows)].Window, time.Now()
 			}
 		}
 	case tea.KeyMsg:
@@ -566,8 +596,21 @@ func summary(r programRecord, width int) string {
 // the entry opens up to show all of it: what a blocked program waits for, title, progress, the whole
 // message, the record's id and the window's other records.
 func (m *sidebar) statusEntry(j int) []string {
-	s, width, now := m.kitty.Statuses[j], m.contentWidth(), time.Now()
+	s, inner := m.kitty.Statuses[j], max(m.contentWidth()-cells(noMarker), 1)
 	expanded := len(m.rows)+j == m.cursor && m.navigating()
+	lines := []string{m.statusHeader(j, expanded)}
+	if expanded {
+		return append(lines, statusDetails(s, inner, 3, 6)...)
+	}
+	if sum := truncate(summary(s.programRecord, inner), inner); sum != "" {
+		lines = append(lines, noMarker+branchStyle.Render(sum)+strings.Repeat(" ", max(inner-cells(sum), 0)))
+	}
+	return lines
+}
+
+// statusHeader is the first row of status entry j, drawn as the cursor's bar when highlighted.
+func (m *sidebar) statusHeader(j int, highlighted bool) string {
+	s, width := m.kitty.Statuses[j], m.contentWidth()
 	mark, markStyle := stateMarker(s.State)
 	// A linked worktree's session is SPACE@DIR; the worktree's name alone fits the narrow dock and is what
 	// its row in the spaces list shows.
@@ -578,7 +621,7 @@ func (m *sidebar) statusEntry(j int) []string {
 	if label == "" {
 		label = s.WindowTitle
 	}
-	right := age(s.Since, now)
+	right := age(s.Since, time.Now())
 	if len(s.Others) > 0 {
 		right = strings.TrimSpace(fmt.Sprintf("+%d %s", len(s.Others), right))
 	}
@@ -587,41 +630,39 @@ func (m *sidebar) statusEntry(j int) []string {
 	}
 	label = truncate(label, max(width-cells(mark)-cells(right), 0))
 	pad := strings.Repeat(" ", max(width-cells(mark)-cells(label)-cells(right), 0))
-	first := markStyle.Render(mark) + label + pad + branchStyle.Render(right)
-	if expanded {
-		first = cursorStyle.Render(mark + label + pad + right)
+	if highlighted {
+		return cursorStyle.Render(mark + label + pad + right)
 	}
-	lines := []string{first}
+	return markStyle.Render(mark) + label + pad + branchStyle.Render(right)
+}
 
-	// Detail rows are indented under the label.
-	indent, inner := noMarker, max(width-cells(noMarker), 1)
+// statusDetails is everything a status entry has to say, indented under its label and wrapped to inner
+// columns: the program, what a blocked one waits for, the title, progress, the message, the record's id
+// and the window's other records. Title and message are cut at titleRows and msgRows, 0 for no limit.
+func statusDetails(s Status, inner, titleRows, msgRows int) []string {
+	var lines []string
 	add := func(style lipgloss.Style, text string, maxRows int) {
 		for i, l := range wrap(text, inner) {
-			if i == maxRows {
+			if maxRows > 0 && i == maxRows {
 				break
 			}
-			lines = append(lines, indent+style.Render(l)+strings.Repeat(" ", max(inner-cells(l), 0)))
+			lines = append(lines, noMarker+style.Render(l)+strings.Repeat(" ", max(inner-cells(l), 0)))
 		}
-	}
-	if !expanded {
-		if sum := truncate(summary(s.programRecord, inner), inner); sum != "" {
-			lines = append(lines, indent+branchStyle.Render(sum)+strings.Repeat(" ", max(inner-cells(sum), 0)))
-		}
-		return lines
 	}
 	plain := lipgloss.NewStyle()
 	add(branchStyle, s.App, 1)
 	if l := kindLabel[s.Kind]; l != "" {
 		add(blockedStyle, l, 1)
 	}
-	add(plain, s.Title, 3)
+	add(plain, s.Title, titleRows)
 	if s.Progress != nil {
 		add(plain, progressBar(*s.Progress, inner), 1)
 	}
-	add(branchStyle, s.Msg, 6)
+	add(branchStyle, s.Msg, msgRows)
 	if s.ID != "" {
 		add(branchStyle, "id "+s.ID, 1)
 	}
+	now := time.Now()
 	for _, o := range s.Others {
 		name := o.ID
 		if name == "" {
@@ -630,6 +671,40 @@ func (m *sidebar) statusEntry(j int) []string {
 		add(branchStyle, strings.Join(strings.Fields(strings.Join([]string{o.State, name, age(o.Since, now), o.Title}, " ")), " "), 1)
 	}
 	return lines
+}
+
+// hovered is the index of the status entry under the mouse, or -1. Kept by window rather than by index, as
+// a refresh can reorder the list under a resting mouse.
+func (m *sidebar) hovered() int {
+	if m.hover == 0 {
+		return -1
+	}
+	for j, s := range m.kitty.Statuses {
+		if s.Window == m.hover {
+			return j
+		}
+	}
+	return -1
+}
+
+// hoverPopup is status entry j in full, for the mouse resting on it, and the screen row it starts at. It
+// covers the entries below it so the list keeps its layout, with a rule closing it off from what it covers,
+// and moves up over the entries above when it would run off the bottom.
+func (m *sidebar) hoverPopup(j int) ([]string, int) {
+	l, width := m.layout(), m.contentWidth()
+	if j < m.statusOffset || j >= len(m.kitty.Statuses) {
+		return nil, 0
+	}
+	top := l.statusTop
+	for k := m.statusOffset; k < j; k++ {
+		top += len(m.statusGroupTitle(k)) + len(m.statusEntry(k))
+	}
+	top += len(m.statusGroupTitle(j))
+	popup := append([]string{m.statusHeader(j, true)}, statusDetails(m.kitty.Statuses[j], max(width-cells(noMarker), 1), 0, 0)...)
+	popup = append(popup, workingStyle.Render(strings.Repeat("\u2500", width)))
+	bottom := l.statusTop + l.status
+	top = max(min(top, bottom-len(popup)), headerRows)
+	return popup[:min(len(popup), bottom-top)], top
 }
 
 // progressBar draws a percentage as a bar that fits width, followed by the number.
@@ -698,6 +773,11 @@ func (m *sidebar) View() string {
 	for len(lines) < m.height-1 {
 		lines = append(lines, "")
 	}
+	if j := m.hovered(); j >= 0 {
+		if popup, top := m.hoverPopup(j); top < len(lines) {
+			copy(lines[top:], popup)
+		}
+	}
 	status := ""
 	if m.err != nil {
 		status = errorStyle.Render(truncate(m.err.Error(), width))
@@ -712,7 +792,8 @@ func (m *sidebar) View() string {
 
 func runSidebar() error {
 	m := &sidebar{self: selfWindowID()}
-	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion(), tea.WithReportFocus())
+	// All motion, not just drags, so resting the mouse on a status entry can show it in full.
+	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseAllMotion(), tea.WithReportFocus())
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("running the sidebar: %w", err)
 	}

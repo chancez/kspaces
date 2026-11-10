@@ -40,8 +40,11 @@ func kitten(args ...string) ([]byte, error) {
 }
 
 type lsWindow struct {
-	ID            int               `json:"id"`
-	Title         string            `json:"title"`
+	ID    int    `json:"id"`
+	Title string `json:"title"`
+	// The window kitty would focus in its tab: is_focused in `kitten @ ls` is true for that one in every
+	// tab, so it does not say which window has the keyboard.
+	IsActive      bool              `json:"is_active"`
 	SessionName   string            `json:"session_name"`
 	LastFocusedAt float64           `json:"last_focused_at"`
 	UserVars      map[string]string `json:"user_vars"`
@@ -49,12 +52,15 @@ type lsWindow struct {
 }
 
 type lsTab struct {
-	ID      int        `json:"id"`
-	Windows []lsWindow `json:"windows"`
+	ID       int        `json:"id"`
+	IsActive bool       `json:"is_active"`
+	Windows  []lsWindow `json:"windows"`
 }
 
 type lsOSWindow struct {
-	Tabs []lsTab `json:"tabs"`
+	IsFocused   bool    `json:"is_focused"`
+	LastFocused bool    `json:"last_focused"`
+	Tabs        []lsTab `json:"tabs"`
 }
 
 // KittyState is the part of `kitten @ ls` the sidebar needs.
@@ -66,10 +72,16 @@ type KittyState struct {
 	// The window focused most recently in the sidebar's tab, not counting docks. Leaving the sidebar returns
 	// focus to it. Zero when unknown.
 	Home int
-	// Every window that reports a program status other than idle, most urgent first.
+	// Every window that reports a program status, grouped by state, most urgent first.
 	Statuses []Status
 }
 
+// focusedWindow stands for the window with keyboard focus, for a command run from a kitty mapping rather
+// than from a window of its own.
+const focusedWindow = -1
+
+// loadKittyState reads kitty's state as seen from the window selfWindowID, or from the focused window
+// when that is focusedWindow.
 func loadKittyState(selfWindowID int) (KittyState, error) {
 	out, err := kitten("ls")
 	if err != nil {
@@ -79,7 +91,35 @@ func loadKittyState(selfWindowID int) (KittyState, error) {
 	if err := json.Unmarshal(out, &data); err != nil {
 		return KittyState{}, fmt.Errorf("parsing kitten @ ls: %w", err)
 	}
+	if selfWindowID == focusedWindow {
+		selfWindowID = keyboardWindow(data)
+	}
 	return kittyStateFrom(data, selfWindowID), nil
+}
+
+// keyboardWindow is the window that has the keyboard: the active window of the active tab of the focused
+// OS window, or of the one focused last when kitty itself does not have focus. Zero when there is none.
+func keyboardWindow(data []lsOSWindow) int {
+	var osw *lsOSWindow
+	for i := range data {
+		if data[i].IsFocused || (osw == nil && data[i].LastFocused) {
+			osw = &data[i]
+		}
+	}
+	if osw == nil {
+		return 0
+	}
+	for _, tab := range osw.Tabs {
+		if !tab.IsActive {
+			continue
+		}
+		for _, w := range tab.Windows {
+			if w.IsActive {
+				return w.ID
+			}
+		}
+	}
+	return 0
 }
 
 func kittyStateFrom(data []lsOSWindow, selfWindowID int) KittyState {

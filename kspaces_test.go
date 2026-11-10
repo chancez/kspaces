@@ -208,3 +208,33 @@ func TestWrap(t *testing.T) {
 		t.Fatalf("got %q\nwant %q", got, want)
 	}
 }
+
+func TestCycleIndex(t *testing.T) {
+	got := []int{
+		cycleIndex(3, 0, 1),
+		cycleIndex(3, 2, 1),
+		cycleIndex(3, 0, -1),
+		cycleIndex(3, -1, 1),
+		cycleIndex(3, -1, -1),
+		cycleIndex(1, 0, 1),
+	}
+	if want := []int{1, 0, 2, 0, 2, 0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestKeyboardWindow(t *testing.T) {
+	tabs := func(active int) []lsTab {
+		return []lsTab{
+			{ID: 1, IsActive: active == 1, Windows: []lsWindow{{ID: 10, IsActive: true}, {ID: 11}}},
+			{ID: 2, IsActive: active == 2, Windows: []lsWindow{{ID: 20}, {ID: 21, IsActive: true}}},
+		}
+	}
+	unfocused := []lsOSWindow{{Tabs: tabs(1)}, {LastFocused: true, Tabs: tabs(2)}}
+	focused := []lsOSWindow{{IsFocused: true, Tabs: tabs(1)}, {LastFocused: true, Tabs: tabs(2)}}
+	got := []int{keyboardWindow(unfocused), keyboardWindow(focused), keyboardWindow(nil)}
+	// Without a focused OS window, the one focused last stands in.
+	if want := []int{21, 10, 0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
