@@ -4,8 +4,9 @@
 
 To consider once the core pieces work:
 
-- A picker: a fuzzy finder over spaces and worktrees, bound to a key, for switching without the sidebar.
 - More UX in general, still to investigate.
+- The picker (f5) has no preview of an entry's details, and cannot open a new worktree that has no session
+  any differently from the sidebar.
 
 ## Status area
 
@@ -16,7 +17,7 @@ A first version reads OSC 7501 records from `kitten @ ls`. Open questions:
   also translate its own 25453 reports, so hooks using `cm report` would show up too.
 - kitty loses its records when it restarts or a window reattaches, while cm keeps the session's state.
 - No time in the entries: kitty does not report when a record was set.
-- Entries are one line, so a long title is cut at the dock's width.
+- A collapsed entry shows one row of detail; the rest only shows with the sidebar's cursor on it.
 
 ## Known issues
 
