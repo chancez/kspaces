@@ -90,3 +90,29 @@ func AddWorktree(root, branch, dir string) (string, error) {
 func BranchExists(root, branch string) bool {
 	return exec.Command("git", "-C", root, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch).Run() == nil
 }
+
+// Changes is how many files git status reports in the worktree at dir: changed, staged or untracked.
+// Removing a worktree with any loses them.
+func Changes(dir string) (int, error) {
+	out, err := exec.Command("git", "-C", dir, "status", "--porcelain").Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
+			return 0, fmt.Errorf("%s", strings.TrimSpace(string(ee.Stderr)))
+		}
+		return 0, err
+	}
+	return strings.Count(string(out), "\n"), nil
+}
+
+// RemoveWorktree removes the linked worktree at dir from the repository at root, its directory included.
+// git refuses one with changes unless force, which loses them. The branch is kept.
+func RemoveWorktree(root, dir string, force bool) error {
+	args := []string{"-C", root, "worktree", "remove", dir}
+	if force {
+		args = append(args, "--force")
+	}
+	if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+		return fmt.Errorf("%s", strings.TrimSpace(string(out)))
+	}
+	return nil
+}

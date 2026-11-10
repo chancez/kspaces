@@ -347,8 +347,8 @@ func TestRightClickMenu(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	rule := strings.Repeat("\u2500", 29)
-	want := []string{rule, " Open", " Fold worktrees", " New worktree...", rule}
-	if got := e.screen()[y+1 : y+6]; !reflect.DeepEqual(got, want) {
+	want := []string{rule, " Open", " Fold worktrees", " New worktree...", " Remove worktree...", rule}
+	if got := e.screen()[y+1 : y+7]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{" Open"}) {
@@ -387,7 +387,7 @@ func TestRightClickMenu(t *testing.T) {
 func TestMenuKeys(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.FocusMsg{})
-	e.press("m", "j", "j", "j", "k")
+	e.press("m", "j", "j", "j", "j", "k", "k")
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Fold worktrees"}) {
 		t.Errorf("highlighted %q", got)
 	}
@@ -404,14 +404,14 @@ func TestMenuKeys(t *testing.T) {
 // A menu that would run off the bottom opens above its row.
 func TestMenuAbove(t *testing.T) {
 	e := newSidebarEnv(t)
-	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 11})
+	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 13})
 	e.m.render()
-	dev := e.row("gr@dev")
-	_, y := e.zone(fmt.Sprintf(entryZone, dev))
-	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
+	fix := e.row("gr@fix")
+	_, y := e.zone(fmt.Sprintf(entryZone, fix))
+	e.click(fmt.Sprintf(entryZone, fix), tea.MouseRight)
 	rule := strings.Repeat("\u2500", 29)
-	want := []string{rule, " Open", " Fold worktrees", " New worktree...", rule}
-	if got := e.screen()[y-5 : y]; !reflect.DeepEqual(got, want) {
+	want := []string{rule, " Open", " Fold worktrees", " New worktree...", " Remove worktree...", rule}
+	if got := e.screen()[y-6 : y]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu above row %d:\n%q\nwant\n%q", y, got, want)
 	}
 }

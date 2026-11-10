@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -73,6 +74,8 @@ type OSWindow struct {
 type State struct {
 	// For each session with windows, the one focused most recently. Switching to a session focuses it.
 	Sessions map[string]int
+	// How many windows each session with windows has, not counting docks.
+	Windows map[string]int
 	// The session of the tab the sidebar runs in, empty when it belongs to none.
 	Current string
 	// The window focused most recently in the sidebar's tab, not counting docks. Leaving the sidebar returns
@@ -129,7 +132,7 @@ func keyboardWindow(data []OSWindow) int {
 }
 
 func stateFrom(data []OSWindow, selfWindowID int) State {
-	st := State{Sessions: map[string]int{}}
+	st := State{Sessions: map[string]int{}, Windows: map[string]int{}}
 	lastFocused := map[string]float64{}
 	for _, osw := range data {
 		for _, tab := range osw.Tabs {
@@ -152,6 +155,7 @@ func stateFrom(data []OSWindow, selfWindowID int) State {
 					continue
 				}
 				session = w.SessionName
+				st.Windows[w.SessionName]++
 				if t, seen := lastFocused[w.SessionName]; !seen || w.LastFocusedAt > t {
 					lastFocused[w.SessionName] = w.LastFocusedAt
 					st.Sessions[w.SessionName] = w.ID
@@ -175,18 +179,26 @@ func SelfWindowID() int {
 	return id
 }
 
-// LaunchNewWorktree opens the new worktree form for the space at root in an overlay over the window of
-// the sidebar's tab. The var keeps the overlay out of saved sessions, whose match leaves out var:kspaces.
-func LaunchNewWorktree(st State, root string) error {
+// LaunchForm runs this kspaces with args, such as `new ROOT`, in an overlay over the window of the
+// sidebar's tab, for a form the sidebar is too narrow for. The var keeps the overlay out of saved
+// sessions, whose match leaves out var:kspaces.
+func LaunchForm(st State, args ...string) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	args := []string{"launch", "--type=overlay", "--var=kspaces_form=1"}
+	launch := []string{"launch", "--type=overlay", "--var=kspaces_form=1"}
 	if st.Home != 0 {
-		args = append(args, "--next-to", fmt.Sprintf("id:%d", st.Home))
+		launch = append(launch, "--next-to", fmt.Sprintf("id:%d", st.Home))
 	}
-	_, err = kitten(append(args, exe, "new", root)...)
+	_, err = kitten(append(append(launch, exe), args...)...)
+	return err
+}
+
+// CloseSession closes every window of session, as closing them by hand would, so whatever kitty.conf runs
+// when a window closes runs for each, such as ending a multiplexer session.
+func CloseSession(session string) error {
+	_, err := kitten("close-window", "--ignore-no-match", "--match", "session:^"+regexp.QuoteMeta(session)+"$")
 	return err
 }
 

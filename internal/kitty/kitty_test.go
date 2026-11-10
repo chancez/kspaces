@@ -27,7 +27,8 @@ func TestStateFrom(t *testing.T) {
 
 	got := stateFrom(data, 12)
 	// Home is the tab's most recently focused window that is not a dock.
-	want := State{Sessions: map[string]int{"gr": 11, "kitty@docks": 21}, Current: "gr", Home: 11}
+	// Windows counts each session's windows, docks left out.
+	want := State{Sessions: map[string]int{"gr": 11, "kitty@docks": 21}, Windows: map[string]int{"gr": 3, "kitty@docks": 1}, Current: "gr", Home: 11}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}

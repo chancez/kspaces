@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -132,5 +133,61 @@ func TestNewWorktreeForm(t *testing.T) {
 	// The space is no repository, so git refuses, and the form says why and stays.
 	if _, quit := f.Update(cmd()); quit != nil || f.busy || !strings.Contains(strings.Join(screen(), "\n"), "not a git repository") {
 		t.Errorf("after git refused: busy %v, quit %v:\n%s", f.busy, quit != nil, strings.Join(screen(), "\n"))
+	}
+}
+
+// The remove worktree form says what goes with the worktree, and y starts removing it while n leaves.
+func TestRemoveWorktreeForm(t *testing.T) {
+	// Resolved, as git reports a worktree's path.
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	space := spaces.Space{Name: "gr", Root: root, Worktrees: []spaces.Worktree{
+		{Path: root, Branch: "main", Session: "gr"},
+		{Path: filepath.Join(root, ".worktrees", "dev"), Branch: "pr/me/dev", Session: "gr@dev"},
+	}}
+	form := func(changes int) *removeWorktreeForm {
+		f := &removeWorktreeForm{th: look.New(true), space: space, wt: space.Worktrees[1], changes: changes, windows: 2}
+		f.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+		return f
+	}
+	screen := func(f *removeWorktreeForm) []string {
+		var out []string
+		for _, l := range strings.Split(ansi.Strip(f.render()), "\n") {
+			out = append(out, strings.TrimRight(l, " "))
+		}
+		return out
+	}
+	f := form(3)
+	want := []string{
+		"",
+		"  Remove worktree dev from gr",
+		"",
+		"  directory  .worktrees/dev",
+		"  branch     pr/me/dev kept",
+		"  session    2 windows closed",
+		"  changes    3 files not committed, lost",
+		"",
+		"  y remove  n/esc cancel",
+		"",
+	}
+	if got := screen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("form:\n%q\nwant\n%q", got, want)
+	}
+	if _, cmd := f.Update(tea.KeyPressMsg{Code: 'n', Text: "n"}); cmd == nil || f.busy {
+		t.Errorf("n: quit %v, busy %v", cmd != nil, f.busy)
+	}
+
+	f = form(0)
+	if got := screen(f)[6]; got != "  changes    none" {
+		t.Errorf("changes row of a clean worktree = %q", got)
+	}
+	// The command removes the worktree for real, and closes kitty windows, so it is not run here.
+	if _, cmd := f.Update(tea.KeyPressMsg{Code: 'y', Text: "y"}); cmd == nil || !f.busy || screen(f)[8] != "  Removing..." {
+		t.Errorf("y: busy %v:\n%s", f.busy, strings.Join(screen(f), "\n"))
+	}
+	if _, cmd := f.Update(tea.KeyPressMsg{Code: 'n', Text: "n"}); cmd != nil {
+		t.Error("n while removing left the form")
 	}
 }

@@ -146,3 +146,14 @@ func (m *sidebar) newWorktree(root string) tea.Cmd {
 		return nil
 	}
 }
+
+// removeWorktree opens the form that confirms removing the worktree at path, in an overlay as newWorktree's.
+func (m *sidebar) removeWorktree(path string) tea.Cmd {
+	st := m.kitty
+	return func() tea.Msg {
+		if err := spaces.AskRemoveWorktree(st, path); err != nil {
+			return spaces.Snapshot{Err: err}
+		}
+		return nil
+	}
+}

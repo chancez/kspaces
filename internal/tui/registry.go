@@ -33,9 +33,10 @@ type paneSubject struct{}
 // menuSubject is the sidebar's open context menu.
 type menuSubject struct{}
 
-// pickerSubject is the picker, formSubject the new worktree form.
+// pickerSubject is the picker, formSubject the new worktree form, removeSubject the remove worktree form.
 type pickerSubject struct{}
 type formSubject struct{}
+type removeSubject struct{}
 
 // do adapts a function that changes the model without a command.
 func do[M, S any](f func(m M)) func(M, S) tea.Cmd {
@@ -83,6 +84,15 @@ var (
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			return m.newWorktree(s.row.Space.Root)
+		},
+	}
+	actRemoveWorktree = &interact.Action[*sidebar, entrySubject]{
+		Title: "Remove worktree...",
+		// Only a linked worktree: the main one is the repository itself.
+		Applies: func(_ *sidebar, s entrySubject) bool { return !s.row.Main && s.row.Worktree != nil },
+		Run: func(m *sidebar, s entrySubject) tea.Cmd {
+			m.remote = false
+			return m.removeWorktree(s.row.Worktree.Path)
 		},
 	}
 )
@@ -184,6 +194,21 @@ var (
 	actCancel = quit[*newWorktreeForm, formSubject]()
 )
 
+// The remove worktree form's.
+var (
+	actRemove = &interact.Action[*removeWorktreeForm, removeSubject]{
+		Title:   "remove",
+		Applies: func(f *removeWorktreeForm, _ removeSubject) bool { return !f.busy },
+		Run:     cmd[*removeWorktreeForm, removeSubject]((*removeWorktreeForm).remove),
+	}
+	actRemoveCancel = &interact.Action[*removeWorktreeForm, removeSubject]{
+		Title:   "cancel",
+		Applies: func(f *removeWorktreeForm, _ removeSubject) bool { return !f.busy },
+		Run:     func(*removeWorktreeForm, removeSubject) tea.Cmd { return tea.Quit },
+	}
+	actRemoveQuit = quit[*removeWorktreeForm, removeSubject]()
+)
+
 var (
 	entryKind  *interact.Kind[*sidebar, entrySubject]
 	statusKind *interact.Kind[*sidebar, statusSubject]
@@ -191,22 +216,25 @@ var (
 	menuKind   *interact.Kind[*sidebar, menuSubject]
 	pickerKind *interact.Kind[*picker, pickerSubject]
 	formKind   *interact.Kind[*newWorktreeForm, formSubject]
+	removeKind *interact.Kind[*removeWorktreeForm, removeSubject]
 
-	spacesList *interact.Place[*sidebar, entrySubject]
-	statusList *interact.Place[*sidebar, statusSubject]
-	thePane    *interact.Place[*sidebar, paneSubject]
-	theMenu    *interact.Place[*sidebar, menuSubject]
-	thePicker  *interact.Place[*picker, pickerSubject]
-	theForm    *interact.Place[*newWorktreeForm, formSubject]
+	spacesList    *interact.Place[*sidebar, entrySubject]
+	statusList    *interact.Place[*sidebar, statusSubject]
+	thePane       *interact.Place[*sidebar, paneSubject]
+	theMenu       *interact.Place[*sidebar, menuSubject]
+	thePicker     *interact.Place[*picker, pickerSubject]
+	theForm       *interact.Place[*newWorktreeForm, formSubject]
+	theRemoveForm *interact.Place[*removeWorktreeForm, removeSubject]
 )
 
 // Kinds and places are made in init, as their actions run code that reads them.
 func init() {
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actFold, actUnfold, actNewWorktree)
+		actOpenWorktree, actFold, actUnfold, actNewWorktree, actRemoveWorktree)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
+	entryKind.Bind(actRemoveWorktree, "x", "remove worktree", "x")
 	spacesList = interact.List(entryKind)
 	spacesList.Bind(actOpenWorktree, "enter/l", "open", "enter", "l")
 
@@ -249,6 +277,12 @@ func init() {
 	formKind.BindQuiet(actWaitForCreate, "enter")
 	formKind.Bind(actCancel, "esc", "cancel", "esc", "ctrl+c")
 	theForm = interact.List(formKind)
+
+	removeKind = interact.NewKind(func(removeSubject) string { return "Remove worktree" }, actRemove, actRemoveCancel, actRemoveQuit)
+	removeKind.Bind(actRemove, "y", "remove", "y")
+	removeKind.Bind(actRemoveCancel, "n/esc", "cancel", "n", "esc")
+	removeKind.Bind(actRemoveQuit, "ctrl+c", "quit", "ctrl+c")
+	theRemoveForm = interact.List(removeKind)
 }
 
 // Targets: the subjects on screen, each in its place.

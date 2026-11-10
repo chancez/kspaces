@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/kitty"
 )
 
@@ -89,29 +90,38 @@ func OpenFromOverlay(cfg config.Config, wt Worktree) error {
 	return OpenWorktree(cfg, st, wt)
 }
 
-// OpenPath switches to the session of the worktree at path, creating it if needed.
-func OpenPath(cfg config.Config, path string) error {
+// FindWorktree is the worktree at path and its space, from any of the configured spaces.
+func FindWorktree(cfg config.Config, path string) (Space, Worktree, error) {
 	// git reports worktree paths with symlinks resolved, for example /private/tmp for /tmp on macOS.
 	path, err := filepath.EvalSymlinks(path)
 	if err != nil {
-		return err
+		return Space{}, Worktree{}, err
 	}
 	if path, err = filepath.Abs(path); err != nil {
-		return err
+		return Space{}, Worktree{}, err
 	}
 	for _, root := range cfg.Spaces {
-		for _, wt := range LoadSpace(root).Worktrees {
-			if wt.Path != path {
-				continue
+		s := LoadSpace(root)
+		for _, wt := range s.Worktrees {
+			if wt.Path == path {
+				return s, wt, nil
 			}
-			st, err := kitty.LoadState(kitty.SelfWindowID())
-			if err != nil {
-				return err
-			}
-			return OpenWorktree(cfg, st, wt)
 		}
 	}
-	return fmt.Errorf("%s is not a worktree of any configured space", path)
+	return Space{}, Worktree{}, fmt.Errorf("%s is not a worktree of any configured space", path)
+}
+
+// OpenPath switches to the session of the worktree at path, creating it if needed.
+func OpenPath(cfg config.Config, path string) error {
+	_, wt, err := FindWorktree(cfg, path)
+	if err != nil {
+		return err
+	}
+	st, err := kitty.LoadState(kitty.SelfWindowID())
+	if err != nil {
+		return err
+	}
+	return OpenWorktree(cfg, st, wt)
 }
 
 // Leave gives keyboard focus back to the window of the tab the sidebar took it from, if it is known.
@@ -125,5 +135,29 @@ func Leave(st kitty.State) error {
 // NewWorktree opens the form that creates a worktree in the space at root, in an overlay over the
 // sidebar's tab: the dock is too narrow to type a name in and read back where it goes.
 func NewWorktree(st kitty.State, root string) error {
-	return kitty.LaunchNewWorktree(st, root)
+	return kitty.LaunchForm(st, "new", root)
+}
+
+// AskRemoveWorktree opens the form that confirms removing the worktree at path, in an overlay as
+// NewWorktree's.
+func AskRemoveWorktree(st kitty.State, path string) error {
+	return kitty.LaunchForm(st, "remove", path)
+}
+
+// RemoveWorktree removes a linked worktree of space, losing its changes if force, and ends its session:
+// its saved file goes, so it is not restored, and its windows close. git goes first, so a worktree git
+// refuses to remove keeps its windows.
+func RemoveWorktree(cfg config.Config, space Space, wt Worktree, force bool) error {
+	if len(space.Worktrees) > 0 && space.Worktrees[0].Path == wt.Path {
+		return fmt.Errorf("%s is the space's main worktree", wt.Path)
+	}
+	if err := git.RemoveWorktree(space.Root, wt.Path, force); err != nil {
+		return err
+	}
+	if cfg.SessionsDir != "" {
+		if err := os.Remove(sessionFile(cfg, wt.Session)); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return kitty.CloseSession(wt.Session)
 }
