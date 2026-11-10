@@ -36,6 +36,13 @@ blocked on you, an error sign for failed, a check for done and a spinner for wor
 show the most urgent state of their session in place of the dot. Clicking an entry, or `enter` on it,
 focuses that window.
 
+Each entry's first row has the session, or the window title for a window in no session, the program's
+name, and `+N` when the window has N more records. Below it is one row of what the program said: a
+progress bar when it reports progress, otherwise its title, otherwise its message. With the sidebar's
+cursor on an entry, the entry opens up to show all of it: what a blocked program waits for (permission,
+a question or a sign-in), the title, progress, up to six rows of the message, the record's id and the
+window's other records.
+
 kitty keeps the records and applies the protocol's rules, and kspaces reads them from `kitten @ ls`:
 working and blocked end at the next shell prompt, done and failed stay until the window is focused or typed
 in. Anything that writes OSC 7501 to its terminal shows up, an agent or a build alike.

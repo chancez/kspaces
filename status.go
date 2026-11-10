@@ -9,8 +9,10 @@ import (
 // the program status protocol (OSC 7501). kitty applies the protocol's lifetime rules, so a done or error
 // record stays until the window is focused or typed in, and working and blocked ones end at the next prompt.
 type programRecord struct {
-	ID       string `json:"id"`
-	State    string `json:"state"`
+	ID    string `json:"id"`
+	State string `json:"state"`
+	// What a blocked program waits for: permission, question or auth. Empty otherwise.
+	Kind     string `json:"kind"`
 	Progress *int   `json:"progress"`
 	App      string `json:"app"`
 	Title    string `json:"title"`
@@ -20,28 +22,35 @@ type programRecord struct {
 // urgency orders states as kitty does when it picks the one record to show for several: higher first.
 var urgency = map[string]int{"idle": 0, "working": 1, "done": 2, "error": 3, "blocked": 4}
 
-// Status is the most urgent program status of one window.
+// Status is the most urgent program status of one window, and the window's other records.
 type Status struct {
 	Window  int
 	Session string
 	// The window's title, for telling apart several windows of one session.
 	WindowTitle string
 	programRecord
+	// The window's other records that are not idle, most urgent first, such as the other steps of a deploy
+	// reporting each under its own id.
+	Others []programRecord
 }
 
 // windowStatus picks the most urgent record of a window, or reports false when none is worth showing.
 func windowStatus(w lsWindow) (Status, bool) {
-	var best *programRecord
-	for i := range w.ProgramStatus {
-		r := &w.ProgramStatus[i]
-		if best == nil || urgency[r.State] > urgency[best.State] {
-			best = r
+	var records []programRecord
+	for _, r := range w.ProgramStatus {
+		if urgency[r.State] > 0 {
+			records = append(records, r)
 		}
 	}
-	if best == nil || urgency[best.State] == 0 {
+	if len(records) == 0 {
 		return Status{}, false
 	}
-	return Status{Window: w.ID, Session: w.SessionName, WindowTitle: w.Title, programRecord: *best}, true
+	slices.SortStableFunc(records, func(a, b programRecord) int { return cmp.Compare(urgency[b.State], urgency[a.State]) })
+	s := Status{Window: w.ID, Session: w.SessionName, WindowTitle: w.Title, programRecord: records[0]}
+	if len(records) > 1 {
+		s.Others = records[1:]
+	}
+	return s, true
 }
 
 // sortStatuses puts the most urgent first, then groups by session, so what needs attention is on top.

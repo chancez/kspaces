@@ -154,7 +154,11 @@ func TestStatuses(t *testing.T) {
 
 	got := kittyStateFrom(data, 0).Statuses
 	want := []Status{
-		{Window: 10, Session: "gr", programRecord: programRecord{ID: "deploy", State: "blocked", App: "claude", Title: "approve"}},
+		{
+			Window: 10, Session: "gr",
+			programRecord: programRecord{ID: "deploy", State: "blocked", App: "claude", Title: "approve"},
+			Others:        []programRecord{{ID: "build", State: "working"}},
+		},
 		{Window: 21, WindowTitle: "scratch", programRecord: programRecord{State: "error", Msg: "exit 1"}},
 		{Window: 20, Session: "kitty", programRecord: programRecord{State: "done", App: "make"}},
 	}
@@ -165,5 +169,13 @@ func TestStatuses(t *testing.T) {
 	gotStates := []string{sessionStatus(got, "gr"), sessionStatus(got, "kitty"), sessionStatus(got, "docs")}
 	if wantStates := []string{"blocked", "done", ""}; !reflect.DeepEqual(gotStates, wantStates) {
 		t.Fatalf("session states: got %q, want %q", gotStates, wantStates)
+	}
+}
+
+func TestWrap(t *testing.T) {
+	got := wrap("run the full test suite\nthen deploy supercalifragilistic", 10)
+	want := []string{"run the", "full test", "suite", "then", "deploy", "supercalif", "ragilistic"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q\nwant %q", got, want)
 	}
 }

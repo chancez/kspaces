@@ -159,7 +159,7 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cfg, m.spaces, m.kitty = *msg.cfg, msg.spaces, msg.kitty
 			m.rows = buildRows(msg.others, m.spaces)
 			m.cursor = min(m.cursor, max(m.numEntries()-1, 0))
-			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-m.layout().status, 0))
+			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))
 		}
 	case tea.MouseMsg:
 		l := m.layout()
@@ -168,7 +168,7 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case msg.Button == tea.MouseButtonWheelUp && inStatus:
 			m.statusOffset = max(m.statusOffset-1, 0)
 		case msg.Button == tea.MouseButtonWheelDown && inStatus:
-			m.statusOffset = min(m.statusOffset+1, max(len(m.kitty.Statuses)-l.status, 0))
+			m.statusOffset = min(m.statusOffset+1, max(len(m.kitty.Statuses)-1, 0))
 		case msg.Button == tea.MouseButtonWheelUp:
 			m.offset = max(m.offset-1, 0)
 		case msg.Button == tea.MouseButtonWheelDown:
@@ -230,8 +230,14 @@ func (m *sidebar) entryAt(y int) (int, bool) {
 		return i, i < len(m.rows) && m.rows[i].space != nil
 	}
 	if l.status > 0 && y >= l.statusTop && y < l.statusTop+l.status {
-		j := y - l.statusTop + m.statusOffset
-		return len(m.rows) + j, j < len(m.kitty.Statuses)
+		// Entries take several rows each, so walk them down to the one drawn at y.
+		top := l.statusTop
+		for j := m.statusOffset; j < len(m.kitty.Statuses); j++ {
+			top += len(m.statusLines(j))
+			if y < top {
+				return len(m.rows) + j, true
+			}
+		}
 	}
 	return 0, false
 }
@@ -247,8 +253,10 @@ func (m *sidebar) scrollToCursor() {
 		j := m.cursor - len(m.rows)
 		if j < m.statusOffset {
 			m.statusOffset = j
-		} else if j >= m.statusOffset+l.status {
-			m.statusOffset = j - l.status + 1
+		}
+		// Scroll until the whole entry fits, as the cursor expands it.
+		for m.statusOffset < j && m.statusRows(m.statusOffset, j) > l.status {
+			m.statusOffset++
 		}
 		return
 	}
@@ -454,10 +462,26 @@ func stateMarker(state string) (string, lipgloss.Style) {
 	}
 }
 
-// renderStatus draws status entry j: its state, the session it belongs to, or the window title for a
-// window in no session, and what the program said.
-func (m *sidebar) renderStatus(j int) string {
+// statusRows is how many rows status entries from through to take.
+func (m *sidebar) statusRows(from, to int) int {
+	n := 0
+	for j := from; j <= to; j++ {
+		n += len(m.statusLines(j))
+	}
+	return n
+}
+
+// kindLabel says what a blocked program is waiting for, from the protocol's kind field.
+var kindLabel = map[string]string{"permission": "wants permission", "question": "has a question", "auth": "needs you to sign in"}
+
+// statusLines draws status entry j. The first row has its state, the session it belongs to, or the window
+// title for a window in no session, and the program's name. Below it is what the program said: its
+// progress, its title or else its message. With the cursor on it, the entry opens up to show all of it:
+// what a blocked program waits for, title, progress, the whole message, the record's id and the window's
+// other records.
+func (m *sidebar) statusLines(j int) []string {
 	s, width := m.kitty.Statuses[j], m.contentWidth()
+	expanded := len(m.rows)+j == m.cursor && m.focused
 	mark, markStyle := stateMarker(s.State)
 	// A linked worktree's session is SPACE@DIR; the worktree's name alone fits the narrow dock and is what
 	// its row in the spaces list shows.
@@ -468,27 +492,102 @@ func (m *sidebar) renderStatus(j int) string {
 	if label == "" {
 		label = s.WindowTitle
 	}
-	detail := s.Title
-	if detail == "" {
-		detail = s.Msg
-	}
-	if detail == "" {
-		detail = s.App
-	}
-	if s.State == "working" && s.Progress != nil {
-		detail = strings.TrimSpace(fmt.Sprintf("%d%% %s", *s.Progress, detail))
+	extra := s.App
+	if len(s.Others) > 0 {
+		extra = strings.TrimSpace(fmt.Sprintf("%s +%d", extra, len(s.Others)))
 	}
 	label = truncate(label, max(width-cells(mark), 0))
-	if rest := width - cells(mark) - cells(label); detail != "" && rest > 2 {
-		detail = " " + truncate(detail, rest-1)
+	if rest := width - cells(mark) - cells(label); extra != "" && rest > 2 {
+		extra = " " + truncate(extra, rest-1)
 	} else {
-		detail = ""
+		extra = ""
 	}
-	pad := strings.Repeat(" ", max(width-cells(mark)-cells(label)-cells(detail), 0))
-	if len(m.rows)+j == m.cursor && m.focused {
-		return cursorStyle.Render(mark + label + detail + pad)
+	pad := strings.Repeat(" ", max(width-cells(mark)-cells(label)-cells(extra), 0))
+	first := markStyle.Render(mark) + label + branchStyle.Render(extra) + pad
+	if expanded {
+		first = cursorStyle.Render(mark + label + extra + pad)
 	}
-	return markStyle.Render(mark) + label + branchStyle.Render(detail) + pad
+	lines := []string{first}
+
+	// Detail rows are indented under the label.
+	indent, inner := noMarker, max(width-cells(noMarker), 1)
+	add := func(style lipgloss.Style, text string, maxRows int) {
+		for i, l := range wrap(text, inner) {
+			if i == maxRows {
+				break
+			}
+			lines = append(lines, indent+style.Render(l)+strings.Repeat(" ", max(inner-cells(l), 0)))
+		}
+	}
+	plain := lipgloss.NewStyle()
+	if !expanded {
+		switch {
+		case s.Progress != nil:
+			add(plain, progressBar(*s.Progress, inner), 1)
+		case s.Title != "":
+			add(plain, s.Title, 1)
+		case s.Msg != "":
+			add(branchStyle, s.Msg, 1)
+		case kindLabel[s.Kind] != "":
+			add(blockedStyle, kindLabel[s.Kind], 1)
+		}
+		return lines
+	}
+	if l := kindLabel[s.Kind]; l != "" {
+		add(blockedStyle, l, 1)
+	}
+	add(plain, s.Title, 3)
+	if s.Progress != nil {
+		add(plain, progressBar(*s.Progress, inner), 1)
+	}
+	add(branchStyle, s.Msg, 6)
+	if s.ID != "" {
+		add(branchStyle, "id "+s.ID, 1)
+	}
+	for _, o := range s.Others {
+		name := o.ID
+		if name == "" {
+			name = o.App
+		}
+		add(branchStyle, strings.TrimSpace(o.State+" "+name+" "+o.Title), 1)
+	}
+	return lines
+}
+
+// progressBar draws a percentage as a bar that fits width, followed by the number.
+func progressBar(percent, width int) string {
+	n := max(min(width-5, 16), 1)
+	filled := n * min(max(percent, 0), 100) / 100
+	return strings.Repeat("\u2588", filled) + strings.Repeat("\u2591", n-filled) + fmt.Sprintf(" %d%%", percent)
+}
+
+// wrap breaks text into rows of at most width cells at spaces, and inside words longer than a row.
+func wrap(text string, width int) []string {
+	var rows []string
+	for _, para := range strings.Split(text, "\n") {
+		row := ""
+		for _, word := range strings.Fields(para) {
+			for cells(word) > width {
+				if row != "" {
+					rows, row = append(rows, row), ""
+				}
+				r := []rune(word)
+				rows, word = append(rows, string(r[:width])), string(r[width:])
+			}
+			switch {
+			case row == "":
+				row = word
+			case cells(row)+1+cells(word) <= width:
+				row += " " + word
+			default:
+				rows, row = append(rows, row), word
+			}
+		}
+		if row != "" {
+			rows = append(rows, row)
+		}
+	}
+	return rows
 }
 
 func (m *sidebar) isOpen(wt *Worktree) bool {
@@ -509,8 +608,13 @@ func (m *sidebar) View() string {
 	if len(m.kitty.Statuses) == 0 {
 		lines = append(lines, closedStyle.Render(truncate("Nothing to report", width)))
 	}
-	for j := m.statusOffset; j < min(m.statusOffset+l.status, len(m.kitty.Statuses)); j++ {
-		lines = append(lines, m.renderStatus(j))
+	for j := m.statusOffset; j < len(m.kitty.Statuses); j++ {
+		for _, line := range m.statusLines(j) {
+			if len(lines) >= l.statusTop+l.status {
+				break
+			}
+			lines = append(lines, line)
+		}
 	}
 	// Fill the height so the border runs the full length of the dock, with errors on the last line.
 	for len(lines) < m.height-1 {
