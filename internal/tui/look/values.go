@@ -260,3 +260,12 @@ func DangerButton(label, key string) []Span {
 	}
 	return out
 }
+
+// More marks n entries of a list scrolled out of view, above or below.
+func More(above bool, n int) []Span {
+	g := GlyphMoreBelow
+	if above {
+		g = GlyphMoreAbove
+	}
+	return []Span{glyph(elMuted, g, false), sp(elMuted, fmt.Sprintf(" %d more", n))}
+}

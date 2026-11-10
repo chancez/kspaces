@@ -26,6 +26,9 @@ const (
 	GlyphOther
 	// GlyphSearch prompts for the picker's query.
 	GlyphSearch
+	// GlyphMoreAbove and GlyphMoreBelow mark entries of a list scrolled out of view.
+	GlyphMoreAbove
+	GlyphMoreBelow
 	numGlyphs
 )
 
@@ -34,36 +37,40 @@ const (
 // keeps them at.
 var glyphSets = map[Glyphs][numGlyphs]string{
 	GlyphsASCII: {
-		GlyphOpen:     "v",
-		GlyphFolded:   ">",
-		GlyphBlocked:  "!",
-		GlyphError:    "x",
-		GlyphDone:     "+",
-		GlyphWorking:  "*",
-		GlyphIdle:     "o",
-		GlyphCurrent:  ">",
-		GlyphSession:  "*",
-		GlyphBroken:   "x",
-		GlyphSpace:    "#",
-		GlyphWorktree: "-",
-		GlyphOther:    "$",
-		GlyphSearch:   "/",
+		GlyphOpen:      "v",
+		GlyphFolded:    ">",
+		GlyphBlocked:   "!",
+		GlyphError:     "x",
+		GlyphDone:      "+",
+		GlyphWorking:   "*",
+		GlyphIdle:      "o",
+		GlyphCurrent:   ">",
+		GlyphSession:   "*",
+		GlyphBroken:    "x",
+		GlyphSpace:     "#",
+		GlyphWorktree:  "-",
+		GlyphOther:     "$",
+		GlyphSearch:    "/",
+		GlyphMoreAbove: "^",
+		GlyphMoreBelow: "v",
 	},
 	GlyphsUnicode: {
-		GlyphOpen:     "\u25bc", // black down-pointing triangle
-		GlyphFolded:   "\u25b6", // black right-pointing triangle
-		GlyphBlocked:  "!",
-		GlyphError:    "\u2717", // ballot x
-		GlyphDone:     "\u2713", // check mark
-		GlyphWorking:  "\u2026", // horizontal ellipsis
-		GlyphIdle:     "\u25cb", // white circle
-		GlyphCurrent:  "\u203a", // single right angle quote
-		GlyphSession:  "\u2022", // bullet
-		GlyphBroken:   "\u2717",
-		GlyphSpace:    "\u25a0", // black square
-		GlyphWorktree: "\u2514", // box drawings up and right
-		GlyphOther:    "\u25aa", // black small square
-		GlyphSearch:   "/",
+		GlyphOpen:      "\u25bc", // black down-pointing triangle
+		GlyphFolded:    "\u25b6", // black right-pointing triangle
+		GlyphBlocked:   "!",
+		GlyphError:     "\u2717", // ballot x
+		GlyphDone:      "\u2713", // check mark
+		GlyphWorking:   "\u2026", // horizontal ellipsis
+		GlyphIdle:      "\u25cb", // white circle
+		GlyphCurrent:   "\u203a", // single right angle quote
+		GlyphSession:   "\u2022", // bullet
+		GlyphBroken:    "\u2717",
+		GlyphSpace:     "\u25a0", // black square
+		GlyphWorktree:  "\u2514", // box drawings up and right
+		GlyphOther:     "\u25aa", // black small square
+		GlyphSearch:    "/",
+		GlyphMoreAbove: "\u25b4", // small up triangle
+		GlyphMoreBelow: "\u25be", // small down triangle
 	},
 	GlyphsNerd: {
 		// The triangles, not Font Awesome's chevrons, which are drawn wider than their cell and thin.
@@ -82,5 +89,8 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphWorktree: "\ue725", // git-branch
 		GlyphOther:    "\uf120", // terminal
 		GlyphSearch:   "\uf002", // search
+		// The small triangles, for the same reason as the fold triangles.
+		GlyphMoreAbove: "\u25b4",
+		GlyphMoreBelow: "\u25be",
 	},
 }

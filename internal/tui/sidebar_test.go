@@ -409,6 +409,10 @@ func TestMenuKeys(t *testing.T) {
 // A menu that would run off the bottom opens above its row.
 func TestMenuAbove(t *testing.T) {
 	e := newSidebarEnv(t)
+	// Only gr, so its last row is the list's last, and no indicator takes it.
+	snap := fixture(time.Now())
+	snap.Spaces = snap.Spaces[:1]
+	e.m.Update(snap)
 	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 13})
 	e.m.render()
 	fix := e.row("gr@fix")
@@ -549,8 +553,66 @@ func TestWheel(t *testing.T) {
 	if e.m.offset != 1 || e.m.statusOffset != 1 {
 		t.Errorf("offsets %d and %d, want 1 and 1", e.m.offset, e.m.statusOffset)
 	}
-	if got := e.screen()[2]; got != "" {
-		t.Errorf("first row after scrolling is %q", got)
+	// The spaces list's first row covers the blank row under default; the status list's indicator takes
+	// a row of its own.
+	l := e.m.layout()
+	got := []string{e.screen()[2], e.screen()[l.statusTop]}
+	if want := []string{"\u25b4 1 more", "\u25b4 1 more"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("first rows after scrolling = %q, want %q", got, want)
+	}
+}
+
+// A short sidebar says how many entries each list has out of view, keeps the cursor clear of the
+// indicators, and a click on one scrolls a page.
+func TestMoreIndicators(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 16})
+	e.m.render()
+	l := e.m.layout()
+	spacesRows := func() []string { return e.screen()[headerRows : headerRows+l.spaces] }
+	statusRows := func() []string { return e.screen()[l.statusTop : l.statusTop+l.status] }
+	want := []string{
+		"  " + termIcon + "default",
+		"",
+		"\u25bc " + repoIcon + "gr main",
+		"  " + blocked + "dev pr/me/dev",
+		"  " + branchIcon + "fix fix",
+		"",
+		"\u25be 3 more",
+	}
+	if got := spacesRows(); !reflect.DeepEqual(got, want) {
+		t.Errorf("spaces:\n%q\nwant\n%q", got, want)
+	}
+	if got := statusRows(); got[len(got)-1] != "\u25be 3 more" {
+		t.Errorf("status list's last row = %q:\n%q", got[len(got)-1], got)
+	}
+
+	// The cursor down to docs scrolls it into view above the indicator, and one comes at the top.
+	e.press("j", "j", "j")
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"\u25b6 \uf110  docs main"}) {
+		t.Fatalf("cursor on %q", got)
+	}
+	want = []string{
+		"\u25b4 3 more",
+		"  " + branchIcon + "fix fix",
+		"",
+		"  " + repoIcon + "kitty master",
+		"",
+		"\u25b6 \uf110  docs main",
+		"\u25be 1 more",
+	}
+	if got := spacesRows(); !reflect.DeepEqual(got, want) {
+		t.Errorf("spaces after j:\n%q\nwant\n%q", got, want)
+	}
+
+	// A click on the top indicator scrolls a page up, leaving the cursor.
+	e.click(fmt.Sprintf(moreZone, "spaces", -1), tea.MouseLeft)
+	if got := spacesRows()[0]; got != "  "+termIcon+"default" || e.m.cursor != e.row("docs") {
+		t.Errorf("after clicking the indicator: first row %q, cursor %d", got, e.m.cursor)
+	}
+	e.click(fmt.Sprintf(moreZone, "status", 1), tea.MouseLeft)
+	if got := statusRows()[0]; !strings.HasPrefix(got, "\u25b4 ") {
+		t.Errorf("status list's first row after clicking its indicator = %q", got)
 	}
 }
 

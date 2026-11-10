@@ -131,6 +131,8 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		// A shorter list can leave the cursor under an indicator, or out of view.
+		m.scrollToCursor()
 	case tea.FocusMsg:
 		m.focused, m.remote = true, false
 		m.cursorToCurrent()
@@ -196,24 +198,13 @@ func (m *sidebar) contentWidth() int {
 	return max(m.width-1, 1)
 }
 
+// scrollToCursor scrolls the list the cursor is in so its entry shows.
 func (m *sidebar) scrollToCursor() {
-	l := m.layout()
 	if m.cursor >= len(m.rows) {
-		j := m.cursor - len(m.rows)
-		if j < m.statusOffset {
-			m.statusOffset = j
-		}
-		// Scroll until the whole entry fits, as the cursor expands it.
-		for m.statusOffset < j && m.statusRows(m.statusOffset, j) > l.status {
-			m.statusOffset++
-		}
+		m.scrollStatusToEntry(m.cursor - len(m.rows))
 		return
 	}
-	if m.cursor < m.offset {
-		m.offset = m.cursor
-	} else if m.cursor >= m.offset+l.spaces {
-		m.offset = m.cursor - l.spaces + 1
-	}
+	m.scrollSpacesToCursor()
 }
 
 // moveCursor moves by delta entries, stepping over the blank row between groups of spaces.
@@ -265,9 +256,7 @@ func (m *sidebar) render() string {
 func (m *sidebar) frame() string {
 	th, width, l := m.th, m.contentWidth(), m.layout()
 	lines := []string{th.Draw(look.Plain, width, th.Cut(width, look.Title("SPACES"))...), ""}
-	for i := m.offset; i < min(m.offset+l.spaces, len(m.rows)); i++ {
-		lines = append(lines, m.renderRow(i))
-	}
+	lines = append(lines, m.spacesLines()...)
 	for len(lines) < l.statusTop-2 {
 		lines = append(lines, "")
 	}
@@ -275,14 +264,8 @@ func (m *sidebar) frame() string {
 	if len(m.kitty.Statuses) == 0 {
 		lines = append(lines, th.Render(look.Plain, th.Cut(width, look.Text("Nothing to report").With(look.Dim))...))
 	}
-	for j := m.statusOffset; j < len(m.kitty.Statuses); j++ {
-		for _, line := range append(m.statusGroupTitle(j), m.statusEntry(j)...) {
-			if len(lines) >= l.statusTop+l.status {
-				break
-			}
-			lines = append(lines, line)
-		}
-	}
+	statusList, _ := m.statusLines()
+	lines = append(lines, statusList...)
 	// Fill the height so the border runs the full length of the dock, with errors on the last line.
 	for len(lines) < m.height-1 {
 		lines = append(lines, "")

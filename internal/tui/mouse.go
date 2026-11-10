@@ -60,6 +60,10 @@ func (m *sidebar) wheel(msg tea.MouseWheelMsg) {
 func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 	switch msg.Button {
 	case tea.MouseLeft:
+		if list, dir, ok := m.moreAt(msg.X, msg.Y); ok && !m.inZone(popupZone, msg.X, msg.Y) {
+			m.scrollPage(list, dir)
+			return nil
+		}
 		if j := m.hovered(); j >= 0 && m.inZone(popupZone, msg.X, msg.Y) {
 			m.hover, m.cursor = 0, len(m.rows)+j
 			t, _ := m.entryTarget(m.cursor)

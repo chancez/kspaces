@@ -9,15 +9,6 @@ import (
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
-// statusRows is how many rows status entries from through to take, with their group titles.
-func (m *sidebar) statusRows(from, to int) int {
-	n := 0
-	for j := from; j <= to; j++ {
-		n += len(m.statusGroupTitle(j)) + len(m.statusEntry(j))
-	}
-	return n
-}
-
 // statusGroupTitle is drawn above entry j when it starts a group of entries in one state, or is the first
 // one shown after scrolling, so a scrolled list still says what it shows. Later groups get a blank row
 // above their title.
@@ -134,6 +125,9 @@ func (m *sidebar) hoverPopup(j int) ([]string, int) {
 		return nil, 0
 	}
 	top := l.statusTop
+	if m.statusAbove() {
+		top++
+	}
 	for k := m.statusOffset; k < j; k++ {
 		top += len(m.statusGroupTitle(k)) + len(m.statusEntry(k))
 	}

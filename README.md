@@ -30,6 +30,10 @@ spaces.
 Sessions that are open or saved (see `sessions` below) but are not any worktree's, such as the one kitty
 starts with, are listed above the spaces.
 
+Each list scrolls on its own, with the wheel or as the cursor moves. A list with entries scrolled out of
+view says how many on its first or last row, as "3 more" after a triangle pointing that way, and clicking
+that row scrolls a page that way.
+
 ## Folding, new worktrees, closing sessions and removing worktrees
 
 A space with linked worktrees has a triangle before its name. Clicking it, or `space` on the space's row,
