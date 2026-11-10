@@ -7,11 +7,10 @@ To consider once the core pieces work:
 - More UX in general, still to investigate.
 - The picker (f5) has no preview of an entry's details, and cannot open a new worktree that has no session
   any differently from the sidebar.
-- Closing a tab should focus the tab next to it, not the session's last used tab, which kitty's default
-  `tab_switch_strategy previous` picks. kitty.conf `tab_switch_strategy left` (or `right`) does it: kitty
-  picks among the tabs `tab_bar_filter` shows, so it stays in the session (kitty/tabs.py `remove`). When
-  a session's last tab closes there is no neighbor, and kitty goes back to the last used tab, in any
-  session. Landing on a tab of the same space's sessions instead needs a watcher hook on tab close.
+- Closing a session's last tab goes back to the last used tab, in any session: the dotfiles' kitty.conf
+  `tab_switch_strategy left` focuses the tab to the left within the session (kitty picks among the tabs
+  `tab_bar_filter` shows, kitty/tabs.py `remove`), but the last tab has none. Landing on a tab of the same
+  space's sessions instead needs a watcher hook on tab close.
 
 ## Status area
 
