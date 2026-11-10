@@ -30,9 +30,12 @@ It knows nothing about what produced a record. Open questions:
 - One `kspaces sidebar` per tab, because kitty can only dock to one tab. Each polls `kitten @ ls` and runs
   `git worktree list` per space every two seconds. A dock for the whole OS window, or one process feeding
   all of them, would fix both.
-- `save_as_session --match` writes `new_os_window` before a space's file depending on which OS window had
-  focus, so with several OS windows a space can be restored in a window of its own. A kitty bug; see the
-  TODO in the dotfiles' `save_sessions.py`.
+- Two kitty bugs, worked around in the dotfiles until fixed in kitty:
+  - `save_as_session --match` writes `new_os_window` before a space's file depending on which OS window had
+    focus, so with several OS windows each space was restored in a window of its own. `save_sessions.py`
+    serializes with the bug fixed instead.
+  - Moving a tab to another OS window (`detach_tab`) drops the tab's session name, so the tab bar filter
+    shows the moved tab in every session. `kspaces_watcher.py` puts it back from the tab's windows.
 - Windows outside spaces are saved into `default` and come back labelled `default`. Left as is for now.
 - kitty's own dock border can sit next to the sidebar's, which may look like a double line.
 - The dotfiles' `cm_reap.py` kills a multiplexer session when one of two windows showing it closes.
