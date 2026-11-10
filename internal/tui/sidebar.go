@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
@@ -201,19 +201,22 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cursor = min(m.cursor, max(m.numEntries()-1, 0))
 			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))
 		}
-	case tea.MouseMsg:
+	case tea.MouseWheelMsg:
 		l := m.layout()
 		inStatus := l.status > 0 && msg.Y >= l.statusTop
 		switch {
-		case msg.Button == tea.MouseButtonWheelUp && inStatus:
+		case msg.Button == tea.MouseWheelUp && inStatus:
 			m.statusOffset = max(m.statusOffset-1, 0)
-		case msg.Button == tea.MouseButtonWheelDown && inStatus:
+		case msg.Button == tea.MouseWheelDown && inStatus:
 			m.statusOffset = min(m.statusOffset+1, max(len(m.kitty.Statuses)-1, 0))
-		case msg.Button == tea.MouseButtonWheelUp:
+		case msg.Button == tea.MouseWheelUp:
 			m.offset = max(m.offset-1, 0)
-		case msg.Button == tea.MouseButtonWheelDown:
+		case msg.Button == tea.MouseWheelDown:
 			m.offset = min(m.offset+1, max(len(m.rows)-l.spaces, 0))
-		case msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress:
+		}
+	case tea.MouseClickMsg:
+		switch msg.Button {
+		case tea.MouseLeft:
 			// A click on the popup is a click on its entry, not on the one it covers.
 			if j := m.hovered(); j >= 0 {
 				if popup, top := m.hoverPopup(j); msg.Y >= top && msg.Y < top+len(popup) {
@@ -231,25 +234,25 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, m.open(i)
 			}
-		case msg.Button == tea.MouseButtonRight && msg.Action == tea.MouseActionPress:
+		case tea.MouseRight:
 			if i, ok := m.entryAt(msg.Y); ok && i < len(m.rows) {
 				m.cursor = i
 				m.openMenu(i, msg.Y)
 			}
-		case msg.Action == tea.MouseActionMotion:
-			// Moving within the popup keeps it, rather than switching to the entry it covers.
-			if j := m.hovered(); j >= 0 {
-				if popup, top := m.hoverPopup(j); msg.Y >= top && msg.Y < top+len(popup) {
-					m.hoverAt = time.Now()
-					return m, nil
-				}
-			}
-			m.hover = 0
-			if i, ok := m.entryAt(msg.Y); ok && i >= len(m.rows) {
-				m.hover, m.hoverAt = m.kitty.Statuses[i-len(m.rows)].Window, time.Now()
+		}
+	case tea.MouseMotionMsg:
+		// Moving within the popup keeps it, rather than switching to the entry it covers.
+		if j := m.hovered(); j >= 0 {
+			if popup, top := m.hoverPopup(j); msg.Y >= top && msg.Y < top+len(popup) {
+				m.hoverAt = time.Now()
+				return m, nil
 			}
 		}
-	case tea.KeyMsg:
+		m.hover = 0
+		if i, ok := m.entryAt(msg.Y); ok && i >= len(m.rows) {
+			m.hover, m.hoverAt = m.kitty.Statuses[i-len(m.rows)].Window, time.Now()
+		}
+	case tea.KeyPressMsg:
 		if !m.focused {
 			if !m.remote {
 				m.remote = true
@@ -283,7 +286,7 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.openMenu(m.cursor, headerRows+m.cursor-m.offset)
 			}
 			return m, nil
-		case " ", "space":
+		case "space":
 			if m.cursor < len(m.rows) && m.rows[m.cursor].Space != nil && !m.rows[m.cursor].Other {
 				m.toggleFold(m.rows[m.cursor].Space.Root)
 			}
@@ -727,7 +730,16 @@ func (m *sidebar) isOpen(wt *spaces.Worktree) bool {
 	return ok
 }
 
-func (m *sidebar) View() string {
+func (m *sidebar) View() tea.View {
+	v := tea.NewView(m.render())
+	v.AltScreen = true
+	// All motion, not just drags, so resting the mouse on a status entry can show it in full.
+	v.MouseMode = tea.MouseModeAllMotion
+	v.ReportFocus = true
+	return v
+}
+
+func (m *sidebar) render() string {
 	width, l := m.contentWidth(), m.layout()
 	lines := []string{titleStyle.Render(truncate("SPACES", width)), ""}
 	for i := m.offset; i < min(m.offset+l.spaces, len(m.rows)); i++ {
@@ -767,14 +779,14 @@ func (m *sidebar) View() string {
 	if m.navigating() {
 		border = accent
 	}
-	return borderStyle.BorderForeground(border).Width(width).Render(strings.Join(lines, "\n"))
+	// The width takes in the border.
+	return borderStyle.BorderForeground(border).Width(width + 1).Render(strings.Join(lines, "\n"))
 }
 
 // RunSidebar runs the sidebar, meant for a kitty dock, until it is quit.
 func RunSidebar(ctx context.Context) error {
 	m := &sidebar{self: kitty.SelfWindowID()}
-	// All motion, not just drags, so resting the mouse on a status entry can show it in full.
-	p := tea.NewProgram(m, tea.WithContext(ctx), tea.WithAltScreen(), tea.WithMouseAllMotion(), tea.WithReportFocus())
+	p := tea.NewProgram(m, tea.WithContext(ctx))
 	if _, err := p.Run(); err != nil {
 		return fmt.Errorf("running the sidebar: %w", err)
 	}

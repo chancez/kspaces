@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/sahilm/fuzzy"
 
 	"github.com/chancez/kspaces/internal/kitty"
@@ -154,7 +154,7 @@ func (m *picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.filter()
 		}
 		return m, nil
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "esc", "ctrl+c":
 			return m, tea.Quit
@@ -211,7 +211,13 @@ func (m *picker) renderMatch(i int, width int) string {
 	return it.style.Render(it.icon) + b.String() + pad
 }
 
-func (m *picker) View() string {
+func (m *picker) View() tea.View {
+	v := tea.NewView(m.render())
+	v.AltScreen = true
+	return v
+}
+
+func (m *picker) render() string {
 	width := max(m.width, 1)
 	lines := []string{m.input.View(), separatorStyle.Render(strings.Repeat("\u2500", width))}
 	list := max(m.height-3, 1)
@@ -234,13 +240,29 @@ func (m *picker) View() string {
 
 // RunPicker runs the picker, meant for a kitty overlay, until something is chosen or it is left.
 func RunPicker(ctx context.Context) error {
-	input := textinput.New()
-	input.Prompt = "\uf002  " // search
+	input := newInput("\uf002  ") // search
 	input.Placeholder = "space, worktree or status"
 	input.Focus()
 	m := &picker{self: kitty.SelfWindowID(), input: input}
-	if _, err := tea.NewProgram(m, tea.WithContext(ctx), tea.WithAltScreen()).Run(); err != nil {
+	if _, err := tea.NewProgram(m, tea.WithContext(ctx)).Run(); err != nil {
 		return fmt.Errorf("running the picker: %w", err)
 	}
 	return nil
+}
+
+// newInput is a text input after prompt, drawn in the terminal's own colors, with a muted placeholder and
+// a block cursor in reverse video.
+func newInput(prompt string) textinput.Model {
+	in := textinput.New()
+	in.Prompt = prompt
+	state := textinput.StyleState{
+		Placeholder: lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+		Suggestion:  lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+	}
+	in.SetStyles(textinput.Styles{
+		Focused: state,
+		Blurred: state,
+		Cursor:  textinput.CursorStyle{Color: lipgloss.NoColor{}, Shape: tea.CursorBlock, Blink: true},
+	})
+	return in
 }

@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/spaces"
@@ -73,7 +73,7 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return f, tea.Quit
 		}
 		return f, nil
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "esc", "ctrl+c":
 			return f, tea.Quit
@@ -107,7 +107,13 @@ func (f *newWorktreeForm) followBranch() {
 	f.dir.Placeholder = dir
 }
 
-func (f *newWorktreeForm) View() string {
+func (f *newWorktreeForm) View() tea.View {
+	v := tea.NewView(f.render())
+	v.AltScreen = true
+	return v
+}
+
+func (f *newWorktreeForm) render() string {
 	width := max(f.width-4, 20)
 	key := lipgloss.NewStyle().Foreground(muted).Width(11)
 	branch, _ := f.plan()
@@ -146,16 +152,14 @@ func (f *newWorktreeForm) View() string {
 func RunNewWorktree(ctx context.Context, cfg config.Config, space spaces.Space) error {
 	// The branch starts with the configured prefix, so typing just the name gives PREFIX/NAME; deleting
 	// it makes a branch without one.
-	branch := textinput.New()
-	branch.Prompt = ""
+	branch := newInput("")
 	branch.SetValue(spaces.BranchStart(cfg))
 	branch.CursorEnd()
 	branch.Focus()
-	dir := textinput.New()
-	dir.Prompt = ""
+	dir := newInput("")
 	f := &newWorktreeForm{cfg: cfg, space: space, branch: branch, dir: dir}
 	f.followBranch()
-	if _, err := tea.NewProgram(f, tea.WithContext(ctx), tea.WithAltScreen()).Run(); err != nil {
+	if _, err := tea.NewProgram(f, tea.WithContext(ctx)).Run(); err != nil {
 		return fmt.Errorf("running the new worktree form: %w", err)
 	}
 	return nil

@@ -3,7 +3,7 @@ package tui
 import (
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/spaces"
 )
@@ -109,25 +109,25 @@ func (m *sidebar) runMenuItem(i int) tea.Cmd {
 // usual, such as a right click elsewhere, which opens that row's menu instead.
 func (m *sidebar) updateMenu(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
-	case tea.MouseMsg:
-		i := m.menuItemAt(msg.Y)
-		switch {
-		case msg.Action == tea.MouseActionMotion:
-			if i >= 0 {
-				m.menu.sel = i
-			}
-			return nil, true
-		case msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress:
-			if i >= 0 {
+	case tea.MouseMotionMsg:
+		if i := m.menuItemAt(msg.Y); i >= 0 {
+			m.menu.sel = i
+		}
+		return nil, true
+	case tea.MouseClickMsg:
+		if msg.Button == tea.MouseLeft {
+			if i := m.menuItemAt(msg.Y); i >= 0 {
 				return m.runMenuItem(i), true
 			}
 			m.menu = nil
 			return nil, true
-		case msg.Action == tea.MouseActionPress:
-			m.menu = nil
-			return nil, false
 		}
-	case tea.KeyMsg:
+		m.menu = nil
+		return nil, false
+	case tea.MouseWheelMsg:
+		m.menu = nil
+		return nil, false
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "j", "down":
 			m.menu.sel = min(m.menu.sel+1, len(m.menu.items)-1)
