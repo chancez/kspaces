@@ -48,19 +48,22 @@ when the sidebar loses focus, or keys sent without focus stop.
 
 ## The menu
 
-Right-click a row, or press `m` on it:
+Right-click a row, or press `m` on it. The menu lists what applies to the row, in sections, each named on
+the rule above it: what acts on the row's session, then on its worktree, then on the space as a whole, the
+same from any of its rows. A menu of one section names none. `j` / `k` and the mouse go over the items
+only.
 
-| Item | Key | Does |
-|---|---|---|
-| Open | `enter` | switch to the session |
-| Fold / Unfold worktrees | `space` | hide or show a space's linked worktrees |
-| New worktree... | `n` | create a worktree in a form |
-| Run... | `R` | run a configured command in the worktree's session, in a form; with `[[commands]]` configured |
-| Close session... | `c` | close every window of the session, on a session with windows open |
-| Remove worktree... | `x` | close the session and remove a linked worktree |
-| Forget... | `x` | delete the saved session file of a missing worktree with no windows open |
-| Clean up worktrees... | `p` | remove the space's linked worktrees that look done with, on a space's row |
-| Add space... | `a` | add a repository to the spaces, in a form; on every row |
+| Section | Item | Key | Does |
+|---|---|---|---|
+| Session | Open | `enter` | switch to the session |
+| Session | Run... | `R` | run a configured command in the worktree's session, in a form; with `[[commands]]` configured |
+| Session | Close session... | `c` | close every window of the session, on a session with windows open |
+| Worktree | Remove worktree... | `x` | close the session and remove a linked worktree |
+| Worktree | Forget... | `x` | delete the saved session file of a missing worktree with no windows open |
+| Space | New worktree... | `n` | create a worktree in the space, in a form |
+| Space | Fold / Unfold worktrees | `space` | hide or show a space's linked worktrees |
+| Space | Clean up worktrees... | `p` | remove the space's linked worktrees that look done with, on a space's row |
+| Space | Add space... | `a` | add a repository to the spaces, in a form; on every row |
 
 Each item that changes something opens a form in an overlay, with buttons and keys to confirm or cancel.
 

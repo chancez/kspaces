@@ -116,8 +116,8 @@ func TestMissingWorktreeMenu(t *testing.T) {
 	}
 	got := [][]string{titles("gr@open"), titles("gr@saved")}
 	want := [][]string{
-		{"Open", "Fold worktrees", "Close session...", "Add space..."},
-		{"Fold worktrees", "Forget...", "Add space..."},
+		{"Open", "Close session...", "Fold worktrees", "Add space..."},
+		{"Forget...", "Fold worktrees", "Add space..."},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("menus %q, want %q", got, want)

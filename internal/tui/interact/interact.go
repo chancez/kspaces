@@ -30,6 +30,9 @@ type Action[M, S any] struct {
 	// Help describes the action where the title is not enough, as in a hint next to another of
 	// the same title. Empty uses Title.
 	Help string
+	// Section is the part of a menu the action is drawn in, such as "Session", for a menu that groups
+	// its items. Empty is none.
+	Section string
 	// Applies reports whether the action applies to s now. Nil always applies.
 	Applies func(m M, s S) bool
 	// Run does it.
@@ -159,6 +162,7 @@ type Group[M any] struct {
 type Bound[M any] struct {
 	Title   string
 	Help    string
+	Section string
 	Applies func(M) bool
 	Run     func(M) tea.Cmd
 	// action is the action bound, by address.
@@ -183,6 +187,7 @@ func bind[M, S any](a *Action[M, S], s S) Bound[M] {
 	return Bound[M]{
 		Title:   a.Title,
 		Help:    help,
+		Section: a.Section,
 		Applies: func(m M) bool { return a.applies(m, s) },
 		Run:     func(m M) tea.Cmd { return a.Run(m, s) },
 		action:  a,

@@ -346,55 +346,93 @@ func TestFoldKey(t *testing.T) {
 	}
 }
 
-// A right click, or m, opens the row's menu below it; the mouse highlights an item, and a click runs it.
+// menuRule is a menu's rule in the 30 cell sidebar, with a section's name on it, or plain for "".
+func menuRule(head string) string {
+	if head == "" {
+		return strings.Repeat("\u2500", 29)
+	}
+	return "\u2500 " + head + " " + strings.Repeat("\u2500", 29-3-len(head))
+}
+
+// A right click, or m, opens the row's menu below it, its items under their sections; the mouse
+// highlights an item, and a click runs it.
 func TestRightClickMenu(t *testing.T) {
 	e := newSidebarEnv(t)
 	dev := e.row("gr@dev")
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
-	rule := strings.Repeat("\u2500", 29)
-	want := []string{rule, " Open", " Fold worktrees", " New worktree...", " Close session...", " Remove worktree...", " Add space...", rule}
-	if got := e.screen()[y+1 : y+9]; !reflect.DeepEqual(got, want) {
+	want := []string{
+		menuRule("Session"), " Open", " Close session...",
+		menuRule("Worktree"), " Remove worktree...",
+		menuRule("Space"), " New worktree...", " Fold worktrees", " Add space...",
+		menuRule(""),
+	}
+	if got := e.screen()[y+1 : y+11]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{" Open"}) {
 		t.Errorf("highlighted %q, want the first item", got)
 	}
-	e.hover(fmt.Sprintf(menuZone, 1))
+	e.hover(fmt.Sprintf(menuZone, 4))
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{" Fold worktrees"}) {
 		t.Errorf("highlighted %q after moving onto Fold worktrees", got)
 	}
-	if cmd := e.click(fmt.Sprintf(menuZone, 1), tea.MouseLeft); cmd != nil || e.m.menu != nil {
+	if cmd := e.click(fmt.Sprintf(menuZone, 4), tea.MouseLeft); cmd != nil || e.m.menu != nil {
 		t.Errorf("running Fold worktrees: cmd %v, menu still open %v", cmd != nil, e.m.menu != nil)
 	}
 	if !e.has("\u25b6 "+blocked+"gr main") || e.m.cursor != e.row("gr") {
 		t.Errorf("Fold worktrees did not fold gr onto the cursor:\n%s", strings.Join(e.screen(), "\n"))
 	}
 
-	// What a row offers depends on it: a session in no space can only be opened and closed, and a space
-	// that is not a repository has only what every row offers.
-	e.click(fmt.Sprintf(entryZone, e.row("default")), tea.MouseRight)
-	titles := func() []string {
-		var out []string
-		for _, it := range e.m.menu.items {
-			out = append(out, it.Title)
-		}
-		return out
-	}
-	if got, want := titles(), []string{"Open", "Close session...", "Add space..."}; !reflect.DeepEqual(got, want) {
-		t.Errorf("default's menu = %q, want %q", got, want)
+	// What a row offers depends on it: a session in no space can only be opened and closed, besides
+	// what every row offers.
+	def := e.row("default")
+	e.click(fmt.Sprintf(entryZone, def), tea.MouseRight)
+	_, y = e.zone(fmt.Sprintf(entryZone, def))
+	want = []string{menuRule("Session"), " Open", " Close session...", menuRule("Space"), " Add space...", menuRule("")}
+	if got := e.screen()[y+1 : y+7]; !reflect.DeepEqual(got, want) {
+		t.Errorf("default's menu:\n%q\nwant\n%q", got, want)
 	}
 	// A click elsewhere closes it; a right click elsewhere opens that row's instead.
 	e.clickAt(5, 0, tea.MouseLeft)
 	if e.m.menu != nil {
 		t.Error("a click elsewhere left the menu open")
 	}
-	e.click(fmt.Sprintf(entryZone, len(e.m.rows)-1), tea.MouseRight)
-	if e.m.menu == nil {
-		t.Fatal("the broken space has no menu")
+	e.click(fmt.Sprintf(entryZone, e.row("kitty")), tea.MouseRight)
+	if e.m.menu == nil || e.m.cursor != e.row("kitty") {
+		t.Error("a right click on kitty did not open its menu")
 	}
-	if got, want := titles(), []string{"Add space..."}; !reflect.DeepEqual(got, want) {
-		t.Errorf("the broken space's menu = %q, want %q", got, want)
+}
+
+// A menu of one section draws no name on its rules: a space that is not a repository has only what every
+// row offers.
+func TestMenuOneSection(t *testing.T) {
+	e := newSidebarEnv(t)
+	broken := len(e.m.rows) - 1
+	e.click(fmt.Sprintf(entryZone, broken), tea.MouseRight)
+	_, y := e.zone(fmt.Sprintf(entryZone, broken))
+	if got, want := e.screen()[y+1:y+4], []string{menuRule(""), " Add space...", menuRule("")}; !reflect.DeepEqual(got, want) {
+		t.Errorf("the broken space's menu:\n%q\nwant\n%q", got, want)
+	}
+}
+
+// In a narrow sidebar the menu keeps to its width, the sections' names cut before the items.
+func TestMenuNarrow(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(tea.WindowSizeMsg{Width: 12, Height: 40})
+	e.m.render()
+	dev := e.row("gr@dev")
+	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
+	_, y := e.zone(fmt.Sprintf(entryZone, dev))
+	rule := strings.Repeat("\u2500", 11)
+	want := []string{
+		"\u2500 Session \u2500", " Open", " Close s...",
+		"\u2500 Work... \u2500", " Remove ...",
+		"\u2500 Space \u2500\u2500\u2500", " New wor...", " Fold wo...", " Add spa...",
+		rule,
+	}
+	if got := e.screen()[y+1 : y+11]; !reflect.DeepEqual(got, want) {
+		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 }
 
@@ -403,7 +441,7 @@ func TestRightClickMenu(t *testing.T) {
 func TestMenuKeys(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.FocusMsg{})
-	e.press("m", "j", "j", "j", "j", "j", "j", "k", "k", "k", "k")
+	e.press("m", "j", "j", "j", "j", "j", "j", "k")
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Fold worktrees"}) {
 		t.Errorf("highlighted %q", got)
 	}
@@ -411,9 +449,37 @@ func TestMenuKeys(t *testing.T) {
 	if e.m.menu != nil || e.m.cursor != e.row("gr@dev") {
 		t.Errorf("menu open %v, cursor %d", e.m.menu != nil, e.m.cursor)
 	}
-	e.press("m", "j", "enter")
+	e.press("m", "j", "j", "j", "j", "enter")
 	if !e.has("\u25b6 " + blocked + "gr main") {
 		t.Errorf("enter on Fold worktrees did not fold gr:\n%s", strings.Join(e.screen(), "\n"))
+	}
+}
+
+// The sections' names are not items: j and k step over them, and the mouse on one, or a click, leaves
+// the menu as it was.
+func TestMenuSkipsSections(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(tea.FocusMsg{})
+	e.press("m", "j", "j")
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree..."}) {
+		t.Errorf("j past Session's last item: highlighted %q", got)
+	}
+	e.press("j", "k")
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree..."}) {
+		t.Errorf("k from Space's first item: highlighted %q", got)
+	}
+	_, y := e.zone(fmt.Sprintf(menuZone, 2))
+	head := y - 1
+	if got := e.screen()[head]; got != menuRule("Worktree") {
+		t.Fatalf("above Remove worktree... is %q, want Worktree's rule", got)
+	}
+	e.m.Update(tea.MouseMotionMsg{X: 3, Y: head})
+	e.m.render()
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree..."}) {
+		t.Errorf("mouse on Worktree's name: highlighted %q", got)
+	}
+	if cmd := e.clickAt(3, head, tea.MouseLeft); cmd != nil || e.m.menu == nil || e.m.menu.sel != 2 {
+		t.Errorf("click on Worktree's name: cmd %v, menu open %v", cmd != nil, e.m.menu != nil)
 	}
 }
 
@@ -503,20 +569,26 @@ func TestAddSpaceButton(t *testing.T) {
 // A menu that would run off the bottom opens above its row.
 func TestMenuAbove(t *testing.T) {
 	e := newSidebarEnv(t)
-	// Only gr, so its last row is the list's last, and no indicator takes it, below two sessions in no
-	// space, so the menu has room above.
+	// Only gr, so its last row is the list's last, and no indicator takes it, below sessions in no space,
+	// so the menu has room above.
 	snap := fixture(time.Now())
 	snap.Spaces = snap.Spaces[:1]
-	snap.Others = append(snap.Others, spaces.Space{Name: "notes", Worktrees: []spaces.Worktree{{Session: "notes"}}})
+	for _, name := range []string{"notes", "scratch", "mail"} {
+		snap.Others = append(snap.Others, spaces.Space{Name: name, Worktrees: []spaces.Worktree{{Session: name}}})
+	}
 	e.m.Update(snap)
-	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 14})
+	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 18})
 	e.m.render()
 	fix := e.row("gr@fix")
 	_, y := e.zone(fmt.Sprintf(entryZone, fix))
 	e.click(fmt.Sprintf(entryZone, fix), tea.MouseRight)
-	rule := strings.Repeat("\u2500", 29)
-	want := []string{rule, " Open", " Fold worktrees", " New worktree...", " Remove worktree...", " Add space...", rule}
-	if got := e.screen()[y-7 : y]; !reflect.DeepEqual(got, want) {
+	want := []string{
+		menuRule("Session"), " Open",
+		menuRule("Worktree"), " Remove worktree...",
+		menuRule("Space"), " New worktree...", " Fold worktrees", " Add space...",
+		menuRule(""),
+	}
+	if got := e.screen()[y-9 : y]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu above row %d:\n%q\nwant\n%q", y, got, want)
 	}
 }

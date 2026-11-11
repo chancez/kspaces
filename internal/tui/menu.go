@@ -11,28 +11,52 @@ import (
 )
 
 // contextMenu is the menu a right click, or `m`, opens on a row of the spaces list: the actions of the
-// row's entry that apply, from the registry. It is drawn over the rows below the one it was opened on, or
-// above when it would run off the bottom. Its actions are bound to the entry as it was, rather than to the
-// row's index, as a refresh can rebuild the rows while it is open.
+// row's entry that apply, from the registry, grouped by their sections. It is drawn over the rows below the
+// one it was opened on, or above when it would run off the bottom. Its actions are bound to the entry as it
+// was, rather than to the row's index, as a refresh can rebuild the rows while it is open.
 type contextMenu struct {
 	items []interact.Bound[*sidebar]
+	// rules are the rules drawn above items, by the item's index, each with the section it starts: the
+	// first item's always, and one between sections. The section is empty when the menu has only one.
+	rules map[int]string
 	sel   int
 	// The screen row of the rule above the items.
 	top int
 }
 
+// height is how many rows the menu takes: its items, the rules above them and the one below.
+func (c *contextMenu) height() int {
+	return len(c.items) + len(c.rules) + 1
+}
+
 // openMenu opens the menu of t, drawn from screen row y.
 func (m *sidebar) openMenu(t interact.Target[*sidebar], y int) {
-	var items []interact.Bound[*sidebar]
+	// Each section's items together, the sections in the order their first items come.
+	var order []string
+	by := map[string][]interact.Bound[*sidebar]{}
 	for _, g := range t.Groups(m) {
-		items = append(items, g.Actions...)
+		for _, it := range g.Actions {
+			if _, ok := by[it.Section]; !ok {
+				order = append(order, it.Section)
+			}
+			by[it.Section] = append(by[it.Section], it)
+		}
 	}
-	if len(items) == 0 {
+	if len(order) == 0 {
 		return
 	}
-	menu := &contextMenu{items: items, top: y + 1}
-	if menu.top+len(items)+2 > m.height-1 {
-		menu.top = max(y-len(items)-2, 0)
+	menu := &contextMenu{rules: map[int]string{}}
+	for _, s := range order {
+		head := s
+		if len(order) == 1 {
+			head = ""
+		}
+		menu.rules[len(menu.items)] = head
+		menu.items = append(menu.items, by[s]...)
+	}
+	menu.top = y + 1
+	if menu.top+menu.height() > m.height-1 {
+		menu.top = max(y-menu.height(), 0)
 	}
 	m.menu, m.hover = menu, 0
 }
@@ -70,7 +94,10 @@ func (m *sidebar) updateMenu(msg tea.Msg) (tea.Cmd, bool) {
 			if i, ok := m.menuItemAt(msg.X, msg.Y); ok {
 				return m.runMenuItem(i), true
 			}
-			m.menu = nil
+			// A click on a section's header or a rule is a near miss of an item, so the menu stays.
+			if msg.Y < m.menu.top || msg.Y >= m.menu.top+m.menu.height() || msg.X >= m.contentWidth() {
+				m.menu = nil
+			}
 			return nil, true
 		}
 		m.menu = nil
@@ -102,9 +129,11 @@ func (m *sidebar) drawMenu(lines []string) {
 		return
 	}
 	th, width := m.th, m.contentWidth()
-	rule := th.Render(look.Plain, look.Rule(width, true))
-	drawn := []string{rule}
+	var drawn []string
 	for i, it := range m.menu.items {
+		if head, ok := m.menu.rules[i]; ok {
+			drawn = append(drawn, m.menuRule(head, width))
+		}
 		surface := look.Plain
 		if i == m.menu.sel {
 			surface = look.Cursor
@@ -112,12 +141,27 @@ func (m *sidebar) drawMenu(lines []string) {
 		label := th.Cut(width-1, look.Text(it.Title))
 		drawn = append(drawn, th.DrawZone(fmt.Sprintf(menuZone, i), surface, width, append([]look.Span{look.Text(" ")}, label...)...))
 	}
-	drawn = append(drawn, rule)
+	drawn = append(drawn, m.menuRule("", width))
 	for i, l := range drawn {
 		if m.menu.top+i < len(lines) {
 			lines[m.menu.top+i] = l
 		}
 	}
+}
+
+// menuRule is a rule width cells long with head, a section's name, muted on it after a dash. The name is
+// cut to fit, and left out with no room for a letter of it, so the rule always spans the menu.
+func (m *sidebar) menuRule(head string, width int) string {
+	th := m.th
+	// A dash and a space before the name, and a space and at least a dash after it.
+	room := width - 4
+	if head == "" || room < 1 {
+		return th.Render(look.Plain, look.Rule(width, true))
+	}
+	name := th.Cut(room, look.Muted(head))
+	spans := append([]look.Span{look.Border("\u2500 ", true)}, name...)
+	spans = append(spans, look.Border(" ", true), look.Rule(width-3-th.Width(name...), true))
+	return th.Render(look.Plain, spans...)
 }
 
 // toggleFold hides or shows the linked worktrees of the space at root, in every sidebar.

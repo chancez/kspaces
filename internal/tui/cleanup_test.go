@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"reflect"
 	"strings"
@@ -146,12 +147,14 @@ func TestCleanupKey(t *testing.T) {
 		t.Errorf("p launched %q, want %q", got, want)
 	}
 	e.press("m")
-	var titles []string
-	for _, it := range e.m.menu.items {
-		titles = append(titles, it.Title)
+	_, y := e.zone(fmt.Sprintf(entryZone, e.row("gr")))
+	want := []string{
+		menuRule("Session"), " Open", " Close session...",
+		menuRule("Space"), " New worktree...", " Fold worktrees", " Clean up worktrees...", " Add space...",
+		menuRule(""),
 	}
-	if want := []string{"Open", "Fold worktrees", "New worktree...", "Close session...", "Clean up worktrees...", "Add space..."}; !reflect.DeepEqual(titles, want) {
-		t.Errorf("gr's menu = %q, want %q", titles, want)
+	if got := e.screen()[y+1 : y+10]; !reflect.DeepEqual(got, want) {
+		t.Errorf("gr's menu:\n%q\nwant\n%q", got, want)
 	}
 	e.press("esc")
 	for _, session := range []string{"gr@dev", "kitty", "default"} {

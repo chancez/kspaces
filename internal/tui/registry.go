@@ -77,10 +77,20 @@ func foldable(m *sidebar, s entrySubject) bool {
 	return !m.filtering && !s.row.Other && s.row.Space.HasLinked()
 }
 
+// The context menu's sections. A menu draws them in the order their first actions come in the kinds'
+// lists: the session first, as opening it is what a row is mostly for; then what acts on the row's own
+// worktree; then what is the same from any row of the space, and the list's own last.
+const (
+	sectionSession  = "Session"
+	sectionWorktree = "Worktree"
+	sectionSpace    = "Space"
+)
+
 // The spaces list's entries. The titles are the context menu's.
 var (
 	actOpenWorktree = &interact.Action[*sidebar, entrySubject]{
-		Title: "Open",
+		Title:   "Open",
+		Section: sectionSession,
 		// A missing worktree only while its session has windows: opening one with none would make it
 		// afresh in a directory that is gone.
 		Applies: func(m *sidebar, s entrySubject) bool {
@@ -93,16 +103,19 @@ var (
 	}
 	actFold = &interact.Action[*sidebar, entrySubject]{
 		Title:   "Fold worktrees",
+		Section: sectionSpace,
 		Applies: func(m *sidebar, s entrySubject) bool { return foldable(m, s) && !m.folded[s.row.Space.Root] },
 		Run:     func(m *sidebar, s entrySubject) tea.Cmd { m.toggleFold(s.row.Space.Root); return nil },
 	}
 	actUnfold = &interact.Action[*sidebar, entrySubject]{
 		Title:   "Unfold worktrees",
+		Section: sectionSpace,
 		Applies: func(m *sidebar, s entrySubject) bool { return foldable(m, s) && m.folded[s.row.Space.Root] },
 		Run:     func(m *sidebar, s entrySubject) tea.Cmd { m.toggleFold(s.row.Space.Root); return nil },
 	}
 	actNewWorktree = &interact.Action[*sidebar, entrySubject]{
 		Title:   "New worktree...",
+		Section: sectionSpace,
 		Applies: func(_ *sidebar, s entrySubject) bool { return !s.row.Other && !s.row.Missing && s.row.Space.Err == nil },
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
@@ -110,7 +123,8 @@ var (
 		},
 	}
 	actRemoveWorktree = &interact.Action[*sidebar, entrySubject]{
-		Title: "Remove worktree...",
+		Title:   "Remove worktree...",
+		Section: sectionWorktree,
 		// Only a linked worktree: the main one is the repository itself.
 		Applies: func(_ *sidebar, s entrySubject) bool { return !s.row.Main && !s.row.Missing && s.row.Worktree != nil },
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
@@ -119,7 +133,8 @@ var (
 		},
 	}
 	actRunCommand = &interact.Action[*sidebar, entrySubject]{
-		Title: "Run...",
+		Title:   "Run...",
+		Section: sectionSession,
 		Applies: func(m *sidebar, s entrySubject) bool {
 			return !s.row.Other && !s.row.Missing && s.row.Worktree != nil && len(m.cfg.Commands) > 0
 		},
@@ -129,7 +144,8 @@ var (
 		},
 	}
 	actCloseSession = &interact.Action[*sidebar, entrySubject]{
-		Title: "Close session...",
+		Title:   "Close session...",
+		Section: sectionSession,
 		Applies: func(m *sidebar, s entrySubject) bool {
 			return s.row.Worktree != nil && m.kitty.Windows[s.row.Worktree.Session] > 0
 		},
@@ -139,7 +155,8 @@ var (
 		},
 	}
 	actForgetSession = &interact.Action[*sidebar, entrySubject]{
-		Title: "Forget...",
+		Title:   "Forget...",
+		Section: sectionWorktree,
 		// A missing worktree with only its saved file left, which kitty would restore it from.
 		Applies: func(m *sidebar, s entrySubject) bool {
 			return s.row.Missing && m.kitty.Windows[s.row.Worktree.Session] == 0 && m.saved[s.row.Worktree.Session]
@@ -150,7 +167,8 @@ var (
 		},
 	}
 	actCleanup = &interact.Action[*sidebar, entrySubject]{
-		Title: "Clean up worktrees...",
+		Title:   "Clean up worktrees...",
+		Section: sectionSpace,
 		// On the space's own row: it offers removing any of the space's linked worktrees.
 		Applies: func(_ *sidebar, s entrySubject) bool {
 			return s.row.Main && !s.row.Other && s.row.Space.Err == nil && len(s.row.Space.Worktrees) > 1
@@ -164,7 +182,8 @@ var (
 
 // The status list's entries.
 var actOpenWindow = &interact.Action[*sidebar, statusSubject]{
-	Title: "Open",
+	Title:   "Open",
+	Section: sectionSession,
 	Run: func(m *sidebar, s statusSubject) tea.Cmd {
 		m.remote = false
 		return m.openWindowCmd(s.status)
@@ -173,7 +192,8 @@ var actOpenWindow = &interact.Action[*sidebar, statusSubject]{
 
 // The spaces list's own, offered on every row and on the sidebar.
 var actAddSpace = &interact.Action[*sidebar, spacesSubject]{
-	Title: "Add space...",
+	Title:   "Add space...",
+	Section: sectionSpace,
 	Run: func(m *sidebar, _ spacesSubject) tea.Cmd {
 		m.remote = false
 		return m.addSpace()
@@ -476,7 +496,7 @@ func init() {
 	spacesKind.Bind(actAddSpace, "a", "add space", "a")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actFold, actUnfold, actNewWorktree, actRunCommand, actCloseSession, actForgetSession, actRemoveWorktree, actCleanup)
+		actOpenWorktree, actRunCommand, actCloseSession, actRemoveWorktree, actForgetSession, actNewWorktree, actFold, actUnfold, actCleanup)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
