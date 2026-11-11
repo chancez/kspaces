@@ -112,18 +112,34 @@ const FocusedWindow = -1
 // LoadState reads kitty's state as seen from the window selfWindowID, or from the focused window when that
 // is FocusedWindow.
 func LoadState(selfWindowID int) (State, error) {
-	out, err := kitten("ls")
+	data, err := ListWindows()
 	if err != nil {
 		return State{}, err
 	}
+	return StateOf(data, selfWindowID), nil
+}
+
+// ListWindows is `kitten @ ls`, the part of it kspaces reads. It is the same for every window, so one
+// process can read it for all the sidebars, each working out its own State with StateOf.
+func ListWindows() ([]OSWindow, error) {
+	out, err := kitten("ls")
+	if err != nil {
+		return nil, err
+	}
 	var data []OSWindow
 	if err := json.Unmarshal(out, &data); err != nil {
-		return State{}, fmt.Errorf("parsing kitten @ ls: %w", err)
+		return nil, fmt.Errorf("parsing kitten @ ls: %w", err)
 	}
+	return data, nil
+}
+
+// StateOf is kitty's state in data as seen from the window selfWindowID, or from the focused window when
+// that is FocusedWindow.
+func StateOf(data []OSWindow, selfWindowID int) State {
 	if selfWindowID == FocusedWindow {
 		selfWindowID = keyboardWindow(data)
 	}
-	return stateFrom(data, selfWindowID), nil
+	return stateFrom(data, selfWindowID)
 }
 
 // keyboardWindow is the window that has the keyboard: the active window of the active tab of the focused

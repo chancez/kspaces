@@ -115,20 +115,5 @@ type Snapshot struct {
 // otherwise keep replacing a dock that exits the moment it starts. kitty's state is seen from the window
 // self, or kitty.FocusedWindow.
 func Load(self int) Snapshot {
-	cfg, err := config.Load()
-	if err != nil {
-		return Snapshot{Err: err}
-	}
-	spaces := make([]Space, 0, len(cfg.Spaces))
-	for _, root := range cfg.Spaces {
-		spaces = append(spaces, LoadSpace(root))
-	}
-	st, err := kitty.LoadState(self)
-	names := savedSessions(cfg.SessionsDir)
-	saved := make(map[string]bool, len(names))
-	for _, name := range names {
-		saved[name] = true
-	}
-	others := otherSessions(spaces, st.Sessions, names)
-	return Snapshot{Config: &cfg, Spaces: spaces, Others: others, Folded: LoadFolded(), Saved: saved, Kitty: st, Err: err}
+	return LoadShared().View(self)
 }

@@ -2,9 +2,9 @@
 
 ## Known issues
 
-- One `kspaces sidebar` per tab, because kitty can only dock to one tab. Each polls `kitten @ ls` and runs
-  `git worktree list` per space every two seconds. A dock for the whole OS window, or one process feeding
-  all of them, would fix both.
+- One `kspaces sidebar` per tab, because kitty can only dock to one tab. They share one poller, so only one
+  of them runs `kitten @ ls` and `git worktree list`, but each is a process, with its own screen to draw.
+  A dock for the whole OS window would fix that.
 - Three kitty bugs, worked around in kspaces' bundled kitty scripts until a kitty release fixes them:
   - `save_as_session --match` writes `new_os_window` before a space's file depending on which OS window had
     focus, so with several OS windows each space was restored in a window of its own. `save_sessions.py`

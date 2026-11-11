@@ -71,11 +71,13 @@ type sidebar struct {
 	// The spaces list's filter, see filter.go; its query narrows rows while filtering.
 	filter    textinput.Model
 	filtering bool
+	// poller shares one load between every sidebar of the kitty.
+	poller *spaces.Poller
 }
 
 func newSidebar(self int) *sidebar {
 	th := look.New(true)
-	return &sidebar{th: th, self: self, folded: map[string]bool{}, mouse: &pixelMouse{}, filter: newFilter(th)}
+	return &sidebar{th: th, self: self, folded: map[string]bool{}, mouse: &pixelMouse{}, filter: newFilter(th), poller: spaces.NewPoller()}
 }
 
 // navigating is whether keys are moving the cursor, so it and the entry under it should be drawn.
@@ -94,9 +96,16 @@ func (m *sidebar) cursorToCurrent() {
 	m.scrollToCursor()
 }
 
+// poll is the latest load, the one the leading sidebar shares, on the timer.
+func (m *sidebar) poll() tea.Cmd {
+	p, self := m.poller, m.self
+	return func() tea.Msg { return p.Poll(false).View(self) }
+}
+
+// refresh loads now, rather than waiting for the leader, for the refresh key.
 func (m *sidebar) refresh() tea.Cmd {
-	self := m.self
-	return func() tea.Msg { return spaces.Load(self) }
+	p, self := m.poller, m.self
+	return func() tea.Msg { return p.Poll(true).View(self) }
 }
 
 func tick() tea.Cmd {
@@ -104,7 +113,7 @@ func tick() tea.Cmd {
 }
 
 func (m *sidebar) Init() tea.Cmd {
-	return tea.Batch(m.refresh(), tick(), checkGlue)
+	return tea.Batch(m.poll(), tick(), checkGlue)
 }
 
 // The cursor runs over the spaces rows first, then the status entries: index i is m.rows[i] below
@@ -114,22 +123,22 @@ func (m *sidebar) numEntries() int {
 }
 
 func (m *sidebar) openWindowCmd(s status.Status) tea.Cmd {
-	cfg, st, self := m.cfg, m.kitty, m.self
+	cfg, st, self, p := m.cfg, m.kitty, m.self, m.poller
 	return func() tea.Msg {
 		if err := spaces.OpenWindow(cfg, st, s.Window, s.Session); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
-		return spaces.Load(self)
+		return p.Poll(true).View(self)
 	}
 }
 
 func (m *sidebar) openWorktreeCmd(wt spaces.Worktree) tea.Cmd {
-	cfg, st, self := m.cfg, m.kitty, m.self
+	cfg, st, self, p := m.cfg, m.kitty, m.self, m.poller
 	return func() tea.Msg {
 		if err := spaces.OpenWorktree(cfg, st, wt); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
-		return spaces.Load(self)
+		return p.Poll(true).View(self)
 	}
 }
 
@@ -171,7 +180,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.hover != 0 && time.Since(m.hoverAt) > hoverIdle {
 			m.hover = 0
 		}
-		return m, tea.Batch(m.refresh(), tick())
+		return m, tea.Batch(m.poll(), tick())
 	case glueMsg:
 		m.notice = &msg.notice
 	case spaces.Snapshot:
