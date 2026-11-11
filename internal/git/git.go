@@ -133,3 +133,54 @@ func RemoveWorktree(root, dir string, force bool) error {
 	}
 	return nil
 }
+
+// output runs git with args and returns what it printed, or git's own message as the error.
+func output(args ...string) (string, error) {
+	out, err := exec.Command("git", args...).Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
+			return "", fmt.Errorf("%s", strings.TrimSpace(string(ee.Stderr)))
+		}
+		return "", err
+	}
+	return string(out), nil
+}
+
+// GoneUpstreams are the local branches of the repository at root whose upstream is set but no longer
+// exists, as after its branch was deleted when merged and the remote pruned.
+func GoneUpstreams(root string) (map[string]bool, error) {
+	out, err := output("-C", root, "for-each-ref", "--format=%(refname:short) %(upstream:track)", "refs/heads")
+	if err != nil {
+		return nil, err
+	}
+	ans := map[string]bool{}
+	for line := range strings.Lines(out) {
+		if branch, ok := strings.CutSuffix(strings.TrimSpace(line), " [gone]"); ok {
+			ans[branch] = true
+		}
+	}
+	return ans, nil
+}
+
+// MergedInto are the local branches of the repository at root that base has all the commits of.
+func MergedInto(root, base string) (map[string]bool, error) {
+	out, err := output("-C", root, "branch", "--format=%(refname:short)", "--merged", base)
+	if err != nil {
+		return nil, err
+	}
+	ans := map[string]bool{}
+	for line := range strings.Lines(out) {
+		if b := strings.TrimSpace(line); b != "" {
+			ans[b] = true
+		}
+	}
+	return ans, nil
+}
+
+// HasOwnHistory reports whether branch has moved since it was created, by its reflog: committed to,
+// reset or pulled. A branch that has not is merged into what it was made from without having been worked
+// on.
+func HasOwnHistory(root, branch string) bool {
+	out, err := output("-C", root, "reflog", "show", "--format=%H", "refs/heads/"+branch, "--")
+	return err == nil && strings.Count(out, "\n") > 1
+}

@@ -47,6 +47,7 @@ Right-click a row, or press `m` on it:
 | New worktree... | `n` | create a worktree in a form |
 | Close session... | `c` | close every window of the session, on a session with windows open |
 | Remove worktree... | `x` | close the session and remove a linked worktree |
+| Clean up worktrees... | `p` | remove the space's linked worktrees that look done with, on a space's row |
 | Add space... | `a` | add a repository to the spaces, in a form; on every row |
 
 Each item that changes something opens a form in an overlay, with buttons and keys to confirm or cancel.
@@ -73,6 +74,15 @@ window closes still runs.
 are lost. It closes the session, waits for its windows to go, deletes the session's saved file and runs
 `git worktree remove`. The branch is kept. What git would refuse, such as a locked worktree, is said before
 you confirm. The removal runs as a kitty background process, so an error after that is shown by kitty.
+
+**Clean up worktrees** lists the space's linked worktrees whose branch's PR is merged, whose upstream is
+gone, or whose branch is merged into the main worktree's, each with why and the files it has not
+committed. A branch merged into the main worktree's counts only once it has moved since it was made, so a
+new worktree not worked on yet is not offered. Each has a box: ticked at first unless it has changes,
+which ticking it says are lost, and a locked one cannot be ticked. `space` ticks the cursor's, and `y`
+removes the ticked ones one after another, each as Remove worktree does, in one kitty background process.
+git is forced only for those the form said have changes. The PR is the one the sidebar shows, or looked
+up with gh as the form opens when the sidebar has none yet.
 
 **Add space**, which the plus at the right end of the SPACES title also opens, has a field for a directory,
 filled in with the repository of the window the sidebar is beside, and shows the root it adds: the top of
@@ -115,6 +125,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `space` | fold or unfold |
 | `m` | menu |
 | `n`, `c`, `x` | new worktree, close session, remove worktree |
+| `p` | clean up the space's worktrees, on a space's row |
 | `a` | add a space, wherever the cursor is |
 | `!` | focus the window that needs you most, wherever the cursor is |
 | `/` | filter the spaces list; see [Spaces](#spaces) |

@@ -44,6 +44,9 @@ type removeSubject struct{}
 type closeSubject struct{}
 type addSubject struct{}
 
+// cleanupSubject is the clean up worktrees form.
+type cleanupSubject struct{}
+
 // filterSubject is the spaces list's filter, while it is open.
 type filterSubject struct{}
 
@@ -113,6 +116,17 @@ var (
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			return m.closeSession(s.row.Worktree.Session)
+		},
+	}
+	actCleanup = &interact.Action[*sidebar, entrySubject]{
+		Title: "Clean up worktrees...",
+		// On the space's own row: it offers removing any of the space's linked worktrees.
+		Applies: func(_ *sidebar, s entrySubject) bool {
+			return s.row.Main && !s.row.Other && s.row.Space.Err == nil && len(s.row.Space.Worktrees) > 1
+		},
+		Run: func(m *sidebar, s entrySubject) tea.Cmd {
+			m.remote = false
+			return m.cleanup(s.row.Space.Root)
 		},
 	}
 )
@@ -291,6 +305,34 @@ var (
 	actCloseQuit = quit[*closeSessionForm, closeSubject]()
 )
 
+// The clean up worktrees form's.
+var (
+	actCleanupDown = &interact.Action[*cleanupForm, cleanupSubject]{
+		Title: "down",
+		Run:   do[*cleanupForm, cleanupSubject](func(f *cleanupForm) { f.cursor = min(f.cursor+1, max(len(f.items)-1, 0)) }),
+	}
+	actCleanupUp = &interact.Action[*cleanupForm, cleanupSubject]{
+		Title: "up",
+		Run:   do[*cleanupForm, cleanupSubject](func(f *cleanupForm) { f.cursor = max(f.cursor-1, 0) }),
+	}
+	actCleanupToggle = &interact.Action[*cleanupForm, cleanupSubject]{
+		Title:   "tick",
+		Applies: func(f *cleanupForm, _ cleanupSubject) bool { return !f.busy && len(f.items) > 0 },
+		Run:     do[*cleanupForm, cleanupSubject](func(f *cleanupForm) { f.toggle(f.cursor) }),
+	}
+	actCleanupRemove = &interact.Action[*cleanupForm, cleanupSubject]{
+		Title:   "remove",
+		Applies: func(f *cleanupForm, _ cleanupSubject) bool { return !f.busy && len(f.chosen()) > 0 },
+		Run:     cmd[*cleanupForm, cleanupSubject]((*cleanupForm).remove),
+	}
+	actCleanupCancel = &interact.Action[*cleanupForm, cleanupSubject]{
+		Title:   "cancel",
+		Applies: func(f *cleanupForm, _ cleanupSubject) bool { return !f.busy },
+		Run:     func(*cleanupForm, cleanupSubject) tea.Cmd { return tea.Quit },
+	}
+	actCleanupQuit = quit[*cleanupForm, cleanupSubject]()
+)
+
 // The add space form's.
 var (
 	actAdd = &interact.Action[*addSpaceForm, addSubject]{
@@ -312,6 +354,7 @@ var (
 	removeKind *interact.Kind[*removeWorktreeForm, removeSubject]
 	closeKind  *interact.Kind[*closeSessionForm, closeSubject]
 	addKind    *interact.Kind[*addSpaceForm, addSubject]
+	cleanKind  *interact.Kind[*cleanupForm, cleanupSubject]
 	filterKind *interact.Kind[*sidebar, filterSubject]
 
 	spacesList    *interact.Place[*sidebar, entrySubject]
@@ -323,6 +366,7 @@ var (
 	theRemoveForm *interact.Place[*removeWorktreeForm, removeSubject]
 	theCloseForm  *interact.Place[*closeSessionForm, closeSubject]
 	theAddForm    *interact.Place[*addSpaceForm, addSubject]
+	theCleanup    *interact.Place[*cleanupForm, cleanupSubject]
 	theFilter     *interact.Place[*sidebar, filterSubject]
 )
 
@@ -334,12 +378,13 @@ func init() {
 	spacesKind.Bind(actAddSpace, "a", "add space", "a")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actFold, actUnfold, actNewWorktree, actCloseSession, actRemoveWorktree)
+		actOpenWorktree, actFold, actUnfold, actNewWorktree, actCloseSession, actRemoveWorktree, actCleanup)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
 	entryKind.Bind(actCloseSession, "c", "close session", "c")
 	entryKind.Bind(actRemoveWorktree, "x", "remove worktree", "x")
+	entryKind.Bind(actCleanup, "p", "clean up worktrees", "p")
 	interact.Via(entryKind, func(entrySubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	spacesList = interact.List(entryKind)
 	spacesList.Bind(actOpenWorktree, "enter/l", "open", "enter", "l")
@@ -393,6 +438,16 @@ func init() {
 	removeKind.Bind(actRemoveCancel, "n/esc", "cancel", "n", "esc")
 	removeKind.Bind(actRemoveQuit, "ctrl+c", "quit", "ctrl+c")
 	theRemoveForm = interact.List(removeKind)
+
+	cleanKind = interact.NewKind(func(cleanupSubject) string { return "Clean up worktrees" },
+		actCleanupDown, actCleanupUp, actCleanupToggle, actCleanupRemove, actCleanupCancel, actCleanupQuit)
+	cleanKind.Bind(actCleanupDown, "j/k", "down/up", "j", "down")
+	cleanKind.Bind(actCleanupUp, "", "", "k", "up")
+	cleanKind.Bind(actCleanupToggle, "space", "tick", "space")
+	cleanKind.Bind(actCleanupRemove, "y", "remove", "y")
+	cleanKind.Bind(actCleanupCancel, "n/esc", "cancel", "n", "esc")
+	cleanKind.Bind(actCleanupQuit, "ctrl+c", "quit", "ctrl+c")
+	theCleanup = interact.List(cleanKind)
 
 	closeKind = interact.NewKind(func(closeSubject) string { return "Close session" }, actClose, actCloseCancel, actCloseQuit)
 	closeKind.Bind(actClose, "y", "close", "y")

@@ -306,3 +306,14 @@ func PRNumber(pr gitstate.PR) Span { return sp(prStates[pr.State], fmt.Sprintf("
 
 // PRState is a pull request's state, in its color.
 func PRState(pr gitstate.PR) Span { return sp(prStates[pr.State], pr.State) }
+
+// Checkbox is a box, ticked when checked, or greyed for one that cannot be.
+func Checkbox(checked, off bool) Span {
+	switch {
+	case off:
+		return sp(elMuted, "[-]")
+	case checked:
+		return sp(elText, "[x]")
+	}
+	return sp(elText, "[ ]")
+}

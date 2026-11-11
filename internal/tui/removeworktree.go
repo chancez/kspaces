@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -174,18 +175,28 @@ func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string) erro
 	return nil
 }
 
-// RemoveWorktree removes the worktree at path without asking, for the background process the form
-// starts. It has no screen, so a failure is shown in kitty as well as returned.
-func RemoveWorktree(cfg config.Config, path string, force bool) error {
-	err := func() error {
+// RemoveWorktrees removes the worktrees at paths without asking, one after another, forcing git for those
+// in force, for the background process the forms start. It has no screen, so failures are shown in kitty
+// as well as returned; one failing does not stop the rest.
+func RemoveWorktrees(cfg config.Config, paths []string, force map[string]bool) error {
+	var failed []string
+	for _, path := range paths {
 		space, wt, err := spaces.FindWorktree(cfg, path)
-		if err != nil {
-			return err
+		if err == nil {
+			err = spaces.RemoveWorktree(cfg, space, wt, force[path])
 		}
-		return spaces.RemoveWorktree(cfg, space, wt, force)
-	}()
-	if err != nil {
-		_ = kitty.ShowError("Could not remove the worktree", fmt.Sprintf("%s: %v", path, err))
+		if err != nil {
+			failed = append(failed, fmt.Sprintf("%s: %v", path, err))
+		}
 	}
-	return err
+	if len(failed) == 0 {
+		return nil
+	}
+	title := "Could not remove the worktree"
+	if len(failed) > 1 {
+		title = "Could not remove the worktrees"
+	}
+	msg := strings.Join(failed, "\n")
+	_ = kitty.ShowError(title, msg)
+	return errors.New(msg)
 }

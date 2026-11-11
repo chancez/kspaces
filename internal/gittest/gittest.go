@@ -64,6 +64,20 @@ func At(t testing.TB, dir string) *Repo {
 	return r
 }
 
+// Bare creates an empty bare repository in a temp directory, to push to and fetch from as a remote. It
+// isolates the test's git, as Isolate does.
+func Bare(t testing.TB) *Repo {
+	t.Helper()
+	Isolate(t)
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &Repo{t: t, Dir: dir}
+	r.Git("init", "-q", "--bare", "-b", "main")
+	return r
+}
+
 // Git runs git in the repository and returns its trimmed stdout, failing the test with git's stderr if it
 // fails.
 func (r *Repo) Git(args ...string) string {
