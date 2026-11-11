@@ -15,11 +15,7 @@ import (
 //	run = ["claude", "{prompt}"]
 //	env = { TASK_PR = "{pr}" }
 //	open = "tab"
-//
-//	[[commands.inputs]]
-//	name = "prompt"
-//	label = "Prompt"
-//	required = true
+//	inputs = [{ name = "prompt", label = "Prompt", required = true }]
 //
 // run and the values of env are templates: {NAME} is a built-in, see Builtins, or an input, substituted
 // as text within the argument, and {{ and }} are literal braces.

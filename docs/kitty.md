@@ -31,14 +31,19 @@ name = "claude"              # shown in the forms; unique
 run = ["claude", "{prompt}"]  # the command line, never run through a shell
 env = { TASK_PR = "{pr}" }    # optional
 open = "tab"                  # optional: tab, split, hsplit, vsplit, overlay or window
-
-[[commands.inputs]]
-name = "prompt"   # lowercase letters, digits and _
-type = "string"   # optional; one line of text, the only type so far
-label = "Prompt"  # optional, the name by default
-default = ""      # optional
-required = true   # optional; an empty required input refuses to run
+inputs = [{ name = "prompt", label = "Prompt", required = true }]
 ```
+
+`inputs` are what the forms ask for, a text box each, in order. An input has:
+
+- `name`: lowercase letters, digits and `_`, used as `{name}` in templates;
+- `type`: optional, `string`, one line of text, the only type so far;
+- `label`: optional, the name by default;
+- `default`: optional;
+- `required`: optional; an empty required input refuses to run.
+
+A command with several inputs or long ones can list them as tables of their own instead, each
+`[[commands.inputs]]` belonging to the `[[commands]]` above it.
 
 `run` and the values of `env` are templates. `{NAME}` is replaced, as text within the argument, by an
 input's value or a built-in: `{space}`, `{root}`, `{worktree}` (its path), `{branch}`, `{base}` (the main
