@@ -199,3 +199,63 @@ func TestCycleIndex(t *testing.T) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
 }
+
+// NewSpaceRoot adds the top of the work tree a path is in, ~/ expanded, and says why it cannot add a path
+// that is no directory, in no repository, or a space already, by any name.
+func TestNewSpaceRoot(t *testing.T) {
+	home, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	repo, plain := filepath.Join(home, "repo"), filepath.Join(home, "plain")
+	for _, dir := range []string{filepath.Join(repo, "sub"), plain} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(home, "file"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	initRepo := exec.Command("git", "-C", repo, "init", "-q")
+	initRepo.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
+	if out, err := initRepo.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	link := filepath.Join(home, "link")
+	if err := os.Symlink(repo, link); err != nil {
+		t.Fatal(err)
+	}
+
+	type result struct{ Root, Err string }
+	check := func(roots []string, paths ...string) []result {
+		var out []result
+		for _, p := range paths {
+			root, err := NewSpaceRoot(roots, p)
+			r := result{Root: root}
+			if err != nil {
+				r.Err = err.Error()
+			}
+			out = append(out, r)
+		}
+		return out
+	}
+	got := check([]string{plain}, repo, " ~/repo/sub ", link, "", "~/nothing", "~/file", plain)
+	want := []result{
+		{Root: repo},
+		{Root: repo},
+		{Root: repo},
+		{Err: "name a repository to add"},
+		{Err: "~/nothing is not a directory"},
+		{Err: "~/file is not a directory"},
+		{Err: plain + " is not in a git repository"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+	// A space configured through a symlink is the same repository.
+	got = check([]string{link}, filepath.Join(repo, "sub"))
+	if want := []result{{Err: "~/repo is already a space"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

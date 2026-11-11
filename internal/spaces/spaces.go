@@ -4,7 +4,6 @@ package spaces
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -81,12 +80,7 @@ func BranchStart(cfg config.Config) string {
 // absolute, ~ expanded, and relative to root otherwise. Without one it is WorktreeDir, under root, and the
 // branch without the configured prefix, any / turned into -: `pr/me/fix/x` goes in `.worktrees/fix-x`.
 func WorktreeDir(cfg config.Config, root, branch, dir string) string {
-	if dir = strings.TrimSpace(dir); dir != "" {
-		if rest, ok := strings.CutPrefix(dir, "~/"); ok {
-			if home, err := os.UserHomeDir(); err == nil {
-				dir = filepath.Join(home, rest)
-			}
-		}
+	if dir = expandHome(strings.TrimSpace(dir)); dir != "" {
 		if filepath.IsAbs(dir) {
 			return filepath.Clean(dir)
 		}
