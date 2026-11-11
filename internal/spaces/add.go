@@ -28,7 +28,7 @@ func NewSpaceRoot(roots []string, path string) (string, error) {
 	if info, err := os.Stat(abs); err != nil || !info.IsDir() {
 		return "", fmt.Errorf("%s is not a directory", path)
 	}
-	top, err := git.TopLevel(abs)
+	top, err := repoRoot(abs)
 	if err != nil {
 		return "", fmt.Errorf("%s is not in a git repository", path)
 	}
@@ -49,11 +49,25 @@ func NewSpaceRoot(roots []string, path string) (string, error) {
 func AskAddSpace(st kitty.State) error {
 	args := []string{"add"}
 	if st.HomeDir != "" {
-		if top, err := git.TopLevel(st.HomeDir); err == nil {
+		if top, err := repoRoot(st.HomeDir); err == nil {
 			args = append(args, top)
 		}
 	}
 	return kitty.LaunchForm(st, args...)
+}
+
+// repoRoot is the main worktree of the repository dir is in. A space is a repository, listed by its main
+// worktree, and its linked worktrees come with it, so a directory in a linked one adds the repository.
+func repoRoot(dir string) (string, error) {
+	top, err := git.TopLevel(dir)
+	if err != nil {
+		return "", err
+	}
+	wts, err := git.ListWorktrees(top)
+	if err != nil || len(wts) == 0 {
+		return top, nil
+	}
+	return wts[0].Path, nil
 }
 
 // expandHome is path with a leading ~/ for the home directory.

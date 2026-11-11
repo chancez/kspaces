@@ -226,6 +226,16 @@ func TestNewSpaceRoot(t *testing.T) {
 	if err := os.Symlink(repo, link); err != nil {
 		t.Fatal(err)
 	}
+	// A linked worktree, outside the repository, as one in another directory would be.
+	wt := filepath.Join(home, "wt")
+	for _, args := range [][]string{{"commit", "-q", "--allow-empty", "-m", "first"}, {"worktree", "add", "-q", "-b", "dev", wt}} {
+		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
+		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
+			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %s: %v\n%s", args[0], err, out)
+		}
+	}
 
 	type result struct{ Root, Err string }
 	check := func(roots []string, paths ...string) []result {
@@ -240,8 +250,10 @@ func TestNewSpaceRoot(t *testing.T) {
 		}
 		return out
 	}
-	got := check([]string{plain}, repo, " ~/repo/sub ", link, "", "~/nothing", "~/file", plain)
+	// A linked worktree adds its repository: spaces are repositories, and their worktrees come with them.
+	got := check([]string{plain}, repo, " ~/repo/sub ", link, "~/wt", "", "~/nothing", "~/file", plain)
 	want := []result{
+		{Root: repo},
 		{Root: repo},
 		{Root: repo},
 		{Root: repo},
@@ -254,8 +266,8 @@ func TestNewSpaceRoot(t *testing.T) {
 		t.Errorf("got %q\nwant %q", got, want)
 	}
 	// A space configured through a symlink is the same repository.
-	got = check([]string{link}, filepath.Join(repo, "sub"))
-	if want := []result{{Err: "~/repo is already a space"}}; !reflect.DeepEqual(got, want) {
+	got = check([]string{link}, filepath.Join(repo, "sub"), wt)
+	if want := []result{{Err: "~/repo is already a space"}, {Err: "~/repo is already a space"}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
