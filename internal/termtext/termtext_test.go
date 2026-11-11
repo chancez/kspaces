@@ -1,6 +1,7 @@
 package termtext
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -41,5 +42,30 @@ func TestWriter(t *testing.T) {
 	}
 	if want := "name^[]0;title^G\n"; b.String() != want {
 		t.Errorf("wrote %q, want %q", b.String(), want)
+	}
+}
+
+// StyledLines keeps SGR sequences, carries the styles a line leaves set into the next, and drops every
+// other sequence and control: prompt marks, cursor moves, a hyperlink, a title, a mode set with a private
+// CSI, a C1 control, whose parameters are left as text, and bad bytes. Tabs stop every eight columns.
+func TestStyledLines(t *testing.T) {
+	in := "\x1b]133;A\x1b\\$ ls\r\n" +
+		"\x1b[31mred \x1b[1mbold\x1b[22m\n" +
+		"moved\x1b[5;5H\x1b[2J\x1b[>4;1m here\n" +
+		"\x1b]8;;https://x\x1b\\link\x1b]8;;\x1b\\\x1b]2;title\x07\u009b1A\xff\n" +
+		"\x1b[0;32mgreen\x1b[m\n" +
+		"a\tb\x1b[1;38:2::1:2:3mc\td\n" +
+		"after"
+	want := []string{
+		"$ ls",
+		"\x1b[31mred \x1b[1mbold\x1b[22m",
+		"\x1b[31m\x1b[1m\x1b[22mmoved here",
+		"\x1b[31m\x1b[1m\x1b[22mlink1A",
+		"\x1b[31m\x1b[1m\x1b[22m\x1b[0;32mgreen\x1b[m",
+		"a       b\x1b[1;38:2::1:2:3mc      d",
+		"\x1b[1;38:2::1:2:3mafter",
+	}
+	if got := StyledLines(in); !reflect.DeepEqual(got, want) {
+		t.Errorf("StyledLines =\n%q\nwant\n%q", got, want)
 	}
 }

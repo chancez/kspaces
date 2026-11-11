@@ -1,4 +1,4 @@
-// Package termtext makes text from repositories and reviews safe to write to a terminal.
+// Package termtext makes text from repositories, reviews and other terminals safe to write to a terminal.
 //
 // File contents, commit messages, names, and comments can hold control characters, and a terminal
 // acts on them: an escape sequence can recolor the screen, move the cursor, or set the window
@@ -11,6 +11,8 @@ import (
 	"io"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 // Line makes s safe as one line: every control character is shown, newlines and tabs included.
@@ -69,6 +71,70 @@ func control(r rune, block bool) bool {
 		return false
 	}
 	return r < 0x20 || r >= 0x7f && r < 0xa0
+}
+
+// tabStop is how far apart tab stops are, as terminals set them by default.
+const tabStop = 8
+
+// StyledLines splits s, text a terminal drew with its colors and styles as SGR sequences, such as kitty's
+// get-text --ansi, into lines safe to write each on its own. Each starts with the styles earlier lines
+// left set, as the text carries them over. SGR sequences are kept; every other escape sequence and control
+// character is dropped, so nothing can move the cursor, set a title or open a link. Tabs become spaces
+// to the next stop.
+func StyledLines(s string) []string {
+	var lines []string
+	var line, carry strings.Builder
+	var state byte
+	col := 0
+	p := ansi.NewParser()
+	for len(s) > 0 {
+		seq, width, n, next := ansi.DecodeSequence(s, state, p)
+		s, state = s[n:], next
+		r, size := utf8.DecodeRuneInString(seq)
+		switch {
+		case seq == "\n":
+			lines = append(lines, line.String())
+			line.Reset()
+			line.WriteString(carry.String())
+			col = 0
+		case seq == "\t":
+			pad := tabStop - col%tabStop
+			line.WriteString(strings.Repeat(" ", pad))
+			col += pad
+		case isSGR(seq):
+			line.WriteString(seq)
+			// Nothing set before a reset carries over it, and a bare reset leaves nothing to carry.
+			params := seq[2 : len(seq)-1]
+			if resets(params) {
+				carry.Reset()
+			}
+			if strings.Trim(params, "0") != "" {
+				carry.WriteString(seq)
+			}
+		case r == utf8.RuneError && size <= 1, control(r, false):
+			// Escape sequences start with ESC, a control, and are dropped whole.
+		default:
+			line.WriteString(seq)
+			col += width
+		}
+	}
+	return append(lines, line.String())
+}
+
+// isSGR reports whether seq is a CSI sequence that sets colors and styles, and nothing else.
+func isSGR(seq string) bool {
+	params, ok := strings.CutPrefix(seq, "\x1b[")
+	if !ok {
+		return false
+	}
+	params, ok = strings.CutSuffix(params, "m")
+	return ok && strings.Trim(params, "0123456789;:") == ""
+}
+
+// resets reports whether SGR params start by resetting every style.
+func resets(params string) bool {
+	first, _, _ := strings.Cut(params, ";")
+	return strings.Trim(first, "0") == ""
 }
 
 // NewWriter returns a writer that shows control characters in what it writes to w, as Block
