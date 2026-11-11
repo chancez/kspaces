@@ -143,3 +143,16 @@ func Parse(data string) (Config, error) {
 	cfg.SessionsDir = expand(cfg.SessionsDir)
 	return cfg, nil
 }
+
+// Tilde is path with the home directory written as ~/, the way the config can say it, or path as it is
+// outside the home directory.
+func Tilde(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return path
+	}
+	if rest, ok := strings.CutPrefix(path, strings.TrimSuffix(home, "/")+"/"); ok && rest != "" {
+		return "~/" + rest
+	}
+	return path
+}

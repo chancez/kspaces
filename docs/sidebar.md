@@ -76,3 +76,13 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 
 Each list scrolls on its own. A list with entries out of view says how many on its first or last row;
 clicking that row scrolls a page.
+
+## The picker
+
+`kspaces pick`, which kitty.conf's `kspaces_pick` runs in an overlay, lists the status entries and then
+every session and worktree, narrowed by a fuzzy query. `enter` switches to the entry under the cursor.
+
+Beside the list in an overlay 90 columns or wider, and below it in a narrower one, a preview shows the
+entry under the cursor: a status entry in full, as the sidebar's opened entry; a worktree's space, path,
+branch, session, how many windows it has open, whether it has a saved session file, and its status
+entries. An overlay too short for both shows only the list.

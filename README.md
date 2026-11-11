@@ -121,7 +121,7 @@ and the keys.
 
 ```
 kspaces [sidebar]        the sidebar, run in a kitty dock
-kspaces pick             a fuzzy picker over sessions, worktrees and status entries, for an overlay
+kspaces pick             a fuzzy picker over sessions, worktrees and status entries, with a preview
 kspaces list             every space's worktrees and their sessions
 kspaces open PATH        switch to the session of the worktree at PATH
 kspaces next, prev       switch to the next or previous session with windows open

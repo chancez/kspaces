@@ -65,3 +65,17 @@ auto_install = true
 		}
 	}
 }
+
+// Tilde writes the home directory as ~/, and leaves the home directory itself and paths outside it, or
+// beside it with the same prefix, as they are.
+func TestTilde(t *testing.T) {
+	t.Setenv("HOME", "/home/me")
+	var got []string
+	for _, p := range []string{"/home/me/src/gr", "/home/me", "/home/me/", "/home/mee/x", "/src/gr"} {
+		got = append(got, Tilde(p))
+	}
+	want := []string{"~/src/gr", "/home/me", "/home/me/", "/home/mee/x", "/src/gr"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}

@@ -104,8 +104,10 @@ type Snapshot struct {
 	Others []Space
 	// Roots of the spaces whose linked worktrees are hidden.
 	Folded map[string]bool
-	Kitty  kitty.State
-	Err    error
+	// Sessions with a file in the sessions directory, to be restored from.
+	Saved map[string]bool
+	Kitty kitty.State
+	Err   error
 }
 
 // Load reads the config on every call, so edits show up without restarting every dock, and a broken
@@ -122,6 +124,11 @@ func Load(self int) Snapshot {
 		spaces = append(spaces, LoadSpace(root))
 	}
 	st, err := kitty.LoadState(self)
-	others := otherSessions(spaces, st.Sessions, savedSessions(cfg.SessionsDir))
-	return Snapshot{Config: &cfg, Spaces: spaces, Others: others, Folded: LoadFolded(), Kitty: st, Err: err}
+	names := savedSessions(cfg.SessionsDir)
+	saved := make(map[string]bool, len(names))
+	for _, name := range names {
+		saved[name] = true
+	}
+	others := otherSessions(spaces, st.Sessions, names)
+	return Snapshot{Config: &cfg, Spaces: spaces, Others: others, Folded: LoadFolded(), Saved: saved, Kitty: st, Err: err}
 }

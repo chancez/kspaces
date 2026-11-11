@@ -25,8 +25,9 @@ type pickItem struct {
 	nameLen int
 	icon    []look.Span
 
-	worktree *spaces.Worktree
-	status   *status.Status
+	// A worktree's row, with its space; or the status, for a window reporting one.
+	row    spaces.Row
+	status *status.Status
 }
 
 type pickItems []pickItem
@@ -70,7 +71,7 @@ func pickItemsFrom(snap spaces.Snapshot) pickItems {
 		case snap.Kitty.Sessions[r.Worktree.Session] != 0:
 			icon = look.SessionMarker()
 		}
-		items = append(items, pickItem{text: joinDetail(name, r.Worktree.Branch), nameLen: len(name), icon: icon, worktree: r.Worktree})
+		items = append(items, pickItem{text: joinDetail(name, r.Worktree.Branch), nameLen: len(name), icon: icon, row: r})
 	}
 	return items
 }
@@ -136,10 +137,10 @@ func (m *picker) choose() tea.Cmd {
 		switch {
 		case it.status != nil:
 			err = spaces.OpenWindow(cfg, st, it.status.Window, it.status.Session)
-		case it.worktree.Session == st.Current:
+		case it.row.Worktree.Session == st.Current:
 			// Already here: closing the picker is all there is to do.
 		default:
-			err = spaces.OpenWorktree(cfg, st, *it.worktree)
+			err = spaces.OpenWorktree(cfg, st, *it.row.Worktree)
 		}
 		if err != nil {
 			return spaces.Snapshot{Err: err}
@@ -214,13 +215,43 @@ func (m *picker) View() tea.View {
 func (m *picker) render() string {
 	th, width := m.th, max(m.width, 1)
 	lines := []string{m.input.View(), th.Render(look.Plain, look.Rule(width, false))}
-	list := max(m.height-3, 1)
-	start := max(m.cursor-list+1, 0)
-	for i := start; i < min(start+list, len(m.matches)); i++ {
-		lines = append(lines, m.renderMatch(i, width))
+	l := pickLayoutFor(width, max(m.height-3, 1))
+	var list []string
+	start := max(m.cursor-l.listRows+1, 0)
+	for i := start; i < min(start+l.listRows, len(m.matches)); i++ {
+		list = append(list, m.renderMatch(i, l.listWidth))
 	}
 	if len(m.matches) == 0 && m.snap.Config != nil {
-		lines = append(lines, th.Render(look.Plain, look.Text("No matches").With(look.Dim)))
+		list = append(list, th.Render(look.Plain, look.Text("No matches").With(look.Dim)))
+	}
+	var preview [][]look.Span
+	if l.previewRows > 0 {
+		preview = m.preview(l.previewWidth)
+	}
+	switch {
+	case l.beside:
+		sep := th.Render(look.Plain, look.Default(" "), look.Border("\u2502", false), look.Default(" "))
+		for i := range l.listRows {
+			row := ""
+			if i < len(list) {
+				row = list[i]
+			}
+			var spans []look.Span
+			if i < len(preview) {
+				spans = th.Cut(l.previewWidth, preview[i]...)
+			}
+			lines = append(lines, look.Fit(row, l.listWidth)+sep+th.Draw(look.Plain, l.previewWidth, spans...))
+		}
+	case l.previewRows > 0:
+		for len(list) < l.listRows {
+			list = append(list, "")
+		}
+		lines = append(append(lines, list...), th.Render(look.Plain, look.Rule(width, false)))
+		for _, row := range preview[:min(len(preview), l.previewRows)] {
+			lines = append(lines, th.Render(look.Plain, th.Cut(width, row...)...))
+		}
+	default:
+		lines = append(lines, list...)
 	}
 	for len(lines) < m.height-1 {
 		lines = append(lines, "")

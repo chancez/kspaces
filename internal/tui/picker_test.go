@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -30,10 +31,11 @@ func typeInto(m tea.Model, s string) {
 }
 
 // The picker lists status entries, then every session and worktree in sidebar order, and narrows them as
-// the query is typed, with the matched characters highlighted.
+// the query is typed, with the matched characters highlighted. Tall enough that the preview below leaves
+// the list room for every entry.
 func TestPicker(t *testing.T) {
 	m := newPicker(0)
-	m.Update(tea.WindowSizeMsg{Width: 40, Height: 14})
+	m.Update(tea.WindowSizeMsg{Width: 40, Height: 26})
 	m.Update(fixture(time.Now()))
 	got := pickerScreen(m)[1:12]
 	want := []string{
@@ -69,7 +71,7 @@ func TestPicker(t *testing.T) {
 	if !strings.Contains(lines[2], m.th.Render(look.Plain, look.Match("g"))) || !strings.Contains(lines[3], "\x1b[7m") {
 		t.Errorf("after gr and ctrl+n:\n%q", lines[2:4])
 	}
-	if got := pickerScreen(m)[13]; got != "4/11" {
+	if got := pickerScreen(m)[25]; got != "4/11" {
 		t.Errorf("count line %q", got)
 	}
 
@@ -78,6 +80,209 @@ func TestPicker(t *testing.T) {
 	}
 	if _, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape}); cmd == nil || cmd() != tea.Quit() {
 		t.Error("esc does not quit")
+	}
+}
+
+// previewFixture is fixture with a sessions directory that has gr@dev's file.
+func previewFixture() spaces.Snapshot {
+	snap := fixture(time.Now())
+	snap.Config.SessionsDir = "/sessions"
+	snap.Saved = map[string]bool{"gr@dev": true}
+	return snap
+}
+
+// down presses down n times.
+func down(m tea.Model, n int) {
+	for range n {
+		m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	}
+}
+
+// A wide picker has the preview of the cursor's entry beside the list: a status entry as the sidebar's
+// opened entry, a worktree's space, path, branch, session, windows, saved file and statuses.
+func TestPickerPreviewBeside(t *testing.T) {
+	m := newPicker(0)
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 16})
+	m.Update(previewFixture())
+	// The list takes 48 cells, then a space, the rule and a space.
+	beside := func(list, preview string) string {
+		return strings.TrimRight(fmt.Sprintf("%-48s \u2502 %s", list, preview), " ")
+	}
+	list := []string{
+		blocked + "gr@dev  approve",
+		"\ue654  scratch  exit 1",
+		"\uf110  docs@notes  make",
+		"\uf10c  default  claude",
+		open + "default",
+		open + "gr  main",
+		blocked + "gr / dev  pr/me/dev",
+		"   gr / fix  fix",
+		"   kitty  master",
+		"   docs  main",
+		"\uf110  docs / notes  notes",
+		"",
+		"",
+	}
+	screen := func(preview ...string) []string {
+		out := []string{"\uf002  space, worktree or status", strings.Repeat("\u2500", 100)}
+		for i, l := range list {
+			p := ""
+			if i < len(preview) {
+				p = preview[i]
+			}
+			out = append(out, beside(l, p))
+		}
+		return append(out, "11/11")
+	}
+
+	want := screen(
+		fmt.Sprintf("%-44s+1 5m", blocked+"dev"),
+		"   claude",
+		"   wants permission",
+		"   approve",
+		"   id deploy",
+		"   working build",
+	)
+	if got := pickerScreen(m); !reflect.DeepEqual(got, want) {
+		t.Errorf("status entry:\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+
+	down(m, 6)
+	want = screen(
+		"gr / dev",
+		"",
+		"space    gr",
+		"path     .worktrees/dev",
+		"branch   pr/me/dev",
+		"session  gr@dev",
+		"windows  2 open",
+		"saved    yes",
+		"",
+		fmt.Sprintf("%-44s+1 5m", blocked+"claude \u00b7 approve"),
+	)
+	if got := pickerScreen(m); !reflect.DeepEqual(got, want) {
+		t.Errorf("worktree:\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// A narrow picker has the preview below the list, ten rows high whatever the entry, and none when that
+// would leave the list too few rows.
+func TestPickerPreviewBelow(t *testing.T) {
+	m := newPicker(0)
+	m.Update(tea.WindowSizeMsg{Width: 40, Height: 26})
+	m.Update(previewFixture())
+	screen := func(preview ...string) []string {
+		out := []string{
+			"\uf002  space, worktree or status",
+			strings.Repeat("\u2500", 40),
+			blocked + "gr@dev  approve",
+			"\ue654  scratch  exit 1",
+			"\uf110  docs@notes  make",
+			"\uf10c  default  claude",
+			open + "default",
+			open + "gr  main",
+			blocked + "gr / dev  pr/me/dev",
+			"   gr / fix  fix",
+			"   kitty  master",
+			"   docs  main",
+			"\uf110  docs / notes  notes",
+			"",
+			strings.Repeat("\u2500", 40),
+		}
+		for i := range 10 {
+			p := ""
+			if i < len(preview) {
+				p = preview[i]
+			}
+			out = append(out, p)
+		}
+		return append(out, "11/11")
+	}
+
+	want := screen(
+		fmt.Sprintf("%-35s+1 5m", blocked+"dev"),
+		"   claude",
+		"   wants permission",
+		"   approve",
+		"   id deploy",
+		"   working build",
+	)
+	if got := pickerScreen(m); !reflect.DeepEqual(got, want) {
+		t.Errorf("status entry:\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+
+	down(m, 6)
+	want = screen(
+		"gr / dev",
+		"",
+		"space    gr",
+		"path     .worktrees/dev",
+		"branch   pr/me/dev",
+		"session  gr@dev",
+		"windows  2 open",
+		"saved    yes",
+		"",
+		fmt.Sprintf("%-35s+1 5m", blocked+"claude \u00b7 approve"),
+	)
+	if got := pickerScreen(m); !reflect.DeepEqual(got, want) {
+		t.Errorf("worktree:\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+
+	// Eight rows leave no room below: the list keeps all five, scrolled to the cursor.
+	m.Update(tea.WindowSizeMsg{Width: 40, Height: 8})
+	want = []string{
+		"\uf002  space, worktree or status",
+		strings.Repeat("\u2500", 40),
+		"\uf110  docs@notes  make",
+		"\uf10c  default  claude",
+		open + "default",
+		open + "gr  main",
+		blocked + "gr / dev  pr/me/dev",
+		"11/11",
+	}
+	if got := pickerScreen(m); !reflect.DeepEqual(got, want) {
+		t.Errorf("no room:\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// The preview of a main worktree has its root in full, of a session in no space no path or branch, and
+// without a sessions directory it says so for the saved file.
+func TestPickerPreviewKinds(t *testing.T) {
+	m := newPicker(0)
+	m.Update(tea.WindowSizeMsg{Width: 40, Height: 26})
+	m.Update(fixture(time.Now()))
+	text := func() []string {
+		var out []string
+		for _, l := range m.preview(40) {
+			out = append(out, m.th.TextOf(l...))
+		}
+		return out
+	}
+	down(m, 4)
+	want := []string{
+		"default", "",
+		"space    none",
+		"session  default",
+		"windows  1 open",
+		"saved    no sessions directory",
+		"",
+		"\uf10c  claude" + strings.Repeat(" ", 31),
+	}
+	if got := text(); !reflect.DeepEqual(got, want) {
+		t.Errorf("session in no space:\n%q\nwant\n%q", got, want)
+	}
+	down(m, 4)
+	want = []string{
+		"kitty", "",
+		"space    kitty",
+		"path     /src/kitty",
+		"branch   master",
+		"session  kitty",
+		"windows  none open",
+		"saved    no sessions directory",
+	}
+	if got := text(); !reflect.DeepEqual(got, want) {
+		t.Errorf("main worktree:\n%q\nwant\n%q", got, want)
 	}
 }
 

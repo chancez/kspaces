@@ -5,8 +5,7 @@
 To consider once the core pieces work:
 
 - More UX in general, still to investigate.
-- The picker (f5) has no preview of an entry's details, and cannot open a new worktree that has no session
-  any differently from the sidebar.
+- The picker (f5) cannot open a new worktree that has no session any differently from the sidebar.
 - Closing a session's last tab goes back to the last used tab, in any session: the dotfiles' kitty.conf
   `tab_switch_strategy left` focuses the tab to the left within the session (kitty picks among the tabs
   `tab_bar_filter` shows, kitty/tabs.py `remove`), but the last tab has none. Landing on a tab of the same
