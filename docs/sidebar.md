@@ -45,6 +45,7 @@ Right-click a row, or press `m` on it:
 | Open | `enter` | switch to the session |
 | Fold / Unfold worktrees | `space` | hide or show a space's linked worktrees |
 | New worktree... | `n` | create a worktree in a form |
+| Run... | `R` | run a configured command in the worktree's session, in a form; with `[[commands]]` configured |
 | Close session... | `c` | close every window of the session, on a session with windows open |
 | Remove worktree... | `x` | close the session and remove a linked worktree |
 | Clean up worktrees... | `p` | remove the space's linked worktrees that look done with, on a space's row |
@@ -66,6 +67,17 @@ for something else, and pulls from `pull/N/head`, as `gh pr checkout` sets up a 
 The remote is the one for the repository the PR is to, else `origin`. A branch set up for the PR before is
 checked out as it is. When gh cannot say, because it is not installed, there is no such PR or the repository
 is not on GitHub, the form shows gh's error as it does git's.
+
+With [commands](kitty.md#running-commands) configured, the form has a `command` field below the directory,
+`none` at first, and below it a field for each input of the command chosen. `tab` and `shift+tab` go round
+all the fields; on `command`, `left` and `right` choose another, and so does a click on it. With a command
+chosen, the new session's first tab runs it rather than a shell, and starts your shell once it exits. A
+required input left empty refuses to create.
+
+**Run** chooses a command, with the same `command` field when there is more than one, and has a field for
+each input of the one chosen. It says where the command opens: as the session's first tab when the session
+has no windows, else where the command's `open` says, beside the window switching to the session focuses.
+Run switches to the session and opens it there.
 
 **Close session** closes every window the way closing them by hand does, so whatever kitty.conf runs when a
 window closes still runs.
@@ -126,6 +138,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `m` | menu |
 | `n`, `c`, `x` | new worktree, close session, remove worktree |
 | `p` | clean up the space's worktrees, on a space's row |
+| `R` | run a command in the worktree, with commands configured |
 | `a` | add a space, wherever the cursor is |
 | `!` | focus the window that needs you most, wherever the cursor is |
 | `/` | filter the spaces list; see [Spaces](#spaces) |

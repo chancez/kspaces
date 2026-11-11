@@ -105,6 +105,23 @@ launch = ["launch"]
 dir = ".worktrees"
 branch_prefix = "pr/me"
 
+# Commands to run in a worktree, from the new worktree form, a worktree's Run... or kspaces run. run and
+# env are templates: {prompt} is the input, {worktree}, {branch}, {pr} and the like are built in.
+[[commands]]
+name = "claude"
+run = ["claude", "{prompt}"]
+
+[[commands.inputs]]
+name = "prompt"
+label = "Prompt"
+required = true
+
+# Where it opens in a session with windows: tab, split, hsplit, vsplit, overlay or window.
+[[commands]]
+name = "gr"
+run = ["gr"]
+open = "split"
+
 # The sidebar's width in columns, 12 to 120.
 [sidebar]
 width = 28
@@ -130,6 +147,8 @@ kspaces open PATH        switch to the session of the worktree at PATH
 kspaces next, prev       switch to the next or previous session with windows open
   --attention            or to the next or previous window that is blocked, failed or done
 kspaces new [SPACE]      create a worktree, in a form
+kspaces run NAME [PATH]  run a configured command in the worktree at PATH or the current directory,
+  --input K=V, --yes     in a form, with inputs filled in; --yes without asking
 kspaces close [SESSION]  close every window of a session, after confirming
 kspaces remove PATH      close a linked worktree's session and remove the worktree, after confirming
 kspaces cleanup SPACE    remove the worktrees whose PR is merged, upstream gone or branch merged, in a form

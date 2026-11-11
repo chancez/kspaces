@@ -11,10 +11,71 @@ Opening a worktree:
 1. focuses its session's most recently focused window, if it has windows open;
 2. otherwise loads `SESSION.kitty-session` from the `sessions` directory with `goto_session`, if there is one
    that opens any window (has a `launch` line);
-3. otherwise runs the `launch` action with `--type=tab --cwd=WORKTREE --add-to-session=SESSION`, in the home directory
-   for a session in no space, such as `default`.
+3. otherwise runs the `launch` action with `--type=tab --cwd=WORKTREE --add-to-session=SESSION`, in the home
+   directory for a session in no space, such as `default`.
+
+`launch` in the config is that action, `["launch"]` by default. Every window kspaces opens in a session
+goes through it, with kspaces' options appended, so a kitten that passes them on to kitty's `launch` can
+stand in for it, such as one that runs each window in a multiplexer session. It has to take options as
+`--name=value` and treat the first argument that does not start with `-` as the start of the command.
 
 kspaces itself never writes session files. The session saver below, which it can install into kitty, does.
+
+## Running commands
+
+Commands are what the new worktree form and a worktree's **Run...** can start in a session:
+
+```toml
+[[commands]]
+name = "claude"              # shown in the forms; unique
+run = ["claude", "{prompt}"]  # the command line, never run through a shell
+env = { TASK_PR = "{pr}" }    # optional
+open = "tab"                  # optional: tab, split, hsplit, vsplit, overlay or window
+
+[[commands.inputs]]
+name = "prompt"   # lowercase letters, digits and _
+type = "string"   # optional; one line of text, the only type so far
+label = "Prompt"  # optional, the name by default
+default = ""      # optional
+required = true   # optional; an empty required input refuses to run
+```
+
+`run` and the values of `env` are templates. `{NAME}` is replaced, as text within the argument, by an
+input's value or a built-in: `{space}`, `{root}`, `{worktree}` (its path), `{branch}`, `{base}` (the main
+worktree's branch), `{session}` and `{pr}`, the PR's number when the worktree was created from one or its
+branch pulls from a PR's head, else empty. Values are never split or expanded, whatever is in them. `{{` and
+`}}` are a literal brace. Anything else in braces, a bad input or an unknown `open` is an error when the
+config loads.
+
+The command also gets `KSPACES_SPACE`, `KSPACES_ROOT`, `KSPACES_WORKTREE`, `KSPACES_BRANCH`, `KSPACES_BASE`,
+`KSPACES_SESSION`, `KSPACES_PR` and `KSPACES_INPUT_NAME` for each input, then `env`, which can override them.
+kitty strips spaces from either end of an environment value.
+
+In a session with no windows the command runs as its first tab, wherever `open` says:
+
+```
+launch --type=tab --cwd=WORKTREE --add-to-session=SESSION --env=K=V... --hold claude 'the prompt'
+```
+
+In a session with windows kspaces switches to it, then runs the `launch` action on the window that
+switching focuses, the session's most recently focused, with `kitten @ action --match=id:N`, so a kitten
+acts on it too:
+
+| `open` | adds |
+|---|---|
+| `tab` | `--type=tab`: a new tab, after the session's last with `tab_bar_filter session:~` |
+| `split`, `hsplit`, `vsplit` | `--type=window --location=split --next-to=id:N`, or `hsplit`, `vsplit`; the layout picks the axis for `split` |
+| `overlay` | `--type=overlay --next-to=id:N`, without `--hold`, so it closes back to the window |
+| `window` | `--type=os-window` |
+
+Each word is quoted for kitty, `$` doubled, so it reaches the command as typed; only a leading `~` is still
+expanded, as kitty has no escape for it. `--hold` has kitty start your shell once the command exits, so the
+window stays usable. The window's program is the command rather than a shell, so a saved session records
+it, and restoring the session runs it again with the same inputs.
+
+`kspaces run NAME [PATH]` opens the same form for the worktree PATH, or the current directory, is in, with
+`--input NAME=VALUE` filling inputs in and `--open=WHERE` overriding `open` once. `--yes` runs it without
+the form, refusing a required input that is empty.
 
 ## Installing the kitty files
 
