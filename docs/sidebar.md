@@ -20,9 +20,19 @@ again at once.
 Sessions that are open or saved but belong to no worktree, such as the one kitty starts with, are listed
 above the spaces.
 
-Clicking a row, or `enter` on it, switches to its session, creating it the first time. Clicking a space's
-triangle, or `space` on its row, folds its linked worktrees into the space's row. Folded spaces are kept in
-`$XDG_STATE_HOME/kspaces/folded`, so every tab's sidebar agrees.
+A session named `SPACE@DIR` after a space that matches none of its worktrees, open or saved, is a missing
+worktree of that space: its directory is gone, as when `git worktree remove` runs while its session still
+has windows. It is listed under the space after its linked worktrees, faint whether open or not, with a
+broken link (a cross in Unicode and ASCII) for its icon and `gone` where the branch goes, and folds with
+the linked worktrees. git is not asked about it. A missing worktree with windows open can be opened and
+closed as any session; one with only a saved file cannot be opened, as that would make it afresh in a
+directory that is gone, and Forget deletes the file. A space whose worktrees could not be listed has no
+missing worktrees: its sessions are listed above the spaces as before.
+
+Clicking a row, or `enter` on it, switches to its session, creating it the first time, but for a missing
+worktree with no windows. Clicking a space's triangle, or `space` on its row, folds its linked worktrees
+into the space's row. Folded spaces are kept in `$XDG_STATE_HOME/kspaces/folded`, so every tab's sidebar
+agrees.
 
 `/` filters the list. The query goes on the row under the SPACES title, so the list keeps all its rows and
 the query stays put as the list narrows. A space shows when its name, its branch, or a linked worktree's
@@ -48,6 +58,7 @@ Right-click a row, or press `m` on it:
 | Run... | `R` | run a configured command in the worktree's session, in a form; with `[[commands]]` configured |
 | Close session... | `c` | close every window of the session, on a session with windows open |
 | Remove worktree... | `x` | close the session and remove a linked worktree |
+| Forget... | `x` | delete the saved session file of a missing worktree with no windows open |
 | Clean up worktrees... | `p` | remove the space's linked worktrees that look done with, on a space's row |
 | Add space... | `a` | add a repository to the spaces, in a form; on every row |
 
@@ -96,6 +107,10 @@ removes the ticked ones one after another, each as Remove worktree does, in one 
 git is forced only for those the form said have changes. The PR is the one the sidebar shows, or looked
 up with gh as the form opens when the sidebar has none yet.
 
+**Forget** shows the saved session file of a missing worktree with no windows open, and Delete deletes it,
+so kitty does not restore the session. `kspaces forget SESSION` does the same for any session with no
+windows open; `--yes` without asking.
+
 **Add space**, which the plus at the right end of the SPACES title also opens, has a field for a directory,
 filled in with the repository of the window the sidebar is beside, and shows the root it adds: the top of
 the directory's work tree, `~/` for the home directory. A directory in no repository, or a repository
@@ -136,7 +151,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `enter` / `l` | open |
 | `space` | fold or unfold |
 | `m` | menu |
-| `n`, `c`, `x` | new worktree, close session, remove worktree |
+| `n`, `c`, `x` | new worktree, close session, remove worktree (forget, on a missing worktree) |
 | `p` | clean up the space's worktrees, on a space's row |
 | `R` | run a command in the worktree, with commands configured |
 | `a` | add a space, wherever the cursor is |
@@ -151,13 +166,15 @@ clicking that row scrolls a page.
 ## The picker
 
 `kspaces pick`, which kitty.conf's `kspaces_pick` runs in an overlay, lists the status entries and then
-every session and worktree, narrowed by a fuzzy query. `enter` switches to the entry under the cursor.
+every session and worktree, narrowed by a fuzzy query. `enter` switches to the entry under the cursor. A
+missing worktree has the sidebar's icon for it and `gone` for its branch, and is not switched to without
+windows open.
 
 Beside the list in an overlay 90 columns or wider, and below it in a narrower one, a preview shows the
 entry under the cursor: a status entry in full, as the sidebar's opened entry; a worktree's space, path,
 branch, its changes, upstream and PR as its row shows them, its session, how many windows it has open,
-whether it has a saved session file, and its status entries. An overlay too short for both shows only
-the list.
+whether it has a saved session file, and its status entries. A missing worktree's path says its directory
+is gone, with no branch or git state. An overlay too short for both shows only the list.
 
 Under what it says of the entry, where there is room, the preview shows the bottom of a window's screen,
 with its colors, under a rule: a status entry's own window, or for a session with windows open the one
