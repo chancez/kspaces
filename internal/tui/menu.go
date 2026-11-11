@@ -168,3 +168,15 @@ func (m *sidebar) closeSession(session string) tea.Cmd {
 		return nil
 	}
 }
+
+// addSpace opens the form that adds a space, in an overlay as newWorktree's, with the repository of the
+// window beside the sidebar filled in.
+func (m *sidebar) addSpace() tea.Cmd {
+	st := m.kitty
+	return func() tea.Msg {
+		if err := spaces.AskAddSpace(st); err != nil {
+			return spaces.Snapshot{Err: err}
+		}
+		return nil
+	}
+}

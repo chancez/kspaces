@@ -128,6 +128,7 @@ kspaces next, prev       switch to the next or previous session with windows ope
 kspaces new [SPACE]      create a worktree, in a form
 kspaces close [SESSION]  close every window of a session, after confirming
 kspaces remove PATH      close a linked worktree's session and remove the worktree, after confirming
+kspaces add [PATH]       add the repository at PATH to the spaces, in a form; --yes without asking
 kspaces kitty install    install the files kitty needs; kspaces kitty check says if they are current
 ```
 

@@ -30,15 +30,19 @@ type statusSubject struct {
 // paneSubject is the sidebar itself, for the moves through it and what acts on no entry.
 type paneSubject struct{}
 
+// spacesSubject is the spaces list as a whole, for what adds to it rather than acting on one row.
+type spacesSubject struct{}
+
 // menuSubject is the sidebar's open context menu.
 type menuSubject struct{}
 
-// pickerSubject is the picker, formSubject the new worktree form, removeSubject the remove worktree form
-// and closeSubject the close session form.
+// pickerSubject is the picker, formSubject the new worktree form, removeSubject the remove worktree form,
+// closeSubject the close session form and addSubject the add space form.
 type pickerSubject struct{}
 type formSubject struct{}
 type removeSubject struct{}
 type closeSubject struct{}
+type addSubject struct{}
 
 // do adapts a function that changes the model without a command.
 func do[M, S any](f func(m M)) func(M, S) tea.Cmd {
@@ -115,6 +119,15 @@ var actOpenWindow = &interact.Action[*sidebar, statusSubject]{
 	Run: func(m *sidebar, s statusSubject) tea.Cmd {
 		m.remote = false
 		return m.openWindowCmd(s.status)
+	},
+}
+
+// The spaces list's own, offered on every row and on the sidebar.
+var actAddSpace = &interact.Action[*sidebar, spacesSubject]{
+	Title: "Add space...",
+	Run: func(m *sidebar, _ spacesSubject) tea.Cmd {
+		m.remote = false
+		return m.addSpace()
 	},
 }
 
@@ -239,15 +252,27 @@ var (
 	actCloseQuit = quit[*closeSessionForm, closeSubject]()
 )
 
+// The add space form's.
+var (
+	actAdd = &interact.Action[*addSpaceForm, addSubject]{
+		Title:   "add",
+		Applies: func(f *addSpaceForm, _ addSubject) bool { return !f.busy && f.problem == nil },
+		Run:     cmd[*addSpaceForm, addSubject]((*addSpaceForm).add),
+	}
+	actAddCancel = quit[*addSpaceForm, addSubject]()
+)
+
 var (
 	entryKind  *interact.Kind[*sidebar, entrySubject]
 	statusKind *interact.Kind[*sidebar, statusSubject]
 	paneKind   *interact.Kind[*sidebar, paneSubject]
+	spacesKind *interact.Kind[*sidebar, spacesSubject]
 	menuKind   *interact.Kind[*sidebar, menuSubject]
 	pickerKind *interact.Kind[*picker, pickerSubject]
 	formKind   *interact.Kind[*newWorktreeForm, formSubject]
 	removeKind *interact.Kind[*removeWorktreeForm, removeSubject]
 	closeKind  *interact.Kind[*closeSessionForm, closeSubject]
+	addKind    *interact.Kind[*addSpaceForm, addSubject]
 
 	spacesList    *interact.Place[*sidebar, entrySubject]
 	statusList    *interact.Place[*sidebar, statusSubject]
@@ -257,10 +282,16 @@ var (
 	theForm       *interact.Place[*newWorktreeForm, formSubject]
 	theRemoveForm *interact.Place[*removeWorktreeForm, removeSubject]
 	theCloseForm  *interact.Place[*closeSessionForm, closeSubject]
+	theAddForm    *interact.Place[*addSpaceForm, addSubject]
 )
 
 // Kinds and places are made in init, as their actions run code that reads them.
 func init() {
+	// Every row and the sidebar carry the list's own, so a row's menu offers them, even a row that has
+	// nothing else, and their keys work wherever the cursor is.
+	spacesKind = interact.NewKind(func(spacesSubject) string { return "Spaces" }, actAddSpace)
+	spacesKind.Bind(actAddSpace, "a", "add space", "a")
+
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
 		actOpenWorktree, actFold, actUnfold, actNewWorktree, actCloseSession, actRemoveWorktree)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
@@ -268,6 +299,7 @@ func init() {
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
 	entryKind.Bind(actCloseSession, "c", "close session", "c")
 	entryKind.Bind(actRemoveWorktree, "x", "remove worktree", "x")
+	interact.Via(entryKind, func(entrySubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	spacesList = interact.List(entryKind)
 	spacesList.Bind(actOpenWorktree, "enter/l", "open", "enter", "l")
 
@@ -286,6 +318,7 @@ func init() {
 	paneKind.Bind(actMenuHere, "m", "menu", "m")
 	paneKind.BindQuiet(actEndRemote, "enter", "l")
 	paneKind.Bind(actQuit, "ctrl+c", "quit", "ctrl+c")
+	interact.Via(paneKind, func(paneSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	thePane = interact.List(paneKind)
 
 	menuKind = interact.NewKind(func(menuSubject) string { return "Menu" },
@@ -322,6 +355,11 @@ func init() {
 	closeKind.Bind(actCloseCancel, "n/esc", "cancel", "n", "esc")
 	closeKind.Bind(actCloseQuit, "ctrl+c", "quit", "ctrl+c")
 	theCloseForm = interact.List(closeKind)
+
+	addKind = interact.NewKind(func(addSubject) string { return "Add space" }, actAdd, actAddCancel)
+	addKind.Bind(actAdd, "enter", "add", "enter")
+	addKind.Bind(actAddCancel, "esc", "cancel", "esc", "ctrl+c")
+	theAddForm = interact.List(addKind)
 }
 
 // Targets: the subjects on screen, each in its place.

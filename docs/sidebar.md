@@ -26,6 +26,7 @@ Right-click a row, or press `m` on it:
 | New worktree... | `n` | create a worktree in a form |
 | Close session... | `c` | close every window of the session, on a session with windows open |
 | Remove worktree... | `x` | close the session and remove a linked worktree |
+| Add space... | `a` | add a repository to the spaces, in a form; on every row |
 
 Each item that changes something opens a form in an overlay, with buttons and keys to confirm or cancel.
 
@@ -41,6 +42,12 @@ window closes still runs.
 are lost. It closes the session, waits for its windows to go, deletes the session's saved file and runs
 `git worktree remove`. The branch is kept. What git would refuse, such as a locked worktree, is said before
 you confirm. The removal runs as a kitty background process, so an error after that is shown by kitty.
+
+**Add space** has a field for a directory, filled in with the repository of the window the sidebar is
+beside, and shows the root it adds: the top of the directory's work tree, `~/` for the home directory. A
+directory in no repository, or a repository already in the spaces, is refused before you confirm. Add
+appends the root to `spaces` in config.toml as text, so the file's comments and layout stay as they were,
+and writes through a symlinked config to its target. Every sidebar shows the new space at its next refresh.
 
 ## Status
 
@@ -71,6 +78,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `space` | fold or unfold |
 | `m` | menu |
 | `n`, `c`, `x` | new worktree, close session, remove worktree |
+| `a` | add a space, wherever the cursor is |
 | `r` | refresh, which also happens every two seconds |
 | `esc` / `q` | give focus back to the window it came from |
 

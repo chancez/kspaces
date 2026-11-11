@@ -60,6 +60,7 @@ default ~/.config/kspaces/config.toml.`,
 		a.newCommand(),
 		a.removeCommand(),
 		a.closeCommand(),
+		a.addCommand(),
 		a.kittyCommand(),
 	)
 	return root

@@ -67,9 +67,3 @@ To make in kitty later, together, rather than while kspaces is still settling:
   (`Boss.drag_resize_start` only targets layout windows), and a command to resize one. The watcher then
   keeps a dragged width for every sidebar instead of setting `DockSpec.size` itself.
 - A dock for the whole OS window, the fix for the first known issue.
-
-## After the MVP
-
-Not until the idea has proven worth it:
-
-- Add new spaces from the sidebar.

@@ -18,6 +18,7 @@ import (
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/status"
+	"github.com/chancez/kspaces/internal/tui/interact"
 )
 
 // fixture is what the sidebar shows in tests: a session in no space; gr with two linked worktrees, the
@@ -348,8 +349,8 @@ func TestRightClickMenu(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	rule := strings.Repeat("\u2500", 29)
-	want := []string{rule, " Open", " Fold worktrees", " New worktree...", " Close session...", " Remove worktree...", rule}
-	if got := e.screen()[y+1 : y+8]; !reflect.DeepEqual(got, want) {
+	want := []string{rule, " Open", " Fold worktrees", " New worktree...", " Close session...", " Remove worktree...", " Add space...", rule}
+	if got := e.screen()[y+1 : y+9]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{" Open"}) {
@@ -367,14 +368,17 @@ func TestRightClickMenu(t *testing.T) {
 	}
 
 	// What a row offers depends on it: a session in no space can only be opened and closed, and a space
-	// that is not a repository offers nothing, so it has no menu.
+	// that is not a repository has only what every row offers.
 	e.click(fmt.Sprintf(entryZone, e.row("default")), tea.MouseRight)
-	var titles []string
-	for _, it := range e.m.menu.items {
-		titles = append(titles, it.Title)
+	titles := func() []string {
+		var out []string
+		for _, it := range e.m.menu.items {
+			out = append(out, it.Title)
+		}
+		return out
 	}
-	if want := []string{"Open", "Close session..."}; !reflect.DeepEqual(titles, want) {
-		t.Errorf("default's menu = %q, want %q", titles, want)
+	if got, want := titles(), []string{"Open", "Close session...", "Add space..."}; !reflect.DeepEqual(got, want) {
+		t.Errorf("default's menu = %q, want %q", got, want)
 	}
 	// A click elsewhere closes it; a right click elsewhere opens that row's instead.
 	e.clickAt(5, 0, tea.MouseLeft)
@@ -382,8 +386,11 @@ func TestRightClickMenu(t *testing.T) {
 		t.Error("a click elsewhere left the menu open")
 	}
 	e.click(fmt.Sprintf(entryZone, len(e.m.rows)-1), tea.MouseRight)
-	if e.m.menu != nil {
-		t.Errorf("the broken space has a menu of %d items", len(e.m.menu.items))
+	if e.m.menu == nil {
+		t.Fatal("the broken space has no menu")
+	}
+	if got, want := titles(), []string{"Add space..."}; !reflect.DeepEqual(got, want) {
+		t.Errorf("the broken space's menu = %q, want %q", got, want)
 	}
 }
 
@@ -392,7 +399,7 @@ func TestRightClickMenu(t *testing.T) {
 func TestMenuKeys(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.FocusMsg{})
-	e.press("m", "j", "j", "j", "j", "j", "k", "k", "k")
+	e.press("m", "j", "j", "j", "j", "j", "j", "k", "k", "k", "k")
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Fold worktrees"}) {
 		t.Errorf("highlighted %q", got)
 	}
@@ -406,21 +413,41 @@ func TestMenuKeys(t *testing.T) {
 	}
 }
 
+// a adds a space wherever the cursor is: on a row, on a status entry, or in a sidebar with neither.
+func TestAddSpaceKey(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(tea.FocusMsg{})
+	adds := func() bool {
+		b, ok := interact.Lookup(e.m, keyMsg("a"), e.m.chain()...)
+		return ok && b.Is(actAddSpace)
+	}
+	got := []bool{adds()}
+	e.press("G")
+	got = append(got, adds())
+	e.m.Update(spaces.Snapshot{Config: &config.Config{}})
+	got = append(got, adds())
+	if want := []bool{true, true, true}; !reflect.DeepEqual(got, want) {
+		t.Errorf("a adds a space on a row, a status entry, nothing: %v, want %v", got, want)
+	}
+}
+
 // A menu that would run off the bottom opens above its row.
 func TestMenuAbove(t *testing.T) {
 	e := newSidebarEnv(t)
-	// Only gr, so its last row is the list's last, and no indicator takes it.
+	// Only gr, so its last row is the list's last, and no indicator takes it, below two sessions in no
+	// space, so the menu has room above.
 	snap := fixture(time.Now())
 	snap.Spaces = snap.Spaces[:1]
+	snap.Others = append(snap.Others, spaces.Space{Name: "notes", Worktrees: []spaces.Worktree{{Session: "notes"}}})
 	e.m.Update(snap)
-	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 13})
+	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 14})
 	e.m.render()
 	fix := e.row("gr@fix")
 	_, y := e.zone(fmt.Sprintf(entryZone, fix))
 	e.click(fmt.Sprintf(entryZone, fix), tea.MouseRight)
 	rule := strings.Repeat("\u2500", 29)
-	want := []string{rule, " Open", " Fold worktrees", " New worktree...", " Remove worktree...", rule}
-	if got := e.screen()[y-6 : y]; !reflect.DeepEqual(got, want) {
+	want := []string{rule, " Open", " Fold worktrees", " New worktree...", " Remove worktree...", " Add space...", rule}
+	if got := e.screen()[y-7 : y]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu above row %d:\n%q\nwant\n%q", y, got, want)
 	}
 }
