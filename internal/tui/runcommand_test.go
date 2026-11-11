@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/gittest"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
 )
@@ -114,6 +115,8 @@ func TestRunKey(t *testing.T) {
 // opens: where configured, or as --open says, or as the first tab of a session with no windows. A required
 // input left empty refuses to run. Run goes to the session and opens the command by its window.
 func TestRunForm(t *testing.T) {
+	// Running looks up the worktree's PR with git, in a repository that is not there.
+	gittest.Isolate(t)
 	calls := fakeKittenLs(t, lsWith("gr@fix"))
 	cfg := testCommands(t)
 	cfg.Launch = []string{"launch"}
