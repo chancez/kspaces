@@ -6,10 +6,12 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/kitty"
+	"github.com/chancez/kspaces/internal/status"
 )
 
 func TestWorktreeSessions(t *testing.T) {
@@ -244,6 +246,46 @@ func TestCycleIndex(t *testing.T) {
 	}
 	if want := []int{1, 0, 2, 0, 2, 0}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+// Stepping through what needs me goes blocked, failed, then done, the most recent change first in each,
+// past working and idle, wrapping around; from a window that is none of them it starts at either end.
+func TestAttentionStep(t *testing.T) {
+	at := func(min int) time.Time { return time.Unix(int64(min)*60, 0) }
+	statuses := []status.Status{
+		{Window: 1, Record: status.Record{State: "done", Since: at(5)}},
+		{Window: 2, Record: status.Record{State: "working", Since: at(9)}},
+		{Window: 3, Record: status.Record{State: "error", Since: at(1)}},
+		{Window: 4, Record: status.Record{State: "blocked", Since: at(2)}},
+		{Window: 5, Record: status.Record{State: "idle", Since: at(9)}},
+		{Window: 6, Record: status.Record{State: "done", Since: at(7)}},
+		{Window: 7, Record: status.Record{State: "blocked", Since: at(3)}},
+	}
+	var order []int
+	for _, s := range Attention(statuses) {
+		order = append(order, s.Window)
+	}
+	if want := []int{7, 4, 3, 6, 1}; !reflect.DeepEqual(order, want) {
+		t.Errorf("order %v, want %v", order, want)
+	}
+	step := func(current, delta int) int {
+		s, ok := attentionStep(statuses, current, delta)
+		if !ok {
+			return 0
+		}
+		return s.Window
+	}
+	got := []int{step(7, 1), step(3, 1), step(1, 1), step(7, -1), step(2, 1), step(2, -1), step(0, 1)}
+	if want := []int{4, 6, 7, 1, 7, 1, 7}; !reflect.DeepEqual(got, want) {
+		t.Errorf("steps %v, want %v", got, want)
+	}
+	// Nothing to attend to: working and idle only, or no statuses at all.
+	if _, ok := attentionStep(statuses[1:2], 2, 1); ok {
+		t.Error("a working window needs me")
+	}
+	if _, ok := attentionStep(nil, 0, -1); ok {
+		t.Error("no statuses gave a window")
 	}
 }
 

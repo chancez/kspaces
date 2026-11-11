@@ -99,6 +99,10 @@ action_alias kspaces_pick launch --type=overlay --var=kspaces_picker=1 kspaces p
 action_alias kspaces_next launch --type=background --allow-remote-control kspaces next
 action_alias kspaces_prev launch --type=background --allow-remote-control kspaces prev
 
+# The next and previous window whose program needs you: blocked, failed or done.
+action_alias kspaces_attention_next launch --type=background --allow-remote-control kspaces next --attention
+action_alias kspaces_attention_prev launch --type=background --allow-remote-control kspaces prev --attention
+
 # Send a key to this tab's sidebar without focusing it, as in: map --mode spaces j kspaces_key j
 action_alias kspaces_key remote_control send-key --match "var:^kspaces$ and state:parent_focused"
 `, path("kspaces_watcher.py"), path("kspaces_toggle.py"), path("kspaces_focus.py"))

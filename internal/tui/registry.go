@@ -162,6 +162,17 @@ var (
 	actQuit      = quit[*sidebar, paneSubject]()
 )
 
+// actAttend focuses the window that needs me most, the first of the status list's blocked, failed and
+// done entries, wherever the cursor is.
+var actAttend = paneAction("attend", func(m *sidebar) tea.Cmd {
+	need := spaces.Attention(m.kitty.Statuses)
+	if len(need) == 0 {
+		return nil
+	}
+	m.remote = false
+	return m.openWindowCmd(need[0])
+})
+
 // The context menu's.
 var (
 	actMenuDown = &interact.Action[*sidebar, menuSubject]{
@@ -308,7 +319,8 @@ func init() {
 	statusList.Bind(actOpenWindow, "enter/l", "open", "enter", "l")
 
 	paneKind = interact.NewKind(func(paneSubject) string { return "Sidebar" },
-		actDown, actUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit)
+		actDown, actUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit,
+		actAttend)
 	paneKind.Bind(actDown, "j/k", "down/up", "j", "down")
 	paneKind.Bind(actUp, "", "", "k", "up")
 	paneKind.Bind(actTop, "g/G", "top/bottom", "g", "home")
@@ -318,6 +330,7 @@ func init() {
 	paneKind.Bind(actMenuHere, "m", "menu", "m")
 	paneKind.BindQuiet(actEndRemote, "enter", "l")
 	paneKind.Bind(actQuit, "ctrl+c", "quit", "ctrl+c")
+	paneKind.Bind(actAttend, "!", "go to what needs you", "!")
 	interact.Via(paneKind, func(paneSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	thePane = interact.List(paneKind)
 

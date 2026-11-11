@@ -65,6 +65,11 @@ kitty keeps the records and ends them by the protocol's rules: working and block
 prompt, done and failed when the window is focused or typed in. The age comes from the kitty watcher; without
 it entries show none.
 
+`!` focuses the window that needs you most: the first blocked, failed or done entry, in the list's order.
+`kspaces next --attention` and `prev --attention`, which kspaces.conf's `kspaces_attention_next` and
+`kspaces_attention_prev` run, step through all of them from the focused window, wrapping around, and do
+nothing when none needs you. Focusing a done or failed window ends its record, so it drops out of the list.
+
 ## Keys
 
 The sidebar takes keys when it has keyboard focus. kitty's `send-key` can send them without focusing it,
@@ -80,6 +85,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `m` | menu |
 | `n`, `c`, `x` | new worktree, close session, remove worktree |
 | `a` | add a space, wherever the cursor is |
+| `!` | focus the window that needs you most, wherever the cursor is |
 | `r` | refresh, which also happens every two seconds |
 | `esc` / `q` | give focus back to the window it came from |
 

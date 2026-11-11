@@ -71,6 +71,8 @@ map f4 kspaces_toggle
 map f5 kspaces_pick
 map cmd+alt+[ kspaces_prev
 map cmd+alt+] kspaces_next
+map cmd+alt+, kspaces_attention_prev
+map cmd+alt+. kspaces_attention_next
 ```
 
 The watcher and the actions find `kspaces` the way kitty's `launch` does: kitty's `exe_search_path`, its

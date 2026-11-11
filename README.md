@@ -125,6 +125,7 @@ kspaces pick             a fuzzy picker over sessions, worktrees and status entr
 kspaces list             every space's worktrees and their sessions
 kspaces open PATH        switch to the session of the worktree at PATH
 kspaces next, prev       switch to the next or previous session with windows open
+  --attention            or to the next or previous window that is blocked, failed or done
 kspaces new [SPACE]      create a worktree, in a form
 kspaces close [SESSION]  close every window of a session, after confirming
 kspaces remove PATH      close a linked worktree's session and remove the worktree, after confirming
