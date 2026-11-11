@@ -120,3 +120,26 @@ func TestParseLockedWorktrees(t *testing.T) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}
 }
+
+// TopLevel is the top of the work tree from anywhere in it, a linked worktree's own, and an error outside
+// any repository.
+func TestTopLevel(t *testing.T) {
+	root, wt := testRepo(t)
+	sub := filepath.Join(root, "sub")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	type result struct {
+		Path string
+		Err  bool
+	}
+	var got []result
+	for _, dir := range []string{root, sub, wt, t.TempDir()} {
+		p, err := TopLevel(dir)
+		got = append(got, result{p, err != nil})
+	}
+	want := []result{{root, false}, {root, false}, {wt, false}, {"", true}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}

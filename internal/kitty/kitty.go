@@ -51,6 +51,7 @@ type Window struct {
 	// tab, so it does not say which window has the keyboard.
 	IsActive      bool              `json:"is_active"`
 	SessionName   string            `json:"session_name"`
+	Cwd           string            `json:"cwd"`
 	LastFocusedAt float64           `json:"last_focused_at"`
 	UserVars      map[string]string `json:"user_vars"`
 	ProgramStatus []status.Record   `json:"program_status"`
@@ -81,6 +82,8 @@ type State struct {
 	// The window focused most recently in the sidebar's tab, not counting docks. Leaving the sidebar returns
 	// focus to it. Zero when unknown.
 	Home int
+	// The working directory of Home, empty when unknown.
+	HomeDir string
 	// Every window that reports a program status, grouped by state, most urgent first.
 	Statuses []status.Status
 }
@@ -137,7 +140,7 @@ func stateFrom(data []OSWindow, selfWindowID int) State {
 	for _, osw := range data {
 		for _, tab := range osw.Tabs {
 			hasSelf, session := false, ""
-			home, homeAt := 0, 0.0
+			home, homeAt, homeDir := 0, 0.0, ""
 			for _, w := range tab.Windows {
 				if w.ID == selfWindowID {
 					hasSelf = true
@@ -146,7 +149,7 @@ func stateFrom(data []OSWindow, selfWindowID int) State {
 					continue
 				}
 				if home == 0 || w.LastFocusedAt > homeAt {
-					home, homeAt = w.ID, w.LastFocusedAt
+					home, homeAt, homeDir = w.ID, w.LastFocusedAt, w.Cwd
 				}
 				if s, ok := status.OfWindow(w.ID, w.SessionName, w.Title, w.UserVars, w.ProgramStatus); ok {
 					st.Statuses = append(st.Statuses, s)
@@ -162,7 +165,7 @@ func stateFrom(data []OSWindow, selfWindowID int) State {
 				}
 			}
 			if hasSelf {
-				st.Current, st.Home = session, home
+				st.Current, st.Home, st.HomeDir = session, home, homeDir
 			}
 		}
 	}

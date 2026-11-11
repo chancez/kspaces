@@ -12,9 +12,9 @@ func TestStateFrom(t *testing.T) {
 	dock := map[string]string{dockVar: "1"}
 	data := []OSWindow{{Tabs: []Tab{
 		{ID: 1, Windows: []Window{
-			{ID: 10, SessionName: "gr", LastFocusedAt: 5},
-			{ID: 11, SessionName: "gr", LastFocusedAt: 9},
-			{ID: 12, UserVars: dock},
+			{ID: 10, SessionName: "gr", LastFocusedAt: 5, Cwd: "/src/gr/docs"},
+			{ID: 11, SessionName: "gr", LastFocusedAt: 9, Cwd: "/src/gr"},
+			{ID: 12, UserVars: dock, Cwd: "/"},
 		}},
 		{ID: 2, Windows: []Window{
 			{ID: 20, SessionName: "gr", LastFocusedAt: 7},
@@ -22,20 +22,20 @@ func TestStateFrom(t *testing.T) {
 			// A dock never counts as a session's window, even if it was saved with one.
 			{ID: 22, SessionName: "kitty@docks", LastFocusedAt: 99, UserVars: dock},
 		}},
-		{ID: 3, Windows: []Window{{ID: 30}}},
+		{ID: 3, Windows: []Window{{ID: 30, Cwd: "/tmp"}}},
 	}}}
 
 	got := stateFrom(data, 12)
-	// Home is the tab's most recently focused window that is not a dock.
+	// Home is the tab's most recently focused window that is not a dock, and HomeDir its directory.
 	// Windows counts each session's windows, docks left out.
-	want := State{Sessions: map[string]int{"gr": 11, "kitty@docks": 21}, Windows: map[string]int{"gr": 3, "kitty@docks": 1}, Current: "gr", Home: 11}
+	want := State{Sessions: map[string]int{"gr": 11, "kitty@docks": 21}, Windows: map[string]int{"gr": 3, "kitty@docks": 1}, Current: "gr", Home: 11, HomeDir: "/src/gr"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}
 
 	// A sidebar in a tab with no session highlights nothing.
 	got = stateFrom(data, 30)
-	want.Current, want.Home = "", 30
+	want.Current, want.Home, want.HomeDir = "", 30, "/tmp"
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}

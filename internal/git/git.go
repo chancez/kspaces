@@ -95,6 +95,19 @@ func BranchExists(root, branch string) bool {
 	return exec.Command("git", "-C", root, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch).Run() == nil
 }
 
+// TopLevel is the top of the work tree dir is in, with symlinks resolved, as git reports it. The error is
+// git's own message, for example when dir is in no repository.
+func TopLevel(dir string) (string, error) {
+	out, err := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
+			err = fmt.Errorf("%s", strings.TrimSpace(string(ee.Stderr)))
+		}
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // Changes is how many files git status reports in the worktree at dir: changed, staged or untracked.
 // Removing a worktree with any loses them.
 func Changes(dir string) (int, error) {
