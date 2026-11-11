@@ -58,6 +58,12 @@ sets of tabs with sessions and `tab_bar_filter`; the proposals still name kspace
    a kitten (in kspaces' kitty files) toggling a dock by a user var, `kitten kspaces_dock.py --var=NAME
    --edge=right --size=80 -- PROG ARGS`; upstream, a `toggle_dock` action or `launch --type=*-dock
    --toggle`, as a proposal after the dock one.
+7. One launcher for every new window: today running each window in a cm session takes a mapping per way
+   of opening one (new tab, split, OS window, each through `kitten cm_launch.py`), and kitty's own
+   new_tab, new_window, new_os_window and splits still start the plain shell. An option that wraps the
+   program of every new window, such as `launch_wrapper cm-attach {session_name}`, or that names a kitten
+   to run in place of `launch`, would make kitty's defaults and every mapping go through it. Check how
+   `shell`, `--hold` and `startup_session` interact first; a proposal, after the others.
 
 Dropped: resizable docks, which the maintainer turned down in #2391; `[sidebar] width` covers it.
 
