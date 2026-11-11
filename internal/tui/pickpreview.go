@@ -100,9 +100,13 @@ func (m *picker) worktreePreview(it pickItem, width int) [][]look.Span {
 		return []look.Span{look.Label(fmt.Sprintf("%-*s", previewLabelWidth, label)), value}
 	}
 	lines := [][]look.Span{{look.Heading(it.text[:it.nameLen])}, {}}
-	if r.Other {
+	switch {
+	case r.Other:
 		lines = append(lines, field("space", look.Muted("none")))
-	} else {
+	case r.Missing:
+		// git no longer lists it, so there is no path, branch or state to show.
+		lines = append(lines, field("space", look.Text(r.Space.Name)), field("path", look.Muted("gone, the worktree directory was removed")))
+	default:
 		lines = append(lines, field("space", look.Text(r.Space.Name)), field("path", look.Text(worktreePath(r.Space.Root, wt.Path))))
 		if wt.Branch == "" {
 			lines = append(lines, field("branch", look.Muted("none, HEAD is detached")))

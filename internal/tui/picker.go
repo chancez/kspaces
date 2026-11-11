@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"fmt"
-	"path/filepath"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -60,10 +59,12 @@ func pickItemsFrom(snap spaces.Snapshot) pickItems {
 		}
 		name := r.Space.Name
 		if !r.Main {
-			name += " / " + filepath.Base(r.Worktree.Path)
+			name += " / " + r.Dir()
 		}
-		icon := []look.Span{look.NoMarker()}
+		icon, detail := []look.Span{look.NoMarker()}, r.Worktree.Branch
 		switch state := status.OfSession(snap.Kitty.Statuses, r.Worktree.Session); {
+		case r.Missing:
+			icon, detail = look.GoneMarker(), "gone"
 		case state != "":
 			icon = look.StateMarker(state)
 		case r.Worktree.Session == snap.Kitty.Current:
@@ -71,7 +72,7 @@ func pickItemsFrom(snap spaces.Snapshot) pickItems {
 		case snap.Kitty.Sessions[r.Worktree.Session] != 0:
 			icon = look.SessionMarker()
 		}
-		items = append(items, pickItem{text: joinDetail(name, r.Worktree.Branch), nameLen: len(name), icon: icon, row: r})
+		items = append(items, pickItem{text: joinDetail(name, detail), nameLen: len(name), icon: icon, row: r})
 	}
 	return items
 }
@@ -147,6 +148,9 @@ func (m *picker) choose() tea.Cmd {
 			err = spaces.OpenWindow(cfg, st, it.status.Window, it.status.Session)
 		case it.row.Worktree.Session == st.Current:
 			// Already here: closing the picker is all there is to do.
+		case it.row.Missing && st.Windows[it.row.Worktree.Session] == 0:
+			// Opening it would make it afresh in a directory that is gone.
+			err = fmt.Errorf("the worktree directory of %s is gone", it.row.Worktree.Session)
 		default:
 			err = spaces.OpenWorktree(cfg, st, *it.row.Worktree)
 		}

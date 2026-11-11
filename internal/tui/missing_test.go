@@ -121,3 +121,61 @@ func TestMissingWorktreeMenu(t *testing.T) {
 		t.Error("a click on gr@saved opened it")
 	}
 }
+
+// The picker lists missing worktrees with the gone marker, its preview says their directory is gone, and
+// one with no windows is not opened.
+func TestPickerMissingWorktrees(t *testing.T) {
+	m := newPicker(0)
+	m.Update(tea.WindowSizeMsg{Width: 40, Height: 26})
+	m.Update(missingFixture("/sessions"))
+	want := []string{
+		"\uf002  space, worktree or status",
+		strings.Repeat("\u2500", 40),
+		open + "default",
+		open + "nope@x",
+		"\uf054  gr  main",
+		"   gr / dev  dev",
+		goneIcon + "gr / open  gone",
+		goneIcon + "gr / saved  gone",
+	}
+	if got := pickerScreen(m)[:len(want)]; !reflect.DeepEqual(got, want) {
+		t.Errorf("picker:\n%q\nwant\n%q", got, want)
+	}
+	preview := func() []string {
+		var out []string
+		for _, l := range m.preview(40, 10) {
+			out = append(out, m.th.TextOf(l...))
+		}
+		return out
+	}
+	down(m, 4)
+	got := [][]string{preview()}
+	down(m, 1)
+	got = append(got, preview())
+	wantPreviews := [][]string{
+		{
+			"gr / open", "",
+			"space    gr",
+			"path     gone, the worktree directory was removed",
+			"session  gr@open",
+			"windows  2 open",
+			"saved    no",
+		},
+		{
+			"gr / saved", "",
+			"space    gr",
+			"path     gone, the worktree directory was removed",
+			"session  gr@saved",
+			"windows  none open",
+			"saved    yes",
+		},
+	}
+	if !reflect.DeepEqual(got, wantPreviews) {
+		t.Errorf("previews:\n%q\nwant\n%q", got, wantPreviews)
+	}
+	_, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+	msg := cmd()
+	if snap, ok := msg.(spaces.Snapshot); !ok || snap.Err == nil || snap.Err.Error() != "the worktree directory of gr@saved is gone" {
+		t.Errorf("choosing gr@saved: %#v", msg)
+	}
+}
