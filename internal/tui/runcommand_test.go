@@ -70,7 +70,7 @@ func lsWith(session string) string {
 	return fmt.Sprintf(`[{"is_focused":true,"tabs":[{"id":1,"is_active":true,"windows":[{"id":7,"is_active":true,"session_name":%q,"last_focused_at":1}]}]}]`, session)
 }
 
-// Run... is on a worktree's menu, and R its key, only with commands configured; it opens the run form in
+// Run is on a worktree's menu, and R its key, only with commands configured; it opens the run form in
 // an overlay for the first command.
 func TestRunKey(t *testing.T) {
 	e := newSidebarEnv(t)
@@ -88,9 +88,9 @@ func TestRunKey(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	want := []string{
-		menuRule("Session"), " Open", " Run...", " Close session...",
-		menuRule("Worktree"), " Remove worktree...",
-		menuRule("Space"), " New worktree...", " Fold worktrees", " Add space...",
+		menuRule("Session"), " Open", " Run", " Close session",
+		menuRule("Worktree"), " Remove worktree",
+		menuRule("Space"), " New worktree", " Fold worktrees", " Add space",
 		menuRule(""),
 	}
 	if got := e.screen()[y+1 : y+12]; !reflect.DeepEqual(got, want) {

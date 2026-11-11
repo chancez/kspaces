@@ -23,7 +23,7 @@ kspaces itself never writes session files. The session saver below, which it can
 
 ## Running commands
 
-Commands are what the new worktree form and a worktree's **Run...** can start in a session:
+Commands are what the new worktree form and a worktree's **Run** can start in a session:
 
 ```toml
 [[commands]]

@@ -105,7 +105,7 @@ launch = ["launch"]
 dir = ".worktrees"
 branch_prefix = "pr/me"
 
-# Commands to run in a worktree, from the new worktree form, a worktree's Run... or kspaces run. run and
+# Commands to run in a worktree, from the new worktree form, a worktree's Run or kspaces run. run and
 # env are templates: {prompt} is the input, {worktree}, {branch}, {pr} and the like are built in.
 [[commands]]
 name = "claude"

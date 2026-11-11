@@ -116,7 +116,7 @@ var (
 		Run:     func(m *sidebar, s entrySubject) tea.Cmd { m.toggleFold(s.row.Space.Root); return nil },
 	}
 	actNewWorktree = &interact.Action[*sidebar, entrySubject]{
-		Title:   "New worktree...",
+		Title:   "New worktree",
 		Section: sectionSpace,
 		Applies: func(_ *sidebar, s entrySubject) bool { return !s.row.Other && !s.row.Missing && s.row.Space.Err == nil },
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
@@ -125,7 +125,7 @@ var (
 		},
 	}
 	actRemoveWorktree = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Remove worktree...",
+		Title:   "Remove worktree",
 		Section: sectionWorktree,
 		// Only a linked worktree: the main one is the repository itself.
 		Applies: func(_ *sidebar, s entrySubject) bool { return !s.row.Main && !s.row.Missing && s.row.Worktree != nil },
@@ -146,7 +146,7 @@ var (
 		},
 	}
 	actRunCommand = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Run...",
+		Title:   "Run",
 		Section: sectionSession,
 		Applies: func(m *sidebar, s entrySubject) bool {
 			return !s.row.Other && !s.row.Missing && s.row.Worktree != nil && len(m.cfg.Commands) > 0
@@ -157,7 +157,7 @@ var (
 		},
 	}
 	actCloseSession = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Close session...",
+		Title:   "Close session",
 		Section: sectionSession,
 		Applies: func(m *sidebar, s entrySubject) bool {
 			return s.row.Worktree != nil && m.kitty.Windows[s.row.Worktree.Session] > 0
@@ -168,7 +168,7 @@ var (
 		},
 	}
 	actForgetSession = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Forget...",
+		Title:   "Forget",
 		Section: sectionWorktree,
 		// A missing worktree with only its saved file left, which kitty would restore it from.
 		Applies: func(m *sidebar, s entrySubject) bool {
@@ -180,7 +180,7 @@ var (
 		},
 	}
 	actCleanup = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Clean up worktrees...",
+		Title:   "Clean up worktrees",
 		Section: sectionSpace,
 		// On the space's own row: it offers removing any of the space's linked worktrees.
 		Applies: func(_ *sidebar, s entrySubject) bool {
@@ -205,7 +205,7 @@ var actOpenWindow = &interact.Action[*sidebar, statusSubject]{
 
 // The spaces list's own, offered on every row and on the sidebar.
 var actAddSpace = &interact.Action[*sidebar, spacesSubject]{
-	Title:   "Add space...",
+	Title:   "Add space",
 	Section: sectionSpace,
 	Run: func(m *sidebar, _ spacesSubject) tea.Cmd {
 		m.remote = false

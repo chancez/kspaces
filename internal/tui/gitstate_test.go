@@ -180,9 +180,9 @@ func TestOpenPR(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	want := []string{
-		menuRule("Session"), " Open", " Close session...",
-		menuRule("Worktree"), " Open PR #123", " Remove worktree...",
-		menuRule("Space"), " New worktree...", " Fold worktrees", " Add space...",
+		menuRule("Session"), " Open", " Close session",
+		menuRule("Worktree"), " Open PR #123", " Remove worktree",
+		menuRule("Space"), " New worktree", " Fold worktrees", " Add space",
 		menuRule(""),
 	}
 	if got := e.screen()[y+1 : y+12]; !reflect.DeepEqual(got, want) {
@@ -192,7 +192,7 @@ func TestOpenPR(t *testing.T) {
 	kitty := e.row("kitty")
 	e.click(fmt.Sprintf(entryZone, kitty), tea.MouseRight)
 	_, y = e.zone(fmt.Sprintf(entryZone, kitty))
-	want = []string{menuRule("Session"), " Open", menuRule("Space"), " New worktree...", " Add space...", menuRule("")}
+	want = []string{menuRule("Session"), " Open", menuRule("Space"), " New worktree", " Add space", menuRule("")}
 	if got := e.screen()[y+1 : y+7]; !reflect.DeepEqual(got, want) {
 		t.Errorf("kitty's menu:\n%q\nwant\n%q", got, want)
 	}

@@ -56,15 +56,15 @@ only.
 | Section | Item | Key | Does |
 |---|---|---|---|
 | Session | Open | `enter` | switch to the session |
-| Session | Run... | `R` | run a configured command in the worktree's session, in a form; with `[[commands]]` configured |
-| Session | Close session... | `c` | close every window of the session, on a session with windows open |
+| Session | Run | `R` | run a configured command in the worktree's session, in a form; with `[[commands]]` configured |
+| Session | Close session | `c` | close every window of the session, on a session with windows open |
 | Worktree | Open PR #N | `b` | open the branch's PR in the browser with `gh browse N`, on a worktree whose row shows a PR |
-| Worktree | Remove worktree... | `x` | close the session and remove a linked worktree |
-| Worktree | Forget... | `x` | delete the saved session file of a missing worktree with no windows open |
-| Space | New worktree... | `n` | create a worktree in the space, in a form |
+| Worktree | Remove worktree | `x` | close the session and remove a linked worktree |
+| Worktree | Forget | `x` | delete the saved session file of a missing worktree with no windows open |
+| Space | New worktree | `n` | create a worktree in the space, in a form |
 | Space | Fold / Unfold worktrees | `space` | hide or show a space's linked worktrees |
-| Space | Clean up worktrees... | `p` | remove the space's linked worktrees that look done with, on a space's row |
-| Space | Add space... | `a` | add a repository to the spaces, in a form; on every row |
+| Space | Clean up worktrees | `p` | remove the space's linked worktrees that look done with, on a space's row |
+| Space | Add space | `a` | add a repository to the spaces, in a form; on every row |
 
 Each item that changes something opens a form in an overlay, with buttons and keys to confirm or cancel.
 

@@ -362,9 +362,9 @@ func TestRightClickMenu(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	want := []string{
-		menuRule("Session"), " Open", " Close session...",
-		menuRule("Worktree"), " Remove worktree...",
-		menuRule("Space"), " New worktree...", " Fold worktrees", " Add space...",
+		menuRule("Session"), " Open", " Close session",
+		menuRule("Worktree"), " Remove worktree",
+		menuRule("Space"), " New worktree", " Fold worktrees", " Add space",
 		menuRule(""),
 	}
 	if got := e.screen()[y+1 : y+11]; !reflect.DeepEqual(got, want) {
@@ -389,7 +389,7 @@ func TestRightClickMenu(t *testing.T) {
 	def := e.row("default")
 	e.click(fmt.Sprintf(entryZone, def), tea.MouseRight)
 	_, y = e.zone(fmt.Sprintf(entryZone, def))
-	want = []string{menuRule("Session"), " Open", " Close session...", menuRule("Space"), " Add space...", menuRule("")}
+	want = []string{menuRule("Session"), " Open", " Close session", menuRule("Space"), " Add space", menuRule("")}
 	if got := e.screen()[y+1 : y+7]; !reflect.DeepEqual(got, want) {
 		t.Errorf("default's menu:\n%q\nwant\n%q", got, want)
 	}
@@ -411,7 +411,7 @@ func TestMenuOneSection(t *testing.T) {
 	broken := len(e.m.rows) - 1
 	e.click(fmt.Sprintf(entryZone, broken), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, broken))
-	if got, want := e.screen()[y+1:y+4], []string{menuRule(""), " Add space...", menuRule("")}; !reflect.DeepEqual(got, want) {
+	if got, want := e.screen()[y+1:y+4], []string{menuRule(""), " Add space", menuRule("")}; !reflect.DeepEqual(got, want) {
 		t.Errorf("the broken space's menu:\n%q\nwant\n%q", got, want)
 	}
 }
@@ -428,7 +428,7 @@ func TestMenuNarrow(t *testing.T) {
 	want := []string{
 		"\u2500 Session \u2500", " Open", " Close s...",
 		"\u2500 Work... \u2500", " Remove ...",
-		"\u2500 Space \u2500\u2500\u2500", " New wor...", " Fold wo...", " Add spa...",
+		"\u2500 Space \u2500\u2500\u2500", " New wor...", " Fold wo...", " Add space",
 		rule,
 	}
 	if got := e.screen()[y+1 : y+11]; !reflect.DeepEqual(got, want) {
@@ -461,21 +461,21 @@ func TestMenuSkipsSections(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.FocusMsg{})
 	e.press("m", "j", "j")
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree..."}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree"}) {
 		t.Errorf("j past Session's last item: highlighted %q", got)
 	}
 	e.press("j", "k")
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree..."}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree"}) {
 		t.Errorf("k from Space's first item: highlighted %q", got)
 	}
 	_, y := e.zone(fmt.Sprintf(menuZone, 2))
 	head := y - 1
 	if got := e.screen()[head]; got != menuRule("Worktree") {
-		t.Fatalf("above Remove worktree... is %q, want Worktree's rule", got)
+		t.Fatalf("above Remove worktree is %q, want Worktree's rule", got)
 	}
 	e.m.Update(tea.MouseMotionMsg{X: 3, Y: head})
 	e.m.render()
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree..."}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree"}) {
 		t.Errorf("mouse on Worktree's name: highlighted %q", got)
 	}
 	if cmd := e.clickAt(3, head, tea.MouseLeft); cmd != nil || e.m.menu == nil || e.m.menu.sel != 2 {
@@ -584,8 +584,8 @@ func TestMenuAbove(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, fix), tea.MouseRight)
 	want := []string{
 		menuRule("Session"), " Open",
-		menuRule("Worktree"), " Remove worktree...",
-		menuRule("Space"), " New worktree...", " Fold worktrees", " Add space...",
+		menuRule("Worktree"), " Remove worktree",
+		menuRule("Space"), " New worktree", " Fold worktrees", " Add space",
 		menuRule(""),
 	}
 	if got := e.screen()[y-9 : y]; !reflect.DeepEqual(got, want) {

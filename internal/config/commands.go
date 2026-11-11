@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Command is a command to run in a worktree, from the new worktree form or a worktree's Run... menu item:
+// Command is a command to run in a worktree, from the new worktree form or a worktree's Run menu item:
 //
 //	[[commands]]
 //	name = "claude"

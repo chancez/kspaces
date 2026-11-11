@@ -149,8 +149,8 @@ func TestCleanupKey(t *testing.T) {
 	e.press("m")
 	_, y := e.zone(fmt.Sprintf(entryZone, e.row("gr")))
 	want := []string{
-		menuRule("Session"), " Open", " Close session...",
-		menuRule("Space"), " New worktree...", " Fold worktrees", " Clean up worktrees...", " Add space...",
+		menuRule("Session"), " Open", " Close session",
+		menuRule("Space"), " New worktree", " Fold worktrees", " Clean up worktrees", " Add space",
 		menuRule(""),
 	}
 	if got := e.screen()[y+1 : y+10]; !reflect.DeepEqual(got, want) {
