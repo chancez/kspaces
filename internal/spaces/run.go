@@ -53,15 +53,11 @@ func WorktreePR(space Space, wt Worktree) int {
 	return pr
 }
 
-// RunCommand runs r in wt, a worktree of space, and switches to its session, see runActions. r's PR is
-// looked up with WorktreePR when not given.
-func RunCommand(cfg config.Config, space Space, wt Worktree, r Run) error {
+// RunCommand runs r in wt, a worktree of space, and switches to its session, see runActions; st says
+// which sessions have windows. r's PR is looked up with WorktreePR when not given.
+func RunCommand(cfg config.Config, st kitty.State, space Space, wt Worktree, r Run) error {
 	if r.PR == 0 {
 		r.PR = WorktreePR(space, wt)
-	}
-	st, err := kitty.LoadState(kitty.SelfWindowID())
-	if err != nil {
-		return err
 	}
 	for _, args := range runActions(cfg, st, space, wt, r) {
 		if err := kitty.Action(args...); err != nil {

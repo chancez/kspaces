@@ -33,6 +33,14 @@ func fakeGH(t *testing.T, prs map[string]string) {
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 }
 
+// mainRepo is a repository with a commit on main.
+func mainRepo(t *testing.T) string {
+	t.Helper()
+	r := gittest.New(t)
+	r.Commit("first")
+	return r.Dir
+}
+
 // lookUpPR lets the form's debounce run out and its lookup finish, as the program would.
 func lookUpPR(t *testing.T, f *newWorktreeForm) {
 	t.Helper()
@@ -47,9 +55,7 @@ func lookUpPR(t *testing.T, f *newWorktreeForm) {
 // shows its title and the branch it checks out, which the directory follows, or why it cannot. The fork's
 // main clashes with the space's.
 func TestNewWorktreeFormPR(t *testing.T) {
-	r := gittest.New(t)
-	r.Commit("first")
-	root := r.Dir
+	root := mainRepo(t)
 	fakeGH(t, map[string]string{
 		"3": `{"headRefName":"feat","headRepositoryOwner":{"login":"o"},"isCrossRepository":false,"number":3,"title":"Add feat","url":"https://github.com/o/r/pull/3"}`,
 		"7": `{"headRefName":"main","headRepositoryOwner":{"login":"forker"},"isCrossRepository":true,"number":7,"title":"Fix from a fork","url":"https://github.com/o/r/pull/7"}`,
@@ -110,5 +116,110 @@ func TestNewWorktreeFormPR(t *testing.T) {
 	}
 	if got := formScreen(f); !strings.Contains(strings.Join(got, "\n"), "PR #7 Fix from a fork") {
 		t.Errorf("a PR looked up already:\n%s", strings.Join(got, "\n"))
+	}
+}
+
+// With commands configured the form chooses one, none at first, and has a field for each of its inputs;
+// tab goes through them all, left and right or a click change the command. A required input left empty
+// refuses to create. Created, the worktree's first tab runs the command: kspaces sends kitty launch with
+// the KSPACES_ and the command's env, --hold and the command, each word quoted, then switches to it.
+func TestNewWorktreeFormCommand(t *testing.T) {
+	root := mainRepo(t)
+	dir := t.TempDir()
+	log := filepath.Join(dir, "calls")
+	script := "#!/bin/sh\n{ for a; do printf '%s\\n' \"$a\"; done; echo --; } >> " + log + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "kitten"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("KITTY_INSTALLATION_DIR", "")
+
+	cfg, err := config.Parse(`
+[worktrees]
+branch_prefix = "pr/me"
+[[commands]]
+name = "claude"
+run = ["claude", "{prompt}"]
+env = { TASK = "{prompt}" }
+[[commands.inputs]]
+name = "prompt"
+label = "Prompt"
+required = true
+[[commands]]
+name = "gr"
+run = ["gr"]
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	space := spaces.Space{Name: "gr", Root: root, Worktrees: []spaces.Worktree{{Path: root, Branch: "main", Session: "gr"}}}
+	f := newForm(cfg, space)
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	screen := func(fields []string, hint string, says ...string) []string {
+		lines := append([]string{"", "  New worktree in gr", "", "  branch     pr/me/fix", "  directory  .worktrees/fix"}, fields...)
+		lines = append(lines, "", "  Creates pr/me/fix from main")
+		for _, s := range says {
+			if s != "" {
+				s = "  " + s
+			}
+			lines = append(lines, s)
+		}
+		return append(lines, "", "   Create enter    Cancel esc   tab next field"+hint, "")
+	}
+	typeInto(f, "fix")
+	if got, want := formScreen(f), screen([]string{"  command    < none >"}, ""); !reflect.DeepEqual(got, want) {
+		t.Errorf("form:\n%q\nwant\n%q", got, want)
+	}
+
+	f.Update(keyMsg("tab"))
+	f.Update(keyMsg("tab"))
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	want := screen([]string{"  command    < claude >", "  Prompt     required"}, "  left/right command", "Runs claude in the first tab")
+	if got := formScreen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("claude chosen:\n%q\nwant\n%q", got, want)
+	}
+	// Round through gr and none, by key and by click, back to claude.
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	if got, want := formScreen(f), screen([]string{"  command    < gr >"}, "  left/right command", "Runs gr in the first tab"); !reflect.DeepEqual(got, want) {
+		t.Errorf("gr chosen:\n%q\nwant\n%q", got, want)
+	}
+	clickOn(t, f, "< gr >")
+	f.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
+	f.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
+	if c, _ := f.cmds.chosen(); c.Name != "claude" {
+		t.Fatalf("chose %q, want claude", c.Name)
+	}
+
+	if _, cmd := f.Update(keyMsg("enter")); cmd != nil || f.busy {
+		t.Fatal("created with the prompt empty")
+	}
+	want = screen([]string{"  command    < claude >", "  Prompt     required"}, "  left/right command", "Runs claude in the first tab", "", "claude needs Prompt")
+	if got := formScreen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("prompt missing:\n%q\nwant\n%q", got, want)
+	}
+
+	f.Update(keyMsg("tab"))
+	typeInto(f, `fix "it" in $HOME`)
+	_, cmd := f.Update(keyMsg("enter"))
+	if cmd == nil {
+		t.Fatal("enter created nothing")
+	}
+	if _, quit := f.Update(cmd()); quit == nil || f.err != nil {
+		t.Fatalf("the form stayed: %v", f.err)
+	}
+	data, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(root, ".worktrees", "fix")
+	if got, want := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n"), []string{
+		"@", "action", "launch", "--type=tab", "--cwd=" + wt, "--add-to-session=gr@fix",
+		"--env=KSPACES_SPACE=gr", "--env=KSPACES_ROOT=" + root, "--env=KSPACES_WORKTREE=" + wt, "--env=KSPACES_BRANCH=pr/me/fix",
+		"--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr@fix", "--env=KSPACES_PR=",
+		`'--env=KSPACES_INPUT_PROMPT=fix "it" in $$$$HOME'`, `'--env=TASK=fix "it" in $$$$HOME'`,
+		"--hold", "claude", `'fix "it" in $$HOME'`, "--",
+		"@", "action", "goto_session", "gr@fix.kitty-session", "--",
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
 	}
 }

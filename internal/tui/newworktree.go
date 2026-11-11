@@ -11,13 +11,14 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
-// newWorktreeForm asks for a branch, or a PR to check out, and, optionally, where its worktree goes, shows
-// what it will do, creates the worktree and switches to its session. It is meant for a kitty overlay, as
-// the sidebar is too narrow to type a name and read back the path in.
+// newWorktreeForm asks for a branch, or a PR to check out, and, optionally, where its worktree goes and a
+// command to run in it, shows what it will do, creates the worktree and switches to its session. It is
+// meant for a kitty overlay, as the sidebar is too narrow to type a name and read back the path in.
 type newWorktreeForm struct {
 	th     *look.Theme
 	cfg    config.Config
@@ -25,6 +26,10 @@ type newWorktreeForm struct {
 	branch textinput.Model
 	// Empty for the default, which spaces.WorktreeDir derives from the branch and the placeholder shows.
 	dir textinput.Model
+	// The command the first tab runs, none for a shell, and its inputs. Only with commands configured.
+	cmds commandFields
+	// focus is the index in fields of the field that has focus.
+	focus int
 	// typed is the branch field as followBranch last saw it, so it works out what that names only when it
 	// changes, not at every cursor blink.
 	typed string
@@ -74,6 +79,7 @@ func newForm(cfg config.Config, space spaces.Space) *newWorktreeForm {
 	branch.CursorEnd()
 	branch.Focus()
 	f := &newWorktreeForm{th: th, cfg: cfg, space: space, branch: branch, dir: newInput(th, ""), lookups: map[string]prLookup{}}
+	f.cmds = newCommandFields(th, cfg.Commands, true, "", nil)
 	f.followBranch()
 	return f
 }
@@ -103,8 +109,26 @@ func (f *newWorktreeForm) plan() (branch, dir string) {
 }
 
 func (f *newWorktreeForm) create() tea.Cmd {
+	var run *spaces.Run
+	if _, ok := f.cmds.chosen(); ok {
+		r, err := f.cmds.run()
+		if err != nil {
+			f.err = err
+			return nil
+		}
+		run = &r
+	}
 	f.busy, f.err = true, nil
 	cfg, space := f.cfg, f.space
+	// The new session has no windows, so a command runs as its first tab, with no state to ask kitty for.
+	open := func(wt spaces.Worktree, pr int) error {
+		if run == nil {
+			return spaces.OpenFromOverlay(cfg, wt)
+		}
+		r := *run
+		r.PR = pr
+		return spaces.RunCommand(cfg, kitty.State{}, space, wt, r)
+	}
 	if l, ok := f.lookup(); ok {
 		ref, dir := f.pr, f.dir.Value()
 		return func() tea.Msg {
@@ -120,7 +144,7 @@ func (f *newWorktreeForm) create() tea.Cmd {
 			if err != nil {
 				return createdMsg{err}
 			}
-			return createdMsg{spaces.OpenFromOverlay(cfg, wt)}
+			return createdMsg{open(wt, pr.Number)}
 		}
 	}
 	branch, dir := f.plan()
@@ -129,18 +153,39 @@ func (f *newWorktreeForm) create() tea.Cmd {
 		if err != nil {
 			return createdMsg{err}
 		}
-		return createdMsg{spaces.OpenFromOverlay(cfg, wt)}
+		return createdMsg{open(wt, 0)}
 	}
 }
 
-// switchField moves typing between the branch and the directory.
-func (f *newWorktreeForm) switchField() tea.Cmd {
-	if f.branch.Focused() {
-		f.branch.Blur()
-		return f.dir.Focus()
+// fields are the form's fields in order: the branch, the directory, the choice of command, nil, when there
+// is one, and the chosen command's inputs.
+func (f *newWorktreeForm) fields() []*textinput.Model {
+	out := []*textinput.Model{&f.branch, &f.dir}
+	if f.cmds.picks() {
+		out = append(out, nil)
 	}
-	f.dir.Blur()
-	return f.branch.Focus()
+	return append(out, f.cmds.fields()...)
+}
+
+// focused is the field typing goes to, nil for the choice of command.
+func (f *newWorktreeForm) focused() *textinput.Model {
+	fields := f.fields()
+	return fields[min(f.focus, len(fields)-1)]
+}
+
+// nextField and prevField move typing to the field below or above, round from the last to the first.
+func (f *newWorktreeForm) nextField() tea.Cmd { return moveFocus(f.fields(), &f.focus, 1) }
+func (f *newWorktreeForm) prevField() tea.Cmd { return moveFocus(f.fields(), &f.focus, -1) }
+
+// onCommand says whether the choice of command has focus.
+func (f *newWorktreeForm) onCommand() bool { return f.cmds.picks() && f.focused() == nil }
+
+// cycleCommand chooses the next command, or the one before, and focuses the choice, as the inputs below it
+// change with it.
+func (f *newWorktreeForm) cycleCommand(delta int) tea.Cmd {
+	f.cmds.cycle(delta)
+	f.focus = 2
+	return moveFocus(f.fields(), &f.focus, 0)
 }
 
 func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -151,6 +196,7 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// after the padding and their labels, and the cursor takes a cell past the text.
 		f.branch.SetWidth(max(f.width-4-labelWidth-1, 1))
 		f.dir.SetWidth(max(f.width-4-labelWidth-1, 1))
+		f.cmds.setWidth(max(f.width-4-labelWidth-1, 1))
 		return f, nil
 	case createdMsg:
 		f.busy, f.err = false, msg.err
@@ -184,14 +230,17 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
 			return f, cmd
 		}
+		if clickedCommand(f.zones, msg) {
+			return f, f.cycleCommand(1)
+		}
 	}
 	// Everything else is typing in the field that has focus.
-	var cmd tea.Cmd
-	if f.branch.Focused() {
-		f.branch, cmd = f.branch.Update(msg)
-	} else {
-		f.dir, cmd = f.dir.Update(msg)
+	in := f.focused()
+	if in == nil {
+		return f, nil
 	}
+	var cmd tea.Cmd
+	*in, cmd = in.Update(msg)
 	return f, tea.Batch(cmd, f.followBranch())
 }
 
@@ -242,8 +291,8 @@ func (f *newWorktreeForm) render() string {
 		line(look.Heading("New worktree in " + f.space.Name)), "",
 		th.Draw(look.Plain, labelWidth, look.Label("branch")) + f.branch.View(),
 		th.Draw(look.Plain, labelWidth, look.Label("directory")) + f.dir.View(),
-		"",
 	}
+	lines = append(append(lines, f.cmds.lines(f.onCommand())...), "")
 	failed := f.err
 	if l, ok := f.lookup(); ok {
 		pr := fmt.Sprintf("PR #%d", f.pr.Number)
@@ -270,6 +319,9 @@ func (f *newWorktreeForm) render() string {
 			lines = append(lines, muted("Creates "+branch))
 		}
 	}
+	if cmd, ok := f.cmds.chosen(); ok {
+		lines = append(lines, muted("Runs "+cmd.Name+" in the first tab"))
+	}
 	lines = append(lines, "")
 	switch {
 	case f.busy:
@@ -284,7 +336,11 @@ func (f *newWorktreeForm) render() string {
 	buttons := f.buttons.draw(f, theForm.Target(formSubject{}),
 		control{action: actCreate, label: "Create"},
 		control{action: actCancel, label: "Cancel"})
-	lines = append(lines, line(append(buttons, look.Text("  "), look.Key("tab"), look.KeyDesc(" next field"))...))
+	hints := []look.Span{look.Text("  "), look.Key("tab"), look.KeyDesc(" next field")}
+	if f.onCommand() {
+		hints = append(hints, look.Text("  "), look.Key("left/right"), look.KeyDesc(" command"))
+	}
+	lines = append(lines, line(append(buttons, hints...)...))
 	return boxed(lines)
 }
 
