@@ -1,33 +1,11 @@
 # TODO
 
-## MVP candidates
-
-To consider once the core pieces work:
-
-- More UX in general, still to investigate.
-- The picker (f5) cannot open a new worktree that has no session any differently from the sidebar.
-- Closing a session's last tab goes back to the last used tab, in any session: the dotfiles' kitty.conf
-  `tab_switch_strategy left` focuses the tab to the left within the session (kitty picks among the tabs
-  `tab_bar_filter` shows, kitty/tabs.py `remove`), but the last tab has none. Landing on a tab of the same
-  space's sessions instead needs a watcher hook on tab close.
-
-## Status area
-
-kspaces reads OSC 7501 records from `kitten @ ls`, and the kitty watcher notes when each changed state.
-It knows nothing about what produced a record. Open questions:
-
-- A program inside a multiplexer reaches kitty only if the multiplexer passes OSC 7501 through.
-- kitty loses its records when it restarts, so the list starts empty after a restart.
-- A record's time is when the watcher saw the state change. A record kitty already had before the watcher
-  was loaded has no time until its state changes again.
-- A collapsed entry shows one row of detail; the rest only shows with the sidebar's cursor on it.
-
 ## Known issues
 
 - One `kspaces sidebar` per tab, because kitty can only dock to one tab. Each polls `kitten @ ls` and runs
   `git worktree list` per space every two seconds. A dock for the whole OS window, or one process feeding
   all of them, would fix both.
-- Three kitty bugs, worked around in the dotfiles until fixed in kitty:
+- Three kitty bugs, worked around in kspaces' bundled kitty scripts until a kitty release fixes them:
   - `save_as_session --match` writes `new_os_window` before a space's file depending on which OS window had
     focus, so with several OS windows each space was restored in a window of its own. `save_sessions.py`
     serializes with the bug fixed instead.
@@ -40,7 +18,10 @@ It knows nothing about what produced a record. Open questions:
   with its last window, but kitty's watchers miss some changes:
   - Nothing says an OS window is closing as a whole, so its windows' closes are told from a user closing
     them only by the OS window being gone, and skipped. A space alone in its own OS window keeps a stale
-    file when its last tab closes, as that closes the OS window too.
+    file when its last tab closes, as that closes the OS window too. Fixable without kitty: inside
+    `on_close` the OS window is already gone from `boss.os_window_map` when it closes as a whole or kitty
+    quits, and `current_application_quit_request()` tells the two apart; the saver checks only later, from
+    a timer.
   - Nothing says a window's directory changed, so a `cd` is saved only at the next focus change, close or
     quit.
 - On macOS kitty keeps timers in a table of 128 (glfw/cocoa_init.m), and `add_timer` returns 0 when it is
@@ -56,16 +37,23 @@ It knows nothing about what produced a record. Open questions:
 - kitty's own dock border can sit next to the sidebar's, which may look like a double line.
 - The dotfiles' `cm_reap.py` kills a multiplexer session when one of two windows showing it closes.
 
-## kitty changes, deferred
+## kitty work
 
-To make in kitty later, together, rather than while kspaces is still settling:
+One at a time: a small bug fix PR, its feedback, then the next. Proposals wait until the PRs have landed.
+Drafts are in `~/projects/kitty/.research/drafts/`. Each describes the use case only as switching between
+sets of tabs with sessions and `tab_bar_filter`; the proposals still name kspaces and need trimming first.
 
-- Fix the three session bugs above, and drop the workarounds.
-- Watcher events for an OS window closing, or a flag on `on_close` for windows closed with their OS
-  window or by quitting, and for a window's directory changing, so `save_sessions.py` misses nothing.
-- Watcher calls queued behind one timer rather than one per event, and only for events a watcher listens
-  to. And a timer table that grows, or an error from `add_timer`, rather than a 0 that never calls back.
-- Resizable docks: drag a dock's border, as borders between layout windows already can be
-  (`Boss.drag_resize_start` only targets layout windows), and a command to resize one. The watcher then
-  keeps a dragged width for every sidebar instead of setting `DockSpec.size` itself.
-- A dock for the whole OS window, the fix for the first known issue.
+1. `save_as_session --match`, the first two bugs above: draft PR kovidgoyal/kitty#10844, branch
+   `pr/chancez/save-as-session-match`.
+2. `detach_tab` and window moves losing their session: branch `pr/chancez/detach-tab-session`, local, to
+   open once #10844 has feedback.
+3. Watcher events (a close reason on `on_close`, an event for a window's directory changing): the
+   maintainer asked which are missing in discussion #10828, so as a comment there.
+4. Watcher calls each taking a timer, and the macOS and Linux tables of 128: an issue, as the fix is a
+   design choice in kitty's event loop.
+5. A dock for the whole OS window, the fix for the first known issue: a proposal, last.
+
+Dropped: resizable docks, which the maintainer turned down in #2391; `[sidebar] width` covers it.
+
+When a kitty release has a fix, drop its workaround behind a check of kitty's version, as older kittys
+still need it.
