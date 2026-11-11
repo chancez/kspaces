@@ -94,9 +94,11 @@ current tab's sidebar and back.
 
 `save_sessions.py`, with `save_sessions = true`, saves each session to its own file at quit and as its
 windows close or take focus, and loads the ones that were open at startup. A space then reopens as it was
-left, and afresh once its last window has closed. The files go next to kitty's `startup_session`, so point
-kspaces' `sessions` at that directory. `kspaces_save_sessions` saves them on demand. The docks, the forms
-kspaces opens and the picker carry a `kspaces*` user variable, and are never saved.
+left, and afresh once its last window has closed: its file is removed, or, for the default session, which
+is `startup_session`'s, emptied. Windows in no session are saved with the default session, at quit and on
+demand only. The files go next to kitty's `startup_session`, so point kspaces' `sessions` at that
+directory. `kspaces_save_sessions` saves them on demand. The docks, the forms kspaces opens and the picker
+carry a `kspaces*` user variable, and are never saved.
 
 ## Keys without focusing the sidebar
 

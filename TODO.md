@@ -49,8 +49,10 @@ It knows nothing about what produced a record. Open questions:
   spaces in one go asked for 271 and was refused 143, each a dropped watcher call; it broke saving for good
   once. `save_sessions.py` now restores one space per timer, which was refused none, and both watchers try
   again later when refused.
-- Quitting with no window in the default session writes an empty `startup_session` file.
-- Windows outside spaces are saved into `default` and come back labelled `default`. Left as is for now.
+- The default session's `startup_session` file is emptied, not removed, once it has no windows; kitty then
+  starts with one shell, and kspaces opens `default` with `new_tab`.
+- Windows in no session are saved into `default` at quit and come back labelled `default`, including one
+  open only then, such as a tab switcher in an OS window of its own. Left as is for now.
 - kitty's own dock border can sit next to the sidebar's, which may look like a double line.
 - The dotfiles' `cm_reap.py` kills a multiplexer session when one of two windows showing it closes.
 

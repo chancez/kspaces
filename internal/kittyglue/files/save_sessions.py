@@ -8,8 +8,8 @@
 #
 # One file per session because kitty names a session after the file it was loaded from and labels every tab
 # the file creates with that name. Saving all tabs into one file would bring every session back as that one
-# file's session. The default session, named after startup_session, also takes the tabs that belong to no
-# session, so nothing open is left unsaved.
+# file's session. When every session is saved, as at quit, the default session, named after startup_session,
+# also takes the tabs that belong to no session, so nothing open is left unsaved.
 #
 # kspaces sidebar docks are never saved. kspaces_watcher.py adds them back to restored tabs.
 
@@ -93,8 +93,10 @@ def main_os_window(boss, sessions):
     return max(counts, key=counts.get) if counts else last_focused_os_window_id()
 
 
-def session_match(name):
-    if name == default_name():
+# session_match matches the windows saved as session name. With unsessioned, the default session also takes
+# the windows in no session.
+def session_match(name, unsessioned=False):
+    if unsessioned and name == default_name():
         return f'(session:^{re.escape(name)}$ or session:^$) and not var:kspaces'
     return f'session:^{re.escape(name)}$ and not var:kspaces'
 
@@ -106,7 +108,7 @@ def save_all(boss):
     others = sorted(n for n in boss.all_loaded_session_names if n != default)
     main = main_os_window(boss, set(others))
     for name in [default] + others:
-        save_matching(boss, session_match(name), session_path(name), main)
+        save_matching(boss, session_match(name, unsessioned=True), session_path(name), main)
     with open(os.path.join(os.path.dirname(startup_path()), OPEN_LIST), 'w') as f:
         f.write(''.join(n + '\n' for n in others))
 
@@ -114,8 +116,12 @@ def save_all(boss):
 # Saving at quit alone left a session's file as it was at the last quit: closing a session's tabs and panes
 # and opening it again brought them all back. So a session is also saved a moment after one of its windows
 # closes or takes focus, which keeps which window is focused too. A session whose last window closed has
-# its file removed, so opening it again starts afresh. The default session's file is startup_session's and
-# is never removed.
+# its file removed, so opening it again starts afresh. The default session's file is startup_session's, so
+# it is emptied instead.
+#
+# Windows in no session are left to save_all. Saved into the default session as they changed, a window that
+# opens an OS window of its own, such as a tab switcher mapped to a key, stayed in its file after closing
+# with that OS window, and opening the default session ran it again.
 #
 # Not while kitty quits, which closes every window after on_quit has saved them, nor for the windows of an
 # OS window closed as a whole, which kitty also closes one by one: either would remove every file. The
@@ -129,9 +135,9 @@ _timer = None
 
 def note_change(boss, window, closed):
     global _timer
-    if _quitting or not startup_path() or any(k.startswith('kspaces') for k in window.user_vars):
+    name = window.created_in_session_name
+    if _quitting or not name or not startup_path() or any(k.startswith('kspaces') for k in window.user_vars):
         return
-    name = window.created_in_session_name or default_name()
     os_windows = _pending.setdefault(name, set())
     if closed:
         os_windows.add(window.os_window_id)
@@ -154,7 +160,9 @@ def save_pending(boss):
         match = session_match(name)
         if any(True for _ in boss.match_windows(match)):
             save_matching(boss, match, session_path(name), main)
-        elif name != default_name():
+        elif name == default_name():
+            atomic_save(b'', session_path(name))
+        else:
             try:
                 os.remove(session_path(name))
             except FileNotFoundError:
