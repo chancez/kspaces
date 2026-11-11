@@ -41,7 +41,7 @@ func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree) error {
 
 // openActions are the kitty actions that switch to wt's session, see OpenWorktree.
 func openActions(cfg config.Config, st kitty.State, wt Worktree) ([][]string, error) {
-	path := sessionFile(cfg, wt.Session)
+	path := SessionFile(cfg, wt.Session)
 	goTo := []string{"goto_session", path}
 	if _, open := st.Sessions[wt.Session]; open {
 		return [][]string{goTo}, nil
@@ -83,10 +83,10 @@ func opensWindows(path string) bool {
 	return false
 }
 
-// sessionFile is where a session would be saved. kitty names a session after its file, so this is also how
+// SessionFile is where a session would be saved. kitty names a session after its file, so this is also how
 // goto_session is told which open session to switch to; without a sessions directory the file need not
 // exist, as kitty reads it only for a session with no windows.
-func sessionFile(cfg config.Config, session string) string {
+func SessionFile(cfg config.Config, session string) string {
 	if cfg.SessionsDir == "" {
 		return session + ".kitty-session"
 	}
@@ -111,7 +111,7 @@ func OpenWindow(cfg config.Config, st kitty.State, id int, session string) error
 		}
 	}
 	if _, open := st.Sessions[session]; open && session != st.Current {
-		if err := gotoSession(sessionFile(cfg, session)); err != nil {
+		if err := gotoSession(SessionFile(cfg, session)); err != nil {
 			return err
 		}
 	}
@@ -195,6 +195,20 @@ func AskCloseSession(st kitty.State, session string) error {
 	return kitty.LaunchForm(st, "close", session)
 }
 
+// AskForgetSession opens the form that confirms forgetting session, in an overlay as NewWorktree's.
+func AskForgetSession(st kitty.State, session string) error {
+	return kitty.LaunchForm(st, "forget", session)
+}
+
+// ForgetSession deletes the saved file of session, so kitty does not restore it: for a missing worktree,
+// whose directory is gone, that is all that is left of it.
+func ForgetSession(cfg config.Config, session string) error {
+	if cfg.SessionsDir == "" {
+		return fmt.Errorf("there is no sessions directory to forget %s from", session)
+	}
+	return os.Remove(SessionFile(cfg, session))
+}
+
 // closeWait is how long CloseSession waits for kitty to close a session's windows.
 const closeWait = 10 * time.Second
 
@@ -241,7 +255,7 @@ func RemoveWorktree(cfg config.Config, space Space, wt Worktree, force bool) err
 		return err
 	}
 	if cfg.SessionsDir != "" {
-		if err := os.Remove(sessionFile(cfg, wt.Session)); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(SessionFile(cfg, wt.Session)); err != nil && !os.IsNotExist(err) {
 			return err
 		}
 	}

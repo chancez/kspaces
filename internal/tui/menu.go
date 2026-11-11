@@ -181,6 +181,17 @@ func (m *sidebar) closeSession(session string) tea.Cmd {
 	}
 }
 
+// forgetSession opens the form that confirms forgetting session, in an overlay as newWorktree's.
+func (m *sidebar) forgetSession(session string) tea.Cmd {
+	st := m.kitty
+	return func() tea.Msg {
+		if err := spaces.AskForgetSession(st, session); err != nil {
+			return spaces.Snapshot{Err: err}
+		}
+		return nil
+	}
+}
+
 // addSpace opens the form that adds a space, in an overlay as newWorktree's, with the repository of the
 // window beside the sidebar filled in.
 func (m *sidebar) addSpace() tea.Cmd {

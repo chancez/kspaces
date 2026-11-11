@@ -60,3 +60,21 @@ func (a *app) closeCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&yes, "yes", false, "close without asking")
 	return cmd
 }
+
+func (a *app) forgetCommand() *cobra.Command {
+	var yes bool
+	cmd := &cobra.Command{
+		Use:   "forget SESSION",
+		Short: "Delete the saved file of a session with no windows open, such as a missing worktree's, after confirming in a form",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+			return tui.RunForgetSession(cmd.Context(), cfg, args[0], yes)
+		},
+	}
+	cmd.Flags().BoolVar(&yes, "yes", false, "delete without asking")
+	return cmd
+}

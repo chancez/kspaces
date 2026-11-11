@@ -146,6 +146,7 @@ kspaces new [SPACE]      create a worktree, in a form
 kspaces run NAME [PATH]  run a configured command in the worktree at PATH or the current directory,
   --input K=V, --yes     in a form, with inputs filled in; --yes without asking
 kspaces close [SESSION]  close every window of a session, after confirming
+kspaces forget SESSION   delete the saved file of a session with no windows, after confirming
 kspaces remove PATH      close a linked worktree's session and remove the worktree, after confirming
 kspaces cleanup SPACE    remove the worktrees whose PR is merged, upstream gone or branch merged, in a form
 kspaces add [PATH]       add the repository at PATH to the spaces, in a form; --yes without asking

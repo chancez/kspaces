@@ -44,6 +44,9 @@ type removeSubject struct{}
 type closeSubject struct{}
 type addSubject struct{}
 
+// forgetSubject is the forget session form.
+type forgetSubject struct{}
+
 // cleanupSubject is the clean up worktrees form.
 type cleanupSubject struct{}
 
@@ -133,6 +136,17 @@ var (
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			return m.closeSession(s.row.Worktree.Session)
+		},
+	}
+	actForgetSession = &interact.Action[*sidebar, entrySubject]{
+		Title: "Forget...",
+		// A missing worktree with only its saved file left, which kitty would restore it from.
+		Applies: func(m *sidebar, s entrySubject) bool {
+			return s.row.Missing && m.kitty.Windows[s.row.Worktree.Session] == 0 && m.saved[s.row.Worktree.Session]
+		},
+		Run: func(m *sidebar, s entrySubject) tea.Cmd {
+			m.remote = false
+			return m.forgetSession(s.row.Worktree.Session)
 		},
 	}
 	actCleanup = &interact.Action[*sidebar, entrySubject]{
@@ -337,6 +351,21 @@ var (
 	actCloseQuit = quit[*closeSessionForm, closeSubject]()
 )
 
+// The forget session form's.
+var (
+	actForget = &interact.Action[*forgetSessionForm, forgetSubject]{
+		Title:   "delete",
+		Applies: func(f *forgetSessionForm, _ forgetSubject) bool { return !f.busy },
+		Run:     cmd[*forgetSessionForm, forgetSubject]((*forgetSessionForm).forget),
+	}
+	actForgetCancel = &interact.Action[*forgetSessionForm, forgetSubject]{
+		Title:   "cancel",
+		Applies: func(f *forgetSessionForm, _ forgetSubject) bool { return !f.busy },
+		Run:     func(*forgetSessionForm, forgetSubject) tea.Cmd { return tea.Quit },
+	}
+	actForgetQuit = quit[*forgetSessionForm, forgetSubject]()
+)
+
 // The clean up worktrees form's.
 var (
 	actCleanupDown = &interact.Action[*cleanupForm, cleanupSubject]{
@@ -418,6 +447,7 @@ var (
 	formKind   *interact.Kind[*newWorktreeForm, formSubject]
 	removeKind *interact.Kind[*removeWorktreeForm, removeSubject]
 	closeKind  *interact.Kind[*closeSessionForm, closeSubject]
+	forgetKind *interact.Kind[*forgetSessionForm, forgetSubject]
 	addKind    *interact.Kind[*addSpaceForm, addSubject]
 	cleanKind  *interact.Kind[*cleanupForm, cleanupSubject]
 	runKind    *interact.Kind[*runForm, runSubject]
@@ -431,6 +461,7 @@ var (
 	theForm       *interact.Place[*newWorktreeForm, formSubject]
 	theRemoveForm *interact.Place[*removeWorktreeForm, removeSubject]
 	theCloseForm  *interact.Place[*closeSessionForm, closeSubject]
+	theForgetForm *interact.Place[*forgetSessionForm, forgetSubject]
 	theAddForm    *interact.Place[*addSpaceForm, addSubject]
 	theCleanup    *interact.Place[*cleanupForm, cleanupSubject]
 	theRunForm    *interact.Place[*runForm, runSubject]
@@ -445,13 +476,15 @@ func init() {
 	spacesKind.Bind(actAddSpace, "a", "add space", "a")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actFold, actUnfold, actNewWorktree, actRunCommand, actCloseSession, actRemoveWorktree, actCleanup)
+		actOpenWorktree, actFold, actUnfold, actNewWorktree, actRunCommand, actCloseSession, actForgetSession, actRemoveWorktree, actCleanup)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
 	entryKind.Bind(actRunCommand, "R", "run a command", "R")
 	entryKind.Bind(actCloseSession, "c", "close session", "c")
 	entryKind.Bind(actRemoveWorktree, "x", "remove worktree", "x")
+	// x on a missing worktree, which has nothing to remove but its saved file.
+	entryKind.Bind(actForgetSession, "", "", "x")
 	entryKind.Bind(actCleanup, "p", "clean up worktrees", "p")
 	interact.Via(entryKind, func(entrySubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	spacesList = interact.List(entryKind)
@@ -526,6 +559,12 @@ func init() {
 	closeKind.Bind(actCloseCancel, "n/esc", "cancel", "n", "esc")
 	closeKind.Bind(actCloseQuit, "ctrl+c", "quit", "ctrl+c")
 	theCloseForm = interact.List(closeKind)
+
+	forgetKind = interact.NewKind(func(forgetSubject) string { return "Forget session" }, actForget, actForgetCancel, actForgetQuit)
+	forgetKind.Bind(actForget, "y", "delete", "y")
+	forgetKind.Bind(actForgetCancel, "n/esc", "cancel", "n", "esc")
+	forgetKind.Bind(actForgetQuit, "ctrl+c", "quit", "ctrl+c")
+	theForgetForm = interact.List(forgetKind)
 
 	addKind = interact.NewKind(func(addSubject) string { return "Add space" }, actAdd, actAddCancel)
 	addKind.Bind(actAdd, "enter", "add", "enter")

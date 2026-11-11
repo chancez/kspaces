@@ -108,7 +108,7 @@ func runActions(cfg config.Config, st kitty.State, space Space, wt Worktree, r R
 	for _, arg := range r.Command.Argv(vars) {
 		argv = append(argv, kitty.Quote(arg))
 	}
-	goTo := []string{"goto_session", sessionFile(cfg, wt.Session)}
+	goTo := []string{"goto_session", SessionFile(cfg, wt.Session)}
 	id, open := st.Sessions[wt.Session]
 	if !open {
 		launch := append(firstTab(cfg, wt.Path, wt.Session), env...)

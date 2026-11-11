@@ -40,8 +40,10 @@ type sidebar struct {
 	spaces []spaces.Space
 	others []spaces.Space
 	folded map[string]bool
-	kitty  kitty.State
-	rows   []spaces.Row
+	// Sessions with a saved file, see spaces.Snapshot.
+	saved map[string]bool
+	kitty kitty.State
+	rows  []spaces.Row
 	// The context menu, nil when closed.
 	menu   *contextMenu
 	cursor int
@@ -192,7 +194,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Config != nil {
 			// Where the cursor is goes by the rows and entries it was drawn on, before they change.
 			at := m.cursorAt()
-			m.cfg, m.spaces, m.others, m.folded, m.kitty = *msg.Config, msg.Spaces, msg.Others, msg.Folded, msg.Kitty
+			m.cfg, m.spaces, m.others, m.folded, m.saved, m.kitty = *msg.Config, msg.Spaces, msg.Others, msg.Folded, msg.Saved, msg.Kitty
 			m.git = msg.Git
 			m.rebuildRows(at)
 			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))

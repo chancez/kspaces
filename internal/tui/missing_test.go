@@ -2,11 +2,14 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
@@ -95,10 +98,12 @@ func TestMissingWorktreesOnScreen(t *testing.T) {
 	}
 }
 
-// A missing worktree offers no more than its session does: opening and closing it while it has windows.
-// One with none cannot be opened, as that would make it afresh in a directory that is gone.
+// A missing worktree offers no more than its session does: opening and closing it while it has windows,
+// and forgetting its saved file when that is all that is left. One with no windows cannot be opened, as
+// that would make it afresh in a directory that is gone.
 func TestMissingWorktreeMenu(t *testing.T) {
 	e := newMissingEnv(t, "")
+	launched := fakeKitten(t)
 	titles := func(session string) []string {
 		e.click(fmt.Sprintf(entryZone, e.row(session)), tea.MouseRight)
 		var out []string
@@ -112,13 +117,88 @@ func TestMissingWorktreeMenu(t *testing.T) {
 	got := [][]string{titles("gr@open"), titles("gr@saved")}
 	want := [][]string{
 		{"Open", "Fold worktrees", "Close session...", "Add space..."},
-		{"Fold worktrees", "Add space..."},
+		{"Fold worktrees", "Forget...", "Add space..."},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("menus %q, want %q", got, want)
 	}
 	if cmd := e.click(fmt.Sprintf(entryZone, e.row("gr@saved")), tea.MouseLeft); cmd != nil {
 		t.Error("a click on gr@saved opened it")
+	}
+
+	// x, which removes a worktree, forgets a missing one, in a form.
+	e.m.Update(tea.FocusMsg{})
+	e.m.cursor = e.row("gr@saved")
+	cmd := e.press("x")
+	if cmd == nil {
+		t.Fatal("x on gr@saved ran nothing")
+	}
+	if msg := cmd(); msg != nil {
+		t.Errorf("forgetting said %v", msg)
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := launched(), []string{"@", "launch", "--type=overlay", "--var=kspaces_form=1", "--next-to", "id:10", exe, "forget", "gr@saved"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("x launched %q, want %q", got, want)
+	}
+}
+
+// The forget form says what it deletes, and Delete deletes that file only.
+func TestForgetSessionForm(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"gr", "gr@dev", "gr@saved"} {
+		if err := os.WriteFile(filepath.Join(dir, name+".kitty-session"), []byte("launch\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f := &forgetSessionForm{th: look.New(true), cfg: config.Config{SessionsDir: dir}, session: "gr@saved"}
+	f.Update(tea.WindowSizeMsg{Width: 300, Height: 20})
+	var screen []string
+	for _, l := range strings.Split(ansi.Strip(f.render()), "\n") {
+		screen = append(screen, strings.TrimRight(l, " "))
+	}
+	want := []string{
+		"",
+		"  Forget session gr@saved",
+		"",
+		"  Deletes its saved file, so kitty does not restore it. Its worktree directory is gone.",
+		"  " + config.Tilde(filepath.Join(dir, "gr@saved.kitty-session")),
+		"",
+		"   Delete y    Cancel n",
+		"",
+	}
+	if !reflect.DeepEqual(screen, want) {
+		t.Errorf("form:\n%q\nwant\n%q", screen, want)
+	}
+	if _, cmd := f.Update(tea.KeyPressMsg{Code: 'n', Text: "n"}); cmd == nil || f.busy {
+		t.Errorf("n: quit %v, busy %v", cmd != nil, f.busy)
+	}
+	f.View()
+	cmd := clickOn(t, f, "Delete y")
+	if cmd == nil || !f.busy {
+		t.Fatalf("Delete: cmd %v, busy %v", cmd != nil, f.busy)
+	}
+	if _, cmd := f.Update(cmd()); cmd == nil || f.err != nil {
+		t.Fatalf("after deleting: quit %v, err %v", cmd != nil, f.err)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var left []string
+	for _, e := range entries {
+		left = append(left, e.Name())
+	}
+	if want := []string{"gr.kitty-session", "gr@dev.kitty-session"}; !reflect.DeepEqual(left, want) {
+		t.Errorf("left %q, want %q", left, want)
+	}
+
+	// Again, with the file gone, the error stays on screen.
+	f.Update(f.forget()())
+	if f.err == nil || f.busy {
+		t.Errorf("forgetting a forgotten session: err %v, busy %v", f.err, f.busy)
 	}
 }
 
