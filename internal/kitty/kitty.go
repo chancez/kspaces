@@ -18,6 +18,17 @@ import (
 // session's own windows.
 const dockVar = "kspaces"
 
+// ownWindow reports whether w is one of kspaces' own, a dock, form or picker, which mark themselves with a
+// user variable starting kspaces, as the saved sessions leave them out.
+func ownWindow(w Window) bool {
+	for k := range w.UserVars {
+		if strings.HasPrefix(k, dockVar) {
+			return true
+		}
+	}
+	return false
+}
+
 // kittenPath prefers the kitten next to the kitty that started us, so remote control talks to a kitten of
 // the same version. That is only known on macOS, where the installation directory sits inside the app
 // bundle; elsewhere kitty puts its own directory on PATH.
@@ -86,6 +97,12 @@ type State struct {
 	HomeDir string
 	// Every window that reports a program status, grouped by state, most urgent first.
 	Statuses []status.Status
+	// For each session with windows, the one whose screen shows what the session is up to: the one
+	// switching to it focuses, as goto_session picks it, leaving out kspaces' own windows and the one
+	// kspaces runs in.
+	Screens map[string]int
+	// kspaces' own windows, docks, forms and the picker, whose screens show nothing of a session.
+	Own map[int]bool
 }
 
 // FocusedWindow stands for the window with keyboard focus, for a command run from a kitty mapping rather
@@ -135,8 +152,8 @@ func keyboardWindow(data []OSWindow) int {
 }
 
 func stateFrom(data []OSWindow, selfWindowID int) State {
-	st := State{Sessions: map[string]int{}, Windows: map[string]int{}}
-	lastFocused := map[string]float64{}
+	st := State{Sessions: map[string]int{}, Windows: map[string]int{}, Screens: map[string]int{}, Own: map[int]bool{}}
+	lastFocused, screenAt, activeScreen := map[string]float64{}, map[string]float64{}, map[string]int{}
 	for _, osw := range data {
 		for _, tab := range osw.Tabs {
 			hasSelf, session := false, ""
@@ -144,6 +161,10 @@ func stateFrom(data []OSWindow, selfWindowID int) State {
 			for _, w := range tab.Windows {
 				if w.ID == selfWindowID {
 					hasSelf = true
+				}
+				own := ownWindow(w)
+				if own {
+					st.Own[w.ID] = true
 				}
 				if _, isDock := w.UserVars[dockVar]; isDock {
 					continue
@@ -163,10 +184,26 @@ func stateFrom(data []OSWindow, selfWindowID int) State {
 					lastFocused[w.SessionName] = w.LastFocusedAt
 					st.Sessions[w.SessionName] = w.ID
 				}
+				if own || w.ID == selfWindowID {
+					continue
+				}
+				// goto_session takes the most recently focused, the first of equals. A kitty that gives no
+				// times leaves the active window of the session's active tab, else its first window.
+				if _, seen := st.Screens[w.SessionName]; !seen || w.LastFocusedAt > screenAt[w.SessionName] {
+					st.Screens[w.SessionName], screenAt[w.SessionName] = w.ID, w.LastFocusedAt
+				}
+				if _, seen := activeScreen[w.SessionName]; !seen && tab.IsActive && w.IsActive {
+					activeScreen[w.SessionName] = w.ID
+				}
 			}
 			if hasSelf {
 				st.Current, st.Home, st.HomeDir = session, home, homeDir
 			}
+		}
+	}
+	for session, id := range activeScreen {
+		if screenAt[session] == 0 {
+			st.Screens[session] = id
 		}
 	}
 	status.Sort(st.Statuses)
@@ -225,6 +262,12 @@ func CloseSession(session string) error {
 func FocusWindow(id int) error {
 	_, err := kitten("focus-window", "--match", fmt.Sprintf("id:%d", id))
 	return err
+}
+
+// ScreenText is what window id has on its screen, its colors and styles as SGR sequences.
+func ScreenText(id int) (string, error) {
+	out, err := kitten("get-text", "--match", fmt.Sprintf("id:%d", id), "--ansi", "--extent", "screen")
+	return string(out), err
 }
 
 // Action runs a kitty action, such as goto_session PATH.

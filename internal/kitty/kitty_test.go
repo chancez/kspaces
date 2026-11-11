@@ -28,7 +28,11 @@ func TestStateFrom(t *testing.T) {
 	got := stateFrom(data, 12)
 	// Home is the tab's most recently focused window that is not a dock, and HomeDir its directory.
 	// Windows counts each session's windows, docks left out.
-	want := State{Sessions: map[string]int{"gr": 11, "kitty@docks": 21}, Windows: map[string]int{"gr": 3, "kitty@docks": 1}, Current: "gr", Home: 11, HomeDir: "/src/gr"}
+	want := State{
+		Sessions: map[string]int{"gr": 11, "kitty@docks": 21}, Windows: map[string]int{"gr": 3, "kitty@docks": 1},
+		Current: "gr", Home: 11, HomeDir: "/src/gr",
+		Screens: map[string]int{"gr": 11, "kitty@docks": 21}, Own: map[int]bool{12: true, 22: true},
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}
@@ -36,6 +40,40 @@ func TestStateFrom(t *testing.T) {
 	// A sidebar in a tab with no session highlights nothing.
 	got = stateFrom(data, 30)
 	want.Current, want.Home, want.HomeDir = "", 30, "/tmp"
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+}
+
+// A session's screen is its most recently focused window, as goto_session picks it, leaving out the
+// picker and kspaces' docks and forms; without focus times, the active window of its active tab.
+func TestScreens(t *testing.T) {
+	picker := map[string]string{"kspaces_picker": "1"}
+	data := []OSWindow{{Tabs: []Tab{
+		{ID: 1, IsActive: true, Windows: []Window{
+			{ID: 10, SessionName: "gr", LastFocusedAt: 5},
+			{ID: 11, SessionName: "gr", LastFocusedAt: 9},
+			{ID: 12, SessionName: "gr", LastFocusedAt: 20, UserVars: map[string]string{dockVar: "1"}},
+			{ID: 13, SessionName: "gr", LastFocusedAt: 30, UserVars: map[string]string{"kspaces_form": "1"}},
+			// The picker's overlay, which has focus.
+			{ID: 14, SessionName: "gr", LastFocusedAt: 40, IsActive: true, UserVars: picker},
+		}},
+		// An older kitty gives no times.
+		{ID: 2, Windows: []Window{{ID: 20, SessionName: "kitty"}, {ID: 21, SessionName: "kitty", IsActive: true}}},
+		{ID: 3, IsActive: true, Windows: []Window{{ID: 30, SessionName: "kitty"}, {ID: 31, SessionName: "kitty", IsActive: true}}},
+		{ID: 4, Windows: []Window{{ID: 40, SessionName: "docs"}, {ID: 41, SessionName: "docs"}}},
+		// Only the picker: nothing to show.
+		{ID: 5, IsActive: true, Windows: []Window{{ID: 50, SessionName: "notes", LastFocusedAt: 3, IsActive: true}}},
+	}}}
+
+	got := stateFrom(data, 50)
+	want := State{
+		Sessions: map[string]int{"gr": 14, "kitty": 20, "docs": 40, "notes": 50},
+		Windows:  map[string]int{"gr": 4, "kitty": 4, "docs": 2, "notes": 1},
+		Current:  "notes", Home: 50,
+		Screens: map[string]int{"gr": 11, "kitty": 31, "docs": 40},
+		Own:     map[int]bool{12: true, 13: true, 14: true},
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}
