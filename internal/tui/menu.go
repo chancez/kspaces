@@ -158,6 +158,18 @@ func (m *sidebar) removeWorktree(path string) tea.Cmd {
 	}
 }
 
+// runCommand opens the form that runs a command in the worktree at path, the first command chosen, in an
+// overlay as newWorktree's.
+func (m *sidebar) runCommand(path string) tea.Cmd {
+	st, name := m.kitty, m.cfg.Commands[0].Name
+	return func() tea.Msg {
+		if err := spaces.AskRunCommand(st, name, path); err != nil {
+			return spaces.Snapshot{Err: err}
+		}
+		return nil
+	}
+}
+
 // closeSession opens the form that confirms closing session, in an overlay as newWorktree's.
 func (m *sidebar) closeSession(session string) tea.Cmd {
 	st := m.kitty

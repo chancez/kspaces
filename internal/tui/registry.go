@@ -47,6 +47,9 @@ type addSubject struct{}
 // cleanupSubject is the clean up worktrees form.
 type cleanupSubject struct{}
 
+// runSubject is the run form.
+type runSubject struct{}
+
 // filterSubject is the spaces list's filter, while it is open.
 type filterSubject struct{}
 
@@ -106,6 +109,16 @@ var (
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			return m.removeWorktree(s.row.Worktree.Path)
+		},
+	}
+	actRunCommand = &interact.Action[*sidebar, entrySubject]{
+		Title: "Run...",
+		Applies: func(m *sidebar, s entrySubject) bool {
+			return !s.row.Other && s.row.Worktree != nil && len(m.cfg.Commands) > 0
+		},
+		Run: func(m *sidebar, s entrySubject) tea.Cmd {
+			m.remote = false
+			return m.runCommand(s.row.Worktree.Path)
 		},
 	}
 	actCloseSession = &interact.Action[*sidebar, entrySubject]{
@@ -348,6 +361,39 @@ var (
 	actCleanupQuit = quit[*cleanupForm, cleanupSubject]()
 )
 
+// The run form's.
+var (
+	actRunNextField = &interact.Action[*runForm, runSubject]{
+		Title: "next field",
+		Run:   cmd[*runForm, runSubject]((*runForm).nextField),
+	}
+	actRunPrevField = &interact.Action[*runForm, runSubject]{
+		Title: "previous field",
+		Run:   cmd[*runForm, runSubject]((*runForm).prevField),
+	}
+	actRunNextCommand = &interact.Action[*runForm, runSubject]{
+		Title:   "next command",
+		Applies: func(f *runForm, _ runSubject) bool { return f.onCommand() },
+		Run:     func(f *runForm, _ runSubject) tea.Cmd { return f.cycleCommand(1) },
+	}
+	actRunPrevCommand = &interact.Action[*runForm, runSubject]{
+		Title:   "previous command",
+		Applies: func(f *runForm, _ runSubject) bool { return f.onCommand() },
+		Run:     func(f *runForm, _ runSubject) tea.Cmd { return f.cycleCommand(-1) },
+	}
+	actRun = &interact.Action[*runForm, runSubject]{
+		Title:   "run",
+		Applies: func(f *runForm, _ runSubject) bool { return !f.busy },
+		Run:     cmd[*runForm, runSubject]((*runForm).run),
+	}
+	// actWaitForRun is enter while the command is being started, which does nothing.
+	actWaitForRun = &interact.Action[*runForm, runSubject]{
+		Title: "running",
+		Run:   func(*runForm, runSubject) tea.Cmd { return nil },
+	}
+	actRunCancel = quit[*runForm, runSubject]()
+)
+
 // The add space form's.
 var (
 	actAdd = &interact.Action[*addSpaceForm, addSubject]{
@@ -370,6 +416,7 @@ var (
 	closeKind  *interact.Kind[*closeSessionForm, closeSubject]
 	addKind    *interact.Kind[*addSpaceForm, addSubject]
 	cleanKind  *interact.Kind[*cleanupForm, cleanupSubject]
+	runKind    *interact.Kind[*runForm, runSubject]
 	filterKind *interact.Kind[*sidebar, filterSubject]
 
 	spacesList    *interact.Place[*sidebar, entrySubject]
@@ -382,6 +429,7 @@ var (
 	theCloseForm  *interact.Place[*closeSessionForm, closeSubject]
 	theAddForm    *interact.Place[*addSpaceForm, addSubject]
 	theCleanup    *interact.Place[*cleanupForm, cleanupSubject]
+	theRunForm    *interact.Place[*runForm, runSubject]
 	theFilter     *interact.Place[*sidebar, filterSubject]
 )
 
@@ -393,10 +441,11 @@ func init() {
 	spacesKind.Bind(actAddSpace, "a", "add space", "a")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actFold, actUnfold, actNewWorktree, actCloseSession, actRemoveWorktree, actCleanup)
+		actOpenWorktree, actFold, actUnfold, actNewWorktree, actRunCommand, actCloseSession, actRemoveWorktree, actCleanup)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
+	entryKind.Bind(actRunCommand, "R", "run a command", "R")
 	entryKind.Bind(actCloseSession, "c", "close session", "c")
 	entryKind.Bind(actRemoveWorktree, "x", "remove worktree", "x")
 	entryKind.Bind(actCleanup, "p", "clean up worktrees", "p")
@@ -478,6 +527,17 @@ func init() {
 	addKind.Bind(actAdd, "enter", "add", "enter")
 	addKind.Bind(actAddCancel, "esc", "cancel", "esc", "ctrl+c")
 	theAddForm = interact.List(addKind)
+
+	runKind = interact.NewKind(func(runSubject) string { return "Run" },
+		actRunNextField, actRunPrevField, actRunNextCommand, actRunPrevCommand, actRun, actRunCancel)
+	runKind.Bind(actRunNextField, "tab", "next field", "tab", "down")
+	runKind.Bind(actRunPrevField, "shift+tab", "previous field", "shift+tab", "up")
+	runKind.Bind(actRunNextCommand, "left/right", "command", "right")
+	runKind.Bind(actRunPrevCommand, "", "", "left")
+	runKind.Bind(actRun, "enter", "run", "enter")
+	runKind.BindQuiet(actWaitForRun, "enter")
+	runKind.Bind(actRunCancel, "esc", "cancel", "esc", "ctrl+c")
+	theRunForm = interact.List(runKind)
 
 	// j and k type, as worktrees are named with them, so only arrows and the picker's ctrl keys move.
 	filterKind = interact.NewKind(func(filterSubject) string { return "Filter" },

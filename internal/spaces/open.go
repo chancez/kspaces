@@ -184,6 +184,12 @@ func AskRemoveWorktree(st kitty.State, path string) error {
 	return kitty.LaunchForm(st, "remove", path)
 }
 
+// AskRunCommand opens the form that runs the command called name in the worktree at path, in an overlay
+// as NewWorktree's.
+func AskRunCommand(st kitty.State, name, path string) error {
+	return kitty.LaunchForm(st, "run", name, path)
+}
+
 // AskCloseSession opens the form that confirms closing session, in an overlay as NewWorktree's.
 func AskCloseSession(st kitty.State, session string) error {
 	return kitty.LaunchForm(st, "close", session)
