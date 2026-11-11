@@ -11,6 +11,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/chancez/kspaces/internal/git"
 )
 
 // Status is what `git status` says of a worktree.
@@ -84,7 +86,7 @@ const ghTimeout = 30 * time.Second
 // repository's default branch is left out without asking: pull requests from forks are often named after
 // it.
 func LookupPR(root, branch string) (*PR, error) {
-	if branch == "" || branch == defaultBranch(root) {
+	if branch == "" || branch == git.DefaultBranch(root) {
 		return nil, nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ghTimeout)
@@ -97,22 +99,6 @@ func LookupPR(root, branch string) (*PR, error) {
 		return nil, err
 	}
 	return ParsePRs(out)
-}
-
-// defaultBranch is the branch origin's HEAD points at, else main or master, whichever exists, as named
-// without the remote.
-func defaultBranch(root string) string {
-	out, err := exec.Command("git", "-C", root, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD").Output()
-	if err == nil {
-		_, name, _ := strings.Cut(strings.TrimSpace(string(out)), "/")
-		return name
-	}
-	for _, name := range []string{"main", "master"} {
-		if exec.Command("git", "-C", root, "rev-parse", "--verify", "--quiet", "refs/heads/"+name).Run() == nil {
-			return name
-		}
-	}
-	return ""
 }
 
 // ParsePRs reads `gh pr list --json number,state,isDraft,isCrossRepository`, newest first, and picks the

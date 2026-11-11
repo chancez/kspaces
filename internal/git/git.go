@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -183,4 +184,74 @@ func MergedInto(root, base string) (map[string]bool, error) {
 func HasOwnHistory(root, branch string) bool {
 	out, err := output("-C", root, "reflog", "show", "--format=%H", "refs/heads/"+branch, "--")
 	return err == nil && strings.Count(out, "\n") > 1
+}
+
+// DefaultBranch is the branch changes in the repository at root are based on, as gr works it out: the base
+// remote's HEAD, or its branch named by init.defaultBranch, main or master, else a local branch by one of
+// those names, named without the remote. "" when there is none. Only the base remote counts: a fork's
+// remote may point its HEAD elsewhere, and an origin/HEAD left by a remote since removed names nothing.
+func DefaultBranch(root string) string {
+	names := []string{"main", "master"}
+	if name, _ := line("-C", root, "config", "init.defaultBranch"); name != "" && !slices.Contains(names, name) {
+		names = append([]string{name}, names...)
+	}
+	if remote := baseRemote(root); remote != "" {
+		if ref, err := line("-C", root, "symbolic-ref", "--quiet", "--short", "refs/remotes/"+remote+"/HEAD"); err == nil {
+			if name, ok := strings.CutPrefix(ref, remote+"/"); ok {
+				return name
+			}
+		}
+		for _, name := range names {
+			if refExists(root, "refs/remotes/"+remote+"/"+name) {
+				return name
+			}
+		}
+	}
+	for _, name := range names {
+		if refExists(root, "refs/heads/"+name) {
+			return name
+		}
+	}
+	return ""
+}
+
+// baseRemote is the remote whose default branch changes are based on, or "" when none can be picked, as
+// gr picks it: checkout.defaultRemote, then clone.defaultRemoteName, then origin, upstream, the only
+// remote, or the one remote that is not remote.pushDefault.
+func baseRemote(root string) string {
+	out, _ := line("-C", root, "remote")
+	remotes := strings.Fields(out)
+	if len(remotes) == 0 {
+		return ""
+	}
+	var candidates []string
+	for _, key := range []string{"checkout.defaultRemote", "clone.defaultRemoteName"} {
+		if name, _ := line("-C", root, "config", key); name != "" {
+			candidates = append(candidates, name)
+		}
+	}
+	for _, name := range append(candidates, "origin", "upstream") {
+		if slices.Contains(remotes, name) {
+			return name
+		}
+	}
+	if len(remotes) == 1 {
+		return remotes[0]
+	}
+	push, _ := line("-C", root, "config", "remote.pushDefault")
+	if others := slices.DeleteFunc(slices.Clone(remotes), func(name string) bool { return name == push }); len(others) == 1 {
+		return others[0]
+	}
+	return ""
+}
+
+func refExists(root, ref string) bool {
+	_, err := output("-C", root, "show-ref", "--verify", "--quiet", ref)
+	return err == nil
+}
+
+// line is output trimmed of the newline git ends it with.
+func line(args ...string) (string, error) {
+	out, err := output(args...)
+	return strings.TrimSpace(out), err
 }

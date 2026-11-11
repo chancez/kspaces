@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/chancez/kspaces/internal/gittest"
@@ -128,5 +129,109 @@ func TestTopLevel(t *testing.T) {
 	want := []result{{root, false}, {root, false}, {wt, false}, {"", true}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// DefaultBranch picks gr's base remote and takes its HEAD, else its branch of a default name, else a local
+// one. The cases follow gr's, plus the one that put a closed PR on hubble-timescape's main worktree: a
+// remote not called origin, with an origin/HEAD left by a remote since removed.
+func TestDefaultBranch(t *testing.T) {
+	type remote struct {
+		name     string
+		branches []string
+		// head is the branch the remote's HEAD points at, or "" for none, as after git remote add.
+		head string
+	}
+	for name, tc := range map[string]struct {
+		remotes []remote
+		local   []string
+		config  map[string]string
+		// stale leaves refs/remotes/origin/HEAD pointing at origin/master with no origin remote.
+		stale bool
+		want  string
+	}{
+		"no remote, main":               {local: []string{"main"}, want: "main"},
+		"no remote, master":             {local: []string{"master"}, want: "master"},
+		"no remote, init.defaultBranch": {local: []string{"main", "trunk"}, config: map[string]string{"init.defaultBranch": "trunk"}, want: "trunk"},
+		"no remote, no default name":    {local: []string{"feature"}, want: ""},
+		"origin's HEAD": {
+			remotes: []remote{{name: "origin", branches: []string{"main", "dev"}, head: "dev"}},
+			want:    "dev",
+		},
+		"the only remote": {
+			remotes: []remote{{name: "work", branches: []string{"trunk"}, head: "trunk"}},
+			want:    "trunk",
+		},
+		"origin before another remote": {
+			remotes: []remote{{name: "fork", branches: []string{"mine"}, head: "mine"}, {name: "origin", branches: []string{"main"}, head: "main"}},
+			want:    "main",
+		},
+		"origin before upstream": {
+			remotes: []remote{{name: "origin", branches: []string{"fork-main"}, head: "fork-main"}, {name: "upstream", branches: []string{"main"}, head: "main"}},
+			want:    "fork-main",
+		},
+		"checkout.defaultRemote before origin": {
+			remotes: []remote{{name: "origin", branches: []string{"fork-main"}, head: "fork-main"}, {name: "upstream", branches: []string{"main"}, head: "main"}},
+			config:  map[string]string{"checkout.defaultRemote": "upstream"},
+			want:    "main",
+		},
+		"clone.defaultRemoteName": {
+			remotes: []remote{{name: "a", branches: []string{"a-main"}, head: "a-main"}, {name: "b", branches: []string{"b-main"}, head: "b-main"}},
+			config:  map[string]string{"clone.defaultRemoteName": "b"},
+			want:    "b-main",
+		},
+		"the remote that is not pushDefault": {
+			remotes: []remote{{name: "mine", branches: []string{"x"}, head: "x"}, {name: "theirs", branches: []string{"main"}, head: "main"}},
+			config:  map[string]string{"remote.pushDefault": "mine"},
+			want:    "main",
+		},
+		"no HEAD, a branch of a default name": {
+			remotes: []remote{{name: "origin", branches: []string{"dev", "master"}}},
+			want:    "master",
+		},
+		"a remote not called origin, a stale origin/HEAD": {
+			remotes: []remote{{name: "isovalent", branches: []string{"main"}, head: "main"}},
+			local:   []string{"main"},
+			stale:   true,
+			want:    "main",
+		},
+		"two remotes, none to pick, a local default": {
+			remotes: []remote{{name: "a", branches: []string{"x"}, head: "x"}, {name: "b", branches: []string{"y"}, head: "y"}},
+			local:   []string{"main"},
+			want:    "main",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			r := gittest.New(t)
+			r.Commit("first")
+			for _, b := range tc.local {
+				if b != "main" {
+					r.Git("branch", b)
+				}
+			}
+			if !slices.Contains(tc.local, "main") {
+				r.Git("checkout", "-q", "--detach")
+				r.Git("branch", "-D", "main")
+			}
+			for _, rm := range tc.remotes {
+				r.Git("remote", "add", rm.name, r.Dir)
+				for _, b := range rm.branches {
+					r.Git("update-ref", "refs/remotes/"+rm.name+"/"+b, "HEAD")
+				}
+				if rm.head != "" {
+					r.Git("symbolic-ref", "refs/remotes/"+rm.name+"/HEAD", "refs/remotes/"+rm.name+"/"+rm.head)
+				}
+			}
+			if tc.stale {
+				r.Git("update-ref", "refs/remotes/origin/master", "HEAD")
+				r.Git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master")
+			}
+			for k, v := range tc.config {
+				r.Git("config", k, v)
+			}
+			if got := DefaultBranch(r.Dir); got != tc.want {
+				t.Errorf("DefaultBranch = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
