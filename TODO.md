@@ -52,6 +52,12 @@ sets of tabs with sessions and `tab_bar_filter`; the proposals still name kspace
 4. Watcher calls each taking a timer, and the macOS and Linux tables of 128: an issue, as the fix is a
    design choice in kitty's event loop.
 5. A dock for the whole OS window, the fix for the first known issue: a proposal, last.
+6. Toggling a dock: show and hide a dock running a given program, such as `gr` for reviews beside the
+   current window, from one mapping, keeping the program running while hidden rather than restarting it.
+   kitty has no such action; kspaces_toggle.py only closes and re-adds kspaces' own docks. In the interim,
+   a kitten (in kspaces' kitty files) toggling a dock by a user var, `kitten kspaces_dock.py --var=NAME
+   --edge=right --size=80 -- PROG ARGS`; upstream, a `toggle_dock` action or `launch --type=*-dock
+   --toggle`, as a proposal after the dock one.
 
 Dropped: resizable docks, which the maintainer turned down in #2391; `[sidebar] width` covers it.
 
