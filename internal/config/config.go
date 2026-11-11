@@ -26,6 +26,10 @@ import (
 //	[kitty]
 //	auto_install = true
 //	save_sessions = true
+//
+//	[[commands]]
+//	name = "gr"
+//	run = ["gr"]
 type Config struct {
 	// Roots of the repositories shown as spaces, in the order they are listed.
 	Spaces []string `toml:"spaces"`
@@ -39,6 +43,8 @@ type Config struct {
 	Worktrees   Worktrees `toml:"worktrees"`
 	Sidebar     Sidebar   `toml:"sidebar"`
 	Kitty       Kitty     `toml:"kitty"`
+	// Commands to run in a worktree, see Command.
+	Commands []Command `toml:"commands"`
 }
 
 // Sidebar is how the sidebar's dock is laid out. kitty sizes the dock, so kitty.conf's watcher reads this
@@ -130,6 +136,9 @@ func Parse(data string) (Config, error) {
 	}
 	if w := cfg.Sidebar.Width; w < MinSidebarWidth || w > MaxSidebarWidth {
 		return Config{}, fmt.Errorf("sidebar.width is %d, it must be from %d to %d", w, MinSidebarWidth, MaxSidebarWidth)
+	}
+	if err := checkCommands(cfg.Commands); err != nil {
+		return Config{}, err
 	}
 	expand := func(p string) string {
 		if rest, ok := strings.CutPrefix(p, "~/"); ok {
