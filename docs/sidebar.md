@@ -8,6 +8,15 @@ worktrees could not be listed. The most urgent status of the row's sessions repl
 green when the session has windows open; the row is faint when it has none. The sidebar's own session is
 drawn as a bar.
 
+At the right end of a worktree's row, a space's own row included, is what git and GitHub say of it: a dot
+and 3 for three files not committed, an up arrow and 2 and a down arrow and 1 for two commits ahead of its
+upstream and one behind, and `#123` for its branch's PR, green when open, grey as a draft, purple merged
+and red closed. The branch is cut to make room for them; in a narrow sidebar ahead and behind go first,
+then the PR, and the changes last. Only the leading sidebar asks: `git status` every 10 seconds, and
+`gh pr list --head BRANCH` every 3 minutes, which needs gh signed in to GitHub. Without gh, a GitHub remote
+or a network there is no PR, and none is looked up for the repository's default branch. `r` asks both
+again at once.
+
 Sessions that are open or saved but belong to no worktree, such as the one kitty starts with, are listed
 above the spaces.
 
@@ -122,8 +131,9 @@ every session and worktree, narrowed by a fuzzy query. `enter` switches to the e
 
 Beside the list in an overlay 90 columns or wider, and below it in a narrower one, a preview shows the
 entry under the cursor: a status entry in full, as the sidebar's opened entry; a worktree's space, path,
-branch, session, how many windows it has open, whether it has a saved session file, and its status
-entries. An overlay too short for both shows only the list.
+branch, its changes, upstream and PR as its row shows them, its session, how many windows it has open,
+whether it has a saved session file, and its status entries. An overlay too short for both shows only
+the list.
 
 Under what it says of the entry, where there is room, the preview shows the bottom of a window's screen,
 with its colors, under a rule: a status entry's own window, or for a session with windows open the one

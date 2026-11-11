@@ -97,9 +97,11 @@ current tab's sidebar and back.
 The sidebars of one kitty share their work: the first to start leads, with a lock on a file in
 `$XDG_RUNTIME_DIR/kspaces/`, or `kspaces-UID/` in the temporary directory, named after kitty's
 `KITTY_LISTEN_ON` socket. Every two seconds the leader runs `kitten @ ls` and `git worktree list` for each
-space and writes what it found beside the lock; the others read that file when it changes, and each works
-out its own tab's session from it. When the leading sidebar's tab closes, the next sidebar to look takes
-the lead. `r` in any sidebar loads at once in that sidebar.
+space, and in the background `git status` and `gh` for the [rows' git state](sidebar.md#spaces), and
+writes what it found beside the lock; the others read that file when it changes, and each works out its
+own tab's session from it. When the leading sidebar's tab closes, the next sidebar to look takes the lead,
+carrying on from what the last one knew. `r` in any sidebar loads at once in that sidebar, and has the
+leader ask git and gh again.
 
 `save_sessions.py`, with `save_sessions = true`, saves each session to its own file at quit and as its
 windows close or take focus, and loads the ones that were open at startup. A space then reopens as it was

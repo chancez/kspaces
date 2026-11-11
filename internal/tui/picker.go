@@ -107,9 +107,14 @@ func newPicker(self int) *picker {
 	return &picker{th: th, self: self, input: input, getText: kitty.ScreenText}
 }
 
+// Init loads afresh, as the picker's own window is new, with the git states the sidebars' leader has.
 func (m *picker) Init() tea.Cmd {
 	self := m.self
-	return tea.Batch(textinput.Blink, func() tea.Msg { return spaces.Load(self) })
+	return tea.Batch(textinput.Blink, func() tea.Msg {
+		snap := spaces.Load(self)
+		snap.Git = spaces.NewPoller().Git()
+		return snap
+	})
 }
 
 // filter ranks the items against the query. An empty query keeps the items in their own order.

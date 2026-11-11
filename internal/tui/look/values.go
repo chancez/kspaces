@@ -3,9 +3,11 @@ package look
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/status"
 )
@@ -278,3 +280,29 @@ func AddButton(hot bool) Span {
 	}
 	return glyph(elMuted, GlyphAdd, false)
 }
+
+// Changes is how many files a worktree has not committed, after its mark.
+func Changes(n int) []Span {
+	return []Span{glyph(elChanges, GlyphChanges, false), sp(elChanges, strconv.Itoa(n))}
+}
+
+// AheadBehind is how many commits a worktree is ahead of and behind its upstream, each left out at zero.
+func AheadBehind(ahead, behind int) []Span {
+	var out []Span
+	if ahead > 0 {
+		out = append(out, glyph(elMuted, GlyphAhead, false), sp(elMuted, strconv.Itoa(ahead)))
+	}
+	if behind > 0 {
+		out = append(out, glyph(elMuted, GlyphBehind, false), sp(elMuted, strconv.Itoa(behind)))
+	}
+	return out
+}
+
+// prStates are the elements of a pull request's states.
+var prStates = map[string]element{"open": elPROpen, "draft": elPRDraft, "merged": elPRMerged, "closed": elPRClosed}
+
+// PRNumber is a pull request by its number, in the color of its state.
+func PRNumber(pr gitstate.PR) Span { return sp(prStates[pr.State], fmt.Sprintf("#%d", pr.Number)) }
+
+// PRState is a pull request's state, in its color.
+func PRState(pr gitstate.PR) Span { return sp(prStates[pr.State], pr.State) }

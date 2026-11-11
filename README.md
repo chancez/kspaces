@@ -23,6 +23,7 @@ Blocked 1
 
 - Click a worktree to switch to its session, created with a tab in the worktree the first time.
 - Create, close and remove worktrees and sessions from a right-click menu.
+- See each worktree's uncommitted changes, how far it is ahead of and behind its upstream, and its PR.
 - See which programs are blocked, failed, done or working, from kitty's program status protocol (OSC 7501).
 - Switch with a fuzzy picker, or to the next and previous session.
 - Filter the list as you type, and jump to the windows whose programs are blocked, failed or done.

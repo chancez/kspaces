@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/status"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
@@ -108,6 +109,7 @@ func (m *picker) worktreePreview(it pickItem, width int) [][]look.Span {
 		} else {
 			lines = append(lines, field("branch", look.Text(wt.Branch)))
 		}
+		lines = append(lines, gitFields(snap.Git[wt.Path])...)
 	}
 	lines = append(lines, field("session", look.Text(wt.Session)))
 	if n := snap.Kitty.Windows[wt.Session]; n > 0 {
@@ -161,4 +163,37 @@ func worktreePath(root, path string) string {
 		return rel
 	}
 	return config.Tilde(path)
+}
+
+// gitFields are what git and gh say of a worktree, as preview fields: its changes, its upstream and how
+// far it is from it, and its PR. What is not known yet is left out.
+func gitFields(st gitstate.State) [][]look.Span {
+	field := func(label string, values ...look.Span) []look.Span {
+		return append([]look.Span{look.Label(fmt.Sprintf("%-*s", previewLabelWidth, label))}, values...)
+	}
+	var lines [][]look.Span
+	if s := st.Status; s != nil {
+		changes := []look.Span{look.Muted("none")}
+		if s.Changes > 0 {
+			changes = append(look.Changes(s.Changes), look.Text(" not committed"))
+		}
+		upstream := []look.Span{look.Muted("none")}
+		switch ab := look.AheadBehind(s.Ahead, s.Behind); {
+		case s.Upstream == "":
+		case s.Gone:
+			upstream = []look.Span{look.Text(s.Upstream), look.Muted(", gone")}
+		case len(ab) > 0:
+			upstream = append([]look.Span{look.Text(s.Upstream), look.Muted(" ")}, ab...)
+		default:
+			upstream = []look.Span{look.Text(s.Upstream), look.Muted(", up to date")}
+		}
+		lines = append(lines, field("changes", changes...), field("upstream", upstream...))
+	}
+	switch {
+	case st.PR != nil:
+		lines = append(lines, field("pr", look.PRNumber(*st.PR), look.Muted(" "), look.PRState(*st.PR)))
+	case !st.PRAt.IsZero():
+		lines = append(lines, field("pr", look.Muted("none")))
+	}
+	return lines
 }

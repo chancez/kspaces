@@ -26,6 +26,8 @@ type roles struct {
 	success   color.Color
 	danger    color.Color
 	attention color.Color
+	// merged is for a merged pull request, as GitHub draws one.
+	merged color.Color
 	// onSolid is text on a solid background, such as the current session's bar.
 	onSolid color.Color
 }
@@ -38,6 +40,7 @@ func newRoles() roles {
 		success:   lipgloss.Color("2"),
 		danger:    lipgloss.Color("1"),
 		attention: lipgloss.Color("3"),
+		merged:    lipgloss.Color("5"),
 		onSolid:   lipgloss.Color("15"),
 	}
 }
@@ -84,6 +87,13 @@ const (
 	elBorderActive
 	// elButton is a control's label.
 	elButton
+	// elChanges is how many files a worktree has not committed.
+	elChanges
+	// elPR* are a pull request's number, by its state.
+	elPROpen
+	elPRDraft
+	elPRMerged
+	elPRClosed
 	numElements
 )
 
@@ -116,6 +126,11 @@ var elementNames = [numElements]string{
 	elBorder:       "border",
 	elBorderActive: "border.active",
 	elButton:       "button",
+	elChanges:      "git.changes",
+	elPROpen:       "pr.open",
+	elPRDraft:      "pr.draft",
+	elPRMerged:     "pr.merged",
+	elPRClosed:     "pr.closed",
 }
 
 // Prop is an option a place asks an element for. The theme defines what each does.
@@ -206,6 +221,11 @@ func New(isDark bool) *Theme {
 		elBorder:       fg(p.muted),
 		elBorderActive: fg(p.accent),
 		elButton:       lipgloss.NewStyle().Bold(true),
+		elChanges:      fg(p.attention),
+		elPROpen:       fg(p.success),
+		elPRDraft:      fg(p.muted),
+		elPRMerged:     fg(p.merged),
+		elPRClosed:     fg(p.danger),
 	}
 	t.surfaces = [numSurfaces]surfaceStyle{
 		Plain:   {},

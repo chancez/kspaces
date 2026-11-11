@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
 )
 
@@ -107,7 +108,9 @@ type Snapshot struct {
 	// Sessions with a file in the sessions directory, to be restored from.
 	Saved map[string]bool
 	Kitty kitty.State
-	Err   error
+	// What git and gh say of each worktree, by path, as far as the leading sidebar knows.
+	Git map[string]gitstate.State
+	Err error
 }
 
 // Load reads the config on every call, so edits show up without restarting every dock, and a broken

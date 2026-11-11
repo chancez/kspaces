@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/status"
@@ -73,6 +74,8 @@ type sidebar struct {
 	filtering bool
 	// poller shares one load between every sidebar of the kitty.
 	poller *spaces.Poller
+	// What git and gh say of each worktree, by path, from the poller's leader.
+	git map[string]gitstate.State
 }
 
 func newSidebar(self int) *sidebar {
@@ -102,10 +105,11 @@ func (m *sidebar) poll() tea.Cmd {
 	return func() tea.Msg { return p.Poll(false).View(self) }
 }
 
-// refresh loads now, rather than waiting for the leader, for the refresh key.
+// refresh loads now, rather than waiting for the leader, for the refresh key, and has the leader ask git
+// and gh again.
 func (m *sidebar) refresh() tea.Cmd {
 	p, self := m.poller, m.self
-	return func() tea.Msg { return p.Poll(true).View(self) }
+	return func() tea.Msg { return p.Refresh().View(self) }
 }
 
 func tick() tea.Cmd {
@@ -189,6 +193,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Where the cursor is goes by the rows and entries it was drawn on, before they change.
 			at := m.cursorAt()
 			m.cfg, m.spaces, m.others, m.folded, m.kitty = *msg.Config, msg.Spaces, msg.Others, msg.Folded, msg.Kitty
+			m.git = msg.Git
 			m.rebuildRows(at)
 			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))
 		}

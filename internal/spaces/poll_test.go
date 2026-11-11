@@ -6,8 +6,10 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
 )
 
@@ -140,5 +142,76 @@ func TestSharedView(t *testing.T) {
 	// A config that could not be read is all there is to show.
 	if got, want := (Shared{Err: "config.toml: unknown keys: space"}).View(11), (Snapshot{Err: errors.New("config.toml: unknown keys: space")}); !reflect.DeepEqual(got, want) {
 		t.Errorf("broken config: %#v, want %#v", got, want)
+	}
+}
+
+// Only the leader asks git and gh, and the others read what it found. A refresh in a follower has the
+// leader ask again, and a new leader carries on from the last one's pull requests.
+func TestPollerGitStates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "kitty.json")
+	now := time.Unix(1_000_000, 0)
+	var asked []string
+	watcher := func() *gitstate.Watcher {
+		return gitstate.WatcherOf(
+			func(dir string) (gitstate.Status, error) {
+				asked = append(asked, "status "+dir)
+				return gitstate.Status{Changes: 2}, nil
+			},
+			func(root, branch string) (*gitstate.PR, error) {
+				asked = append(asked, "pr "+branch)
+				return &gitstate.PR{Number: 7, State: "merged"}, nil
+			},
+			func() time.Time { return now },
+			func(f func()) { f() },
+		)
+	}
+	load := func() Shared {
+		return Shared{Config: &config.Config{}, Spaces: []sharedSpace{
+			{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Branch: "main"}, {Path: "/src/gr/dev", Branch: "dev"}}},
+			{Name: "broken", Root: "/src/broken", Err: "not a git repository"},
+		}}
+	}
+	poller := func() *Poller {
+		p := newPoller(path, load)
+		p.newWatcher = watcher
+		return p
+	}
+	pa, pb, pc := poller(), poller(), poller()
+	poll := func(p *Poller, fresh bool) []string {
+		asked = nil
+		p.Poll(fresh)
+		return asked
+	}
+
+	states := map[string]gitstate.State{
+		"/src/gr":     {Status: &gitstate.Status{Changes: 2}, PR: &gitstate.PR{Number: 7, State: "merged"}, PRAt: now, PRBranch: "main"},
+		"/src/gr/dev": {Status: &gitstate.Status{Changes: 2}, PR: &gitstate.PR{Number: 7, State: "merged"}, PRAt: now, PRBranch: "dev"},
+	}
+	got := [][]string{poll(pa, false), poll(pb, false)}
+	if sh := pb.Poll(false); !reflect.DeepEqual(sh.Git, states) {
+		t.Errorf("follower's states:\n%+v\nwant\n%+v", sh.Git, states)
+	}
+	// A follower's own load keeps the states it read.
+	if sh := pb.Poll(true); !reflect.DeepEqual(sh.Git, states) {
+		t.Errorf("follower's own load lost the states: %+v", sh.Git)
+	}
+	now = now.Add(time.Second)
+	asked = nil
+	pb.Refresh()
+	got = append(got, asked, poll(pa, false), poll(pa, false))
+	pa.Close()
+	now = now.Add(time.Minute)
+	got = append(got, poll(pc, false))
+	want := [][]string{
+		{"status /src/gr", "status /src/gr/dev", "pr main", "pr dev"},
+		nil,
+		nil,
+		{"status /src/gr", "status /src/gr/dev", "pr main", "pr dev"},
+		nil,
+		// Statuses are read again, but the pull requests are not due.
+		{"status /src/gr", "status /src/gr/dev"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("asked:\n%q\nwant\n%q", got, want)
 	}
 }

@@ -31,6 +31,11 @@ const (
 	GlyphMoreBelow
 	// GlyphAdd is the button that adds a space.
 	GlyphAdd
+	// GlyphChanges marks how many files a worktree has not committed, GlyphAhead and GlyphBehind how many
+	// commits it is ahead of and behind its upstream.
+	GlyphChanges
+	GlyphAhead
+	GlyphBehind
 	numGlyphs
 )
 
@@ -56,6 +61,9 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphMoreAbove: "^",
 		GlyphMoreBelow: "v",
 		GlyphAdd:       "+",
+		GlyphChanges:   "*",
+		GlyphAhead:     "+",
+		GlyphBehind:    "-",
 	},
 	GlyphsUnicode: {
 		GlyphOpen:      "\u25bc", // black down-pointing triangle
@@ -75,6 +83,9 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphMoreAbove: "\u25b4", // small up triangle
 		GlyphMoreBelow: "\u25be", // small down triangle
 		GlyphAdd:       "+",
+		GlyphChanges:   "\u25cf", // black circle
+		GlyphAhead:     "\u2191", // upwards arrow
+		GlyphBehind:    "\u2193", // downwards arrow
 	},
 	GlyphsNerd: {
 		// The triangles, not Font Awesome's chevrons, which are drawn wider than their cell and thin.
@@ -97,5 +108,9 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphMoreAbove: "\u25b4",
 		GlyphMoreBelow: "\u25be",
 		GlyphAdd:       "\uf067", // plus
+		// Unicode rather than Nerd Font icons: they are followed by a number, not a space.
+		GlyphChanges: "\u25cf",
+		GlyphAhead:   "\u2191",
+		GlyphBehind:  "\u2193",
 	},
 }
