@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"image/color"
 	"path/filepath"
 	"strings"
 	"time"
@@ -12,7 +13,8 @@ import (
 )
 
 // The picker's preview of the entry under the cursor: beside the list in a wide overlay, below it in a
-// narrow one, and left out when it would leave the list too few rows.
+// narrow one, and left out when it would leave the list too few rows. What it says of the entry comes
+// first, then the screen of the entry's window where there is room.
 
 const (
 	// previewBesideWidth is the narrowest overlay that has the preview beside the list, each half of it.
@@ -49,13 +51,40 @@ func pickLayoutFor(width, rows int) pickLayout {
 	return pickLayout{listRows: rows - below, listWidth: width, previewRows: below - 1, previewWidth: width}
 }
 
-// preview is what the picker says of the entry under the cursor, width cells wide at most: a status entry
-// as the sidebar's opened entry says it, or a worktree's space, path, branch, session and statuses.
-func (m *picker) preview(width int) [][]look.Span {
+func (m *picker) layout() pickLayout {
+	return pickLayoutFor(max(m.width, 1), max(m.height-3, 1))
+}
+
+// current is the entry under the cursor, if any.
+func (m *picker) current() (pickItem, bool) {
 	if m.cursor >= len(m.matches) || m.snap.Config == nil {
+		return pickItem{}, false
+	}
+	return m.items[m.matches[m.cursor].Index], true
+}
+
+// preview is the preview of the cursor's entry in width cells and rows rows: what it says of the entry,
+// then under a rule the bottom of its window's screen, when it has been fetched and there is room.
+func (m *picker) preview(width, rows int) [][]look.Span {
+	it, ok := m.current()
+	if !ok {
 		return nil
 	}
-	it := m.items[m.matches[m.cursor].Index]
+	lines := m.details(it, width)
+	n := screenRoom(len(lines), rows)
+	if n == 0 || m.screen.lines == nil {
+		return lines
+	}
+	lines = append(lines, []look.Span{look.Rule(width, false)})
+	for _, l := range screenBlock(m.screen.lines, width, n) {
+		lines = append(lines, []look.Span{look.Styled(func(color.Color) string { return l })})
+	}
+	return lines
+}
+
+// details is what the picker says of an entry, width cells wide at most: a status entry as the sidebar's
+// opened entry says it, or a worktree's space, path, branch, session and statuses.
+func (m *picker) details(it pickItem, width int) [][]look.Span {
 	if s := it.status; s != nil {
 		lines := [][]look.Span{statusHeader(m.th, *s, width, time.Now())}
 		return append(lines, statusDetails(*s, max(width-m.th.Width(look.NoMarker()), 1), 0, 0)...)

@@ -95,3 +95,13 @@ Beside the list in an overlay 90 columns or wider, and below it in a narrower on
 entry under the cursor: a status entry in full, as the sidebar's opened entry; a worktree's space, path,
 branch, session, how many windows it has open, whether it has a saved session file, and its status
 entries. An overlay too short for both shows only the list.
+
+Under what it says of the entry, where there is room, the preview shows the bottom of a window's screen,
+with its colors, under a rule: a status entry's own window, or for a session with windows open the one
+switching to it focuses, the one focused most recently, as `goto_session` picks it. Without focus times
+from kitty, it is the active window of the session's active tab. A session with no windows open shows no
+screen, and neither do the picker's own window, the docks and the forms. The screen is read with
+`kitten @ get-text` when the cursor lands on the entry and again every second while it stays, so it
+follows what the window is doing. Only colors and styles are kept from it; anything else the window drew,
+such as links or cursor moves, is left out. Beside the list there is room for most of a screen; below it
+only under an entry with few details, such as a status entry.

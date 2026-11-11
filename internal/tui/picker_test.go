@@ -253,7 +253,7 @@ func TestPickerPreviewKinds(t *testing.T) {
 	m.Update(fixture(time.Now()))
 	text := func() []string {
 		var out []string
-		for _, l := range m.preview(40) {
+		for _, l := range m.preview(40, 10) {
 			out = append(out, m.th.TextOf(l...))
 		}
 		return out

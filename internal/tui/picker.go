@@ -94,6 +94,9 @@ type picker struct {
 	width   int
 	height  int
 	err     error
+	screen  pickScreen
+	// getText fetches a window's screen, kitty.ScreenText but in tests.
+	getText func(window int) (string, error)
 }
 
 func newPicker(self int) *picker {
@@ -101,7 +104,7 @@ func newPicker(self int) *picker {
 	input := newInput(th, th.SearchPrompt())
 	input.Placeholder = "space, worktree or status"
 	input.Focus()
-	return &picker{th: th, self: self, input: input}
+	return &picker{th: th, self: self, input: input, getText: kitty.ScreenText}
 }
 
 func (m *picker) Init() tea.Cmd {
@@ -149,24 +152,35 @@ func (m *picker) choose() tea.Cmd {
 	}
 }
 
+// Update follows the cursor's entry with the preview's screen after whatever moved it: a key, the query,
+// the snapshot or a resize.
 func (m *picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	cmd := m.update(msg)
+	return m, tea.Batch(cmd, m.follow())
+}
+
+func (m *picker) update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
+	case screenMsg:
+		return m.gotScreen(msg)
+	case screenTickMsg:
+		return m.screenTick(msg)
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		// bubbles v2 draws only the first character of a placeholder without a width, and the cursor
 		// takes a cell past the text.
 		m.input.SetWidth(max(m.width-ansi.StringWidth(m.input.Prompt)-1, 1))
-		return m, nil
+		return nil
 	case spaces.Snapshot:
 		m.err = msg.Err
 		if msg.Config != nil {
 			m.snap, m.items = msg, pickItemsFrom(msg)
 			m.filter()
 		}
-		return m, nil
+		return nil
 	case tea.KeyPressMsg:
 		if cmd, ok := runOn(m, msg, thePicker.Target(pickerSubject{})); ok {
-			return m, cmd
+			return cmd
 		}
 	}
 	// Everything else is typing the query.
@@ -177,7 +191,7 @@ func (m *picker) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cursor = 0
 		m.filter()
 	}
-	return m, cmd
+	return cmd
 }
 
 // renderMatch draws an item with the characters the query matched highlighted, and its detail muted.
@@ -215,7 +229,7 @@ func (m *picker) View() tea.View {
 func (m *picker) render() string {
 	th, width := m.th, max(m.width, 1)
 	lines := []string{m.input.View(), th.Render(look.Plain, look.Rule(width, false))}
-	l := pickLayoutFor(width, max(m.height-3, 1))
+	l := m.layout()
 	var list []string
 	start := max(m.cursor-l.listRows+1, 0)
 	for i := start; i < min(start+l.listRows, len(m.matches)); i++ {
@@ -226,7 +240,7 @@ func (m *picker) render() string {
 	}
 	var preview [][]look.Span
 	if l.previewRows > 0 {
-		preview = m.preview(l.previewWidth)
+		preview = m.preview(l.previewWidth, l.previewRows)
 	}
 	switch {
 	case l.beside:
