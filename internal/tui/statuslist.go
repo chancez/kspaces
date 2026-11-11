@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chancez/kspaces/internal/status"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
@@ -41,9 +40,9 @@ func (m *sidebar) statusEntry(j int) []string {
 	inner := max(width-th.Width(look.NoMarker()), 1)
 	zone := fmt.Sprintf(entryZone, len(m.rows)+j)
 	expanded := len(m.rows)+j == m.cursor && m.navigating()
-	lines := [][]look.Span{m.statusHeader(j)}
+	lines := [][]look.Span{statusHeader(th, s, width, time.Now())}
 	if expanded {
-		lines = append(lines, m.statusDetails(s, inner, 3, 6)...)
+		lines = append(lines, statusDetails(s, inner, 3, 6)...)
 	} else if sum := th.Cut(inner, look.Summary(s.Record, inner)); th.Width(sum...) > 0 {
 		lines = append(lines, append([]look.Span{look.NoMarker()}, sum...))
 	}
@@ -58,49 +57,6 @@ func (m *sidebar) statusEntry(j int) []string {
 	return out
 }
 
-// statusHeader is the first row of status entry j: its marker, label, and on the right its age.
-func (m *sidebar) statusHeader(j int) []look.Span {
-	th, s, width := m.th, m.kitty.Statuses[j], m.contentWidth()
-	mark, right := look.StateMarker(s.State), look.StatusAge(s, time.Now())
-	label := th.Cut(max(width-th.Width(mark...)-th.Width(right), 0), look.StatusLabel(s))
-	pad := look.Default(strings.Repeat(" ", max(width-th.Width(mark...)-th.Width(label...)-th.Width(right), 0)))
-	return append(append(append(mark, label...), pad), right)
-}
-
-// statusDetails is everything a status entry has to say, indented under its label and wrapped to inner
-// columns: the program, what a blocked one waits for, the title, progress, the message, the record's id
-// and the window's other records. Title and message are cut at titleRows and msgRows, 0 for no limit.
-func (m *sidebar) statusDetails(s status.Status, inner, titleRows, msgRows int) [][]look.Span {
-	var lines [][]look.Span
-	add := func(x look.Span, maxRows int) {
-		for i, row := range x.Wrapped(inner) {
-			if maxRows > 0 && i == maxRows {
-				break
-			}
-			lines = append(lines, []look.Span{look.NoMarker(), row})
-		}
-	}
-	add(look.Muted(s.App), 1)
-	add(look.WaitsFor(s.Record), 1)
-	add(look.Text(s.Title), titleRows)
-	if s.Progress != nil {
-		add(look.Text(look.ProgressBar(*s.Progress, inner)), 1)
-	}
-	add(look.Muted(s.Msg), msgRows)
-	if s.ID != "" {
-		add(look.Muted("id "+s.ID), 1)
-	}
-	now := time.Now()
-	for _, o := range s.Others {
-		name := o.ID
-		if name == "" {
-			name = o.App
-		}
-		add(look.Muted(strings.Join(strings.Fields(strings.Join([]string{o.State, name, status.Age(o.Since, now), o.Title}, " ")), " ")), 1)
-	}
-	return lines
-}
-
 // popupAdds reports whether status entry j in full says more than its summary row does, so the popup is
 // worth covering the entries below for: a row of the details the summary does not show, or shows cut. The
 // summary always shows progress, in a bar of its own width.
@@ -108,7 +64,7 @@ func (m *sidebar) popupAdds(j int) bool {
 	th, s := m.th, m.kitty.Statuses[j]
 	inner := max(m.contentWidth()-th.Width(look.NoMarker()), 1)
 	shown := th.TextOf(th.Cut(inner, look.Summary(s.Record, inner))...)
-	for _, row := range m.statusDetails(s, inner, 0, 0) {
+	for _, row := range statusDetails(s, inner, 0, 0) {
 		text := strings.TrimSpace(th.TextOf(row...))
 		if s.Progress != nil && text == look.ProgressBar(*s.Progress, inner) {
 			continue
@@ -151,8 +107,9 @@ func (m *sidebar) hoverPopup(j int) ([]string, int) {
 		top += len(m.statusGroupTitle(k)) + len(m.statusEntry(k))
 	}
 	top += len(m.statusGroupTitle(j))
-	popup := []string{th.DrawZone(popupZone, look.Cursor, width, m.statusHeader(j)...)}
-	for _, l := range m.statusDetails(m.kitty.Statuses[j], max(width-th.Width(look.NoMarker()), 1), 0, 0) {
+	s := m.kitty.Statuses[j]
+	popup := []string{th.DrawZone(popupZone, look.Cursor, width, statusHeader(th, s, width, time.Now())...)}
+	for _, l := range statusDetails(s, max(width-th.Width(look.NoMarker()), 1), 0, 0) {
 		popup = append(popup, th.DrawZone(popupZone, look.Plain, width, l...))
 	}
 	popup = append(popup, th.DrawZone(popupZone, look.Plain, width, look.Rule(width, true)))
