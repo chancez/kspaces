@@ -51,8 +51,8 @@ func BuildRows(others, spaces []Space, folded map[string]bool) []Row {
 }
 
 // otherSessions are the sessions that are open or have a saved file but belong to no worktree, such as the
-// one kitty starts with. Each is a space of its own with one worktree that has no path, so it can only be
-// switched to or restored, never created.
+// one kitty starts with. Each is a space of its own with one worktree that has no path, so one created
+// afresh starts in the home directory.
 func otherSessions(spaces []Space, open map[string]int, saved []string) []Space {
 	inSpace := map[string]bool{}
 	for _, s := range spaces {

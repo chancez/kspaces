@@ -9,8 +9,10 @@ show up on their own. Each worktree is a kitty session: the main worktree's is n
 Opening a worktree:
 
 1. focuses its session's most recently focused window, if it has windows open;
-2. otherwise loads `SESSION.kitty-session` from the `sessions` directory with `goto_session`, if there is one;
-3. otherwise runs the `new_tab` action with `--cwd=WORKTREE --add-to-session=SESSION`.
+2. otherwise loads `SESSION.kitty-session` from the `sessions` directory with `goto_session`, if there is one
+   that opens any window (has a `launch` line);
+3. otherwise runs the `new_tab` action with `--cwd=WORKTREE --add-to-session=SESSION`, in the home directory
+   for a session in no space, such as `default`.
 
 kspaces itself never writes session files. The session saver below, which it can install into kitty, does.
 

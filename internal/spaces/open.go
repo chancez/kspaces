@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/chancez/kspaces/internal/config"
@@ -12,7 +13,8 @@ import (
 )
 
 // OpenWorktree switches to the worktree's session. When it has no windows, the session is restored from its
-// saved file if there is one, and otherwise created with one tab in the worktree.
+// saved file if that opens any, and otherwise created with one tab in the worktree, or in the home directory
+// for a session in no space.
 func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree) error {
 	if st.Home != 0 {
 		// Hand this tab's focus back to its own window before leaving, so coming back to the tab lands
@@ -25,23 +27,56 @@ func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree) error {
 			return nil
 		}
 	}
-	path := sessionFile(cfg, wt.Session)
-	if _, open := st.Sessions[wt.Session]; open {
-		return gotoSession(path)
-	}
-	if _, err := os.Stat(path); err == nil && cfg.SessionsDir != "" {
-		return gotoSession(path)
-	}
-	if wt.Path == "" {
-		return fmt.Errorf("session %s has no windows and no saved file", wt.Session)
-	}
-	args := append([]string{}, cfg.NewTab...)
-	args = append(args, "--cwd="+wt.Path, "--add-to-session="+wt.Session)
-	if err := kitty.Action(args...); err != nil {
+	actions, err := openActions(cfg, st, wt)
+	if err != nil {
 		return err
 	}
-	// The new tab is the session's only window, so this only records the switch, see gotoSession.
-	return gotoSession(path)
+	for _, args := range actions {
+		if err := kitty.Action(args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// openActions are the kitty actions that switch to wt's session, see OpenWorktree.
+func openActions(cfg config.Config, st kitty.State, wt Worktree) ([][]string, error) {
+	path := sessionFile(cfg, wt.Session)
+	goTo := []string{"goto_session", path}
+	if _, open := st.Sessions[wt.Session]; open {
+		return [][]string{goTo}, nil
+	}
+	if cfg.SessionsDir != "" && opensWindows(path) {
+		return [][]string{goTo}, nil
+	}
+	cwd := wt.Path
+	if cwd == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, err
+		}
+		cwd = home
+	}
+	args := append([]string{}, cfg.NewTab...)
+	args = append(args, "--cwd="+cwd, "--add-to-session="+wt.Session)
+	// The new tab is the session's only window, so going to it only records the switch, see gotoSession.
+	return [][]string{args, goTo}, nil
+}
+
+// opensWindows says whether goto_session opens any window from the session file at path. Windows come only
+// from launch lines, and kitty opens nothing, silently, for a file without one, such as the empty file
+// save_sessions.py leaves for the default session once its last window has closed.
+func opensWindows(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	for line := range strings.Lines(string(data)) {
+		if f := strings.Fields(line); len(f) > 0 && f[0] == "launch" {
+			return true
+		}
+	}
+	return false
 }
 
 // sessionFile is where a session would be saved. kitty names a session after its file, so this is also how
