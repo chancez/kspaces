@@ -28,8 +28,16 @@ type Space struct {
 	Name      string
 	Root      string
 	Worktrees []Worktree
+	// Missing are sessions named after a linked worktree of this space that git no longer lists, as when
+	// one is removed while its session still has windows: open or saved, with no path. See placeSessions.
+	Missing []Worktree
 	// Err is why the worktrees could not be listed, for example because Root is not a repository.
 	Err error
+}
+
+// HasLinked reports whether the space has rows under its own: linked worktrees, or missing ones.
+func (s Space) HasLinked() bool {
+	return len(s.Worktrees) > 1 || len(s.Missing) > 0
 }
 
 // sessionName names the kitty session of a worktree. The main worktree's session is named after the space,

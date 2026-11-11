@@ -53,6 +53,9 @@ func SessionMarker() []Span { return marker(elSession, GlyphSession) }
 // BrokenMarker marks a space whose worktrees could not be listed.
 func BrokenMarker() []Span { return marker(elBroken, GlyphBroken) }
 
+// GoneMarker marks a missing worktree, one whose directory is gone: muted, as the rest of its row.
+func GoneMarker() []Span { return marker(elMuted, GlyphGone) }
+
 // Caret heads a space with linked worktrees: pointing down while they are shown, right when folded.
 func Caret(folded bool) []Span {
 	g := GlyphOpen
@@ -105,6 +108,12 @@ func Worktree(wt spaces.Worktree) Span { return sp(elWorktree, filepath.Base(wt.
 
 // Branch is the branch a worktree has checked out.
 func Branch(wt spaces.Worktree) Span { return sp(elBranch, wt.Branch) }
+
+// MissingWorktree is a missing worktree, by the directory its session is named after.
+func MissingWorktree(r spaces.Row) Span { return sp(elWorktree, r.Dir()) }
+
+// Gone stands for a missing worktree's branch, which went with its directory.
+func Gone() Span { return sp(elMuted, "gone") }
 
 // stateGroups name the groups of status entries in a state, in the order the list sorts them.
 var stateGroups = map[string]string{"blocked": "Blocked", "error": "Failed", "done": "Done", "working": "Working", "idle": "Idle"}

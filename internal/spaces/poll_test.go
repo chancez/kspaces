@@ -2,9 +2,11 @@ package spaces
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -101,7 +103,7 @@ func TestSharedView(t *testing.T) {
 			{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Branch: "main", Session: "gr"}, {Path: "/src/gr/dev", Branch: "dev", Session: "gr@dev"}}},
 			{Name: "broken", Root: "/src/broken", Err: "not a git repository"},
 		},
-		Saved: []string{"gr", "notes"},
+		Saved: []string{"gr", "notes", "gr@gone"},
 		Windows: []kitty.OSWindow{{Tabs: []kitty.Tab{
 			{ID: 1, Windows: []kitty.Window{{ID: 10, SessionName: "gr", LastFocusedAt: 2, Cwd: "/src/gr"}, {ID: 11, SessionName: "gr", UserVars: dock}}},
 			{ID: 2, Windows: []kitty.Window{{ID: 20, SessionName: "gr@dev", LastFocusedAt: 1, Cwd: "/src/gr/dev"}, {ID: 21, SessionName: "gr@dev", UserVars: dock}}},
@@ -117,7 +119,7 @@ func TestSharedView(t *testing.T) {
 		return snap
 	}
 	spaces := []Space{
-		{Name: "gr", Root: "/src/gr", Worktrees: sh.Spaces[0].Worktrees},
+		{Name: "gr", Root: "/src/gr", Worktrees: sh.Spaces[0].Worktrees, Missing: []Worktree{{Session: "gr@gone"}}},
 		{Name: "broken", Root: "/src/broken", Err: errors.New("not a git repository")},
 	}
 	common := kitty.State{
@@ -130,7 +132,7 @@ func TestSharedView(t *testing.T) {
 		return Snapshot{
 			Config: &cfg, Spaces: spaces,
 			Others: []Space{{Name: "notes", Worktrees: []Worktree{{Session: "notes"}}}},
-			Folded: map[string]bool{}, Saved: map[string]bool{"gr": true, "notes": true}, Kitty: st,
+			Folded: map[string]bool{}, Saved: map[string]bool{"gr": true, "notes": true, "gr@gone": true}, Kitty: st,
 		}
 	}
 	for self, w := range map[int]Snapshot{11: want("gr", 10, "/src/gr"), 21: want("gr@dev", 20, "/src/gr/dev")} {
@@ -165,11 +167,12 @@ func TestPollerGitStates(t *testing.T) {
 			func(f func()) { f() },
 		)
 	}
+	// gr@gone is a missing worktree of gr, which git is not asked about.
 	load := func() Shared {
 		return Shared{Config: &config.Config{}, Spaces: []sharedSpace{
-			{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Branch: "main"}, {Path: "/src/gr/dev", Branch: "dev"}}},
+			{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Branch: "main", Session: "gr"}, {Path: "/src/gr/dev", Branch: "dev", Session: "gr@dev"}}},
 			{Name: "broken", Root: "/src/broken", Err: "not a git repository"},
-		}}
+		}, Saved: []string{"gr@gone"}}
 	}
 	poller := func() *Poller {
 		p := newPoller(path, load)
@@ -213,5 +216,14 @@ func TestPollerGitStates(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("asked:\n%q\nwant\n%q", got, want)
+	}
+	// What the sidebars see of the leader's load has gr@gone missing, and the states none for it.
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	sh := pc.Poll(false)
+	if got, want := sh.View(0).Spaces[0].Missing, []Worktree{{Session: "gr@gone"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("missing %#v, want %#v", got, want)
+	}
+	if got := slices.Sorted(maps.Keys(sh.Git)); !reflect.DeepEqual(got, []string{"/src/gr", "/src/gr/dev"}) {
+		t.Errorf("states for %q", got)
 	}
 }

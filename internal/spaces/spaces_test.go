@@ -1,6 +1,7 @@
 package spaces
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -158,22 +159,74 @@ func TestCreateWorktree(t *testing.T) {
 	}
 }
 
-func TestOtherSessions(t *testing.T) {
-	spaces := []Space{{Name: "gr", Worktrees: []Worktree{
-		{Path: "/src/gr", Session: "gr"},
-		{Path: "/src/gr/.worktrees/dev", Session: "gr@dev"},
-	}}}
-	open := map[string]int{"gr": 1, "default": 2, "scratch": 3}
-	saved := []string{"default", "gr@dev", "old"}
+func TestPlaceSessions(t *testing.T) {
+	spaces := []Space{
+		{Name: "gr", Worktrees: []Worktree{
+			{Path: "/src/gr", Session: "gr"},
+			{Path: "/src/gr/.worktrees/dev", Session: "gr@dev"},
+		}},
+		{Name: "broken", Err: errors.New("not a git repository")},
+	}
+	open := map[string]int{"gr": 1, "default": 2, "scratch": 3, "gr@gone": 4, "broken@x": 5, "nope@x": 6}
+	saved := []string{"default", "gr@dev", "old", "gr@saved", "gr@gone", "gr@"}
 
-	got := otherSessions(spaces, open, saved)
+	got := placeSessions(spaces, open, saved)
+	// gr's sessions that match no worktree of it are its missing ones; a broken space's and an unknown
+	// space's stay others, as does a bare gr@.
 	want := []Space{
+		{Name: "broken@x", Worktrees: []Worktree{{Session: "broken@x"}}},
 		{Name: "default", Worktrees: []Worktree{{Session: "default"}}},
+		{Name: "gr@", Worktrees: []Worktree{{Session: "gr@"}}},
+		{Name: "nope@x", Worktrees: []Worktree{{Session: "nope@x"}}},
 		{Name: "old", Worktrees: []Worktree{{Session: "old"}}},
 		{Name: "scratch", Worktrees: []Worktree{{Session: "scratch"}}},
 	}
 	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("others %#v\nwant %#v", got, want)
+	}
+	if want := []Worktree{{Session: "gr@gone"}, {Session: "gr@saved"}}; !reflect.DeepEqual(spaces[0].Missing, want) {
+		t.Fatalf("missing %#v\nwant %#v", spaces[0].Missing, want)
+	}
+}
+
+// A space's missing worktrees are listed after its linked ones, and fold with them.
+func TestMissingRows(t *testing.T) {
+	spaces := []Space{{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{
+		{Path: "/src/gr", Branch: "main", Session: "gr"},
+		{Path: "/src/gr/.worktrees/dev", Branch: "dev", Session: "gr@dev"},
+	}}}
+	open := map[string]int{"gr": 1, "gr@open": 2, "kitty@x": 3, "default": 4}
+	others := placeSessions(spaces, open, []string{"gr@saved", "default"})
+	gr := &spaces[0]
+	got := BuildRows(others, spaces, nil)
+	want := []Row{
+		{Space: &others[0], Worktree: &others[0].Worktrees[0], Main: true, Other: true},
+		{Space: &others[1], Worktree: &others[1].Worktrees[0], Main: true, Other: true},
+		{},
+		{Space: gr, Worktree: &gr.Worktrees[0], Main: true},
+		{Space: gr, Worktree: &gr.Worktrees[1]},
+		{Space: gr, Worktree: &gr.Missing[0], Missing: true},
+		{Space: gr, Worktree: &gr.Missing[1], Missing: true},
+	}
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+	if got := rowNames(got); !reflect.DeepEqual(got, []string{"default", "kitty@x", "", "gr", "gr@dev", "gr@open", "gr@saved"}) {
+		t.Fatalf("rows %q", got)
+	}
+	var dirs []string
+	for _, r := range want[4:] {
+		dirs = append(dirs, r.Dir())
+	}
+	if want := []string{"dev", "open", "saved"}; !reflect.DeepEqual(dirs, want) {
+		t.Fatalf("dirs %q, want %q", dirs, want)
+	}
+
+	// Missing ones alone make a space foldable, and folding hides them.
+	solo := []Space{{Name: "kitty", Root: "/src/kitty", Worktrees: []Worktree{{Path: "/src/kitty", Session: "kitty"}}, Missing: []Worktree{{Session: "kitty@x"}}}}
+	got = BuildRows(nil, solo, map[string]bool{"/src/kitty": true})
+	if want := []Row{{Space: &solo[0], Worktree: &solo[0].Worktrees[0], Main: true, Folded: true}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("folded %#v\nwant %#v", got, want)
 	}
 }
 

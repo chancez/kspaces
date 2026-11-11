@@ -71,14 +71,18 @@ func quit[M, S any]() *interact.Action[M, S] {
 // foldable is whether an entry's space has linked worktrees to fold, and the list shows folds: the filter
 // ignores them.
 func foldable(m *sidebar, s entrySubject) bool {
-	return !m.filtering && !s.row.Other && len(s.row.Space.Worktrees) > 1
+	return !m.filtering && !s.row.Other && s.row.Space.HasLinked()
 }
 
 // The spaces list's entries. The titles are the context menu's.
 var (
 	actOpenWorktree = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Open",
-		Applies: func(_ *sidebar, s entrySubject) bool { return s.row.Worktree != nil },
+		Title: "Open",
+		// A missing worktree only while its session has windows: opening one with none would make it
+		// afresh in a directory that is gone.
+		Applies: func(m *sidebar, s entrySubject) bool {
+			return s.row.Worktree != nil && (!s.row.Missing || m.isOpen(s.row.Worktree))
+		},
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			return m.openWorktreeCmd(*s.row.Worktree)
@@ -96,7 +100,7 @@ var (
 	}
 	actNewWorktree = &interact.Action[*sidebar, entrySubject]{
 		Title:   "New worktree...",
-		Applies: func(_ *sidebar, s entrySubject) bool { return !s.row.Other && s.row.Space.Err == nil },
+		Applies: func(_ *sidebar, s entrySubject) bool { return !s.row.Other && !s.row.Missing && s.row.Space.Err == nil },
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			return m.newWorktree(s.row.Space.Root)
@@ -105,7 +109,7 @@ var (
 	actRemoveWorktree = &interact.Action[*sidebar, entrySubject]{
 		Title: "Remove worktree...",
 		// Only a linked worktree: the main one is the repository itself.
-		Applies: func(_ *sidebar, s entrySubject) bool { return !s.row.Main && s.row.Worktree != nil },
+		Applies: func(_ *sidebar, s entrySubject) bool { return !s.row.Main && !s.row.Missing && s.row.Worktree != nil },
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			return m.removeWorktree(s.row.Worktree.Path)
@@ -114,7 +118,7 @@ var (
 	actRunCommand = &interact.Action[*sidebar, entrySubject]{
 		Title: "Run...",
 		Applies: func(m *sidebar, s entrySubject) bool {
-			return !s.row.Other && s.row.Worktree != nil && len(m.cfg.Commands) > 0
+			return !s.row.Other && !s.row.Missing && s.row.Worktree != nil && len(m.cfg.Commands) > 0
 		},
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false

@@ -19,6 +19,8 @@ const (
 	GlyphSession
 	// GlyphBroken marks a space whose worktrees could not be listed.
 	GlyphBroken
+	// GlyphGone marks a missing worktree: a session whose worktree directory is gone.
+	GlyphGone
 	// GlyphSpace, GlyphWorktree and GlyphOther head the rows of a space, a linked worktree and a session in
 	// no space.
 	GlyphSpace
@@ -54,6 +56,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphCurrent:   ">",
 		GlyphSession:   "*",
 		GlyphBroken:    "x",
+		GlyphGone:      "x",
 		GlyphSpace:     "#",
 		GlyphWorktree:  "-",
 		GlyphOther:     "$",
@@ -76,6 +79,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphCurrent:   "\u203a", // single right angle quote
 		GlyphSession:   "\u2022", // bullet
 		GlyphBroken:    "\u2717",
+		GlyphGone:      "\u2715", // multiplication x
 		GlyphSpace:     "\u25a0", // black square
 		GlyphWorktree:  "\u2514", // box drawings up and right
 		GlyphOther:     "\u25aa", // black small square
@@ -100,6 +104,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphCurrent:  "\uf054", // chevron-right
 		GlyphSession:  "\uf444", // dot-fill
 		GlyphBroken:   "\uf00d", // times
+		GlyphGone:     "\uf127", // chain-broken
 		GlyphSpace:    "\uf401", // repo
 		GlyphWorktree: "\ue725", // git-branch
 		GlyphOther:    "\uf120", // terminal

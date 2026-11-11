@@ -2,6 +2,7 @@ package spaces
 
 import (
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -17,15 +18,26 @@ type Row struct {
 	Worktree *Worktree
 	// The space's own row, which opens its main worktree.
 	Main bool
-	// A session that belongs to no space, see otherSessions.
+	// A session that belongs to no space, see placeSessions.
 	Other bool
+	// A missing worktree of the space, see Space.Missing. Its Worktree has no path.
+	Missing bool
 	// On a space's own row: its linked worktrees are hidden.
 	Folded bool
 }
 
+// Dir names a linked worktree's row: its directory, or for a missing one the directory its session is
+// named after, as git no longer has its path.
+func (r Row) Dir() string {
+	if r.Missing {
+		return strings.TrimPrefix(r.Worktree.Session, r.Space.Name+"@")
+	}
+	return filepath.Base(r.Worktree.Path)
+}
+
 // BuildRows lists the sessions that belong to no space first, then each space followed by its linked
-// worktrees, with a blank row between groups and between spaces. A space's own row opens its main worktree.
-// The linked worktrees of a space whose root is in folded are left out.
+// worktrees and its missing ones, with a blank row between groups and between spaces. A space's own row
+// opens its main worktree. The linked and missing worktrees of a space whose root is in folded are left out.
 func BuildRows(others, spaces []Space, folded map[string]bool) []Row {
 	var rows []Row
 	for i := range others {
@@ -36,7 +48,7 @@ func BuildRows(others, spaces []Space, folded map[string]bool) []Row {
 			rows = append(rows, Row{})
 		}
 		s := &spaces[i]
-		r := Row{Space: s, Main: true, Folded: folded[s.Root] && len(s.Worktrees) > 1}
+		r := Row{Space: s, Main: true, Folded: folded[s.Root] && s.HasLinked()}
 		if len(s.Worktrees) > 0 {
 			r.Worktree = &s.Worktrees[0]
 		}
@@ -47,14 +59,19 @@ func BuildRows(others, spaces []Space, folded map[string]bool) []Row {
 		for j := 1; j < len(s.Worktrees); j++ {
 			rows = append(rows, Row{Space: s, Worktree: &s.Worktrees[j]})
 		}
+		for j := range s.Missing {
+			rows = append(rows, Row{Space: s, Worktree: &s.Missing[j], Missing: true})
+		}
 	}
 	return rows
 }
 
-// otherSessions are the sessions that are open or have a saved file but belong to no worktree, such as the
-// one kitty starts with. Each is a space of its own with one worktree that has no path, so one created
-// afresh starts in the home directory.
-func otherSessions(spaces []Space, open map[string]int, saved []string) []Space {
+// placeSessions sorts the sessions that are open or have a saved file but belong to no worktree. One named
+// SPACE@DIR after a space whose worktrees were listed is a missing worktree of that space, added to its
+// Missing in name order: its directory is gone, as when a worktree is removed while its session has
+// windows. The rest are returned as the others, such as the one kitty starts with, each a space of its
+// own with one worktree that has no path, so one created afresh starts in the home directory.
+func placeSessions(spaces []Space, open map[string]int, saved []string) (others []Space) {
 	inSpace := map[string]bool{}
 	for _, s := range spaces {
 		for _, wt := range s.Worktrees {
@@ -68,14 +85,33 @@ func otherSessions(spaces []Space, open map[string]int, saved []string) []Space 
 	for _, name := range saved {
 		names[name] = true
 	}
-	var ans []Space
+	var sorted []string
 	for name := range names {
 		if !inSpace[name] {
-			ans = append(ans, Space{Name: name, Worktrees: []Worktree{{Session: name}}})
+			sorted = append(sorted, name)
 		}
 	}
-	slices.SortFunc(ans, func(a, b Space) int { return strings.Compare(a.Name, b.Name) })
-	return ans
+	slices.Sort(sorted)
+	for _, name := range sorted {
+		if s := missingOf(spaces, name); s != nil {
+			s.Missing = append(s.Missing, Worktree{Session: name})
+			continue
+		}
+		others = append(others, Space{Name: name, Worktrees: []Worktree{{Session: name}}})
+	}
+	return others
+}
+
+// missingOf is the space session would be a linked worktree of, by its name, if its worktrees were listed.
+// The name is matched whole rather than cut at an @, which a space's or a directory's name may have.
+func missingOf(spaces []Space, session string) *Space {
+	for i := range spaces {
+		s := &spaces[i]
+		if dir, ok := strings.CutPrefix(session, s.Name+"@"); ok && dir != "" && s.Err == nil {
+			return s
+		}
+	}
+	return nil
 }
 
 // savedSessions names the session files in dir. An unreadable or missing directory has none.
@@ -101,7 +137,7 @@ type Snapshot struct {
 	// Nil when nothing was loaded, for example because opening a worktree failed.
 	Config *config.Config
 	Spaces []Space
-	// Sessions that belong to no space, see otherSessions.
+	// Sessions that belong to no space, see placeSessions.
 	Others []Space
 	// Roots of the spaces whose linked worktrees are hidden.
 	Folded map[string]bool

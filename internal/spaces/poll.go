@@ -93,7 +93,9 @@ func (sh Shared) View(self int) Snapshot {
 	for _, name := range sh.Saved {
 		saved[name] = true
 	}
-	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: otherSessions(spaces, st.Sessions, sh.Saved), Folded: LoadFolded(), Saved: saved, Kitty: st}
+	// The missing worktrees go in the spaces, which are this view's own copies: what the leader shares, and
+	// asks git about in targets, is only what git lists.
+	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, st.Sessions, sh.Saved), Folded: LoadFolded(), Saved: saved, Kitty: st}
 	if sh.KittyErr != "" {
 		snap.Err = errors.New(sh.KittyErr)
 	}

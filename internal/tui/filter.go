@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"path/filepath"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -208,7 +207,7 @@ func filterRows(rows []spaces.Row, query string) []spaces.Row {
 		var linked []spaces.Row
 		for i+1 < len(rows) && rows[i+1].Space == head.Space && !rows[i+1].Main {
 			i++
-			if wt := rows[i].Worktree; matches(filepath.Base(wt.Path), wt.Branch) {
+			if wt := rows[i].Worktree; matches(rows[i].Dir(), wt.Branch) {
 				linked = append(linked, rows[i])
 			}
 		}

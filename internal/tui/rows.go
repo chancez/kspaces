@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/chancez/kspaces/internal/gitstate"
@@ -24,11 +25,12 @@ const (
 	addZone = "add"
 )
 
-// rowSessions are the worktrees a row stands for: its own, and for a folded space all of the space's.
+// rowSessions are the worktrees a row stands for: its own, and for a folded space all of the space's,
+// missing ones too.
 func rowSessions(r spaces.Row) []spaces.Worktree {
 	switch {
 	case r.Folded:
-		return r.Space.Worktrees
+		return slices.Concat(r.Space.Worktrees, r.Space.Missing)
 	case r.Worktree != nil:
 		return []spaces.Worktree{*r.Worktree}
 	}
@@ -46,7 +48,8 @@ func rowHolds(r spaces.Row, session string) bool {
 
 // renderRow draws row i of the spaces list, marked as its entry: the fold caret, or as wide a blank, which
 // indents linked worktrees under their space, then the row's icon and its name. The icon says what the row
-// is, and is replaced by the most urgent status of its sessions' windows; see look.RowIcon.
+// is, and is replaced by the most urgent status of its sessions' windows; see look.RowIcon. A missing
+// worktree is faint whatever its windows, with the gone marker and `gone` for its branch.
 func (m *sidebar) renderRow(i int) string {
 	r, width, th := m.rows[i], m.contentWidth(), m.th
 	if r.Space == nil {
@@ -54,11 +57,13 @@ func (m *sidebar) renderRow(i int) string {
 	}
 	caret := []look.Span{look.NoCaret()}
 	// Not while filtering, which ignores folds, so a caret would fold what the list does not show.
-	if r.Main && !r.Other && len(r.Space.Worktrees) > 1 && !m.filtering {
+	if r.Main && !r.Other && r.Space.HasLinked() && !m.filtering {
 		caret = look.Mark(fmt.Sprintf(caretZone, i), look.Caret(r.Folded)...)
 	}
 	kind, label := look.RowSpace, look.Space(*r.Space)
 	switch {
+	case r.Missing:
+		kind, label = look.RowWorktree, look.MissingWorktree(r)
 	case !r.Main:
 		kind, label = look.RowWorktree, look.Worktree(*r.Worktree)
 	case r.Other:
@@ -74,21 +79,28 @@ func (m *sidebar) renderRow(i int) string {
 		}
 	}
 	icon := look.RowIcon(kind, state, open, r.Worktree == nil)
-	if state == "" && r.Worktree != nil {
+	switch {
+	case r.Missing:
+		icon = look.DimIf(true, look.GoneMarker()...)
+	case state == "" && r.Worktree != nil:
 		icon = look.DimIf(!open, icon...)
 	}
+	faint := !open || r.Missing
 	head := append(caret, icon...)
-	spans := append(head, look.DimIf(!open, th.Cut(max(width-th.Width(head...), 0), label)...)...)
+	spans := append(head, look.DimIf(faint, th.Cut(max(width-th.Width(head...), 0), label)...)...)
 	rest := width - th.Width(spans...)
 	// The git state takes the right end, after a space, and the branch what is left between.
 	var git []look.Span
-	if r.Worktree != nil && !r.Folded && !r.Other {
+	if r.Worktree != nil && !r.Folded && !r.Other && !r.Missing {
 		git = look.DimIf(!open, m.gitSpans(m.git[r.Worktree.Path], rest-1)...)
 	}
 	if w := th.Width(git...); w > 0 {
 		rest -= w + 1
 	}
-	if r.Worktree != nil && r.Worktree.Branch != "" && rest > 2 {
+	switch {
+	case r.Missing && rest > 2:
+		spans = append(append(spans, look.Muted(" ")), look.DimIf(true, th.Cut(rest-1, look.Gone())...)...)
+	case r.Worktree != nil && r.Worktree.Branch != "" && rest > 2:
 		spans = append(append(spans, look.Muted(" ")), th.Cut(rest-1, look.Branch(*r.Worktree))...)
 	}
 	if len(git) > 0 {
