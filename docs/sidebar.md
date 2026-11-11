@@ -47,6 +47,16 @@ empty for the default: `worktrees.dir` under the space's root, named after the b
 checked out; a new one is created from what the main worktree has checked out. Create switches to the new
 session.
 
+The branch field also takes a GitHub PR: `#123`, the PR's URL, or a number that is no branch, after the
+prefix or in place of it. Once typing rests on it, the form looks it up with `gh pr view` in the space's root
+and shows the PR's title and the branch it checks out, which the directory follows. A PR from the repository
+itself is its branch, fetched and tracking the remote's. A PR from a fork is fetched from the remote's
+`pull/N/head` into a branch named after the fork's, or `pr-N-BRANCH` when the space has a branch of that name
+for something else, and pulls from `pull/N/head`, as `gh pr checkout` sets up a fork it has no remote for.
+The remote is the one for the repository the PR is to, else `origin`. A branch set up for the PR before is
+checked out as it is. When gh cannot say, because it is not installed, there is no such PR or the repository
+is not on GitHub, the form shows gh's error as it does git's.
+
 **Close session** closes every window the way closing them by hand does, so whatever kitty.conf runs when a
 window closes still runs.
 

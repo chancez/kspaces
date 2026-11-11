@@ -307,7 +307,7 @@ func TestNewWorktreeForm(t *testing.T) {
 		"  branch     pr/me/",
 		"  directory  .worktrees",
 		"",
-		"  Name the branch to create or check out",
+		"  Name the branch to create or check out, or a PR",
 		"",
 		"   Create enter    Cancel esc   tab next field",
 		"",
