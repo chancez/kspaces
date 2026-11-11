@@ -5,6 +5,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/chancez/kspaces/internal/gh"
+	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui/interact"
 	"github.com/chancez/kspaces/internal/tui/look"
@@ -208,6 +210,25 @@ func (m *sidebar) runCommand(path string) tea.Cmd {
 	st, name := m.kitty, m.cfg.Commands[0].Name
 	return func() tea.Msg {
 		if err := spaces.AskRunCommand(st, name, path); err != nil {
+			return spaces.Snapshot{Err: err}
+		}
+		return nil
+	}
+}
+
+// rowPR is the PR of r's worktree's branch the poller found, the one its row shows, nil for none.
+func (m *sidebar) rowPR(r spaces.Row) *gitstate.PR {
+	if r.Worktree == nil {
+		return nil
+	}
+	return m.git[r.Worktree.Path].PR
+}
+
+// openPR opens PR number in the browser with gh, in the worktree at dir for its repository. It runs
+// off the UI, as gh can take a moment to work out the repository.
+func openPR(dir string, number int) tea.Cmd {
+	return func() tea.Msg {
+		if err := gh.Browse(dir, number); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
 		return nil

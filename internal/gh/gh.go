@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -38,18 +39,34 @@ func ViewPR(dir, pr string) (PR, error) {
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
-		var ee *exec.ExitError
-		switch {
-		case errors.Is(err, exec.ErrNotFound):
-			return PR{}, errors.New("gh is not installed, and looking up a PR needs it")
-		case errors.As(err, &ee) && len(ee.Stderr) > 0:
-			return PR{}, errors.New(strings.TrimSpace(string(ee.Stderr)))
-		}
-		return PR{}, fmt.Errorf("gh pr view: %w", err)
+		return PR{}, ghError(err, "looking up a PR", "gh pr view")
 	}
 	var ans PR
 	if err := json.Unmarshal(out, &ans); err != nil {
 		return PR{}, fmt.Errorf("parsing gh pr view: %w", err)
 	}
 	return ans, nil
+}
+
+// Browse opens PR number in the browser, with gh run in dir for the repository it is of. The error is
+// gh's own message, as ViewPR's.
+func Browse(dir string, number int) error {
+	cmd := exec.Command("gh", "browse", strconv.Itoa(number))
+	cmd.Dir = dir
+	if _, err := cmd.Output(); err != nil {
+		return ghError(err, "opening a PR", "gh browse")
+	}
+	return nil
+}
+
+// ghError is err from running gh, for doing what, as gh's message when it said one.
+func ghError(err error, doing, name string) error {
+	var ee *exec.ExitError
+	switch {
+	case errors.Is(err, exec.ErrNotFound):
+		return fmt.Errorf("gh is not installed, and %s needs it", doing)
+	case errors.As(err, &ee) && len(ee.Stderr) > 0:
+		return errors.New(strings.TrimSpace(string(ee.Stderr)))
+	}
+	return fmt.Errorf("%s: %w", name, err)
 }

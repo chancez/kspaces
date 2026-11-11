@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -131,5 +134,90 @@ func TestPickerPreviewGitState(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("previews:\n%q\nwant\n%q", got, want)
+	}
+}
+
+// fakeGh puts a gh on PATH that records the directory it ran in and its arguments, a line each, and
+// fails saying so when fail is set. It returns them as the last call had them.
+func fakeGh(t *testing.T, fail bool) func() []string {
+	t.Helper()
+	dir := t.TempDir()
+	log := filepath.Join(dir, "calls")
+	script := "#!/bin/sh\n{ pwd -P; for a; do printf '%s\\n' \"$a\"; done; } > " + log + "\n"
+	if fail {
+		script += "echo 'no pull request found' >&2\nexit 1\n"
+	}
+	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	return func() []string {
+		data, err := os.ReadFile(log)
+		if err != nil {
+			return nil
+		}
+		return strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
+	}
+}
+
+// A worktree whose branch has a PR offers to open it, in its menu and on b, with gh browse run in the
+// worktree; one without a PR offers neither. gh failing shows on the last line.
+func TestOpenPR(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(tea.FocusMsg{})
+	// gh runs in the worktree, so dev's is a real directory.
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap := gitFixture()
+	snap.Spaces[0].Worktrees[1].Path = dir
+	snap.Git[dir] = snap.Git["/src/gr/.worktrees/dev"]
+	e.m.Update(snap)
+	e.m.render()
+
+	dev := e.row("gr@dev")
+	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
+	_, y := e.zone(fmt.Sprintf(entryZone, dev))
+	want := []string{
+		menuRule("Session"), " Open", " Close session...",
+		menuRule("Worktree"), " Open PR #123", " Remove worktree...",
+		menuRule("Space"), " New worktree...", " Fold worktrees", " Add space...",
+		menuRule(""),
+	}
+	if got := e.screen()[y+1 : y+12]; !reflect.DeepEqual(got, want) {
+		t.Errorf("dev's menu:\n%q\nwant\n%q", got, want)
+	}
+	e.press("esc")
+	kitty := e.row("kitty")
+	e.click(fmt.Sprintf(entryZone, kitty), tea.MouseRight)
+	_, y = e.zone(fmt.Sprintf(entryZone, kitty))
+	want = []string{menuRule("Session"), " Open", menuRule("Space"), " New worktree...", " Add space...", menuRule("")}
+	if got := e.screen()[y+1 : y+7]; !reflect.DeepEqual(got, want) {
+		t.Errorf("kitty's menu:\n%q\nwant\n%q", got, want)
+	}
+	e.press("esc")
+	if cmd := e.press("b"); cmd != nil {
+		t.Error("b on kitty, with no PR, ran something")
+	}
+
+	calls := fakeGh(t, false)
+	e.m.cursor = dev
+	cmd := e.press("b")
+	if cmd == nil {
+		t.Fatal("b on dev ran nothing")
+	}
+	if msg := cmd(); msg != nil {
+		t.Errorf("opening the PR said %v", msg)
+	}
+	if got, want := calls(), []string{dir, "browse", "123"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("gh ran as %q, want %q", got, want)
+	}
+
+	fakeGh(t, true)
+	e.m.Update(e.press("b")())
+	lines := e.screen()
+	if got := lines[len(lines)-1]; got != "no pull request found" {
+		t.Errorf("last line %q, want gh's error", got)
 	}
 }

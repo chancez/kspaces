@@ -58,6 +58,7 @@ only.
 | Session | Open | `enter` | switch to the session |
 | Session | Run... | `R` | run a configured command in the worktree's session, in a form; with `[[commands]]` configured |
 | Session | Close session... | `c` | close every window of the session, on a session with windows open |
+| Worktree | Open PR #N | `b` | open the branch's PR in the browser with `gh browse N`, on a worktree whose row shows a PR |
 | Worktree | Remove worktree... | `x` | close the session and remove a linked worktree |
 | Worktree | Forget... | `x` | delete the saved session file of a missing worktree with no windows open |
 | Space | New worktree... | `n` | create a worktree in the space, in a form |
@@ -66,6 +67,10 @@ only.
 | Space | Add space... | `a` | add a repository to the spaces, in a form; on every row |
 
 Each item that changes something opens a form in an overlay, with buttons and keys to confirm or cancel.
+
+**Open PR** is the PR the row shows, which needs gh signed in. gh runs in the worktree, in the
+background, so the sidebar does not wait for it; what it says when it fails shows on the sidebar's last
+line.
 
 **New worktree** has a branch field, which starts with `worktrees.branch_prefix/`, and a directory field,
 empty for the default: `worktrees.dir` under the space's root, named after the branch. An existing branch is
@@ -157,6 +162,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `n`, `c`, `x` | new worktree, close session, remove worktree (forget, on a missing worktree) |
 | `p` | clean up the space's worktrees, on a space's row |
 | `R` | run a command in the worktree, with commands configured |
+| `b` | open the worktree's PR in the browser, when its row shows one |
 | `a` | add a space, wherever the cursor is |
 | `!` | focus the window that needs you most, wherever the cursor is |
 | `/` | filter the spaces list; see [Spaces](#spaces) |

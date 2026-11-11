@@ -27,6 +27,9 @@ import (
 type Action[M, S any] struct {
 	// Title is the action in menus and the hint bar, such as "mark reviewed".
 	Title string
+	// Name is the action's title in a menu, for s now, where it says more than Title, such as the
+	// number of a PR it opens. Nil uses Title.
+	Name func(m M, s S) string
 	// Help describes the action where the title is not enough, as in a hint next to another of
 	// the same title. Empty uses Title.
 	Help string
@@ -167,6 +170,8 @@ type Bound[M any] struct {
 	Run     func(M) tea.Cmd
 	// action is the action bound, by address.
 	action any
+	// name is the action's Name, bound to its subject, or nil.
+	name func(M) string
 }
 
 // Is reports whether b is a, bound to its subject.
@@ -184,7 +189,7 @@ func bind[M, S any](a *Action[M, S], s S) Bound[M] {
 	if help == "" {
 		help = a.Title
 	}
-	return Bound[M]{
+	b := Bound[M]{
 		Title:   a.Title,
 		Help:    help,
 		Section: a.Section,
@@ -192,6 +197,10 @@ func bind[M, S any](a *Action[M, S], s S) Bound[M] {
 		Run:     func(m M) tea.Cmd { return a.Run(m, s) },
 		action:  a,
 	}
+	if a.Name != nil {
+		b.name = func(m M) string { return a.Name(m, s) }
+	}
+	return b
 }
 
 // Key is a binding, bound to a subject: what its keys run there.
@@ -337,14 +346,17 @@ func (t Target[M]) Involves(kp any) bool {
 	return slices.ContainsFunc(t.groups, func(g Group[M]) bool { return g.from == kp })
 }
 
-// Groups are the target's actions that apply, by subject, its own first. Subjects with none are
-// left out.
+// Groups are the target's actions that apply, by subject, its own first, each titled by its Name
+// when it has one. Subjects with none are left out.
 func (t Target[M]) Groups(m M) []Group[M] {
 	var out []Group[M]
 	for _, g := range t.groups {
 		var kept []Bound[M]
 		for _, a := range g.Actions {
 			if a.Applies(m) {
+				if a.name != nil {
+					a.Title = a.name(m)
+				}
 				kept = append(kept, a)
 			}
 		}

@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/spaces"
@@ -130,6 +132,17 @@ var (
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			return m.removeWorktree(s.row.Worktree.Path)
+		},
+	}
+	actOpenPR = &interact.Action[*sidebar, entrySubject]{
+		Title:   "Open PR",
+		Name:    func(m *sidebar, s entrySubject) string { return fmt.Sprintf("Open PR #%d", m.rowPR(s.row).Number) },
+		Section: sectionWorktree,
+		// Not on a missing worktree: its directory, where gh would run, is gone.
+		Applies: func(m *sidebar, s entrySubject) bool { return !s.row.Missing && m.rowPR(s.row) != nil },
+		Run: func(m *sidebar, s entrySubject) tea.Cmd {
+			m.remote = false
+			return openPR(s.row.Worktree.Path, m.rowPR(s.row).Number)
 		},
 	}
 	actRunCommand = &interact.Action[*sidebar, entrySubject]{
@@ -496,12 +509,13 @@ func init() {
 	spacesKind.Bind(actAddSpace, "a", "add space", "a")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actRunCommand, actCloseSession, actRemoveWorktree, actForgetSession, actNewWorktree, actFold, actUnfold, actCleanup)
+		actOpenWorktree, actRunCommand, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actFold, actUnfold, actCleanup)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
 	entryKind.Bind(actRunCommand, "R", "run a command", "R")
 	entryKind.Bind(actCloseSession, "c", "close session", "c")
+	entryKind.Bind(actOpenPR, "b", "open the PR in the browser", "b")
 	entryKind.Bind(actRemoveWorktree, "x", "remove worktree", "x")
 	// x on a missing worktree, which has nothing to remove but its saved file.
 	entryKind.Bind(actForgetSession, "", "", "x")
