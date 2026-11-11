@@ -151,7 +151,9 @@ func TestSharedView(t *testing.T) {
 // leader ask again, and a new leader carries on from the last one's pull requests.
 func TestPollerGitStates(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "kitty.json")
-	now := time.Unix(1_000_000, 0)
+	// UTC, as a follower reads the times back from JSON: with the machine's zone at UTC that gives time.UTC,
+	// not time.Local, and DeepEqual tells the two apart.
+	now := time.Unix(1_000_000, 0).UTC()
 	var asked []string
 	watcher := func() *gitstate.Watcher {
 		return gitstate.WatcherOf(
