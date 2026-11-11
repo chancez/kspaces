@@ -2,7 +2,6 @@ package tui
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/gittest"
 	"github.com/chancez/kspaces/internal/spaces"
 )
 
@@ -47,18 +47,9 @@ func lookUpPR(t *testing.T, f *newWorktreeForm) {
 // shows its title and the branch it checks out, which the directory follows, or why it cannot. The fork's
 // main clashes with the space's.
 func TestNewWorktreeFormPR(t *testing.T) {
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"commit", "-q", "--allow-empty", "-m", "first"}} {
-		git := exec.Command("git", append([]string{"-C", root}, args...)...)
-		git.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
-			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
-		if out, err := git.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
+	r := gittest.New(t)
+	r.Commit("first")
+	root := r.Dir
 	fakeGH(t, map[string]string{
 		"3": `{"headRefName":"feat","headRepositoryOwner":{"login":"o"},"isCrossRepository":false,"number":3,"title":"Add feat","url":"https://github.com/o/r/pull/3"}`,
 		"7": `{"headRefName":"main","headRepositoryOwner":{"login":"forker"},"isCrossRepository":true,"number":7,"title":"Fix from a fork","url":"https://github.com/o/r/pull/7"}`,

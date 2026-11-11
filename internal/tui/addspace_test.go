@@ -2,7 +2,6 @@ package tui
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -10,6 +9,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/chancez/kspaces/internal/gittest"
 )
 
 // addSpaceEnv is a home directory with a repository at ~/repo, a directory in no repository at ~/plain and
@@ -27,11 +28,7 @@ func addSpaceEnv(t *testing.T) (home, config string) {
 			t.Fatal(err)
 		}
 	}
-	git := exec.Command("git", "-C", filepath.Join(home, "repo"), "init", "-q")
-	git.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
-	if out, err := git.CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v\n%s", err, out)
-	}
+	gittest.At(t, filepath.Join(home, "repo"))
 	config = filepath.Join(home, ".config", "kspaces", "config.toml")
 	if err := os.WriteFile(config, []byte("# Mine.\nspaces = [\n  \"~/other\", # old\n]\n"), 0o600); err != nil {
 		t.Fatal(err)

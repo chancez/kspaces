@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/gittest"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
@@ -289,6 +290,8 @@ func TestPickerPreviewKinds(t *testing.T) {
 // The form starts the branch with the configured prefix, shows where the worktree goes and what creating
 // it does, and keeps git's refusal on screen.
 func TestNewWorktreeForm(t *testing.T) {
+	// Not a repository, so git refuses, unless GIT_DIR points it at one.
+	gittest.Isolate(t)
 	root := t.TempDir()
 	space := spaces.Space{Name: "gr", Root: root, Worktrees: []spaces.Worktree{{Path: root, Branch: "main", Session: "gr"}}}
 	f := newForm(config.Config{Worktrees: config.Worktrees{Dir: ".worktrees", BranchPrefix: "pr/me"}}, space)

@@ -2,7 +2,6 @@ package spaces
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -10,20 +9,8 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/git"
+	"github.com/chancez/kspaces/internal/gittest"
 )
-
-// gitIn runs git in dir, with an identity and no global config of the user's, and returns its output.
-func gitIn(t *testing.T, dir string, args ...string) string {
-	t.Helper()
-	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
-		"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("git %v: %v\n%s", args, err, out)
-	}
-	return strings.TrimSpace(string(out))
-}
 
 // fakeGH puts a gh first on PATH that answers `gh pr view N` with prs[N], fails as gh does for a PR that
 // is not there, and records where it ran and with what. It returns the last call's directory and arguments.
@@ -56,31 +43,30 @@ func fakeGH(t *testing.T, prs map[string]string) func() []string {
 
 // prRepos is a repository standing in for GitHub's, with a branch feat for a PR from itself and a
 // pull/7/head for one from a fork, and a clone of it as the space, which has main and 123 of its own.
-func prRepos(t *testing.T) (remote, root, pullHead string) {
+func prRepos(t *testing.T) (space *gittest.Repo, pullHead string) {
 	t.Helper()
+	remote := gittest.New(t)
+	remote.Commit("first")
+	remote.Git("switch", "-q", "-c", "feat")
+	remote.Commit("feat")
+	remote.Git("switch", "-q", "-c", "fork", "main")
+	pullHead = remote.Commit("from a fork")
+	remote.Git("update-ref", "refs/pull/7/head", pullHead)
+	remote.Git("switch", "-q", "main")
+	remote.Git("branch", "-q", "-D", "fork")
 	tmp, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	remote, root = filepath.Join(tmp, "remote"), filepath.Join(tmp, "space")
-	gitIn(t, tmp, "init", "-q", "-b", "main", remote)
-	gitIn(t, remote, "commit", "-q", "--allow-empty", "-m", "first")
-	gitIn(t, remote, "switch", "-q", "-c", "feat")
-	gitIn(t, remote, "commit", "-q", "--allow-empty", "-m", "feat")
-	gitIn(t, remote, "switch", "-q", "-c", "fork", "main")
-	gitIn(t, remote, "commit", "-q", "--allow-empty", "-m", "from a fork")
-	pullHead = gitIn(t, remote, "rev-parse", "HEAD")
-	gitIn(t, remote, "update-ref", "refs/pull/7/head", pullHead)
-	gitIn(t, remote, "switch", "-q", "main")
-	gitIn(t, remote, "branch", "-q", "-D", "fork")
-	gitIn(t, tmp, "clone", "-q", remote, root)
-	gitIn(t, root, "branch", "123")
-	return remote, root, pullHead
+	space = remote.Clone(filepath.Join(tmp, "space"))
+	space.Git("branch", "123")
+	return space, pullHead
 }
 
 // The branch field names a PR as #N, a URL or a number that is no branch, after the prefix or not.
 func TestParsePRRef(t *testing.T) {
-	_, root, _ := prRepos(t)
+	r, _ := prRepos(t)
+	root := r.Dir
 	cfg := config.Config{Worktrees: config.Worktrees{BranchPrefix: "pr/me"}}
 	space := Space{Name: "space", Root: root}
 	type result struct {
@@ -112,7 +98,8 @@ func TestParsePRRef(t *testing.T) {
 // A PR from the repository itself is its branch, tracking the remote's; one from a fork is pull/N/head in
 // a branch of the fork's name, or pr-N-NAME when the space has that name, which pulls from pull/N/head.
 func TestPRWorktree(t *testing.T) {
-	_, root, pullHead := prRepos(t)
+	r, pullHead := prRepos(t)
+	root := r.Dir
 	args := fakeGH(t, map[string]string{
 		"3": `{"headRefName":"feat","headRepositoryOwner":{"id":"U_1","login":"o"},"isCrossRepository":false,"number":3,"title":"Add feat","url":"https://github.com/o/r/pull/3"}`,
 		"7": `{"headRefName":"main","headRepositoryOwner":{"id":"U_2","login":"forker"},"isCrossRepository":true,"number":7,"title":"Fix from a fork","url":"https://github.com/o/r/pull/7"}`,
@@ -147,11 +134,11 @@ func TestPRWorktree(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		return made{wt, gitIn(t, wt.Path, "rev-parse", "HEAD"), gitIn(t, root, "config", "branch."+pr.Branch+".remote"), git.BranchMerge(root, pr.Branch)}
+		return made{wt, r.Git("-C", wt.Path, "rev-parse", "HEAD"), r.Git("config", "branch."+pr.Branch+".remote"), git.BranchMerge(root, pr.Branch)}
 	}
 	got := []made{check(same, "feat"), check(fork, "pr-7")}
 	want := []made{
-		{Worktree{Path: filepath.Join(root, ".worktrees", "feat"), Branch: "feat", Session: "space@feat"}, gitIn(t, root, "rev-parse", "origin/feat"), "origin", "refs/heads/feat"},
+		{Worktree{Path: filepath.Join(root, ".worktrees", "feat"), Branch: "feat", Session: "space@feat"}, r.Git("rev-parse", "origin/feat"), "origin", "refs/heads/feat"},
 		{Worktree{Path: filepath.Join(root, ".worktrees", "pr-7"), Branch: "pr-7-main", Session: "space@pr-7"}, pullHead, "origin", "refs/pull/7/head"},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -172,7 +159,7 @@ func TestPRWorktree(t *testing.T) {
 		t.Errorf("again: got %+v\nwant %+v", again, want)
 	}
 	// Another PR from a fork's main finds both names taken.
-	gitIn(t, root, "config", "branch.pr-7-main.merge", "refs/heads/main")
+	r.Git("config", "branch.pr-7-main.merge", "refs/heads/main")
 	if _, err := ResolvePR(space, PRRef{Arg: "7", Number: 7}); err == nil || err.Error() != "the branches main and pr-7-main are taken, so PR #7 needs a branch of its own" {
 		t.Errorf("both names taken: %v", err)
 	}
@@ -180,7 +167,8 @@ func TestPRWorktree(t *testing.T) {
 
 // gh's own error comes back, and so does gh being missing.
 func TestResolvePRErrors(t *testing.T) {
-	_, root, _ := prRepos(t)
+	r, _ := prRepos(t)
+	root := r.Dir
 	fakeGH(t, nil)
 	space := Space{Name: "space", Root: root}
 	var got []string

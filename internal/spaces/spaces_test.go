@@ -2,7 +2,6 @@ package spaces
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/git"
+	"github.com/chancez/kspaces/internal/gittest"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/status"
 )
@@ -122,22 +122,10 @@ func TestWorktreeDir(t *testing.T) {
 }
 
 func TestCreateWorktree(t *testing.T) {
-	run := func(dir string, args ...string) {
-		t.Helper()
-		cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
-		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
-			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v\n%s", args, err, out)
-		}
-	}
-	root, err := filepath.EvalSymlinks(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	run(root, "init", "-q", "-b", "main")
-	run(root, "commit", "-q", "--allow-empty", "-m", "first")
-	run(root, "branch", "old")
+	r := gittest.New(t)
+	r.Commit("first")
+	r.Git("branch", "old")
+	root := r.Dir
 	space := Space{Name: "repo", Root: root}
 
 	// A new branch.
@@ -306,25 +294,15 @@ func TestNewSpaceRoot(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(home, "file"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	initRepo := exec.Command("git", "-C", repo, "init", "-q")
-	initRepo.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null")
-	if out, err := initRepo.CombinedOutput(); err != nil {
-		t.Fatalf("git init: %v\n%s", err, out)
-	}
+	r := gittest.At(t, repo)
 	link := filepath.Join(home, "link")
 	if err := os.Symlink(repo, link); err != nil {
 		t.Fatal(err)
 	}
 	// A linked worktree, outside the repository, as one in another directory would be.
 	wt := filepath.Join(home, "wt")
-	for _, args := range [][]string{{"commit", "-q", "--allow-empty", "-m", "first"}, {"worktree", "add", "-q", "-b", "dev", wt}} {
-		cmd := exec.Command("git", append([]string{"-C", repo}, args...)...)
-		cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t",
-			"GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("git %s: %v\n%s", args[0], err, out)
-		}
-	}
+	r.Commit("first")
+	r.Worktree("dev", wt)
 
 	type result struct{ Root, Err string }
 	check := func(roots []string, paths ...string) []result {
