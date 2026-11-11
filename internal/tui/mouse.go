@@ -56,10 +56,15 @@ func (m *sidebar) wheel(msg tea.MouseWheelMsg) {
 
 // click acts on what was drawn where the mouse was pressed. A left click moves the cursor to the entry and
 // opens it, or folds its space on the caret; a click on the hover popup is one on its entry rather than on
-// the one it covers. A right click opens a spaces row's menu.
+// the one it covers. A left click on the add button does what a does. A right click opens a spaces row's
+// menu.
 func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 	switch msg.Button {
 	case tea.MouseLeft:
+		if m.inZone(addZone, msg.X, msg.Y) {
+			m.hover = 0
+			return runFirst(m, thePane.Target(paneSubject{}), actAddSpace)
+		}
 		if list, dir, ok := m.moreAt(msg.X, msg.Y); ok && !m.inZone(popupZone, msg.X, msg.Y) {
 			m.scrollPage(list, dir)
 			return nil
@@ -90,10 +95,11 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 	return nil
 }
 
-// motion shows the status entry the mouse rests on in full, when that says more than the entry does. Moving
-// within the popup keeps it, rather than switching to the entry it covers; moving anywhere but a status
-// entry clears it.
+// motion lights the add button under the mouse, and shows the status entry the mouse rests on in full,
+// when that says more than the entry does. Moving within the popup keeps it, rather than switching to the
+// entry it covers; moving anywhere but a status entry clears it.
 func (m *sidebar) motion(msg tea.MouseMotionMsg) {
+	m.addHot = m.inZone(addZone, msg.X, msg.Y)
 	if m.hovered() >= 0 && m.inZone(popupZone, msg.X, msg.Y) {
 		m.hoverAt = time.Now()
 		return

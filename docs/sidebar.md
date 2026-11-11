@@ -43,11 +43,12 @@ are lost. It closes the session, waits for its windows to go, deletes the sessio
 `git worktree remove`. The branch is kept. What git would refuse, such as a locked worktree, is said before
 you confirm. The removal runs as a kitty background process, so an error after that is shown by kitty.
 
-**Add space** has a field for a directory, filled in with the repository of the window the sidebar is
-beside, and shows the root it adds: the top of the directory's work tree, `~/` for the home directory. A
-directory in no repository, or a repository already in the spaces, is refused before you confirm. Add
-appends the root to `spaces` in config.toml as text, so the file's comments and layout stay as they were,
-and writes through a symlinked config to its target. Every sidebar shows the new space at its next refresh.
+**Add space**, which the plus at the right end of the SPACES title also opens, has a field for a directory,
+filled in with the repository of the window the sidebar is beside, and shows the root it adds: the top of
+the directory's work tree, `~/` for the home directory. A directory in no repository, or a repository
+already in the spaces, is refused before you confirm. Add appends the root to `spaces` in config.toml as
+text, so the file's comments and layout stay as they were, and writes through a symlinked config to its
+target. Every sidebar shows the new space at its next refresh.
 
 ## Status
 

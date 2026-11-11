@@ -19,6 +19,7 @@ import (
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/status"
 	"github.com/chancez/kspaces/internal/tui/interact"
+	"github.com/chancez/kspaces/internal/tui/look"
 )
 
 // fixture is what the sidebar shows in tests: a session in no space; gr with two linked worktrees, the
@@ -219,13 +220,16 @@ const (
 	termIcon   = "\uf120  "
 )
 
+// spacesTitle is the SPACES title with the add button in the last of the 29 columns before the border.
+const spacesTitle = "SPACES" + "                      " + "\uf067"
+
 // The spaces list: sessions in no space, then each space and its linked worktrees. A row starts with
 // the fold caret, or as wide a blank, then its icon: what the row is, or the most urgent state of its
 // sessions, or a cross for a broken space.
 func TestSpacesList(t *testing.T) {
 	e := newSidebarEnv(t)
 	want := []string{
-		"SPACES",
+		spacesTitle,
 		"",
 		"  " + termIcon + "default",
 		"",
@@ -428,6 +432,71 @@ func TestAddSpaceKey(t *testing.T) {
 	got = append(got, adds())
 	if want := []bool{true, true, true}; !reflect.DeepEqual(got, want) {
 		t.Errorf("a adds a space on a row, a status entry, nothing: %v, want %v", got, want)
+	}
+}
+
+// fakeKitten puts a kitten on PATH that records its arguments, and returns them as the last call had them.
+func fakeKitten(t *testing.T) func() []string {
+	t.Helper()
+	dir := t.TempDir()
+	log := filepath.Join(dir, "args")
+	script := "#!/bin/sh\nfor a; do printf '%s\\n' \"$a\"; done > " + log + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "kitten"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	t.Setenv("KITTY_INSTALLATION_DIR", "")
+	return func() []string {
+		data, err := os.ReadFile(log)
+		if err != nil {
+			return nil
+		}
+		return strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
+	}
+}
+
+// The plus at the right end of SPACES adds a space as a does, lit while the mouse is on it; a click on
+// the rest of the title does nothing. The narrowest sidebar keeps both.
+func TestAddSpaceButton(t *testing.T) {
+	e := newSidebarEnv(t)
+	launched := fakeKitten(t)
+	if got := e.screen()[0]; got != spacesTitle {
+		t.Errorf("title %q, want %q", got, spacesTitle)
+	}
+	lit := e.m.th.Render(look.Plain, look.AddButton(true))
+	e.hover(addZone)
+	if got := strings.Split(e.m.render(), "\n")[0]; !strings.Contains(got, lit) {
+		t.Errorf("button under the mouse not lit: %q", got)
+	}
+	e.m.Update(tea.MouseMotionMsg{X: 3, Y: 0})
+	if got := strings.Split(e.m.render(), "\n")[0]; strings.Contains(got, lit) {
+		t.Errorf("button lit with the mouse off it: %q", got)
+	}
+
+	if cmd := e.clickAt(3, 0, tea.MouseLeft); cmd != nil {
+		t.Errorf("a click on the title ran %v", cmd())
+	}
+	if got := launched(); got != nil {
+		t.Errorf("a click on the title launched %q", got)
+	}
+	cmd := e.click(addZone, tea.MouseLeft)
+	if cmd == nil {
+		t.Fatal("a click on the button ran nothing")
+	}
+	if msg := cmd(); msg != nil {
+		t.Errorf("adding a space said %v", msg)
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := launched(), []string{"@", "launch", "--type=overlay", "--var=kspaces_form=1", "--next-to", "id:11", exe, "add"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("the button launched %q, want %q", got, want)
+	}
+
+	e.m.Update(tea.WindowSizeMsg{Width: 12, Height: 40})
+	if got, want := e.screen()[0], "SPACES    \uf067"; got != want {
+		t.Errorf("narrowest title %q, want %q", got, want)
 	}
 }
 

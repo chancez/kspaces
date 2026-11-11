@@ -29,6 +29,8 @@ const (
 	// GlyphMoreAbove and GlyphMoreBelow mark entries of a list scrolled out of view.
 	GlyphMoreAbove
 	GlyphMoreBelow
+	// GlyphAdd is the button that adds a space.
+	GlyphAdd
 	numGlyphs
 )
 
@@ -53,6 +55,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphSearch:    "/",
 		GlyphMoreAbove: "^",
 		GlyphMoreBelow: "v",
+		GlyphAdd:       "+",
 	},
 	GlyphsUnicode: {
 		GlyphOpen:      "\u25bc", // black down-pointing triangle
@@ -71,6 +74,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphSearch:    "/",
 		GlyphMoreAbove: "\u25b4", // small up triangle
 		GlyphMoreBelow: "\u25be", // small down triangle
+		GlyphAdd:       "+",
 	},
 	GlyphsNerd: {
 		// The triangles, not Font Awesome's chevrons, which are drawn wider than their cell and thin.
@@ -92,5 +96,6 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		// The small triangles, for the same reason as the fold triangles.
 		GlyphMoreAbove: "\u25b4",
 		GlyphMoreBelow: "\u25be",
+		GlyphAdd:       "\uf067", // plus
 	},
 }

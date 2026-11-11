@@ -269,3 +269,12 @@ func More(above bool, n int) []Span {
 	}
 	return []Span{glyph(elMuted, g, false), sp(elMuted, fmt.Sprintf(" %d more", n))}
 }
+
+// AddButton is the icon button that adds a space: muted, as the list's other quiet controls are, and lit
+// while the mouse is on it.
+func AddButton(hot bool) Span {
+	if hot {
+		return glyph(elButton, GlyphAdd, false)
+	}
+	return glyph(elMuted, GlyphAdd, false)
+}

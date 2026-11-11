@@ -18,6 +18,8 @@ const (
 	menuZone = "menu:%d"
 	// popupZone is the hover popup, all of it.
 	popupZone = "popup"
+	// addZone is the button on the SPACES title that adds a space.
+	addZone = "add"
 )
 
 // rowSessions are the worktrees a row stands for: its own, and for a folded space all of the space's.

@@ -63,6 +63,8 @@ type sidebar struct {
 	hover   int
 	hoverAt time.Time
 	mouse   *pixelMouse
+	// Whether the mouse is on the add space button, which lights it.
+	addHot bool
 	// zones are where the last frame drew marked spans, by id, so a click maps back to what was drawn.
 	zones map[string][]look.Zone
 }
@@ -177,7 +179,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMotionMsg:
 		m.motion(msg)
 	case mouseLeftMsg:
-		m.hover = 0
+		m.hover, m.addHot = 0, false
 	case tea.KeyPressMsg:
 		if !m.focused {
 			if !m.remote {
@@ -271,9 +273,19 @@ func (m *sidebar) render() string {
 	return out
 }
 
+// titleLine is SPACES with the add space button at its right end. The title is cut first, keeping a cell
+// between it and the button.
+func (m *sidebar) titleLine(width int) string {
+	th := m.th
+	title := th.Cut(max(width-2, 0), look.Title("SPACES"))
+	gap := look.Default(strings.Repeat(" ", max(width-th.Width(title...)-1, 0)))
+	spans := append(append(title, gap), look.Mark(addZone, look.AddButton(m.addHot))...)
+	return th.Draw(look.Plain, width, spans...)
+}
+
 func (m *sidebar) frame() string {
 	th, width, l := m.th, m.contentWidth(), m.layout()
-	lines := []string{th.Draw(look.Plain, width, th.Cut(width, look.Title("SPACES"))...), ""}
+	lines := []string{m.titleLine(width), ""}
 	lines = append(lines, m.spacesLines()...)
 	for len(lines) < l.statusTop-2 {
 		lines = append(lines, "")
