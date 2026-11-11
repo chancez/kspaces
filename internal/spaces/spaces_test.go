@@ -192,7 +192,7 @@ func TestOpenActions(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	cfg := config.Config{NewTab: []string{"launch", "--type=tab"}, SessionsDir: dir}
+	cfg := config.Config{Launch: []string{"launch"}, SessionsDir: dir}
 	st := kitty.State{Sessions: map[string]int{"gr@fix": 7}}
 	file := func(name string) string { return filepath.Join(dir, name+".kitty-session") }
 	newTab := func(cwd, session string) []string {
@@ -212,7 +212,7 @@ func TestOpenActions(t *testing.T) {
 		{cfg, Worktree{Session: "default"}, [][]string{newTab(home, "default"), {"goto_session", file("default")}}},
 		{cfg, Worktree{Session: "old"}, [][]string{newTab(home, "old"), {"goto_session", file("old")}}},
 		// Without a sessions directory nothing is restored, and the file only names the session.
-		{config.Config{NewTab: cfg.NewTab}, Worktree{Path: "/src/gr", Session: "gr"}, [][]string{newTab("/src/gr", "gr"), {"goto_session", "gr.kitty-session"}}},
+		{config.Config{Launch: cfg.Launch}, Worktree{Path: "/src/gr", Session: "gr"}, [][]string{newTab("/src/gr", "gr"), {"goto_session", "gr.kitty-session"}}},
 	} {
 		got, err := openActions(c.cfg, st, c.wt)
 		if err != nil {

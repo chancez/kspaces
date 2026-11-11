@@ -96,8 +96,9 @@ spaces = ["~/projects/gr", "~/projects/kitty"]
 # Unset by default.
 sessions = "~/.local/share/kitty/sessions"
 
-# The kitty action that opens a worktree's first tab.
-new_tab = ["launch", "--type=tab"]
+# The kitty action every window kspaces opens goes through, its options appended: --type, --cwd and the
+# like, then any command. A kitten that passes them on to launch can stand in for it.
+launch = ["launch"]
 
 # Where new worktrees go, under the space's root, and what new branch names start with.
 [worktrees]

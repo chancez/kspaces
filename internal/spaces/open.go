@@ -57,10 +57,14 @@ func openActions(cfg config.Config, st kitty.State, wt Worktree) ([][]string, er
 		}
 		cwd = home
 	}
-	args := append([]string{}, cfg.NewTab...)
-	args = append(args, "--cwd="+cwd, "--add-to-session="+wt.Session)
 	// The new tab is the session's only window, so going to it only records the switch, see gotoSession.
-	return [][]string{args, goTo}, nil
+	return [][]string{firstTab(cfg, cwd, wt.Session), goTo}, nil
+}
+
+// firstTab is the launch action that opens a session's first tab, in cwd.
+func firstTab(cfg config.Config, cwd, session string) []string {
+	args := append([]string{}, cfg.Launch...)
+	return append(args, "--type=tab", "--cwd="+cwd, "--add-to-session="+session)
 }
 
 // opensWindows says whether goto_session opens any window from the session file at path. Windows come only

@@ -13,8 +13,8 @@ func TestAppendSpace(t *testing.T) {
 	for _, c := range []struct{ name, in, want string }{
 		{
 			name: "multi-line with a trailing comma",
-			in:   "spaces = [\n    \"~/a\",\n    \"~/b\",\n]\nnew_tab = [\"launch\"]\n",
-			want: "spaces = [\n    \"~/a\",\n    \"~/b\",\n    \"NEW\",\n]\nnew_tab = [\"launch\"]\n",
+			in:   "spaces = [\n    \"~/a\",\n    \"~/b\",\n]\nlaunch = [\"launch\"]\n",
+			want: "spaces = [\n    \"~/a\",\n    \"~/b\",\n    \"NEW\",\n]\nlaunch = [\"launch\"]\n",
 		},
 		{
 			name: "multi-line without a trailing comma",
@@ -83,13 +83,13 @@ func TestAppendSpace(t *testing.T) {
 		},
 		{
 			name: "spaces inside a table is not the top-level key",
-			in:   "new_tab = [\"launch\"]\n[other]\nspaces = [\"~/a\"]\n",
-			want: "new_tab = [\"launch\"]\nspaces = [\"NEW\"]\n\n[other]\nspaces = [\"~/a\"]\n",
+			in:   "launch = [\"launch\"]\n[other]\nspaces = [\"~/a\"]\n",
+			want: "launch = [\"launch\"]\nspaces = [\"NEW\"]\n\n[other]\nspaces = [\"~/a\"]\n",
 		},
 		{
 			name: "strings and comments with brackets and hashes",
-			in:   "new_tab = [\"spaces = [\", '#]', \"\\\"]\"] # spaces = [\nspaces = [\"~/a]#b\", '~/c]', \"~/d\\\"]#\"] # ] \"\n",
-			want: "new_tab = [\"spaces = [\", '#]', \"\\\"]\"] # spaces = [\nspaces = [\"~/a]#b\", '~/c]', \"~/d\\\"]#\", \"NEW\"] # ] \"\n",
+			in:   "launch = [\"spaces = [\", '#]', \"\\\"]\"] # spaces = [\nspaces = [\"~/a]#b\", '~/c]', \"~/d\\\"]#\"] # ] \"\n",
+			want: "launch = [\"spaces = [\", '#]', \"\\\"]\"] # spaces = [\nspaces = [\"~/a]#b\", '~/c]', \"~/d\\\"]#\", \"NEW\"] # ] \"\n",
 		},
 		{
 			name: "multi-line strings and a quoted key",

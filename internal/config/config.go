@@ -13,7 +13,7 @@ import (
 // Config is what ~/.config/kspaces/config.toml says:
 //
 //	spaces = ["~/projects/gr", "~/projects/kitty"]
-//	new_tab = ["launch", "--type=tab"]
+//	launch = ["launch"]
 //	sessions = "~/.local/share/kitty/sessions"
 //
 //	[worktrees]
@@ -33,12 +33,13 @@ import (
 type Config struct {
 	// Roots of the repositories shown as spaces, in the order they are listed.
 	Spaces []string `toml:"spaces"`
-	// The kitty action that opens the first tab of a worktree's session. kspaces appends --cwd and
-	// --add-to-session to it.
-	NewTab []string `toml:"new_tab"`
+	// The kitty action every window kspaces opens for a session goes through, such as a worktree's first
+	// tab, with kspaces' own options appended: --type, --cwd, --add-to-session and the like, then any
+	// command. A kitten that passes them on to launch can stand in for it.
+	Launch []string `toml:"launch"`
 	// Where kitty session files are saved, named SESSION.kitty-session. A worktree whose session has no
-	// windows but has a file here is restored from it rather than opened with NewTab. Empty to always use
-	// NewTab.
+	// windows but has a file here is restored from it rather than opened with Launch. Empty to always use
+	// Launch.
 	SessionsDir string    `toml:"sessions"`
 	Worktrees   Worktrees `toml:"worktrees"`
 	Sidebar     Sidebar   `toml:"sidebar"`
@@ -80,7 +81,7 @@ type Worktrees struct {
 	BranchPrefix string `toml:"branch_prefix"`
 }
 
-var defaultNewTab = []string{"launch", "--type=tab"}
+var defaultLaunch = []string{"launch"}
 
 const defaultWorktreeDir = ".worktrees"
 
@@ -119,7 +120,7 @@ func Parse(data string) (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("finding the home directory: %w", err)
 	}
-	cfg := Config{NewTab: defaultNewTab, Worktrees: Worktrees{Dir: defaultWorktreeDir}, Sidebar: Sidebar{Width: DefaultSidebarWidth}}
+	cfg := Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: defaultWorktreeDir}, Sidebar: Sidebar{Width: DefaultSidebarWidth}}
 	md, err := toml.Decode(data, &cfg)
 	if err != nil {
 		return Config{}, err
@@ -131,8 +132,8 @@ func Parse(data string) (Config, error) {
 		}
 		return Config{}, fmt.Errorf("unknown keys: %s", strings.Join(names, ", "))
 	}
-	if len(cfg.NewTab) == 0 {
-		return Config{}, fmt.Errorf("new_tab cannot be empty")
+	if len(cfg.Launch) == 0 {
+		return Config{}, fmt.Errorf("launch cannot be empty")
 	}
 	if w := cfg.Sidebar.Width; w < MinSidebarWidth || w > MaxSidebarWidth {
 		return Config{}, fmt.Errorf("sidebar.width is %d, it must be from %d to %d", w, MinSidebarWidth, MaxSidebarWidth)

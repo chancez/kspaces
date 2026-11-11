@@ -31,7 +31,7 @@
   once. `save_sessions.py` now restores one space per timer, which was refused none, and both watchers try
   again later when refused.
 - The default session's `startup_session` file is emptied, not removed, once it has no windows; kitty then
-  starts with one shell, and kspaces opens `default` with `new_tab`.
+  starts with one shell, and kspaces opens `default` with `launch`.
 - Windows in no session are saved into `default` at quit and come back labelled `default`, including one
   open only then, such as a tab switcher in an OS window of its own. Left as is for now.
 - kitty's own dock border can sit next to the sidebar's, which may look like a double line.

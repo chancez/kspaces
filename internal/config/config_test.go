@@ -14,7 +14,7 @@ func TestParse(t *testing.T) {
 	}
 	in := `
 spaces = ["~/projects/gr", "/src/kitty"]
-new_tab = ["kitten", "my_launch.py", "--type=tab"]
+launch = ["kitten", "my_launch.py"]
 sessions = "~/.local/share/kitty/sessions"
 
 [worktrees]
@@ -33,7 +33,7 @@ auto_install = true
 	// worktrees.dir is left out, so it has its default.
 	want := Config{
 		Spaces:      []string{filepath.Join(home, "projects/gr"), "/src/kitty"},
-		NewTab:      []string{"kitten", "my_launch.py", "--type=tab"},
+		Launch:      []string{"kitten", "my_launch.py"},
 		SessionsDir: filepath.Join(home, ".local/share/kitty/sessions"),
 		Worktrees:   Worktrees{Dir: ".worktrees", BranchPrefix: "pr/me"},
 		Sidebar:     Sidebar{Width: 40},
@@ -48,15 +48,16 @@ auto_install = true
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := (Config{NewTab: defaultNewTab, Worktrees: Worktrees{Dir: ".worktrees"}, Sidebar: Sidebar{Width: 28}}); !reflect.DeepEqual(got, want) {
+	if want := (Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: ".worktrees"}, Sidebar: Sidebar{Width: 28}}); !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}
 
 	for _, bad := range []string{
 		`space = ["~/x"]`,                 // a typo of spaces
 		"[worktrees]\nprefix = \"pr/me\"", // a typo inside a table
-		`new_tab = []`,
-		`spaces = "~/x"`, // a string, not a list
+		`launch = []`,
+		`new_tab = ["launch"]`, // renamed launch
+		`spaces = "~/x"`,       // a string, not a list
 		"[sidebar]\nwidth = 11",
 		"[sidebar]\nwidth = 121",
 	} {
