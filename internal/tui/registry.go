@@ -44,6 +44,9 @@ type removeSubject struct{}
 type closeSubject struct{}
 type addSubject struct{}
 
+// filterSubject is the spaces list's filter, while it is open.
+type filterSubject struct{}
+
 // do adapts a function that changes the model without a command.
 func do[M, S any](f func(m M)) func(M, S) tea.Cmd {
 	return func(m M, _ S) tea.Cmd { f(m); return nil }
@@ -59,9 +62,10 @@ func quit[M, S any]() *interact.Action[M, S] {
 	return &interact.Action[M, S]{Title: "quit", Run: func(M, S) tea.Cmd { return tea.Quit }}
 }
 
-// foldable is whether an entry's space has linked worktrees to fold.
-func foldable(s entrySubject) bool {
-	return !s.row.Other && len(s.row.Space.Worktrees) > 1
+// foldable is whether an entry's space has linked worktrees to fold, and the list shows folds: the filter
+// ignores them.
+func foldable(m *sidebar, s entrySubject) bool {
+	return !m.filtering && !s.row.Other && len(s.row.Space.Worktrees) > 1
 }
 
 // The spaces list's entries. The titles are the context menu's.
@@ -76,12 +80,12 @@ var (
 	}
 	actFold = &interact.Action[*sidebar, entrySubject]{
 		Title:   "Fold worktrees",
-		Applies: func(m *sidebar, s entrySubject) bool { return foldable(s) && !m.folded[s.row.Space.Root] },
+		Applies: func(m *sidebar, s entrySubject) bool { return foldable(m, s) && !m.folded[s.row.Space.Root] },
 		Run:     func(m *sidebar, s entrySubject) tea.Cmd { m.toggleFold(s.row.Space.Root); return nil },
 	}
 	actUnfold = &interact.Action[*sidebar, entrySubject]{
 		Title:   "Unfold worktrees",
-		Applies: func(m *sidebar, s entrySubject) bool { return foldable(s) && m.folded[s.row.Space.Root] },
+		Applies: func(m *sidebar, s entrySubject) bool { return foldable(m, s) && m.folded[s.row.Space.Root] },
 		Run:     func(m *sidebar, s entrySubject) tea.Cmd { m.toggleFold(s.row.Space.Root); return nil },
 	}
 	actNewWorktree = &interact.Action[*sidebar, entrySubject]{
@@ -172,6 +176,30 @@ var actAttend = paneAction("attend", func(m *sidebar) tea.Cmd {
 	m.remote = false
 	return m.openWindowCmd(need[0])
 })
+
+// actFilter opens the spaces list's filter.
+var actFilter = paneAction("filter", (*sidebar).openFilter)
+
+// The filter's: moving over the rows it shows, opening one, and closing it. Every other key types.
+var (
+	actFilterDown = &interact.Action[*sidebar, filterSubject]{
+		Title: "down",
+		Run:   do[*sidebar, filterSubject](func(m *sidebar) { m.moveFiltered(1) }),
+	}
+	actFilterUp = &interact.Action[*sidebar, filterSubject]{
+		Title: "up",
+		Run:   do[*sidebar, filterSubject](func(m *sidebar) { m.moveFiltered(-1) }),
+	}
+	actFilterOpen = &interact.Action[*sidebar, filterSubject]{
+		Title: "open",
+		Run:   cmd[*sidebar, filterSubject]((*sidebar).openFiltered),
+	}
+	actFilterClear = &interact.Action[*sidebar, filterSubject]{
+		Title: "clear",
+		Run:   do[*sidebar, filterSubject]((*sidebar).clearFilter),
+	}
+	actFilterQuit = quit[*sidebar, filterSubject]()
+)
 
 // The context menu's.
 var (
@@ -284,6 +312,7 @@ var (
 	removeKind *interact.Kind[*removeWorktreeForm, removeSubject]
 	closeKind  *interact.Kind[*closeSessionForm, closeSubject]
 	addKind    *interact.Kind[*addSpaceForm, addSubject]
+	filterKind *interact.Kind[*sidebar, filterSubject]
 
 	spacesList    *interact.Place[*sidebar, entrySubject]
 	statusList    *interact.Place[*sidebar, statusSubject]
@@ -294,6 +323,7 @@ var (
 	theRemoveForm *interact.Place[*removeWorktreeForm, removeSubject]
 	theCloseForm  *interact.Place[*closeSessionForm, closeSubject]
 	theAddForm    *interact.Place[*addSpaceForm, addSubject]
+	theFilter     *interact.Place[*sidebar, filterSubject]
 )
 
 // Kinds and places are made in init, as their actions run code that reads them.
@@ -320,7 +350,7 @@ func init() {
 
 	paneKind = interact.NewKind(func(paneSubject) string { return "Sidebar" },
 		actDown, actUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit,
-		actAttend)
+		actAttend, actFilter)
 	paneKind.Bind(actDown, "j/k", "down/up", "j", "down")
 	paneKind.Bind(actUp, "", "", "k", "up")
 	paneKind.Bind(actTop, "g/G", "top/bottom", "g", "home")
@@ -331,6 +361,7 @@ func init() {
 	paneKind.BindQuiet(actEndRemote, "enter", "l")
 	paneKind.Bind(actQuit, "ctrl+c", "quit", "ctrl+c")
 	paneKind.Bind(actAttend, "!", "go to what needs you", "!")
+	paneKind.Bind(actFilter, "/", "filter the spaces", "/")
 	interact.Via(paneKind, func(paneSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	thePane = interact.List(paneKind)
 
@@ -373,6 +404,16 @@ func init() {
 	addKind.Bind(actAdd, "enter", "add", "enter")
 	addKind.Bind(actAddCancel, "esc", "cancel", "esc", "ctrl+c")
 	theAddForm = interact.List(addKind)
+
+	// j and k type, as worktrees are named with them, so only arrows and the picker's ctrl keys move.
+	filterKind = interact.NewKind(func(filterSubject) string { return "Filter" },
+		actFilterDown, actFilterUp, actFilterOpen, actFilterClear, actFilterQuit)
+	filterKind.Bind(actFilterDown, "down/up", "down/up", "down", "ctrl+n", "ctrl+j")
+	filterKind.Bind(actFilterUp, "", "", "up", "ctrl+p", "ctrl+k")
+	filterKind.Bind(actFilterOpen, "enter", "open", "enter")
+	filterKind.Bind(actFilterClear, "esc", "clear", "esc")
+	filterKind.Bind(actFilterQuit, "ctrl+c", "quit", "ctrl+c")
+	theFilter = interact.List(filterKind)
 }
 
 // Targets: the subjects on screen, each in its place.

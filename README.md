@@ -25,6 +25,7 @@ Blocked 1
 - Create, close and remove worktrees and sessions from a right-click menu.
 - See which programs are blocked, failed, done or working, from kitty's program status protocol (OSC 7501).
 - Switch with a fuzzy picker, or to the next and previous session.
+- Filter the list as you type, and jump to the windows whose programs are blocked, failed or done.
 
 ## Install
 

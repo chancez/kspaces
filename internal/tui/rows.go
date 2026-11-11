@@ -51,7 +51,8 @@ func (m *sidebar) renderRow(i int) string {
 		return th.Draw(look.Plain, width)
 	}
 	caret := []look.Span{look.NoCaret()}
-	if r.Main && !r.Other && len(r.Space.Worktrees) > 1 {
+	// Not while filtering, which ignores folds, so a caret would fold what the list does not show.
+	if r.Main && !r.Other && len(r.Space.Worktrees) > 1 && !m.filtering {
 		caret = look.Mark(fmt.Sprintf(caretZone, i), look.Caret(r.Folded)...)
 	}
 	kind, label := look.RowSpace, look.Space(*r.Space)

@@ -15,6 +15,18 @@ Clicking a row, or `enter` on it, switches to its session, creating it the first
 triangle, or `space` on its row, folds its linked worktrees into the space's row. Folded spaces are kept in
 `$XDG_STATE_HOME/kspaces/folded`, so every tab's sidebar agrees.
 
+`/` filters the list. The query goes on the row under the SPACES title, so the list keeps all its rows and
+the query stays put as the list narrows. A space shows when its name, its branch, or a linked worktree's
+directory or branch has the query in it, ignoring case, with only the linked worktrees that match under it;
+a session in no space shows by its name. Folds are ignored while filtering, so a match in a folded space
+shows, and the carets are hidden. A substring rather than the picker's fuzzy match, as the list keeps its
+order and does not rank, so loose matches would sit among the real ones. Every key types into the query,
+`j` and `k` too, as worktrees are named with them; `up` / `down`, or `ctrl+p` / `ctrl+n` as in the picker,
+move over the rows shown. `enter` opens the cursor's row and clears the filter, and `esc` clears it. The
+cursor stays on its row while it shows, and goes to the first row shown when the query hides it. Clearing
+puts it back on its row, or on the folded space that holds it. The filter also goes when navigating ends:
+when the sidebar loses focus, or keys sent without focus stop.
+
 ## The menu
 
 Right-click a row, or press `m` on it:
@@ -86,6 +98,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `n`, `c`, `x` | new worktree, close session, remove worktree |
 | `a` | add a space, wherever the cursor is |
 | `!` | focus the window that needs you most, wherever the cursor is |
+| `/` | filter the spaces list; see [Spaces](#spaces) |
 | `r` | refresh, which also happens every two seconds |
 | `esc` / `q` | give focus back to the window it came from |
 

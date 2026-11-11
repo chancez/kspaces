@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/config"
@@ -67,10 +68,14 @@ type sidebar struct {
 	addHot bool
 	// zones are where the last frame drew marked spans, by id, so a click maps back to what was drawn.
 	zones map[string][]look.Zone
+	// The spaces list's filter, see filter.go; its query narrows rows while filtering.
+	filter    textinput.Model
+	filtering bool
 }
 
 func newSidebar(self int) *sidebar {
-	return &sidebar{th: look.New(true), self: self, folded: map[string]bool{}, mouse: &pixelMouse{}}
+	th := look.New(true)
+	return &sidebar{th: th, self: self, folded: map[string]bool{}, mouse: &pixelMouse{}, filter: newFilter(th)}
 }
 
 // navigating is whether keys are moving the cursor, so it and the entry under it should be drawn.
@@ -134,6 +139,10 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		start = m.mouse.start()
 	}
 	_, cmd := m.update(msg)
+	// The filter belongs to navigating: it goes when the keys stop coming, so no sidebar is left narrowed.
+	if m.filtering && !m.navigating() {
+		m.closeFilter()
+	}
 	return m, tea.Batch(start, cmd)
 }
 
@@ -146,6 +155,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m.filter.SetWidth(m.filterWidth())
 		m.mouse.resize()
 		// A shorter list can leave the cursor under an indicator, or out of view.
 		m.scrollToCursor()
@@ -167,9 +177,10 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case spaces.Snapshot:
 		m.err = msg.Err
 		if msg.Config != nil {
+			// Where the cursor is goes by the rows and entries it was drawn on, before they change.
+			at := m.cursorAt()
 			m.cfg, m.spaces, m.others, m.folded, m.kitty = *msg.Config, msg.Spaces, msg.Others, msg.Folded, msg.Kitty
-			m.rows = spaces.BuildRows(m.others, m.spaces, m.folded)
-			m.cursor = min(m.cursor, max(m.numEntries()-1, 0))
+			m.rebuildRows(at)
 			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))
 		}
 	case tea.MouseWheelMsg:
@@ -187,6 +198,9 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cursorToCurrent()
 			}
 			m.remoteAt = time.Now()
+		}
+		if m.filtering {
+			return m, m.typeFilter(msg)
 		}
 		cmd, _ := runOn(m, msg, m.chain()...)
 		return m, cmd
@@ -285,7 +299,7 @@ func (m *sidebar) titleLine(width int) string {
 
 func (m *sidebar) frame() string {
 	th, width, l := m.th, m.contentWidth(), m.layout()
-	lines := []string{m.titleLine(width), ""}
+	lines := []string{m.titleLine(width), m.filterLine()}
 	lines = append(lines, m.spacesLines()...)
 	for len(lines) < l.statusTop-2 {
 		lines = append(lines, "")

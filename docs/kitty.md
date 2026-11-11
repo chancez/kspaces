@@ -115,3 +115,14 @@ map --mode spaces k kspaces_key k
 map --mode spaces enter combine : kspaces_key enter : pop_keyboard_mode
 map --mode spaces esc combine : kspaces_key esc : pop_keyboard_mode
 ```
+
+The filter takes keys sent this way too, but a keyboard mode only sends the keys mapped in it, and
+`passthrough_and_end` hands any other to the window, so typing a query needs its keys mapped. `send-key`
+takes several keys, so a mapping can filter by a fixed query and leave the cursor on the first match:
+
+```conf
+map --mode spaces / kspaces_key /
+map --mode spaces up kspaces_key up
+map --mode spaces down kspaces_key down
+map --mode spaces f kspaces_key / f i x
+```

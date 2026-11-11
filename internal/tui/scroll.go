@@ -68,6 +68,9 @@ func (m *sidebar) entriesIn(from, to int) int {
 // spacesLines draws the rows of the spaces list that are in view.
 func (m *sidebar) spacesLines() []string {
 	h := m.layout().spaces
+	if m.filtering && len(m.rows) == 0 {
+		return []string{m.th.Render(look.Plain, m.th.Cut(m.contentWidth(), look.Text("No matches").With(look.Dim))...)}
+	}
 	above, below := m.spacesMore(m.offset)
 	var out []string
 	for y := 0; y < h && m.offset+y < len(m.rows); y++ {

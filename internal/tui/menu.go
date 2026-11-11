@@ -126,7 +126,7 @@ func (m *sidebar) toggleFold(root string) {
 	if err := spaces.SaveFolded(m.folded); err != nil {
 		m.err = err
 	}
-	m.rows = spaces.BuildRows(m.others, m.spaces, m.folded)
+	m.setRows()
 	for i, r := range m.rows {
 		if r.Main && r.Space.Root == root {
 			m.cursor = i
