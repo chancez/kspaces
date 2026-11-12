@@ -110,7 +110,7 @@ branch_prefix = "pr/me"
 [[commands]]
 name = "claude"
 run = ["claude", "{prompt}"]
-inputs = [{ name = "prompt", label = "Prompt", required = true }]
+inputs = [{ name = "prompt", label = "Prompt", required = false }] # Inputs can be marked required, and default to false.
 
 # Where it opens in a session with windows: tab, split, hsplit, vsplit, overlay or window.
 [[commands]]
