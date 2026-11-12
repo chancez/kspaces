@@ -57,10 +57,11 @@ tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/
    --toggle`, as a proposal after the dock one.
 7. One launcher for every new window: today running each window in a cm session takes a mapping per way
    of opening one (new tab, split, OS window, each through `kitten cm_launch.py`), and kitty's own
-   new_tab, new_window, new_os_window and splits still start the plain shell. An option that wraps the
-   program of every new window, such as `launch_wrapper cm-attach {session_name}`, or that names a kitten
-   to run in place of `launch`, would make kitty's defaults and every mapping go through it. Check how
-   `shell`, `--hold` and `startup_session` interact first; a proposal, after the others.
+   new_tab, new_window, new_os_window and splits still start the plain shell. `action_alias launch`
+   reaches actions but not the macOS menus, the tab bar's new tab button, `kitten @ launch` or session
+   files, and redefining a built-in action is not documented; `shell` misses windows with a command and
+   is saved without its argv. Filed as an `on_launch` watcher event, called before every window's child
+   starts: issue kovidgoyal/kitty#10858. cm_launch.py's logic would move into a watcher once it lands.
 8. Resizing docks by dragging their inner border and with `resize_window`, or else not offering a drag
    that does nothing: issue kovidgoyal/kitty#10857. #2391 had said docks need no resizing, before they
    existed.
