@@ -87,9 +87,17 @@ func TestLaunchPopup(t *testing.T) {
 	}
 }
 
-// In a panel an action runs on the window the panel was opened from, unless it names its own.
+// forgetLeft lets a test leave a panel afresh, as each process leaves its panel once.
+func forgetLeft(t *testing.T) {
+	left.Store(false)
+	t.Cleanup(func() { left.Store(false) })
+}
+
+// In a panel the first action leaves it, so a kitten launcher acting on kitty's active tab acts on the
+// window's OS window, and each runs on the window the panel was opened from, unless it names its own.
 func TestActionInPanel(t *testing.T) {
-	calls := fakeKitten(t, "", "")
+	forgetLeft(t)
+	calls := fakeKitten(t, `[{"is_focused": true, "tabs": [{"windows": [{"id": 11}]}]}, {"tabs": [{"windows": [{"id": 20}]}]}]`, "")
 	if err := Action("launch", "--type=tab"); err != nil {
 		t.Fatal(err)
 	}
@@ -102,6 +110,8 @@ func TestActionInPanel(t *testing.T) {
 	}
 	want := [][]string{
 		{"@", "action", "launch", "--type=tab"},
+		{"@", "focus-window", "--match", "id:11"},
+		{"@", "ls"},
 		{"@", "action", "--match=id:11", "launch", "--type=tab"},
 		{"@", "action", "--match=id:5", "launch", "--type=window"},
 	}
@@ -113,21 +123,40 @@ func TestActionInPanel(t *testing.T) {
 	}
 }
 
+// An action in a panel kitty keeps the focus in runs nothing: it would act on the panel's OS window.
+func TestActionKeptInPanel(t *testing.T) {
+	forgetLeft(t)
+	defer func(d time.Duration) { leaveWait = d }(leaveWait)
+	leaveWait = 0
+	calls := fakeKitten(t, `[{"tabs": [{"windows": [{"id": 11}]}]}, {"is_focused": true, "tabs": [{"windows": [{"id": 20}]}]}]`, "")
+	t.Setenv(FromEnv, "11")
+	if err := Action("launch", "--type=tab"); err == nil || err.Error() != "kitty did not move its focus to window 11, so this panel would have taken the session" {
+		t.Errorf("kept in the panel: %v", err)
+	}
+	if got, want := calls(), [][]string{{"@", "focus-window", "--match", "id:11"}, {"@", "ls"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 // Leaving a panel focuses the window it was opened from and returns once kitty has focused that
-// window's OS window; it gives up, saying so, when kitty keeps the focus in the panel.
+// window's OS window, once per process; it gives up, saying so, when kitty keeps the focus in the panel.
 func TestLeavePanel(t *testing.T) {
+	forgetLeft(t)
 	calls := fakeKitten(t, `[{"is_focused": true, "tabs": [{"windows": [{"id": 11}]}]}, {"tabs": [{"windows": [{"id": 20}]}]}]`, "")
 	if err := LeavePanel(); err != nil || calls() != nil {
 		t.Fatalf("outside a panel: %v, %q", err, calls())
 	}
 	t.Setenv(FromEnv, "11")
-	if err := LeavePanel(); err != nil {
-		t.Fatal(err)
+	for range 2 {
+		if err := LeavePanel(); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if got, want := calls(), [][]string{{"@", "focus-window", "--match", "id:11"}, {"@", "ls"}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 
+	left.Store(false)
 	defer func(d time.Duration) { leaveWait = d }(leaveWait)
 	leaveWait = 0
 	fakeKitten(t, `[{"tabs": [{"windows": [{"id": 11}]}]}, {"is_focused": true, "tabs": [{"windows": [{"id": 20}]}]}]`, "")

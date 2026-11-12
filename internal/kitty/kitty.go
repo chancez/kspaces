@@ -386,13 +386,18 @@ func Acted() bool { return acted.Load() }
 // leaveWait is how long LeavePanel waits for kitty to move its focus, a var for tests.
 var leaveWait = time.Second
 
+// left is whether LeavePanel has moved the focus out of the panel, which it does once.
+var left atomic.Bool
+
 // LeavePanel gives the keyboard back to the window the panel kspaces runs in was opened from, and waits
-// until kitty has moved its focus to that window's OS window: goto_session loads a session with no
-// windows into the focused OS window, whatever window the action runs on, which would be the panel.
-// Nothing outside a panel.
+// until kitty has moved its focus to that window's OS window. Without it kitty acts on the panel's OS
+// window, the focused one: goto_session loads a session with no windows into it whatever window the
+// action runs on, and a kitten launcher's remote control launch places tabs and windows by the active tab,
+// whatever --match or --next-to say, as kitty's own launch action does not. Once per process; nothing
+// outside a panel.
 func LeavePanel() error {
 	from := PanelFrom()
-	if from == 0 {
+	if from == 0 || left.Load() {
 		return nil
 	}
 	if err := FocusWindow(from); err != nil {
@@ -404,6 +409,7 @@ func LeavePanel() error {
 			return err
 		}
 		if osWindowFocused(data, from) {
+			left.Store(true)
 			return nil
 		}
 		if time.Now().After(deadline) {
@@ -454,12 +460,17 @@ func ScreenText(id int) (string, error) {
 	return string(out), err
 }
 
-// Action runs a kitty action, such as goto_session PATH. In a panel it runs on the window the panel was
-// opened from, unless args start with a --match of their own, as it would run on an overlay over that
-// window: launch puts a tab in the OS window of the window it runs on, which would be the panel's.
+// Action runs a kitty action, such as goto_session PATH. In a panel it first leaves the panel, see
+// LeavePanel, and runs on the window the panel was opened from, unless args start with a --match of their
+// own, as it would run on an overlay over that window.
 func Action(args ...string) error {
-	if from := PanelFrom(); from != 0 && !strings.HasPrefix(args[0], "--match") {
-		args = append([]string{fmt.Sprintf("--match=id:%d", from)}, args...)
+	if from := PanelFrom(); from != 0 {
+		if err := LeavePanel(); err != nil {
+			return err
+		}
+		if !strings.HasPrefix(args[0], "--match") {
+			args = append([]string{fmt.Sprintf("--match=id:%d", from)}, args...)
+		}
 	}
 	acted.Store(true)
 	_, err := kitten(append([]string{"action"}, args...)...)

@@ -400,10 +400,12 @@ popup = "panel"
 
 A panel is in no session's tab, so it is told the window it was opened from in `KSPACES_FROM`, and works
 as an overlay over that window would: the current session is that window's, Save as layout's "this tab"
-is its tab, and kitty actions run on it, so a tab a form opens goes in that window's OS window rather than
-the panel's. kitty loads a session restored from its file into the focused OS window, so before that a
-panel hands the keyboard back to the window it was opened from, and waits up to a second for kitty to
-have moved its focus; if kitty does not, it refuses with an error rather than fill the panel.
+is its tab, and kitty actions run on it. Some of kitty still goes by the focused OS window, the panel's:
+a session restored from its file is loaded into it, and a kitten standing in for `launch` that launches
+through remote control, as `boss.call_remote_control(window, ('launch', ...))` does without `--self`, puts
+its tabs and windows in kitty's active tab, whatever `--match` or `--next-to` say. So before its first
+action a panel hands the keyboard back to the window it was opened from, and waits up to a second for
+kitty to have moved its focus; if kitty does not, it refuses with an error rather than fill the panel.
 
 The picker's panel is opened by kspaces, not kitty: with `popup = "panel"` kspaces.conf's `kspaces_pick`
 is `launch --type=background kspaces pick --from @active-kitty-window-id`, which opens the panel for that

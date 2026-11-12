@@ -50,12 +50,6 @@ func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree, opts OpenOptio
 			skipped = fmt.Errorf("opened %s with a shell, as %w", wt.Session, err)
 		}
 	}
-	if _, open := st.Sessions[wt.Session]; !open && len(actions) == 1 {
-		// Restoring from its file, which kitty does into the focused OS window.
-		if err := kitty.LeavePanel(); err != nil {
-			return err
-		}
-	}
 	for _, args := range actions {
 		if err := kitty.Action(args...); err != nil {
 			return err
