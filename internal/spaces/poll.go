@@ -43,15 +43,23 @@ type Shared struct {
 	Git map[string]gitstate.State `json:"git,omitempty"`
 }
 
-// sharedSpace is a Space with its error as text.
+// sharedSpace is a Space with its errors as text.
 type sharedSpace struct {
 	Name      string     `json:"name"`
 	Root      string     `json:"root"`
 	Worktrees []Worktree `json:"worktrees,omitempty"`
 	Err       string     `json:"err,omitempty"`
+	// The space's own config, see Space.Config.
+	Config    *config.Config `json:"config,omitempty"`
+	Untrusted bool           `json:"untrusted,omitempty"`
+	ConfigErr string         `json:"config_err,omitempty"`
 }
 
-// LoadShared reads the config, every space's worktrees, the saved sessions and kitty's windows.
+// LoadShared reads the config, every space's worktrees and own file, the saved sessions and kitty's
+// windows. The leader reads the space files for every sidebar, as it lists the worktrees: what trusting
+// one or editing it does shows in all of them alike at the next poll, and a follower that loads for
+// itself, as after trusting, reads them too. Each read is a stat while a file has not changed, see
+// statCache.
 func LoadShared() Shared {
 	cfg, err := config.Load()
 	if err != nil {
@@ -59,10 +67,13 @@ func LoadShared() Shared {
 	}
 	sh := Shared{Config: &cfg}
 	for _, root := range cfg.Spaces {
-		s := LoadSpace(root)
-		ss := sharedSpace{Name: s.Name, Root: s.Root, Worktrees: s.Worktrees}
+		s := ReadSpace(cfg, root)
+		ss := sharedSpace{Name: s.Name, Root: s.Root, Worktrees: s.Worktrees, Config: s.Config, Untrusted: s.Untrusted}
 		if s.Err != nil {
 			ss.Err = s.Err.Error()
+		}
+		if s.ConfigErr != nil {
+			ss.ConfigErr = s.ConfigErr.Error()
 		}
 		sh.Spaces = append(sh.Spaces, ss)
 	}
@@ -84,9 +95,12 @@ func (sh Shared) View(self int) Snapshot {
 	}
 	spaces := make([]Space, len(sh.Spaces))
 	for i, s := range sh.Spaces {
-		spaces[i] = Space{Name: s.Name, Root: s.Root, Worktrees: s.Worktrees}
+		spaces[i] = Space{Name: s.Name, Root: s.Root, Worktrees: s.Worktrees, Config: s.Config, Untrusted: s.Untrusted}
 		if s.Err != "" {
 			spaces[i].Err = errors.New(s.Err)
+		}
+		if s.ConfigErr != "" {
+			spaces[i].ConfigErr = errors.New(s.ConfigErr)
 		}
 	}
 	st := kitty.StateOf(sh.Windows, self)

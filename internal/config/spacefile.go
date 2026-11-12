@@ -116,7 +116,7 @@ func (cfg Config) WithSpace(name string, f SpaceFile) (Config, error) {
 	}
 	// Each layout is checked again, as a command it runs may be the space's now, and checking fills in its
 	// panes: copies, so cfg's are left as they were.
-	out.Layouts = make([]Layout, 0, len(cfg.Layouts)+len(f.Layouts))
+	out.Layouts = nil
 	for _, l := range slices.Concat(cfg.Layouts, f.Layouts) {
 		l.Tabs = slices.Clone(l.Tabs)
 		for t := range l.Tabs {

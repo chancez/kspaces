@@ -186,27 +186,29 @@ func buildLayout(cfg config.Config, st kitty.State, space Space, wt Worktree, lr
 }
 
 // freshLayout is the layout wt's session opens with afresh, its default, see config.LayoutFor, for a
-// worktree of a configured space, with that space and the worktree as git lists it; ok false for none. A
-// layout that needs an input it has no default for is not one to open without asking: err says so.
-func freshLayout(cfg config.Config, wt Worktree) (space Space, found Worktree, lr LayoutRun, ok bool, err error) {
-	if len(cfg.Layouts) == 0 || wt.Path == "" {
-		return Space{}, Worktree{}, LayoutRun{}, false, nil
+// worktree of a configured space, with that space, the worktree as git lists it and the config as the
+// space sees it; ok false for none. A layout that needs an input it has no default for is not one to open
+// without asking: err says so.
+func freshLayout(global config.Config, wt Worktree) (cfg config.Config, space Space, found Worktree, lr LayoutRun, ok bool, err error) {
+	if wt.Path == "" {
+		return cfg, Space{}, Worktree{}, LayoutRun{}, false, nil
 	}
-	space, found, err = FindWorktree(cfg, wt.Path)
+	space, found, err = FindWorktree(global, wt.Path)
 	if err != nil {
 		// Not a worktree git lists, such as one being removed: the shell, as before layouts.
-		return Space{}, Worktree{}, LayoutRun{}, false, nil
+		return cfg, Space{}, Worktree{}, LayoutRun{}, false, nil
 	}
+	cfg = space.ConfigOf(global)
 	name := cfg.LayoutFor(space.Name, space.Worktrees[0].Path != found.Path)
 	l, ok := cfg.Layout(name)
 	if !ok {
-		return Space{}, Worktree{}, LayoutRun{}, false, nil
+		return cfg, Space{}, Worktree{}, LayoutRun{}, false, nil
 	}
 	lr, err = NewLayoutRun(l, nil)
 	if err != nil {
-		return Space{}, Worktree{}, LayoutRun{}, false, err
+		return cfg, Space{}, Worktree{}, LayoutRun{}, false, err
 	}
-	return space, found, lr, true, nil
+	return cfg, space, found, lr, true, nil
 }
 
 // OpenNew opens the session of wt, a worktree of space just created, so its session has no windows:

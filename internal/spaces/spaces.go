@@ -33,6 +33,12 @@ type Space struct {
 	Missing []Worktree
 	// Err is why the worktrees could not be listed, for example because Root is not a repository.
 	Err error
+	// Config is the config as the space sees it: the global config with the space's own file, see
+	// ConfigPath, merged in, see config.Config.WithSpace. Nil when it has no file in use: none, one not
+	// trusted, or a broken one, which ConfigErr says what is wrong with.
+	Config    *config.Config
+	Untrusted bool
+	ConfigErr error
 }
 
 // HasLinked reports whether the space has rows under its own: linked worktrees, or missing ones.
@@ -110,7 +116,7 @@ func CreateWorktree(space Space, branch, dir string) (Worktree, error) {
 }
 
 // Find is the space given by root or name, or, with an empty query, the space of the session of the
-// window that has the keyboard.
+// window that has the keyboard, its file read as cfg's, see ReadSpace.
 func Find(cfg config.Config, query string) (Space, error) {
 	var current string
 	if query == "" {
@@ -125,10 +131,12 @@ func Find(cfg config.Config, query string) (Space, error) {
 		s := LoadSpace(root)
 		switch {
 		case query != "" && (root == abs || s.Name == query):
+			s.readConfig(cfg)
 			return s, s.Err
 		case query == "":
 			for _, wt := range s.Worktrees {
 				if wt.Session == current {
+					s.readConfig(cfg)
 					return s, nil
 				}
 			}

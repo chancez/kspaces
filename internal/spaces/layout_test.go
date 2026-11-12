@@ -2,6 +2,7 @@ package spaces
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -215,8 +216,9 @@ panes = [
 
 // A worktree opens afresh with its space's layout for it, found with git; a layout that needs an input
 // with no default is not opened, and says why. A session in no space, or a config with no layouts, has
-// none.
+// none. The space's own file, once trusted, has its say first.
 func TestFreshLayout(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	r := gittest.New(t)
 	r.Commit("first")
 	linked := r.Worktree("dev", ".worktrees/dev")
@@ -231,6 +233,10 @@ func TestFreshLayout(t *testing.T) {
 		Space, Worktree, Layout, Err string
 		OK                           bool
 	}
+	fresh := func(cfg config.Config, wt Worktree) result {
+		_, s, wt, lr, ok, err := freshLayout(cfg, wt)
+		return result{s.Name, wt.Path, lr.Layout.Name, errString(err), ok}
+	}
 	var got []result
 	for _, c := range []struct {
 		cfg config.Config
@@ -241,14 +247,27 @@ func TestFreshLayout(t *testing.T) {
 		{cfg, Worktree{Session: "default"}},
 		{config.Config{Spaces: cfg.Spaces}, space.Worktrees[0]},
 	} {
-		s, wt, lr, ok, err := freshLayout(c.cfg, c.wt)
-		got = append(got, result{s.Name, wt.Path, lr.Layout.Name, errString(err), ok})
+		got = append(got, fresh(c.cfg, c.wt))
 	}
+	file := filepath.Join(r.Dir, config.SpaceFileName)
+	data := []byte("layout = \"mine\"\n[[layouts]]\nname = \"mine\"\ntabs = [{ panes = [{}] }]\n")
+	if err := os.WriteFile(file, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got = append(got, fresh(cfg, space.Worktrees[0]))
+	if err := Trust(file, data); err != nil {
+		t.Fatal(err)
+	}
+	got = append(got, fresh(cfg, space.Worktrees[0]), fresh(cfg, Worktree{Path: linked.Dir}))
 	want := []result{
 		{name, r.Dir, "plain", "<nil>", true},
 		{"", "", "", "agent needs Prompt", false},
 		{"", "", "", "<nil>", false},
 		{"", "", "", "<nil>", false},
+		// Untrusted, so the space table's.
+		{name, r.Dir, "plain", "<nil>", true},
+		{name, r.Dir, "mine", "<nil>", true},
+		{name, linked.Dir, "mine", "<nil>", true},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v\nwant %+v", got, want)

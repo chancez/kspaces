@@ -35,9 +35,9 @@ func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree) error {
 	// More than the switch is a fresh session's first tab, which the default layout stands in for.
 	var skipped error
 	if len(actions) > 1 {
-		space, found, lr, ok, err := freshLayout(cfg, wt)
+		spaceCfg, space, found, lr, ok, err := freshLayout(cfg, wt)
 		if ok {
-			return OpenLayout(cfg, st, space, found, lr)
+			return OpenLayout(spaceCfg, st, space, found, lr)
 		}
 		if err != nil {
 			skipped = fmt.Errorf("opened %s with a shell, as %w", wt.Session, err)
@@ -142,7 +142,8 @@ func OpenFromOverlay(cfg config.Config, wt Worktree) error {
 	return OpenWorktree(cfg, st, wt)
 }
 
-// FindWorktree is the worktree at path and its space, from any of the configured spaces.
+// FindWorktree is the worktree at path and its space, from any of the configured spaces, its file read as
+// cfg's, see ReadSpace.
 func FindWorktree(cfg config.Config, path string) (Space, Worktree, error) {
 	// git reports worktree paths with symlinks resolved, for example /private/tmp for /tmp on macOS.
 	path, err := filepath.EvalSymlinks(path)
@@ -156,6 +157,7 @@ func FindWorktree(cfg config.Config, path string) (Space, Worktree, error) {
 		s := LoadSpace(root)
 		for _, wt := range s.Worktrees {
 			if wt.Path == path {
+				s.readConfig(cfg)
 				return s, wt, nil
 			}
 		}
