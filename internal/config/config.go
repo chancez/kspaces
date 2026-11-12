@@ -46,6 +46,12 @@ type Config struct {
 	Kitty       Kitty     `toml:"kitty"`
 	// Commands to run in a worktree, see Command.
 	Commands []Command `toml:"commands"`
+	// Layouts to open in a session, see Layout.
+	Layouts []Layout `toml:"layouts"`
+	// The layout a worktree's session opens with afresh, when the space says none; empty for a shell.
+	DefaultLayout string `toml:"layout"`
+	// What each space, by name, says of itself.
+	Space map[string]SpaceSettings `toml:"space"`
 }
 
 // Sidebar is how the sidebar's dock is laid out. kitty sizes the dock, so kitty.conf's watcher reads this
@@ -132,6 +138,11 @@ func Parse(data string) (Config, error) {
 		}
 		return Config{}, fmt.Errorf("unknown keys: %s", strings.Join(names, ", "))
 	}
+	// The toml package skips a value of the wrong type for a map rather than failing, and `space` is also
+	// what a typo of `spaces` looks like.
+	if typ := md.Type("space"); typ != "" && typ != "Hash" {
+		return Config{}, fmt.Errorf("space must be [space.NAME] tables; the list of spaces is spaces")
+	}
 	if len(cfg.Launch) == 0 {
 		return Config{}, fmt.Errorf("launch cannot be empty")
 	}
@@ -151,6 +162,9 @@ func Parse(data string) (Config, error) {
 		cfg.Spaces[i] = expand(s)
 	}
 	cfg.SessionsDir = expand(cfg.SessionsDir)
+	if err := checkLayouts(&cfg); err != nil {
+		return Config{}, err
+	}
 	return cfg, nil
 }
 

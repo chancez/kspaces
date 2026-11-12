@@ -116,28 +116,38 @@ func (c *Command) check() error {
 			in.Label = in.Name
 		}
 	}
-	check := func(where, tmpl string) error {
-		parts, err := parseTemplate(tmpl)
-		if err != nil {
-			return fmt.Errorf("%s: %w", where, err)
-		}
-		for _, p := range parts {
-			if p.name != "" && !known[p.name] {
-				return fmt.Errorf("%s: {%s} is neither a built-in nor an input", where, p.name)
-			}
-		}
-		return nil
-	}
-	for i, arg := range c.Run {
-		if err := check(fmt.Sprintf("run[%d]", i), arg); err != nil {
-			return err
-		}
+	if err := checkRun(c.Run, known); err != nil {
+		return err
 	}
 	for _, k := range slices.Sorted(maps.Keys(c.Env)) {
 		if k == "" || strings.ContainsAny(k, "= \t\n") {
 			return fmt.Errorf("env has a bad name %q", k)
 		}
-		if err := check("env."+k, c.Env[k]); err != nil {
+		if err := checkTemplate("env."+k, c.Env[k], known); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// checkTemplate says what is wrong with tmpl, found at where, whose placeholders must be in known.
+func checkTemplate(where, tmpl string, known map[string]bool) error {
+	parts, err := parseTemplate(tmpl)
+	if err != nil {
+		return fmt.Errorf("%s: %w", where, err)
+	}
+	for _, p := range parts {
+		if p.name != "" && !known[p.name] {
+			return fmt.Errorf("%s: {%s} is neither a built-in nor an input", where, p.name)
+		}
+	}
+	return nil
+}
+
+// checkRun checks each word of run with checkTemplate.
+func checkRun(run []string, known map[string]bool) error {
+	for i, arg := range run {
+		if err := checkTemplate(fmt.Sprintf("run[%d]", i), arg, known); err != nil {
 			return err
 		}
 	}
@@ -229,19 +239,24 @@ func (c Command) Environ(vars map[string]string) []string {
 // Values are the command's inputs as given, by name, the default for any not given. An input it does not
 // have, or a required one left empty, is an error.
 func (c Command) Values(given map[string]string) (map[string]string, error) {
+	return inputValues(c.Name, c.Inputs, given)
+}
+
+// inputValues are the values of inputs, those of owner, as given, the default for any not given.
+func inputValues(owner string, inputs []Input, given map[string]string) (map[string]string, error) {
 	out := map[string]string{}
 	for name := range given {
-		if !slices.ContainsFunc(c.Inputs, func(in Input) bool { return in.Name == name }) {
-			return nil, fmt.Errorf("%s has no input %s", c.Name, name)
+		if !slices.ContainsFunc(inputs, func(in Input) bool { return in.Name == name }) {
+			return nil, fmt.Errorf("%s has no input %s", owner, name)
 		}
 	}
-	for _, in := range c.Inputs {
+	for _, in := range inputs {
 		v, ok := given[in.Name]
 		if !ok {
 			v = in.Default
 		}
 		if in.Required && strings.TrimSpace(v) == "" {
-			return nil, fmt.Errorf("%s needs %s", c.Name, in.Label)
+			return nil, fmt.Errorf("%s needs %s", owner, in.Label)
 		}
 		out[in.Name] = v
 	}
