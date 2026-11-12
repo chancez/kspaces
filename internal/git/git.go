@@ -196,7 +196,8 @@ func DeleteBranch(root, branch string, force bool) error {
 	if force {
 		flag = "-D"
 	}
-	if out, err := exec.Command("git", "-C", root, "branch", flag, branch).CombinedOutput(); err != nil {
+	// The hint to force is for git's own command line; the error goes to a kitty error window.
+	if out, err := exec.Command("git", "-C", root, "-c", "advice.forceDeleteBranch=false", "branch", flag, branch).CombinedOutput(); err != nil {
 		return fmt.Errorf("%s", strings.TrimSpace(string(out)))
 	}
 	return nil

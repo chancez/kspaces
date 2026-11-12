@@ -72,12 +72,12 @@ func (f *cleanupForm) chosen() []spaces.Cleanup {
 func (f *cleanupForm) remove() tea.Cmd {
 	f.busy, f.err = true, nil
 	var paths []string
-	force := map[string]bool{}
+	opts := map[string]spaces.RemoveOptions{}
 	for _, c := range f.chosen() {
 		paths = append(paths, c.Worktree.Path)
-		force[c.Worktree.Path] = c.Changes > 0
+		opts[c.Worktree.Path] = spaces.RemoveOptions{Force: c.Changes > 0}
 	}
-	return func() tea.Msg { return cleanedMsg{spaces.RemoveAllInBackground(paths, force)} }
+	return func() tea.Msg { return cleanedMsg{spaces.RemoveAllInBackground(paths, opts)} }
 }
 
 func (f *cleanupForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

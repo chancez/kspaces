@@ -6,12 +6,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui"
 )
 
 func (a *app) removeCommand() *cobra.Command {
-	var yes, force bool
-	var forcePaths []string
+	var yes, force, deleteBranch, forceBranch bool
+	var forcePaths, deletePaths, forceBranchPaths []string
 	cmd := &cobra.Command{
 		Use:   "remove PATH...",
 		Short: "Close the session of the linked worktree at PATH and remove the worktree, after confirming in a form",
@@ -22,14 +23,7 @@ func (a *app) removeCommand() *cobra.Command {
 				return err
 			}
 			if yes {
-				forced := map[string]bool{}
-				for _, p := range args {
-					forced[p] = force
-				}
-				for _, p := range forcePaths {
-					forced[p] = true
-				}
-				return tui.RemoveWorktrees(cfg, args, forced)
+				return tui.RemoveWorktrees(cfg, args, removeOptions(args, force, deleteBranch, forceBranch, forcePaths, deletePaths, forceBranchPaths))
 			}
 			if len(args) > 1 {
 				return fmt.Errorf("the form removes one worktree; give --yes to remove several")
@@ -40,7 +34,31 @@ func (a *app) removeCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&yes, "yes", false, "remove without asking, as the form does once confirmed, one after another; errors are also shown in kitty")
 	cmd.Flags().BoolVar(&force, "force", false, "with --yes, remove the worktrees even with changes that are not committed, losing them")
 	cmd.Flags().StringArrayVar(&forcePaths, "force-path", nil, "with --yes, remove the worktree at this path even with changes that are not committed; repeatable")
+	cmd.Flags().BoolVar(&deleteBranch, "delete-branch", false, "with --yes, delete each worktree's local branch after removing it, refusing one with commits not merged and keeping its worktree")
+	cmd.Flags().StringArrayVar(&deletePaths, "delete-branch-path", nil, "with --yes, delete the branch of the worktree at this path, as --delete-branch does; repeatable")
+	cmd.Flags().BoolVar(&forceBranch, "force-branch", false, "with --yes and --delete-branch, delete the branches even with commits not merged, losing them")
+	cmd.Flags().StringArrayVar(&forceBranchPaths, "force-branch-path", nil, "with --yes, delete the branch of the worktree at this path even with commits not merged, as --force-branch does; repeatable")
 	return cmd
+}
+
+// removeOptions are how to remove each of paths, from the remove command's flags: the ones for all of them,
+// then the ones for one path each.
+func removeOptions(paths []string, force, deleteBranch, forceBranch bool, forcePaths, deletePaths, forceBranchPaths []string) map[string]spaces.RemoveOptions {
+	opts := map[string]spaces.RemoveOptions{}
+	for _, p := range paths {
+		opts[p] = spaces.RemoveOptions{Force: force, DeleteBranch: deleteBranch, ForceBranch: forceBranch}
+	}
+	set := func(ps []string, on func(*spaces.RemoveOptions)) {
+		for _, p := range ps {
+			o := opts[p]
+			on(&o)
+			opts[p] = o
+		}
+	}
+	set(forcePaths, func(o *spaces.RemoveOptions) { o.Force = true })
+	set(deletePaths, func(o *spaces.RemoveOptions) { o.DeleteBranch = true })
+	set(forceBranchPaths, func(o *spaces.RemoveOptions) { o.ForceBranch = true })
+	return opts
 }
 
 func (a *app) closeCommand() *cobra.Command {

@@ -245,11 +245,20 @@ func CanRemove(space Space, wt Worktree) error {
 }
 
 // RemoveWorktree ends the session of wt, a linked worktree of space, then removes the worktree, losing its
-// changes if force. The session goes first so nothing still runs in the directory as it is deleted, and
-// its saved file goes too, so it is not restored. The branch is kept.
-func RemoveWorktree(cfg config.Config, space Space, wt Worktree, force bool) error {
+// changes if opts.Force. The session goes first so nothing still runs in the directory as it is deleted,
+// and its saved file goes too, so it is not restored. With opts.DeleteBranch the branch goes last, with
+// git branch -d when merged and -D only with opts.ForceBranch; a branch that cannot go keeps the worktree
+// too, but one git refuses after the worktree is removed is a *BranchError.
+func RemoveWorktree(cfg config.Config, space Space, wt Worktree, opts RemoveOptions) error {
 	if err := CanRemove(space, wt); err != nil {
 		return err
+	}
+	var branch Branch
+	if opts.DeleteBranch {
+		var err error
+		if branch, err = branchToDelete(space, wt, opts); err != nil {
+			return err
+		}
 	}
 	if err := CloseSession(wt.Session); err != nil {
 		return err
@@ -259,15 +268,30 @@ func RemoveWorktree(cfg config.Config, space Space, wt Worktree, force bool) err
 			return err
 		}
 	}
-	return git.RemoveWorktree(space.Root, wt.Path, force)
+	if err := git.RemoveWorktree(space.Root, wt.Path, opts.Force); err != nil {
+		return err
+	}
+	if !opts.DeleteBranch {
+		return nil
+	}
+	if err := git.DeleteBranch(space.Root, branch.Name, branch.Unmerged > 0); err != nil {
+		return &BranchError{Branch: branch.Name, Err: err}
+	}
+	return nil
 }
 
 // RemoveInBackground runs `kspaces remove --yes` for the worktree at path as a kitty background process.
 // Removing closes the worktree's windows, and the form that asked may be over one of them.
-func RemoveInBackground(path string, force bool) error {
+func RemoveInBackground(path string, opts RemoveOptions) error {
 	args := []string{"remove", "--yes"}
-	if force {
+	if opts.Force {
 		args = append(args, "--force")
+	}
+	if opts.DeleteBranch {
+		args = append(args, "--delete-branch")
+	}
+	if opts.DeleteBranch && opts.ForceBranch {
+		args = append(args, "--force-branch")
 	}
 	return kitty.LaunchBackground(append(args, path)...)
 }

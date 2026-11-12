@@ -77,12 +77,19 @@ func AskCleanup(st kitty.State, root string) error {
 }
 
 // RemoveAllInBackground runs `kspaces remove --yes` for the worktrees at paths, one after another, as a
-// kitty background process, forcing git for those in force.
-func RemoveAllInBackground(paths []string, force map[string]bool) error {
+// kitty background process, each as opts has it.
+func RemoveAllInBackground(paths []string, opts map[string]RemoveOptions) error {
 	args := []string{"remove", "--yes"}
 	for _, p := range paths {
-		if force[p] {
+		o := opts[p]
+		if o.Force {
 			args = append(args, "--force-path", p)
+		}
+		if o.DeleteBranch {
+			args = append(args, "--delete-branch-path", p)
+		}
+		if o.DeleteBranch && o.ForceBranch {
+			args = append(args, "--force-branch-path", p)
 		}
 	}
 	return kitty.LaunchBackground(append(append(args, "--"), paths...)...)

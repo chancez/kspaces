@@ -45,8 +45,8 @@ func (f *removeWorktreeForm) Init() tea.Cmd { return nil }
 // has said they are lost; the background process shows anything else that goes wrong in kitty.
 func (f *removeWorktreeForm) remove() tea.Cmd {
 	f.busy, f.err = true, nil
-	path, force := f.wt.Path, f.changes > 0
-	return func() tea.Msg { return removedMsg{spaces.RemoveInBackground(path, force)} }
+	path, opts := f.wt.Path, spaces.RemoveOptions{Force: f.changes > 0}
+	return func() tea.Msg { return removedMsg{spaces.RemoveInBackground(path, opts)} }
 }
 
 func (f *removeWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -175,25 +175,35 @@ func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string) erro
 	return nil
 }
 
-// RemoveWorktrees removes the worktrees at paths without asking, one after another, forcing git for those
-// in force, for the background process the forms start. It has no screen, so failures are shown in kitty
-// as well as returned; one failing does not stop the rest.
-func RemoveWorktrees(cfg config.Config, paths []string, force map[string]bool) error {
+// RemoveWorktrees removes the worktrees at paths without asking, one after another, each as opts has it,
+// for the background process the forms start. It has no screen, so failures are shown in kitty as well
+// as returned; one failing does not stop the rest, and a branch git refuses to delete leaves its worktree
+// removed.
+func RemoveWorktrees(cfg config.Config, paths []string, opts map[string]spaces.RemoveOptions) error {
 	var failed []string
+	branches := 0
 	for _, path := range paths {
 		space, wt, err := spaces.FindWorktree(cfg, path)
 		if err == nil {
-			err = spaces.RemoveWorktree(cfg, space, wt, force[path])
+			err = spaces.RemoveWorktree(cfg, space, wt, opts[path])
 		}
 		if err != nil {
 			failed = append(failed, fmt.Sprintf("%s: %v", path, err))
+		}
+		if _, ok := errors.AsType[*spaces.BranchError](err); ok {
+			branches++
 		}
 	}
 	if len(failed) == 0 {
 		return nil
 	}
 	title := "Could not remove the worktree"
-	if len(failed) > 1 {
+	switch {
+	case branches == len(failed) && branches > 1:
+		title = "Could not delete the branches"
+	case branches == len(failed):
+		title = "Could not delete the branch"
+	case len(failed) > 1:
 		title = "Could not remove the worktrees"
 	}
 	msg := strings.Join(failed, "\n")
