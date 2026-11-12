@@ -4,7 +4,8 @@
 
 - One `kspaces sidebar` per tab, because kitty can only dock to one tab. They share one poller, so only one
   of them runs `kitten @ ls` and `git worktree list`, but each is a process, with its own screen to draw.
-  A dock for the whole OS window would fix that.
+  kitty after 0.50.0 has `launch --type=os-window-dock` (bdd1e8434): one sidebar per OS window once a
+  release has it, with a version check so older kittys keep a dock per tab.
 - Three kitty bugs, fixed upstream after 0.50.0 and worked around in kspaces' bundled kitty scripts until a
   release has the fixes:
   - `save_as_session --match` writes `new_os_window` before a space's file depending on which OS window had
@@ -23,7 +24,8 @@
   and focus change, listened to or not, and none fire until the code that caused them returns. Restoring 9
   spaces in one go asked for 271 and was refused 143, each a dropped watcher call; it broke saving for good
   once. `save_sessions.py` now restores one space per timer, which was refused none, and both watchers try
-  again later when refused.
+  again later when refused. Fixed upstream after 0.50.0 (cb66ed55c, one queued timer for all watcher calls);
+  the workaround stays until a release has it.
 - The default session's `startup_session` file is emptied, not removed, once it has no windows; kitty then
   starts with one shell, and kspaces opens `default` with `launch`.
 - Windows in no session are saved into `default` at quit and come back labelled `default`, including one
@@ -42,8 +44,11 @@ tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/
    instead, more broadly. `repair_session` in `kspaces_watcher.py` comes out once a release has it.
 3. Watcher events (a close reason on `on_close`, an event for a window's directory changing): commented on
    discussion #10828, offering PRs.
-4. Watcher calls each taking a timer, and the macOS and Linux tables of 128: issue kovidgoyal/kitty#10853.
-5. A dock for the whole OS window, the fix for the first known issue: issue kovidgoyal/kitty#10854.
+4. Watcher calls each taking a timer, and the macOS and Linux tables of 128: issue kovidgoyal/kitty#10853,
+   fixed by the maintainer in cb66ed55c.
+5. A dock for the whole OS window, the fix for the first known issue: issue kovidgoyal/kitty#10854,
+   implemented by the maintainer in bdd1e8434 as `launch --type=os-window-dock`. Its group's `dock` entry in
+   `kitten @ ls` has `scope: os-window`.
 6. Toggling a dock: show and hide a dock running a given program, such as `gr` for reviews beside the
    current window, from one mapping, keeping the program running while hidden rather than restarting it.
    kitty has no such action; kspaces_toggle.py only closes and re-adds kspaces' own docks. In the interim,
