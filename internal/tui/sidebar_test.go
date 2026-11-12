@@ -488,6 +488,23 @@ func TestMenuSkipsSections(t *testing.T) {
 	}
 }
 
+// The sidebar losing focus, as to a click in another window, closes its menu.
+func TestMenuClosesOnBlur(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(tea.FocusMsg{})
+	e.m.Update(tea.BlurMsg{})
+	want := e.screen()
+	e.m.Update(tea.FocusMsg{})
+	e.click(fmt.Sprintf(entryZone, e.row("gr@dev")), tea.MouseRight)
+	if e.m.menu == nil {
+		t.Fatal("the right click opened no menu")
+	}
+	e.m.Update(tea.BlurMsg{})
+	if got := e.screen(); e.m.menu != nil || !reflect.DeepEqual(got, want) {
+		t.Errorf("menu open %v after the blur:\n%q\nwant\n%q", e.m.menu != nil, got, want)
+	}
+}
+
 // a adds a space wherever the cursor is: on a row, on a status entry, or in a sidebar with neither.
 func TestAddSpaceKey(t *testing.T) {
 	e := newSidebarEnv(t)

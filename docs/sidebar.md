@@ -93,7 +93,7 @@ made.
 Right-click a row, or press `m` on it. The menu lists what applies to the row, in sections, each named on
 the rule above it: what acts on the row's session, then on its worktree, then on the space as a whole, the
 same from any of its rows. A menu of one section names none. `j` / `k` and the mouse go over the items
-only.
+only. `esc`, a click outside it, or a click in another window closes it.
 
 | Section | Item | Key | Does |
 |---|---|---|---|

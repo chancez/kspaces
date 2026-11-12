@@ -109,6 +109,10 @@ func (m *sidebar) updateMenu(msg tea.Msg) (tea.Cmd, bool) {
 	case tea.MouseWheelMsg:
 		m.menu = nil
 		return nil, false
+	case tea.BlurMsg:
+		// The sidebar lost focus, as to a click in another window.
+		m.menu = nil
+		return nil, false
 	case tea.KeyPressMsg:
 		// Keys the menu does not take do nothing while it is open.
 		cmd, _ := runOn(m, msg, theMenu.Target(menuSubject{}))
