@@ -655,6 +655,11 @@ var (
 		Applies: func(f *saveLayoutForm, _ saveSubject) bool { return !f.busy && !f.confirm && f.onChoice() },
 		Run:     do[*saveLayoutForm, saveSubject](func(f *saveLayoutForm) { f.focused().choice.openList() }),
 	}
+	actSaveTick = &interact.Action[*saveLayoutForm, saveSubject]{
+		Title:   "tick",
+		Applies: func(f *saveLayoutForm, _ saveSubject) bool { return !f.busy && !f.confirm && f.onTick() },
+		Run:     do[*saveLayoutForm, saveSubject]((*saveLayoutForm).tick),
+	}
 	actSaveLayout = &interact.Action[*saveLayoutForm, saveSubject]{
 		Title:   "save",
 		Applies: func(f *saveLayoutForm, _ saveSubject) bool { return !f.busy && !f.confirm },
@@ -887,12 +892,13 @@ func init() {
 	theLayoutForm = interact.List(layoutKind)
 
 	saveKind = interact.NewKind(func(saveSubject) string { return "Save layout" },
-		actSaveNextField, actSavePrevField, actSaveNextChoice, actSavePrevChoice, actSaveList, actSaveLayout, actSaveReplace, actSaveKeep, actSaveCancel)
+		actSaveNextField, actSavePrevField, actSaveNextChoice, actSavePrevChoice, actSaveList, actSaveTick, actSaveLayout, actSaveReplace, actSaveKeep, actSaveCancel)
 	saveKind.Bind(actSaveNextField, "tab", "next field", "tab", "down")
 	saveKind.Bind(actSavePrevField, "shift+tab", "previous field", "shift+tab", "up")
 	saveKind.Bind(actSaveNextChoice, "left/right", "choose", "right")
 	saveKind.Bind(actSavePrevChoice, "", "", "left")
 	saveKind.Bind(actSaveList, "enter/space", "list", "enter", "space")
+	saveKind.Bind(actSaveTick, "space", "tick", "space")
 	saveKind.Bind(actSaveLayout, "enter", "save", "enter")
 	saveKind.Bind(actSaveReplace, "y", "replace", "y")
 	saveKind.Bind(actSaveKeep, "n/esc", "keep it", "n", "esc")

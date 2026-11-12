@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -18,17 +19,30 @@ import (
 )
 
 // saveLayoutForm saves a session's tabs, as kitty has them, as a layout in the config: a name, this tab or
-// every tab, and for each pane what the layout runs there, prefilled from what runs there now. It is meant
-// for a kitty overlay, like the run form.
+// every tab, where to save it, the space's own file or the global config, and for each pane what the
+// layout runs there, prefilled from what runs there now. It is meant for a kitty overlay, like the run
+// form.
 type saveLayoutForm struct {
-	th   *look.Theme
-	cfg  config.Config
-	wt   spaces.Worktree
-	tabs []spaces.CapturedTab
+	th *look.Theme
+	// cfg is the config as the space sees it, whose commands the panes choose from; global is the
+	// global config.
+	cfg    config.Config
+	global config.Config
+	space  spaces.Space
+	wt     spaces.Worktree
+	tabs   []spaces.CapturedTab
 	// this is the index in tabs of this tab, the one saved alone.
-	this  int
-	name  textinput.Model
-	scope choiceFields[string]
+	this   int
+	name   textinput.Model
+	scope  choiceFields[string]
+	target choiceFields[string]
+	// own is the space's file as it was when the form opened: whether it is there, and the layouts it has.
+	own struct {
+		exists  bool
+		layouts []string
+	}
+	// exclude adds a space file the save creates to the repository's info/exclude.
+	exclude bool
 	// panes choose what each pane of each tab runs, by tab and pane.
 	panes [][]choiceFields[paneChoice]
 	// focus is the index in fields of the field that has focus.
@@ -58,6 +72,11 @@ const (
 	thisTab   = "this tab"
 	everyTab  = "every tab"
 	scopeZone = "save"
+	// Where a layout is saved, besides the space's own file, and the zones of that choice and the box
+	// that keeps a new file out of git.
+	globalTarget = "the global config"
+	targetZone   = "save to"
+	excludeZone  = "exclude"
 )
 
 func (c paneChoice) name() string {
@@ -72,11 +91,11 @@ func (c paneChoice) name() string {
 
 type layoutSavedMsg struct{ err error }
 
-// newSaveLayoutForm is the form for saving tabs, wt's session's, as the layout called name, this tab
-// alone when only says so.
-func newSaveLayoutForm(cfg config.Config, wt spaces.Worktree, tabs []spaces.CapturedTab, this int, name string, only bool) *saveLayoutForm {
-	th := look.New(true)
-	f := &saveLayoutForm{th: th, cfg: cfg, wt: wt, tabs: tabs, this: this, name: newInput(th, "")}
+// newSaveLayoutForm is the form for saving tabs, wt's session's, a worktree of space, as the layout called
+// name, this tab alone when only says so, with global the global config.
+func newSaveLayoutForm(global config.Config, space spaces.Space, wt spaces.Worktree, tabs []spaces.CapturedTab, this int, name string, only bool) *saveLayoutForm {
+	th, cfg := look.New(true), space.ConfigOf(global)
+	f := &saveLayoutForm{th: th, cfg: cfg, global: global, space: space, wt: wt, tabs: tabs, this: this, name: newInput(th, ""), exclude: true}
 	f.name.SetValue(name)
 	f.name.CursorEnd()
 	f.name.Placeholder = "required"
@@ -84,8 +103,19 @@ func newSaveLayoutForm(cfg config.Config, wt spaces.Worktree, tabs []spaces.Capt
 	if only {
 		scope = thisTab
 	}
-	f.scope = newChoiceFields(th, scopeZone, []string{thisTab, everyTab}, func(s string) string { return s },
-		func(string) []config.Input { return nil }, nil, false, scope, nil)
+	plain := func(s string) string { return s }
+	none := func(string) []config.Input { return nil }
+	f.scope = newChoiceFields(th, scopeZone, []string{thisTab, everyTab}, plain, none, nil, false, scope, nil)
+	// The space's file first, so a layout of one repository stays out of the global config.
+	f.target = newChoiceFields(th, targetZone, []string{space.Name + "'s " + config.SpaceFileName, globalTarget}, plain, none, nil, false, "", nil)
+	if data, err := os.ReadFile(space.ConfigPath()); err == nil {
+		f.own.exists = true
+		if file, err := config.ParseSpaceFile(string(data)); err == nil {
+			for _, l := range file.Layouts {
+				f.own.layouts = append(f.own.layouts, l.Name)
+			}
+		}
+	}
 	choices := make([]paneChoice, 0, len(cfg.Commands)+2)
 	for _, c := range cfg.Commands {
 		choices = append(choices, paneChoice{command: c.Name})
@@ -145,7 +175,7 @@ func (f *saveLayoutForm) saved() []int {
 	return out
 }
 
-// saveField is a field of the form: a text box, or a choice when in is nil.
+// saveField is a field of the form: a text box, a choice, or a box to tick.
 type saveField struct {
 	in     *textinput.Model
 	choice interface {
@@ -155,12 +185,29 @@ type saveField struct {
 		listOpen() bool
 		updateList(tea.Msg, map[string][]look.Zone) (tea.Cmd, bool)
 	}
+	tick *bool
 }
 
-// fields are the form's fields in order: the name, the scope, and each saved pane's choice, with its run
-// box when it runs that.
+// toSpace says whether the layout goes to the space's own file.
+func (f *saveLayoutForm) toSpace() bool {
+	t, _ := f.target.chosen()
+	return t != globalTarget
+}
+
+// untrusted says whether the layout would go to a space file that is there but not trusted, which saving
+// to is refused.
+func (f *saveLayoutForm) untrusted() bool { return f.toSpace() && f.space.Untrusted }
+
+// creates says whether saving makes the space's file, which can be kept out of git.
+func (f *saveLayoutForm) creates() bool { return f.toSpace() && !f.own.exists }
+
+// fields are the form's fields in order: the name, the scope, where to save, the box that keeps a new
+// space file out of git, and each saved pane's choice, with its run box when it runs that.
 func (f *saveLayoutForm) fields() []saveField {
-	out := []saveField{{in: &f.name}, {choice: &f.scope}}
+	out := []saveField{{in: &f.name}, {choice: &f.scope}, {choice: &f.target}}
+	if f.creates() {
+		out = append(out, saveField{tick: &f.exclude})
+	}
 	for _, t := range f.saved() {
 		for p := range f.panes[t] {
 			c := &f.panes[t][p]
@@ -191,8 +238,12 @@ func (f *saveLayoutForm) focused() saveField {
 func (f *saveLayoutForm) nextField() tea.Cmd { return moveFocus(f.boxes(), &f.focus, 1) }
 func (f *saveLayoutForm) prevField() tea.Cmd { return moveFocus(f.boxes(), &f.focus, -1) }
 
-// onChoice says whether a choice has focus.
+// onChoice says whether a choice has focus, onTick a box to tick.
 func (f *saveLayoutForm) onChoice() bool { return f.focused().choice != nil }
+func (f *saveLayoutForm) onTick() bool   { return f.focused().tick != nil }
+
+// tick ticks the focused box, or clears it.
+func (f *saveLayoutForm) tick() { *f.focused().tick = !*f.focused().tick }
 
 // cycleChoice chooses the next, or the one before, of the focused choice, which keeps focus.
 func (f *saveLayoutForm) cycleChoice(delta int) tea.Cmd {
@@ -232,20 +283,31 @@ func (f *saveLayoutForm) layout() (config.Layout, error) {
 	return l, nil
 }
 
-// save saves the layout and leaves, or says why it cannot; a name the config has asks to replace it
-// first, unless replace says to.
+// save saves the layout and leaves, or says why it cannot; a name where it goes has already asks to
+// replace it first, unless replace says to.
 func (f *saveLayoutForm) save(replace bool) tea.Cmd {
 	l, err := f.layout()
+	if err == nil && f.untrusted() {
+		err = fmt.Errorf("%s is not trusted: trust it before saving to it", config.Tilde(f.space.ConfigPath()))
+	}
 	f.err = err
 	if err != nil {
 		return nil
 	}
-	if _, exists := f.cfg.Layout(l.Name); exists && !replace {
+	exists := slices.Contains(f.own.layouts, l.Name)
+	if !f.toSpace() {
+		_, exists = f.global.Layout(l.Name)
+	}
+	if exists && !replace {
 		f.confirm = true
 		return nil
 	}
 	f.busy, f.confirm = true, false
-	return func() tea.Msg { return layoutSavedMsg{config.SaveLayout(l, replace)} }
+	if !f.toSpace() {
+		return func() tea.Msg { return layoutSavedMsg{config.SaveLayout(l, replace)} }
+	}
+	global, space, exclude := f.global, f.space, f.creates() && f.exclude
+	return func() tea.Msg { return layoutSavedMsg{spaces.SaveSpaceLayout(global, space, l, replace, exclude)} }
 }
 
 func (f *saveLayoutForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -289,6 +351,11 @@ func (f *saveLayoutForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				fl.choice.openList()
 				return f, f.cycleChoice(0)
 			}
+			if fl.tick != nil && clickedChoice(f.zones, excludeZone, msg) {
+				f.focus = i
+				f.tick()
+				return f, moveFocus(f.boxes(), &f.focus, 0)
+			}
 		}
 	}
 	in := f.focused().in
@@ -325,6 +392,21 @@ func (f *saveLayoutForm) render() string {
 		list = func(lines []string) []string { return f.scope.drawList(lines, at, width, f.height) }
 	}
 	lines = append(lines, f.scope.lines(on == &f.scope, width)...)
+	if f.target.listOpen() {
+		at := len(lines)
+		list = func(lines []string) []string { return f.target.drawList(lines, at, width, f.height) }
+	}
+	lines = append(lines, f.target.lines(on == &f.target, width)...)
+	indent := look.Default(strings.Repeat(" ", labelWidth))
+	if f.untrusted() {
+		for _, row := range look.Error("not trusted: trust it before saving to it").Wrapped(width - labelWidth) {
+			lines = append(lines, line(indent, row))
+		}
+	}
+	if f.creates() {
+		spans := []look.Span{indent, look.Checkbox(f.exclude, false), look.Text(" keep out of git (adds it to .git/info/exclude)")}
+		lines = append(lines, th.DrawZone(excludeZone, look.Plain, width, th.Cut(width, spans...)...))
+	}
 	saved := f.saved()
 	for n, t := range saved {
 		for p, prog := range f.tabs[t].Programs {
@@ -340,7 +422,12 @@ func (f *saveLayoutForm) render() string {
 			lines = append(lines, c.lines(on == c, width)...)
 		}
 	}
-	lines = append(lines, "", muted(fmt.Sprintf("Adds %s to the config's layouts", plural(len(saved), "tab"))), "")
+	target, _ := f.target.chosen()
+	adds := fmt.Sprintf("Adds %s to %s", plural(len(saved), "tab"), target)
+	if f.creates() {
+		adds += ", which it makes"
+	}
+	lines = append(lines, "", muted(adds), "")
 	switch {
 	case f.busy:
 		lines = append(lines, line(look.Busy("Saving...")), "")
@@ -365,8 +452,11 @@ func (f *saveLayoutForm) render() string {
 		control{action: actSaveLayout, label: "Save"},
 		control{action: actSaveCancel, label: "Cancel"})
 	spans = append(spans, look.Text("  "), look.Key("tab"), look.KeyDesc(" next field"))
-	if on != nil {
+	switch {
+	case on != nil:
 		spans = append(spans, choiceHints("choose")...)
+	case f.onTick():
+		spans = append(spans, look.Text("  "), look.Key("space"), look.KeyDesc(" tick"))
 	}
 	return boxed(append(lines, line(spans...)))
 }
@@ -387,7 +477,7 @@ func SaveLayoutForm(ctx context.Context, cfg config.Config, dir, name string, on
 	if err != nil {
 		return err
 	}
-	if _, err := tea.NewProgram(newSaveLayoutForm(space.ConfigOf(cfg), wt, tabs, this, name, only), tea.WithContext(ctx)).Run(); err != nil {
+	if _, err := tea.NewProgram(newSaveLayoutForm(cfg, space, wt, tabs, this, name, only), tea.WithContext(ctx)).Run(); err != nil {
 		return fmt.Errorf("running the save layout form: %w", err)
 	}
 	return nil
