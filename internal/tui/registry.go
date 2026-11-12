@@ -264,6 +264,13 @@ var actFilter = paneAction("filter", (*sidebar).openFilter)
 // actCycleSort goes on to the next sort mode, as a left click on the sort button does.
 var actCycleSort = paneAction("sort", func(m *sidebar) tea.Cmd { m.setSort(m.sortMode().Next()); return nil })
 
+// actMoveUp and actMoveDown move the cursor's space, or linked worktree within its space, as dragging it
+// does.
+var (
+	actMoveUp   = paneAction("move up", func(m *sidebar) tea.Cmd { return m.moveRow(-1) })
+	actMoveDown = paneAction("move down", func(m *sidebar) tea.Cmd { return m.moveRow(1) })
+)
+
 // sortAction chooses mode from the sort button's menu.
 func sortAction(title string, mode spaces.SortMode) *interact.Action[*sidebar, sortSubject] {
 	return &interact.Action[*sidebar, sortSubject]{
@@ -564,7 +571,7 @@ func init() {
 
 	paneKind = interact.NewKind(func(paneSubject) string { return "Sidebar" },
 		actDown, actUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit,
-		actAttend, actFilter, actCycleSort)
+		actAttend, actFilter, actCycleSort, actMoveUp, actMoveDown)
 	paneKind.Bind(actDown, "j/k", "down/up", "j", "down")
 	paneKind.Bind(actUp, "", "", "k", "up")
 	paneKind.Bind(actTop, "g/G", "top/bottom", "g", "home")
@@ -577,6 +584,8 @@ func init() {
 	paneKind.Bind(actAttend, "!", "go to what needs you", "!")
 	paneKind.Bind(actFilter, "/", "filter the spaces", "/")
 	paneKind.Bind(actCycleSort, "s", "change the sort mode", "s")
+	paneKind.Bind(actMoveUp, "K/J", "move the row up/down", "K")
+	paneKind.Bind(actMoveDown, "", "", "J")
 	interact.Via(paneKind, func(paneSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	thePane = interact.List(paneKind)
 

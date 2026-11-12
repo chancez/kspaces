@@ -40,8 +40,10 @@ type sidebar struct {
 	spaces []spaces.Space
 	others []spaces.Space
 	folded map[string]bool
-	// How the rows are ordered, see spaces.Snapshot.
+	// How the rows are ordered, see spaces.Snapshot, and the order held while the mouse is on them, see
+	// keepOrder.
 	order spaces.Order
+	held  map[string]int
 	// Sessions with a saved file, see spaces.Snapshot.
 	saved map[string]bool
 	kitty kitty.State
@@ -160,6 +162,7 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.filtering && !m.navigating() {
 		m.closeFilter()
 	}
+	m.keepOrder()
 	return m, tea.Batch(start, cmd)
 }
 

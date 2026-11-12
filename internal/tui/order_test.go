@@ -173,3 +173,129 @@ func TestSortMenu(t *testing.T) {
 		t.Errorf("menu again:\n%q\nwant\n%q", got, want)
 	}
 }
+
+// orderConfig is a config.toml listing the fixture's spaces with comments, in a config directory of the
+// test's own.
+const orderConfig = "# Mine.\nspaces = [\n  \"/src/gr\", # work\n  # the terminal\n  \"/src/kitty\",\n  \"/src/docs\",\n  \"/src/broken\",\n]\n"
+
+// newConfig writes text as the config, and returns a function that reads it back.
+func newConfig(t *testing.T, text string) func() string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "kspaces", "config.toml")
+	t.Setenv("XDG_CONFIG_HOME", filepath.Dir(filepath.Dir(path)))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return func() string {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+}
+
+// savedOrder is what the worktrees' order file says.
+func savedOrder(t *testing.T) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(os.Getenv("XDG_STATE_HOME"), "kspaces", "order"))
+	if err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+// K and J move the cursor's row up and down, sent from another window too: a linked worktree within its
+// space, saved in the state directory, and a space, in config.toml with its comments. Moving in an
+// automatic mode switches to manual, from the order shown.
+func TestMoveKeys(t *testing.T) {
+	e := newOrderEnv(t)
+	cfg := newConfig(t, orderConfig)
+	type state struct {
+		Screen              []string
+		Cursor              []string
+		Config, Order, Sort string
+	}
+	now := func() state {
+		return state{e.spacesScreen(), e.highlighted(), cfg(), savedOrder(t), savedSort(t)}
+	}
+	gr := []string{"\u25bc " + repoIcon + "gr main", "  " + blocked + "dev pr/me/dev", "  " + branchIcon + "fix fix"}
+	dev, fix := gr[1], gr[2]
+	kitty, docs, broken := "  "+repoIcon+"kitty master", "\u25b6 \uf110  docs main", "  \uf00d  broken"
+	screen := func(title string, rows ...string) []string {
+		return append([]string{title, "", "  " + termIcon + "default"}, rows...)
+	}
+
+	// Without focus, as kitty's send-key sends them, starting on the sidebar's own session.
+	e.press("J")
+	want := state{
+		Screen: screen(spacesTitle, "", gr[0], fix, dev, "", kitty, "", docs, "", broken),
+		Cursor: []string{dev}, Config: orderConfig, Order: "{\n  \"/src/gr\": [\n    \"fix\",\n    \"dev\"\n  ]\n}\n",
+	}
+	if got := now(); !reflect.DeepEqual(got, want) {
+		t.Errorf("J on dev:\n%#v\nwant\n%#v", got, want)
+	}
+	// The last stays last.
+	e.press("J")
+	if got := now(); !reflect.DeepEqual(got, want) {
+		t.Errorf("J on the last:\n%#v\nwant\n%#v", got, want)
+	}
+
+	e.press("k", "k", "J")
+	want.Screen = screen(spacesTitle, "", kitty, "", gr[0], fix, dev, "", docs, "", broken)
+	want.Cursor = []string{gr[0]}
+	want.Config = "# Mine.\nspaces = [\n  # the terminal\n  \"/src/kitty\",\n  \"/src/gr\", # work\n  \"/src/docs\",\n  \"/src/broken\",\n]\n"
+	if got := now(); !reflect.DeepEqual(got, want) {
+		t.Errorf("J on gr:\n%#v\nwant\n%#v", got, want)
+	}
+
+	// By activity gr comes first again, dev after fix, which K moves above it: manual, as shown.
+	e.press("s", "j", "j", "K")
+	want = state{
+		Screen: screen(spacesTitle, "", gr[0], dev, fix, "", kitty, "", docs, "", broken),
+		Cursor: []string{dev}, Config: orderConfig,
+		Order: "{\n  \"/src/docs\": [\n    \"notes\"\n  ],\n  \"/src/gr\": [\n    \"dev\",\n    \"fix\"\n  ]\n}\n", Sort: "manual\n",
+	}
+	if got := now(); !reflect.DeepEqual(got, want) {
+		t.Errorf("K in activity:\n%#v\nwant\n%#v", got, want)
+	}
+
+	// A session in no space does not move.
+	e.press("g", "K", "J")
+	want.Cursor = []string{"  " + termIcon + "default"}
+	if got := now(); !reflect.DeepEqual(got, want) {
+		t.Errorf("K and J on default:\n%#v\nwant\n%#v", got, want)
+	}
+}
+
+// While a menu is open the rows keep their order, so what it was opened on stays by it; the next refresh
+// after it closes reorders them.
+func TestHoldWhileMenuOpen(t *testing.T) {
+	e := newOrderEnv(t)
+	e.press("s")
+	e.m.Update(tea.BlurMsg{})
+	busy := orderFixture()
+	busy.Order.Focused["docs@notes"] = 100
+	e.click(fmt.Sprintf(entryZone, e.row("kitty")), tea.MouseRight)
+	e.m.Update(busy)
+	e.m.render()
+	keys := func() []string {
+		var out []string
+		for _, r := range e.m.rows {
+			out = append(out, rowKey(r))
+		}
+		return out
+	}
+	if got, want := keys(), []string{"default", "", "gr", "gr@fix", "gr@dev", "", "kitty", "", "docs", "", "/src/broken"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("refreshed under the menu: %q, want %q", got, want)
+	}
+	e.press("esc")
+	e.m.Update(busy)
+	want := []string{"\u25b6 \uf110  docs main", "", "\u25bc " + repoIcon + "gr main", "  " + branchIcon + "fix fix", "  " + blocked + "dev pr/me/dev", "", "  " + repoIcon + "kitty master", "", "  \uf00d  broken"}
+	if got := e.spacesScreen()[4:13]; !reflect.DeepEqual(got, want) {
+		t.Errorf("refreshed with the menu closed:\n%q\nwant\n%q", got, want)
+	}
+}
