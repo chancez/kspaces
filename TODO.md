@@ -60,4 +60,6 @@ tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/
 Dropped: resizable docks, which the maintainer turned down in #2391; `[sidebar] width` covers it.
 
 When a kitty release has a fix, drop its workaround behind a check of kitty's version, as older kittys
-still need it.
+still need it. Going back to kitty's `save_as_session --match` for the saver: since c5e6bdf1f it fails
+rather than writing an empty file when nothing matches, so the saver keeps removing a session's file itself
+when its last window is gone.
