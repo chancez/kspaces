@@ -27,7 +27,7 @@ type newWorktreeForm struct {
 	// Empty for the default, which spaces.WorktreeDir derives from the branch and the placeholder shows.
 	dir textinput.Model
 	// The command the first tab runs, none for a shell, and its inputs. Only with commands configured.
-	cmds commandFields
+	cmds choiceFields[config.Command]
 	// focus is the index in fields of the field that has focus.
 	focus int
 	// typed is the branch field as followBranch last saw it, so it works out what that names only when it
@@ -110,8 +110,8 @@ func (f *newWorktreeForm) plan() (branch, dir string) {
 
 func (f *newWorktreeForm) create() tea.Cmd {
 	var run *spaces.Run
-	if _, ok := f.cmds.chosen(); ok {
-		r, err := f.cmds.run()
+	if cmd, ok := f.cmds.chosen(); ok {
+		r, err := spaces.NewRun(cmd, f.cmds.values())
 		if err != nil {
 			f.err = err
 			return nil
@@ -230,7 +230,7 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
 			return f, cmd
 		}
-		if clickedCommand(f.zones, msg) {
+		if clickedChoice(f.zones, commandZone, msg) {
 			return f, f.cycleCommand(1)
 		}
 	}

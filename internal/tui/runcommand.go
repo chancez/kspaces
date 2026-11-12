@@ -23,7 +23,7 @@ type runForm struct {
 	cfg   config.Config
 	space spaces.Space
 	wt    spaces.Worktree
-	cmds  commandFields
+	cmds  choiceFields[config.Command]
 	// open overrides where the command opens, empty for where it is configured to.
 	open string
 	// windows says whether the session has windows, without which the command is its first tab.
@@ -118,7 +118,8 @@ func (f *runForm) opensWhere() string {
 
 // run runs the chosen command and leaves, or says why it cannot.
 func (f *runForm) run() tea.Cmd {
-	r, err := f.cmds.run()
+	cmd, _ := f.cmds.chosen()
+	r, err := spaces.NewRun(cmd, f.cmds.values())
 	if err != nil {
 		f.err = err
 		return nil
@@ -158,7 +159,7 @@ func (f *runForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
 			return f, cmd
 		}
-		if clickedCommand(f.zones, msg) {
+		if clickedChoice(f.zones, commandZone, msg) {
 			return f, f.cycleCommand(1)
 		}
 	}
