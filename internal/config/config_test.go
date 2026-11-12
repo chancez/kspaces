@@ -22,6 +22,7 @@ branch_prefix = "pr/me"
 
 [sidebar]
 width = 40
+popup = "panel"
 
 [kitty]
 auto_install = true
@@ -36,7 +37,7 @@ auto_install = true
 		Launch:      []string{"kitten", "my_launch.py"},
 		SessionsDir: filepath.Join(home, ".local/share/kitty/sessions"),
 		Worktrees:   Worktrees{Dir: ".worktrees", BranchPrefix: "pr/me"},
-		Sidebar:     Sidebar{Width: 40},
+		Sidebar:     Sidebar{Width: 40, Popup: PopupPanel},
 		Kitty:       Kitty{AutoInstall: true},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -48,7 +49,7 @@ auto_install = true
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := (Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: ".worktrees"}, Sidebar: Sidebar{Width: 28}}); !reflect.DeepEqual(got, want) {
+	if want := (Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: ".worktrees"}, Sidebar: Sidebar{Width: 28, Popup: PopupOverlay}}); !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}
 
@@ -60,6 +61,8 @@ auto_install = true
 		`spaces = "~/x"`,       // a string, not a list
 		"[sidebar]\nwidth = 11",
 		"[sidebar]\nwidth = 121",
+		"[sidebar]\npopup = \"window\"",
+		"[sidebar]\npopup = \"\"",
 	} {
 		if _, err := Parse(bad); err == nil {
 			t.Fatalf("%q was accepted", bad)

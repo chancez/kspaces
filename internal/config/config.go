@@ -22,6 +22,7 @@ import (
 //
 //	[sidebar]
 //	width = 28
+//	popup = "overlay"
 //
 //	[kitty]
 //	auto_install = true
@@ -54,12 +55,21 @@ type Config struct {
 	Space map[string]SpaceSettings `toml:"space"`
 }
 
-// Sidebar is how the sidebar's dock is laid out. kitty sizes the dock, so kitty.conf's watcher reads this
-// rather than kspaces; kspaces checks it with the rest.
+// Sidebar is how the sidebar's dock is laid out, and where its forms and the picker open. kitty sizes the
+// dock, so kitty.conf's watcher reads Width rather than kspaces; kspaces checks it with the rest.
 type Sidebar struct {
 	// The dock's width in columns, the right border included.
 	Width int `toml:"width"`
+	// Where the forms and the picker open: PopupOverlay or PopupPanel.
+	Popup string `toml:"popup"`
 }
+
+// The places a form or the picker can open: an overlay over the window it is for, or a kitty panel, an
+// OS window of its own of a fixed size, centered on the screen.
+const (
+	PopupOverlay = "overlay"
+	PopupPanel   = "panel"
+)
 
 // Kitty is what `kspaces kitty install` puts in kitty's config directory.
 type Kitty struct {
@@ -126,7 +136,7 @@ func Parse(data string) (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("finding the home directory: %w", err)
 	}
-	cfg := Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: defaultWorktreeDir}, Sidebar: Sidebar{Width: DefaultSidebarWidth}}
+	cfg := Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: defaultWorktreeDir}, Sidebar: Sidebar{Width: DefaultSidebarWidth, Popup: PopupOverlay}}
 	md, err := toml.Decode(data, &cfg)
 	if err != nil {
 		return Config{}, err
@@ -148,6 +158,9 @@ func Parse(data string) (Config, error) {
 	}
 	if w := cfg.Sidebar.Width; w < MinSidebarWidth || w > MaxSidebarWidth {
 		return Config{}, fmt.Errorf("sidebar.width is %d, it must be from %d to %d", w, MinSidebarWidth, MaxSidebarWidth)
+	}
+	if p := cfg.Sidebar.Popup; p != PopupOverlay && p != PopupPanel {
+		return Config{}, fmt.Errorf("sidebar.popup is %q, it must be %q or %q", p, PopupOverlay, PopupPanel)
 	}
 	if err := checkCommands(cfg.Commands); err != nil {
 		return Config{}, err
