@@ -6,7 +6,7 @@ import (
 )
 
 // Commands parse with their defaults filled in: open is a tab, an input's type is string and its label
-// its name.
+// its name. An input's default can be a string of several lines.
 func TestParseCommands(t *testing.T) {
 	got, err := Parse(`
 [[commands]]
@@ -19,6 +19,9 @@ open = "split"
 name = "prompt"
 label = "Prompt"
 required = true
+default = """
+fix it
+and test"""
 
 [[commands.inputs]]
 name = "model"
@@ -39,7 +42,7 @@ run = ["gr"]
 			Env:  map[string]string{"TASK_PR": "{pr}", "LITERAL": "{{x}}"},
 			Open: "split",
 			Inputs: []Input{
-				{Name: "prompt", Type: "string", Label: "Prompt", Required: true},
+				{Name: "prompt", Type: "string", Label: "Prompt", Default: "fix it\nand test", Required: true},
 				{Name: "model", Type: "string", Label: "model", Default: "opus"},
 			},
 		},

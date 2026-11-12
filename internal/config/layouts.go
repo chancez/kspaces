@@ -271,10 +271,13 @@ func (cfg Config) PaneCommand(l Layout, p Pane) (Command, bool) {
 	return Command{}, false
 }
 
-// TitleWith is the tab's title with vars substituted, as Command.Argv does.
+// TitleWith is the tab's title with vars substituted, as Command.Argv does. Its newlines, as an input's
+// value can have, become spaces, as a tab's title is one line.
 func (t LayoutTab) TitleWith(vars map[string]string) string {
-	return expand(t.Title, vars)
+	return oneLine.Replace(expand(t.Title, vars))
 }
+
+var oneLine = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ")
 
 // KittyLayout is the kitty layout the tab is set to.
 func (t LayoutTab) KittyLayout() string {

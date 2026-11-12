@@ -20,7 +20,8 @@ func TestVersion(t *testing.T) {
 	}
 }
 
-// --input is NAME=VALUE, the value taking any further =, and anything else is an error.
+// --input is NAME=VALUE, the value taking any further = and newlines as given, and anything else is an
+// error.
 func TestParseInputs(t *testing.T) {
 	type result struct {
 		Inputs map[string]string
@@ -28,7 +29,7 @@ func TestParseInputs(t *testing.T) {
 	}
 	var got []result
 	for _, flags := range [][]string{
-		{"prompt=fix a=b", "model="},
+		{"prompt=fix a=b\nand c", "model="},
 		{"prompt"},
 		{"=x"},
 	} {
@@ -40,7 +41,7 @@ func TestParseInputs(t *testing.T) {
 		got = append(got, r)
 	}
 	want := []result{
-		{Inputs: map[string]string{"prompt": "fix a=b", "model": ""}},
+		{Inputs: map[string]string{"prompt": "fix a=b\nand c", "model": ""}},
 		{Err: `--input "prompt" is not NAME=VALUE`},
 		{Err: `--input "=x" is not NAME=VALUE`},
 	}

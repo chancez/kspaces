@@ -216,7 +216,8 @@ panes = [{ command = "claude" }, { command = "codex", split = "right" }, { run =
 	if !reflect.DeepEqual(panes, wantPanes) {
 		t.Errorf("panes %#v\nwant %#v", panes, wantPanes)
 	}
-	if got, want := l.Tabs[0].TitleWith(map[string]string{"prompt": "fix"}), "fix {x}"; got != want {
-		t.Errorf("title %q, want %q", got, want)
+	titles := []string{l.Tabs[0].TitleWith(map[string]string{"prompt": "fix"}), l.Tabs[0].TitleWith(map[string]string{"prompt": "fix\nit\r\nnow"})}
+	if want := []string{"fix {x}", "fix it now {x}"}; !reflect.DeepEqual(titles, want) {
+		t.Errorf("titles %q, want %q", titles, want)
 	}
 }

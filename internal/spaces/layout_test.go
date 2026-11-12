@@ -78,7 +78,8 @@ tabs = [{ panes = [{}] }]
 // window of the one it names, on its side at its size; commands have their env and --hold. Each tab's
 // focus pane is focused, the first tab's last. A session with no windows gets the first tab as its first
 // window and the second by it, then the switch; one with windows is switched to first, and gets them by
-// its window 7. Through a kitten the same, after its own words.
+// its window 7. Through a kitten the same, after its own words. The prompt's newline stays in its word,
+// and is a space in the tab's title.
 func TestBuildLayout(t *testing.T) {
 	cfg, err := config.Parse(agentConfig)
 	if err != nil {
@@ -87,7 +88,7 @@ func TestBuildLayout(t *testing.T) {
 	space := Space{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Branch: "main", Session: "gr"}}}
 	wt := Worktree{Path: "/src/gr/.worktrees/fix", Branch: "pr/me/fix", Session: "gr@fix"}
 	l, _ := cfg.Layout("agent")
-	lr, err := NewLayoutRun(l, map[string]string{"prompt": "fix it"})
+	lr, err := NewLayoutRun(l, map[string]string{"prompt": "fix\nit"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +97,7 @@ func TestBuildLayout(t *testing.T) {
 		"--env=KSPACES_SPACE=gr", "--env=KSPACES_ROOT=/src/gr", "--env=KSPACES_WORKTREE=/src/gr/.worktrees/fix",
 		"--env=KSPACES_BRANCH=pr/me/fix", "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr@fix", "--env=KSPACES_PR=12",
 	}
-	withPrompt := append(slices.Clone(builtins), "'--env=KSPACES_INPUT_PROMPT=fix it'")
+	withPrompt := append(slices.Clone(builtins), "'--env=KSPACES_INPUT_PROMPT=fix\nit'")
 	at := []string{"--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix"}
 	goTo := []string{"action", "goto_session", "gr@fix.kitty-session"}
 	type result struct {
@@ -115,7 +116,7 @@ func TestBuildLayout(t *testing.T) {
 		// tabs are the calls for both tabs, the first tab's launch on window first, the second's on second.
 		tabs := func(first, second int) [][]string {
 			return [][]string{
-				on(first, []string{"--type=tab"}, slices.Concat([]string{"'--tab-title=pr/me/fix: fix it'"}, withPrompt, []string{"--hold", "claude", "'fix it'"})...),
+				on(first, []string{"--type=tab"}, slices.Concat([]string{"'--tab-title=pr/me/fix: fix it'"}, withPrompt, []string{"--hold", "claude", "'fix\nit'"})...),
 				{"goto-layout", "--match=window_id:11", "splits"},
 				on(11, split(11, "vsplit", 35), slices.Concat(builtins, []string{"--hold", "gr"})...),
 				on(11, split(11, "hsplit", 30)),
