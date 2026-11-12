@@ -23,6 +23,8 @@ const (
 	popupZone = "popup"
 	// addZone is the button on the SPACES title that adds a space.
 	addZone = "add"
+	// sortZone is the button on the SPACES title that shows and changes the sort mode.
+	sortZone = "sort"
 )
 
 // rowSessions are the worktrees a row stands for: its own, and for a folded space all of the space's,

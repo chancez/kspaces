@@ -220,8 +220,9 @@ const (
 	termIcon   = "\uf120  "
 )
 
-// spacesTitle is the SPACES title with the add button in the last of the 29 columns before the border.
-const spacesTitle = "SPACES" + "                      " + "\uf067"
+// spacesTitle is the SPACES title with the sort button, manual, and the add button in the last of the 29
+// columns before the border.
+const spacesTitle = "SPACES" + "                    " + "\uf0c9 \uf067"
 
 // The spaces list: sessions in no space, then each space and its linked worktrees. A row starts with
 // the fold caret, or as wide a blank, then its icon: what the row is, or the most urgent state of its
@@ -561,7 +562,7 @@ func TestAddSpaceButton(t *testing.T) {
 	}
 
 	e.m.Update(tea.WindowSizeMsg{Width: 12, Height: 40})
-	if got, want := e.screen()[0], "SPACES    \uf067"; got != want {
+	if got, want := e.screen()[0], "SPACES  \uf0c9 \uf067"; got != want {
 		t.Errorf("narrowest title %q, want %q", got, want)
 	}
 }

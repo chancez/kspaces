@@ -69,8 +69,8 @@ type sidebar struct {
 	hover   int
 	hoverAt time.Time
 	mouse   *pixelMouse
-	// Whether the mouse is on the add space button, which lights it.
-	addHot bool
+	// Whether the mouse is on the add space button or the sort button, which lights it.
+	addHot, sortHot bool
 	// zones are where the last frame drew marked spans, by id, so a click maps back to what was drawn.
 	zones map[string][]look.Zone
 	// The spaces list's filter, see filter.go; its query narrows rows while filtering.
@@ -209,7 +209,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseMotionMsg:
 		m.motion(msg)
 	case mouseLeftMsg:
-		m.hover, m.addHot = 0, false
+		m.hover, m.addHot, m.sortHot = 0, false, false
 	case tea.KeyPressMsg:
 		if !m.focused {
 			if !m.remote {
@@ -306,14 +306,15 @@ func (m *sidebar) render() string {
 	return out
 }
 
-// titleLine is SPACES with the add space button at its right end. The title is cut first, keeping a cell
-// between it and the button.
+// titleLine is SPACES with the sort button and the add space button at its right end. The title is cut
+// first, keeping a cell between it and the buttons.
 func (m *sidebar) titleLine(width int) string {
 	th := m.th
-	title := th.Cut(max(width-2, 0), look.Title("SPACES"))
-	gap := look.Default(strings.Repeat(" ", max(width-th.Width(title...)-1, 0)))
-	spans := append(append(title, gap), look.Mark(addZone, look.AddButton(m.addHot))...)
-	return th.Draw(look.Plain, width, spans...)
+	buttons := append(look.Mark(sortZone, look.SortButton(m.order.Mode, m.sortHot)), look.Default(" "))
+	buttons = append(buttons, look.Mark(addZone, look.AddButton(m.addHot))...)
+	title := th.Cut(max(width-th.Width(buttons...)-1, 0), look.Title("SPACES"))
+	gap := look.Default(strings.Repeat(" ", max(width-th.Width(title...)-th.Width(buttons...), 0)))
+	return th.Draw(look.Plain, width, append(append(title, gap), buttons...)...)
 }
 
 func (m *sidebar) frame() string {

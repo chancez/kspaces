@@ -58,6 +58,9 @@ type runSubject struct{}
 // filterSubject is the spaces list's filter, while it is open.
 type filterSubject struct{}
 
+// sortSubject is the sort button on the SPACES title, whose menu chooses the sort mode.
+type sortSubject struct{}
+
 // do adapts a function that changes the model without a command.
 func do[M, S any](f func(m M)) func(M, S) tea.Cmd {
 	return func(m M, _ S) tea.Cmd { f(m); return nil }
@@ -257,6 +260,25 @@ var actAttend = paneAction("attend", func(m *sidebar) tea.Cmd {
 
 // actFilter opens the spaces list's filter.
 var actFilter = paneAction("filter", (*sidebar).openFilter)
+
+// actCycleSort goes on to the next sort mode, as a left click on the sort button does.
+var actCycleSort = paneAction("sort", func(m *sidebar) tea.Cmd { m.setSort(m.sortMode().Next()); return nil })
+
+// sortAction chooses mode from the sort button's menu.
+func sortAction(title string, mode spaces.SortMode) *interact.Action[*sidebar, sortSubject] {
+	return &interact.Action[*sidebar, sortSubject]{
+		Title:   title,
+		Section: "Sort",
+		Run:     do[*sidebar, sortSubject](func(m *sidebar) { m.setSort(mode) }),
+	}
+}
+
+// The sort button's menu, by mode.
+var sortActions = map[spaces.SortMode]*interact.Action[*sidebar, sortSubject]{
+	spaces.SortManual:   sortAction("Manual", spaces.SortManual),
+	spaces.SortActivity: sortAction("Activity", spaces.SortActivity),
+	spaces.SortStatus:   sortAction("Status", spaces.SortStatus),
+}
 
 // The filter's: moving over the rows it shows, opening one, and closing it. Every other key types.
 var (
@@ -495,6 +517,7 @@ var (
 	cleanKind  *interact.Kind[*cleanupForm, cleanupSubject]
 	runKind    *interact.Kind[*runForm, runSubject]
 	filterKind *interact.Kind[*sidebar, filterSubject]
+	sortKind   *interact.Kind[*sidebar, sortSubject]
 
 	spacesList    *interact.Place[*sidebar, entrySubject]
 	statusList    *interact.Place[*sidebar, statusSubject]
@@ -509,6 +532,7 @@ var (
 	theCleanup    *interact.Place[*cleanupForm, cleanupSubject]
 	theRunForm    *interact.Place[*runForm, runSubject]
 	theFilter     *interact.Place[*sidebar, filterSubject]
+	theSort       *interact.Place[*sidebar, sortSubject]
 )
 
 // Kinds and places are made in init, as their actions run code that reads them.
@@ -540,7 +564,7 @@ func init() {
 
 	paneKind = interact.NewKind(func(paneSubject) string { return "Sidebar" },
 		actDown, actUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit,
-		actAttend, actFilter)
+		actAttend, actFilter, actCycleSort)
 	paneKind.Bind(actDown, "j/k", "down/up", "j", "down")
 	paneKind.Bind(actUp, "", "", "k", "up")
 	paneKind.Bind(actTop, "g/G", "top/bottom", "g", "home")
@@ -552,6 +576,7 @@ func init() {
 	paneKind.Bind(actQuit, "ctrl+c", "quit", "ctrl+c")
 	paneKind.Bind(actAttend, "!", "go to what needs you", "!")
 	paneKind.Bind(actFilter, "/", "filter the spaces", "/")
+	paneKind.Bind(actCycleSort, "s", "change the sort mode", "s")
 	interact.Via(paneKind, func(paneSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	thePane = interact.List(paneKind)
 
@@ -638,6 +663,10 @@ func init() {
 	filterKind.Bind(actFilterClear, "esc", "clear", "esc")
 	filterKind.Bind(actFilterQuit, "ctrl+c", "quit", "ctrl+c")
 	theFilter = interact.List(filterKind)
+
+	sortKind = interact.NewKind(func(sortSubject) string { return "Sort" },
+		sortActions[spaces.SortManual], sortActions[spaces.SortActivity], sortActions[spaces.SortStatus])
+	theSort = interact.List(sortKind)
 }
 
 // Targets: the subjects on screen, each in its place.
