@@ -43,7 +43,7 @@ func TestPopups(t *testing.T) {
 		return append([]string{
 			"@", "launch", "--type=os-panel", "--os-panel", "edge=center-sized", "--os-panel", "columns=" + columns,
 			"--os-panel", "lines=" + lines, "--os-panel", "focus-policy=exclusive", "--os-panel", "layer=overlay",
-			"--var=" + v + "=1", "--env", "KSPACES_FROM=11", exe,
+			"--var=" + v + "=1", "--var=kspaces_popup=1", "--env", "KSPACES_FROM=11", exe,
 		}, args...)
 	}
 	overlay := func(v string, args []string) []string {

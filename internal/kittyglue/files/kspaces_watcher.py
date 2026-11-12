@@ -24,6 +24,8 @@ import tomllib
 from kitty.fast_data_types import add_timer
 
 DOCK_VAR = 'kspaces'
+# The user variable of a kspaces popup in a panel.
+POPUP_VAR = 'kspaces_popup'
 # Where this file was installed. The sidebar checks the files there against the ones it would install.
 GLUE_DIR = os.path.dirname(os.path.abspath(__file__))
 # kspaces' default for [sidebar] width, and how often its config is checked for a new one.
@@ -82,11 +84,25 @@ def check_config(boss):
     def run(timer_id):
         global _missed
         resize_docks(boss, sidebar_width())
+        # A config reload shows the bars again, see hide_popup_tab_bar.
+        for tm in tuple(boss.all_tab_managers):
+            hide_popup_tab_bar(tm)
         if _missed:
             _missed = False
             add_docks(boss)
 
     add_timer(run, CONFIG_CHECK_SECONDS, True)
+
+
+# hide_popup_tab_bar hides the tab bar of a kspaces popup's panel, an OS window of its own with one tab,
+# where the bar is only in the way. kitty has no option for one OS window's tab bar, and tab_bar_filter
+# always shows the active tab, so this sets the TabManager's own tab_bar_hidden, which is kitty's internal
+# API: tab_bar_style hidden sets it, and a config reload (TabManager.apply_options) resets it from that.
+def hide_popup_tab_bar(tm):
+    if not tm.tab_bar_hidden and any(POPUP_VAR in w.user_vars for t in tm for w in t):
+        tm.tab_bar_hidden = True
+        tm.mark_tab_bar_dirty()
+        tm.resize()
 
 
 # Called when kitty loads this watcher, at startup and whenever kitty.conf's list of watchers changes. The
@@ -176,6 +192,8 @@ def schedule(boss):
 
 
 def on_tab_bar_dirty(boss, window, data):
+    if (tm := data.get('tab_manager')) is not None:
+        hide_popup_tab_bar(tm)
     schedule(boss)
 
 

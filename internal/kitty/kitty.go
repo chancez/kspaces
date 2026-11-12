@@ -251,6 +251,10 @@ func SelfWindowID() int {
 // its tab in no session, so it cannot learn the session it is for from its own tab as an overlay does.
 const FromEnv = "KSPACES_FROM"
 
+// PopupVar marks every panel kspaces opens, beside kspaces_form or kspaces_picker, so kitty.conf's watcher
+// can hide its tab bar.
+const PopupVar = "kspaces_popup"
+
 // PanelFrom is the window the panel kspaces runs in was opened from, zero when it runs in no panel.
 func PanelFrom() int {
 	id, err := strconv.Atoi(os.Getenv(FromEnv))
@@ -331,7 +335,7 @@ func panelLaunch(p Popup, from int, v string) []string {
 		"--os-panel", fmt.Sprintf("lines=%d", p.Lines),
 		"--os-panel", "focus-policy=exclusive",
 		"--os-panel", "layer=overlay",
-		"--var=" + v + "=1",
+		"--var=" + v + "=1", "--var=" + PopupVar + "=1",
 		"--env", fmt.Sprintf("%s=%d", FromEnv, from),
 	}
 }

@@ -188,7 +188,7 @@ func TestSidebarFormInPanel(t *testing.T) {
 	want := []string{
 		"@", "launch", "--type=os-panel", "--os-panel", "edge=center-sized", "--os-panel", "columns=90",
 		"--os-panel", "lines=24", "--os-panel", "focus-policy=exclusive", "--os-panel", "layer=overlay",
-		"--var=kspaces_form=1", "--env", "KSPACES_FROM=11", exe, "add",
+		"--var=kspaces_form=1", "--var=kspaces_popup=1", "--env", "KSPACES_FROM=11", exe, "add",
 	}
 	if got := launched(); !reflect.DeepEqual(got, want) {
 		t.Errorf("launched %q\nwant %q", got, want)
