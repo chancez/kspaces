@@ -24,7 +24,8 @@ kspaces itself never writes session files. The session saver below, which it can
 
 ## Running commands
 
-Commands are what the new worktree form and a worktree's **Run** can start in a session:
+Commands are what the new worktree form and a worktree's **Run** can start in a session, from config.toml
+or a space's [own config](#per-space-config):
 
 ```toml
 [[commands]]
@@ -148,7 +149,8 @@ switching to it focuses, as a command's do.
 
 A worktree whose session has no windows and no saved file to restore opens with its default layout: for a
 linked worktree its space's `worktree_layout`, else the space's `layout`, else the top-level `layout`; for
-the main worktree the space's `layout`, else the top-level one; else the one tab it always had.
+the main worktree the space's `layout`, else the top-level one; else the one tab it always had. A space's
+[own config](#per-space-config) can set its defaults too, which come first.
 
 ```toml
 layout = "agent"            # before any table
@@ -187,17 +189,74 @@ integration; else for a window running `cm attach NAME`, what `cm list --json` s
 and its cwd is cm's; else the program in the window's foreground, when that is not a shell; else the shell
 at its prompt.
 
-The layout goes at the end of config.toml as a `[[layouts]]` block, its panes inline a line each, and the
-rest of the file is kept byte for byte. Replacing a layout puts the block where the old one's lines were,
-from its `[[layouts]]` to the next table that is not one of its own, keeping the comments right above
-that table; that needs the layouts to be `[[layouts]]` tables, not an inline `layouts = [...]`. The
-result is parsed back and must have the layout as saved and nothing else changed, or the file is left as
-it was. A symlinked config has its target written, by a rename from a file beside it.
+The layout goes at the end of the file it is saved to, a space's [own config](#per-space-config) or
+config.toml, as a `[[layouts]]` block, its panes inline a line each, and the rest of the file is kept byte
+for byte. Replacing a layout puts the block where the old one's lines were, from its `[[layouts]]` to the
+next table that is not one of its own, keeping the comments right above that table; that needs the
+layouts to be `[[layouts]]` tables, not an inline `layouts = [...]`. The result is parsed back and must
+have the layout as saved and nothing else changed, or the file is left as it was. A symlinked file has its
+target written, by a rename from a file beside it.
 
 Not everything kitty arranges can be saved: the biases of `tall`, `fat` and the other layouts, and a
 `splits` tab's sizes finer than a percent, come back at the layout's defaults and to the percent; a
 session's tabs in another OS window come back as tabs of the one it opens in; a pane's scrollback, and what
 a program does when it starts again, are not kept.
+
+## Per-space config
+
+Some layouts and commands belong to one repository, and a work repository's should not end up in
+config.toml, which is often in dotfiles. A space can have its own, in `.kspaces.toml` at the top of its
+main worktree; its linked worktrees use the main worktree's, as it is on disk. Commit it, or keep it to
+yourself in `.git/info/exclude`.
+
+```toml
+layout = "tests"            # the space's default layouts, in place of its [space.NAME]'s
+worktree_layout = "agent"
+
+[worktrees]                 # in place of config.toml's
+branch_prefix = "pr/me"
+
+[[commands]]
+name = "test"
+run = ["make", "test"]
+
+[[layouts]]
+name = "tests"
+tabs = [{ panes = [{ command = "test" }, { command = "claude", split = "right" }] }]
+```
+
+It can have `[[layouts]]`, `[[commands]]`, `layout`, `worktree_layout` and `[worktrees]`'s `dir` and
+`branch_prefix`, checked as config.toml's are; anything else is an error naming the key, `spaces`,
+`launch`, `sessions`, `[sidebar]`, `[kitty]` and `[space.NAME]` included, which only config.toml has. For
+that space alone, in its forms, its rows' menus, opening its worktrees and `kspaces layout` and `kspaces
+run` in them, its layouts and commands are added to config.toml's, one called as one of config.toml's in
+that one's place, and a layout of either can run a command of either. Its `layout` and `worktree_layout`
+come first, then the space's `[space.NAME]`'s, then the top-level `layout`; a linked worktree's falls back
+on the file's own `layout` before `[space.NAME]`'s. Its worktree settings are used in place of
+config.toml's they name. Other spaces never see any of it.
+
+A file with an error is left out, and only for its space: the space's row says `config error`, and
+`kspaces list` what it is.
+
+A repository can bring a `.kspaces.toml` with a clone, a pull or a branch checked out, and its commands
+run, so a file is used only once trusted, and only with the content trusted: kspaces keeps the sha256 of
+each file's trusted content, by its path, in `$XDG_STATE_HOME/kspaces/trust`. Until then, and again
+whenever the file changes, it is left out and the space's row has a lock and `untrusted config` where its
+git state goes. **Trust space config**, in the menu of the space's rows, and `kspaces trust [PATH]`, for the
+space PATH is in, or the current directory's, open a form showing what the file adds: each command and the
+line it runs, each layout and what each of its panes runs, and the settings it sets, saying which take
+the place of config.toml's. Trust trusts that content. `--yes` trusts the file as it is without asking,
+and `--revoke` forgets it. A file kspaces writes itself, saving a layout to it, is trusted as written.
+
+Saving a layout to a space's file, as [Save as layout](sidebar.md#the-menu) does at first, edits it as
+text the way config.toml is edited, checked merged with config.toml. A file that is not there is made; a
+file that is there but not trusted is refused until trusted, as saving would trust what is in it unseen.
+Making the file adds `/.kspaces.toml` to the repository's `info/exclude`, in its common git directory, so
+git leaves it out, unless the form's box says not to; the line is added once.
+
+The sidebars' leader reads every space's file, as it lists their worktrees, and shares what it read, so
+each sidebar sees the same and trusting or editing a file shows in all of them at the next poll. A file
+that has not changed, by its size, time and inode, is not read again: every two seconds is a stat.
 
 ## Installing the kitty files
 

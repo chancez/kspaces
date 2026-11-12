@@ -150,6 +150,28 @@ save_sessions = true
 
 Every key is optional. An unknown key is an error.
 
+A repository's own layouts and commands can live with it, rather than in your dotfiles, in `.kspaces.toml`
+at the top of its main worktree, which its linked worktrees share. They are added to config.toml's for that
+space alone, a name it has taking config.toml's one's place, and it can set the space's `layout`,
+`worktree_layout` and `[worktrees]`:
+
+```toml
+layout = "tests"
+
+[[commands]]
+name = "test"
+run = ["make", "test"]
+
+[[layouts]]
+name = "tests"
+tabs = [{ panes = [{ command = "test" }, { command = "claude", split = "right" }] }]
+```
+
+A repository can bring one with a clone or a pull, so it is used only once trusted, and again after each
+change: the space's row says `untrusted config` until **Trust space config** in its menu, or `kspaces
+trust`, shows what it adds and you trust it. Save as layout saves to it at first, making it and adding it to
+`.git/info/exclude`. See [Per-space config](docs/kitty.md#per-space-config).
+
 ## Usage
 
 [docs/sidebar.md](docs/sidebar.md) covers the sidebar: its rows and their order, the menu and its forms,
@@ -158,7 +180,7 @@ the status list and the keys.
 ```
 kspaces [sidebar]        the sidebar, run in a kitty dock
 kspaces pick             a fuzzy picker over sessions, worktrees and status entries, with a preview
-kspaces list             every space's worktrees and their sessions
+kspaces list             every space's worktrees and their sessions, and a space's own config not in use
 kspaces open PATH        switch to the session of the worktree at PATH
 kspaces next, prev       switch to the next or previous session with windows open
   --attention            or to the next or previous window that is blocked, failed or done
@@ -170,6 +192,8 @@ kspaces layout save [NAME] [PATH]  save the session's tabs as a layout, choosing
   --tab                  form; --tab saves only this tab
 kspaces close [SESSION]  close every window of a session, after confirming
 kspaces forget SESSION   delete the saved file of a session with no windows, after confirming
+kspaces trust [PATH]     trust the .kspaces.toml of the space PATH is in, after seeing what it adds in a
+  --yes, --revoke        form; --yes without asking, --revoke to forget it
 kspaces remove PATH      close a linked worktree's session and remove the worktree, after confirming
   --delete-branch        and then its branch, if merged; --force-branch even if not, losing its commits
 kspaces cleanup SPACE    remove the worktrees whose PR is merged, upstream gone or branch merged, in a form

@@ -17,6 +17,11 @@ then the PR, and the changes last. Only the leading sidebar asks: `git status` e
 or a network there is no PR, and none is looked up for the repository's default branch. `r` asks both
 again at once.
 
+A space with its [own config](kitty.md#per-space-config) that is not in use says why on its own row, where
+the git state goes: a lock and `untrusted config` (`?` in Unicode and ASCII) while the file is not trusted
+as it is, or the cross of a broken space and `config error` when it has an error, which `kspaces list`
+shows. A narrower row says `untrusted`, then shows the mark alone.
+
 Sessions that are open or saved but belong to no worktree, such as the one kitty starts with, are listed
 above the spaces.
 
@@ -101,6 +106,7 @@ only.
 | Space | New worktree | `n` | create a worktree in the space, in a form |
 | Space | Fold / Unfold worktrees | `space` | hide or show a space's linked worktrees |
 | Space | Clean up worktrees | `p` | remove the space's linked worktrees that look done with, on a space's row |
+| Space | Trust space config | | show what the space's own config adds, and trust it, in a form; while its `.kspaces.toml` is untrusted or changed |
 | Space | Add space | `a` | add a repository to the spaces, in a form; on every row |
 
 Each item that changes something opens a form in an overlay, with buttons and keys to confirm or cancel.
@@ -157,16 +163,22 @@ builds them, as [layouts](kitty.md#layouts) says, and switches to the session.
 
 **Save as layout** saves the session's tabs, as kitty has them, as a [layout](kitty.md#saving-a-layout):
 a `name` field, then `save`, `every tab` at first or `this tab`, which is the tab the sidebar is in for its
-own session, else the session's most recently focused. Below them a line for each pane of the tabs saved,
-`tab 1, pane 2: claude --resume abc`, saying what runs there now, then `runs`, chosen as `command` is in
-the forms above: a configured command, at first the one whose program is what runs there, as
-`claude --resume abc` is the `claude` command; `run`, at first for anything else, with a `run` field
-holding its command line, a template, to edit; or `shell`, at first for a pane at its prompt. Save adds
-the layout at the end of config.toml as text, so the rest of the file stays as it was, and writes through
-a symlinked config to its target. A name the config has already asks whether to replace it, `y` or `n`;
-Replace puts the new layout where the old one's lines were. `kspaces layout save [NAME] [PATH]` opens the
-same form for the worktree PATH, or the current directory, is in, its name filled in, with `--tab` for
-this tab at first: the one kspaces runs in, if it is the session's.
+own session, else the session's most recently focused. `save to` says where: `SPACE's .kspaces.toml`, the
+space's [own config](kitty.md#per-space-config), at first, or `the global config`, config.toml. A space
+file that is not there yet is made, and a box below, `keep out of git (adds it to .git/info/exclude)`,
+ticked at first, `space` or a click to change, adds it to the repository's `info/exclude`; one that is
+there but not trusted is refused, and the form says so under the field. Below them a line for each pane of
+the tabs saved, `tab 1, pane 2: claude --resume abc`, saying what runs there now, then `runs`, chosen as
+`command` is in the forms above: a configured command, the space's own included, at first the one whose
+program is what runs there, as `claude --resume abc` is the `claude` command; `run`, at first for anything
+else, with a `run` field holding its command line, a template, to edit; or `shell`, at first for a pane at
+its prompt. Save adds the layout at the end of the file as text, so the rest of it stays as it was, and
+writes through a symlink to its target; a space file kspaces writes is trusted as written. A name the file
+has already asks whether to replace it, `y` or `n`; Replace puts the new layout where the old one's lines
+were. A layout saved to the space's file under a name config.toml has takes that one's place in the space.
+`kspaces layout save [NAME] [PATH]` opens the same form for the worktree PATH, or the current directory, is
+in, its name filled in, with `--tab` for this tab at first: the one kspaces runs in, if it is the
+session's.
 
 **Close session** closes every window the way closing them by hand does, so whatever kitty.conf runs when a
 window closes still runs.
@@ -202,6 +214,12 @@ its worktree is ticked; one whose PR is merged, as after a squash, says so and l
 **Forget** shows the saved session file of a missing worktree with no windows open, and Delete deletes it,
 so kitty does not restore the session. `kspaces forget SESSION` does the same for any session with no
 windows open; `--yes` without asking.
+
+**Trust space config** shows the space's `.kspaces.toml` and what it would add, as
+[Per-space config](kitty.md#per-space-config) says: each command and the line it runs, each layout and
+what each of its panes runs, and the settings it sets. Trust, `y`, trusts what it shows; a file with an
+error says what it is, and cannot be trusted until fixed. `kspaces trust [PATH]` does the same for the
+space PATH is in; `--yes` without asking, `--revoke` to forget it.
 
 **Add space**, which the plus at the right end of the SPACES title also opens, has a field for a directory,
 filled in with the repository of the window the sidebar is beside, and shows the root it adds: the top of
