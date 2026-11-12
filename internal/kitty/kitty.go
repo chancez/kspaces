@@ -88,6 +88,9 @@ type State struct {
 	Sessions map[string]int
 	// How many windows each session with windows has, not counting docks.
 	Windows map[string]int
+	// For each session with windows, when one of them, not counting docks, was last focused: kitty's
+	// last_focused_at, in seconds. Zero when kitty gives no times.
+	Focused map[string]float64
 	// The session of the tab the sidebar runs in, empty when it belongs to none.
 	Current string
 	// The window focused most recently in the sidebar's tab, not counting docks. Leaving the sidebar returns
@@ -170,6 +173,7 @@ func keyboardWindow(data []OSWindow) int {
 func stateFrom(data []OSWindow, selfWindowID int) State {
 	st := State{Sessions: map[string]int{}, Windows: map[string]int{}, Screens: map[string]int{}, Own: map[int]bool{}}
 	lastFocused, screenAt, activeScreen := map[string]float64{}, map[string]float64{}, map[string]int{}
+	st.Focused = lastFocused
 	for _, osw := range data {
 		for _, tab := range osw.Tabs {
 			hasSelf, session := false, ""

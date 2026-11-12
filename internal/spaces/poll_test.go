@@ -124,6 +124,7 @@ func TestSharedView(t *testing.T) {
 	}
 	common := kitty.State{
 		Sessions: map[string]int{"gr": 10, "gr@dev": 20}, Windows: map[string]int{"gr": 1, "gr@dev": 1},
+		Focused: map[string]float64{"gr": 2, "gr@dev": 1},
 		Screens: map[string]int{"gr": 10, "gr@dev": 20}, Own: map[int]bool{11: true, 21: true},
 	}
 	want := func(current string, home int, dir string) Snapshot {
@@ -133,6 +134,8 @@ func TestSharedView(t *testing.T) {
 			Config: &cfg, Spaces: spaces,
 			Others: []Space{{Name: "notes", Worktrees: []Worktree{{Session: "notes"}}}},
 			Folded: map[string]bool{}, Saved: map[string]bool{"gr": true, "notes": true, "gr@gone": true}, Kitty: st,
+			// Nothing saved: manual, with kitty's times.
+			Order: Order{Mode: SortManual, Worktrees: map[string][]string{}, Focused: st.Focused},
 		}
 	}
 	for self, w := range map[int]Snapshot{11: want("gr", 10, "/src/gr"), 21: want("gr@dev", 20, "/src/gr/dev")} {

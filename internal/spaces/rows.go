@@ -36,9 +36,11 @@ func (r Row) Dir() string {
 }
 
 // BuildRows lists the sessions that belong to no space first, then each space followed by its linked
-// worktrees and its missing ones, with a blank row between groups and between spaces. A space's own row
-// opens its main worktree. The linked and missing worktrees of a space whose root is in folded are left out.
-func BuildRows(others, spaces []Space, folded map[string]bool) []Row {
+// worktrees and its missing ones, with a blank row between groups and between spaces, all in order's
+// order. A space's own row opens its main worktree. The linked and missing worktrees of a space whose root
+// is in folded are left out. The rows point into copies of others and spaces.
+func BuildRows(others, spaces []Space, folded map[string]bool, order Order) []Row {
+	others, spaces = order.arrange(others, spaces)
 	var rows []Row
 	for i := range others {
 		rows = append(rows, Row{Space: &others[i], Worktree: &others[i].Worktrees[0], Main: true, Other: true})
@@ -141,6 +143,9 @@ type Snapshot struct {
 	Others []Space
 	// Roots of the spaces whose linked worktrees are hidden.
 	Folded map[string]bool
+	// How the rows are ordered: the sort mode and the worktrees' manual order, saved as the folded spaces
+	// are, with kitty's focus times and statuses.
+	Order Order
 	// Sessions with a file in the sessions directory, to be restored from.
 	Saved map[string]bool
 	Kitty kitty.State

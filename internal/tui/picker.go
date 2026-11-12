@@ -53,7 +53,7 @@ func pickItemsFrom(snap spaces.Snapshot) pickItems {
 		}
 		items = append(items, pickItem{text: joinDetail(name, detail), nameLen: len(name), icon: look.StateMarker(s.State), status: s})
 	}
-	for _, r := range spaces.BuildRows(snap.Others, snap.Spaces, nil) {
+	for _, r := range spaces.BuildRows(snap.Others, snap.Spaces, nil, snap.Order) {
 		if r.Worktree == nil {
 			continue
 		}

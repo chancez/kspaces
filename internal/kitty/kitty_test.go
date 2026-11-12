@@ -27,9 +27,10 @@ func TestStateFrom(t *testing.T) {
 
 	got := stateFrom(data, 12)
 	// Home is the tab's most recently focused window that is not a dock, and HomeDir its directory.
-	// Windows counts each session's windows, docks left out.
+	// Windows counts each session's windows, docks left out, and Focused is when one was last focused.
 	want := State{
 		Sessions: map[string]int{"gr": 11, "kitty@docks": 21}, Windows: map[string]int{"gr": 3, "kitty@docks": 1},
+		Focused: map[string]float64{"gr": 9, "kitty@docks": 1},
 		Current: "gr", Home: 11, HomeDir: "/src/gr",
 		Screens: map[string]int{"gr": 11, "kitty@docks": 21}, Own: map[int]bool{12: true, 22: true},
 	}
@@ -70,7 +71,9 @@ func TestScreens(t *testing.T) {
 	want := State{
 		Sessions: map[string]int{"gr": 14, "kitty": 20, "docs": 40, "notes": 50},
 		Windows:  map[string]int{"gr": 4, "kitty": 4, "docs": 2, "notes": 1},
-		Current:  "notes", Home: 50,
+		// The picker's focus counts: it is over the session's tab.
+		Focused: map[string]float64{"gr": 40, "kitty": 0, "docs": 0, "notes": 3},
+		Current: "notes", Home: 50,
 		Screens: map[string]int{"gr": 11, "kitty": 31, "docs": 40},
 		Own:     map[int]bool{12: true, 13: true, 14: true},
 	}

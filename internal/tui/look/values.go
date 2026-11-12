@@ -290,6 +290,35 @@ func AddButton(hot bool) Span {
 	return glyph(elMuted, GlyphAdd, false)
 }
 
+// sortGlyphs are the sort button's icons, by mode.
+var sortGlyphs = map[spaces.SortMode]Glyph{
+	spaces.SortManual:   GlyphSortManual,
+	spaces.SortActivity: GlyphSortActivity,
+	spaces.SortStatus:   GlyphSortStatus,
+}
+
+// SortButton is the icon button that shows the sort mode and cycles it, drawn as AddButton is. The zero
+// mode is manual.
+func SortButton(mode spaces.SortMode, hot bool) Span {
+	g, ok := sortGlyphs[mode]
+	if !ok {
+		g = GlyphSortManual
+	}
+	if hot {
+		return glyph(elButton, g, false)
+	}
+	return glyph(elMuted, g, false)
+}
+
+// Chosen marks the item chosen now in a list of choices, as the sort mode in its menu, and is a blank as
+// wide for the others.
+func Chosen(chosen bool) Span {
+	if chosen {
+		return glyph(elText, GlyphChosen, false)
+	}
+	return Text(" ")
+}
+
 // Changes is how many files a worktree has not committed, after its mark.
 func Changes(n int) []Span {
 	return []Span{glyph(elChanges, GlyphChanges, false), sp(elChanges, strconv.Itoa(n))}

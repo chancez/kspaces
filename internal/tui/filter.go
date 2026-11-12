@@ -135,9 +135,9 @@ func (m *sidebar) setRows() {
 func (m *sidebar) rebuildRows(at cursorPos) {
 	key, entry := at.key, at.entry
 	if m.filtering {
-		m.rows = filterRows(spaces.BuildRows(m.others, m.spaces, nil), m.filter.Value())
+		m.rows = filterRows(spaces.BuildRows(m.others, m.spaces, nil, m.rowOrder()), m.filter.Value())
 	} else {
-		m.rows = spaces.BuildRows(m.others, m.spaces, m.folded)
+		m.rows = spaces.BuildRows(m.others, m.spaces, m.folded, m.rowOrder())
 	}
 	if entry >= 0 {
 		m.cursor = min(len(m.rows)+entry, max(m.numEntries()-1, 0))

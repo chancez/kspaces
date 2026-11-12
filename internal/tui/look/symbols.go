@@ -33,6 +33,12 @@ const (
 	GlyphMoreBelow
 	// GlyphAdd is the button that adds a space.
 	GlyphAdd
+	// GlyphSortManual, GlyphSortActivity and GlyphSortStatus are the sort button in each mode.
+	GlyphSortManual
+	GlyphSortActivity
+	GlyphSortStatus
+	// GlyphChosen marks the menu item chosen now, as the sort mode.
+	GlyphChosen
 	// GlyphChanges marks how many files a worktree has not committed, GlyphAhead and GlyphBehind how many
 	// commits it is ahead of and behind its upstream.
 	GlyphChanges
@@ -46,50 +52,58 @@ const (
 // keeps them at.
 var glyphSets = map[Glyphs][numGlyphs]string{
 	GlyphsASCII: {
-		GlyphOpen:      "v",
-		GlyphFolded:    ">",
-		GlyphBlocked:   "!",
-		GlyphError:     "x",
-		GlyphDone:      "+",
-		GlyphWorking:   "*",
-		GlyphIdle:      "o",
-		GlyphCurrent:   ">",
-		GlyphSession:   "*",
-		GlyphBroken:    "x",
-		GlyphGone:      "x",
-		GlyphSpace:     "#",
-		GlyphWorktree:  "-",
-		GlyphOther:     "$",
-		GlyphSearch:    "/",
-		GlyphMoreAbove: "^",
-		GlyphMoreBelow: "v",
-		GlyphAdd:       "+",
-		GlyphChanges:   "*",
-		GlyphAhead:     "+",
-		GlyphBehind:    "-",
+		GlyphOpen:         "v",
+		GlyphFolded:       ">",
+		GlyphBlocked:      "!",
+		GlyphError:        "x",
+		GlyphDone:         "+",
+		GlyphWorking:      "*",
+		GlyphIdle:         "o",
+		GlyphCurrent:      ">",
+		GlyphSession:      "*",
+		GlyphBroken:       "x",
+		GlyphGone:         "x",
+		GlyphSpace:        "#",
+		GlyphWorktree:     "-",
+		GlyphOther:        "$",
+		GlyphSearch:       "/",
+		GlyphMoreAbove:    "^",
+		GlyphMoreBelow:    "v",
+		GlyphAdd:          "+",
+		GlyphSortManual:   "=",
+		GlyphSortActivity: "@",
+		GlyphSortStatus:   "!",
+		GlyphChosen:       "*",
+		GlyphChanges:      "*",
+		GlyphAhead:        "+",
+		GlyphBehind:       "-",
 	},
 	GlyphsUnicode: {
-		GlyphOpen:      "\u25bc", // black down-pointing triangle
-		GlyphFolded:    "\u25b6", // black right-pointing triangle
-		GlyphBlocked:   "!",
-		GlyphError:     "\u2717", // ballot x
-		GlyphDone:      "\u2713", // check mark
-		GlyphWorking:   "\u2026", // horizontal ellipsis
-		GlyphIdle:      "\u25cb", // white circle
-		GlyphCurrent:   "\u203a", // single right angle quote
-		GlyphSession:   "\u2022", // bullet
-		GlyphBroken:    "\u2717",
-		GlyphGone:      "\u2715", // multiplication x
-		GlyphSpace:     "\u25a0", // black square
-		GlyphWorktree:  "\u2514", // box drawings up and right
-		GlyphOther:     "\u25aa", // black small square
-		GlyphSearch:    "/",
-		GlyphMoreAbove: "\u25b4", // small up triangle
-		GlyphMoreBelow: "\u25be", // small down triangle
-		GlyphAdd:       "+",
-		GlyphChanges:   "\u25cf", // black circle
-		GlyphAhead:     "\u2191", // upwards arrow
-		GlyphBehind:    "\u2193", // downwards arrow
+		GlyphOpen:         "\u25bc", // black down-pointing triangle
+		GlyphFolded:       "\u25b6", // black right-pointing triangle
+		GlyphBlocked:      "!",
+		GlyphError:        "\u2717", // ballot x
+		GlyphDone:         "\u2713", // check mark
+		GlyphWorking:      "\u2026", // horizontal ellipsis
+		GlyphIdle:         "\u25cb", // white circle
+		GlyphCurrent:      "\u203a", // single right angle quote
+		GlyphSession:      "\u2022", // bullet
+		GlyphBroken:       "\u2717",
+		GlyphGone:         "\u2715", // multiplication x
+		GlyphSpace:        "\u25a0", // black square
+		GlyphWorktree:     "\u2514", // box drawings up and right
+		GlyphOther:        "\u25aa", // black small square
+		GlyphSearch:       "/",
+		GlyphMoreAbove:    "\u25b4", // small up triangle
+		GlyphMoreBelow:    "\u25be", // small down triangle
+		GlyphAdd:          "+",
+		GlyphSortManual:   "\u2261", // identical to
+		GlyphSortActivity: "\u25f7", // white circle with upper right quadrant, a clock face
+		GlyphSortStatus:   "!",
+		GlyphChosen:       "\u2713", // check mark
+		GlyphChanges:      "\u25cf", // black circle
+		GlyphAhead:        "\u2191", // upwards arrow
+		GlyphBehind:       "\u2193", // downwards arrow
 	},
 	GlyphsNerd: {
 		// The triangles, not Font Awesome's chevrons, which are drawn wider than their cell and thin.
@@ -110,9 +124,13 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphOther:    "\uf120", // terminal
 		GlyphSearch:   "\uf002", // search
 		// The small triangles, for the same reason as the fold triangles.
-		GlyphMoreAbove: "\u25b4",
-		GlyphMoreBelow: "\u25be",
-		GlyphAdd:       "\uf067", // plus
+		GlyphMoreAbove:    "\u25b4",
+		GlyphMoreBelow:    "\u25be",
+		GlyphAdd:          "\uf067", // plus
+		GlyphSortManual:   "\uf0c9", // bars
+		GlyphSortActivity: "\uf017", // clock
+		GlyphSortStatus:   "\uf071", // warning
+		GlyphChosen:       "\uf00c", // check
 		// Unicode rather than Nerd Font icons: they are followed by a number, not a space.
 		GlyphChanges: "\u25cf",
 		GlyphAhead:   "\u2191",
