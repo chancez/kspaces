@@ -39,11 +39,17 @@ func AddSpace(text, root string) (string, error) {
 	return out, nil
 }
 
-// SaveSpace adds root to the spaces of the config file Load reads, see AddSpace. A symlinked config, as
-// from dotfiles, has its target written, so it stays a symlink. The write is a rename from a temporary
-// file beside it, so a sidebar refreshing meanwhile reads the old config or the new one, never half.
-// A missing config is created.
+// SaveSpace adds root to the spaces of the config file Load reads, see AddSpace and editFile. A missing
+// config is created.
 func SaveSpace(root string) error {
+	return editFile(func(text string) (string, error) { return AddSpace(text, root) })
+}
+
+// editFile rewrites the config file Load reads with edit. A symlinked config, as from dotfiles, has its
+// target written, so it stays a symlink. The write is a rename from a temporary file beside it, so a
+// sidebar refreshing meanwhile reads the old config or the new one, never half. A missing config is
+// edited as empty, and created unless the edit leaves it so.
+func editFile(edit func(text string) (string, error)) error {
 	path, err := filePath()
 	if err != nil {
 		return err
@@ -53,9 +59,12 @@ func SaveSpace(root string) error {
 	if err != nil && !missing {
 		return fmt.Errorf("reading the config: %w", err)
 	}
-	out, err := AddSpace(string(data), root)
+	out, err := edit(string(data))
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)
+	}
+	if out == string(data) {
+		return nil
 	}
 	target, mode := path, fs.FileMode(0o644)
 	if missing {
@@ -118,36 +127,49 @@ func tomlString(s string) string {
 // and the comments right above it, or at the end.
 func appendSpace(text, entry string) (string, error) {
 	sc := scanner{s: text}
+	open, stop, err := sc.spacesArray()
+	switch {
+	case err != nil:
+		return "", err
+	case open >= 0:
+		return sc.appendItem(open, entry)
+	case stop >= len(text):
+		sep := ""
+		if text != "" && !strings.HasSuffix(text, "\n") {
+			sep = "\n"
+		}
+		return text + sep + "spaces = [" + entry + "]\n", nil
+	}
+	at := commentsAbove(text, lineStart(text, stop))
+	return text[:at] + "spaces = [" + entry + "]\n\n" + text[at:], nil
+}
+
+// spacesArray is where the top-level spaces array opens, or -1 without one, and then stop is where the
+// top-level keys end: the first table, or the end of the text.
+func (sc *scanner) spacesArray() (open, stop int, err error) {
+	text := sc.s
 	for {
 		i := sc.skipBlank(sc.i)
-		if i >= len(text) {
-			sep := ""
-			if text != "" && !strings.HasSuffix(text, "\n") {
-				sep = "\n"
-			}
-			return text + sep + "spaces = [" + entry + "]\n", nil
-		}
-		if text[i] == '[' {
-			at := commentsAbove(text, lineStart(text, i))
-			return text[:at] + "spaces = [" + entry + "]\n\n" + text[at:], nil
+		if i >= len(text) || text[i] == '[' {
+			return -1, i, nil
 		}
 		key, j, err := sc.key(i)
 		if err != nil {
-			return "", err
+			return 0, 0, err
 		}
 		j = sc.skipSpace(j)
 		if j >= len(text) || text[j] != '=' {
-			return "", fmt.Errorf("line %d: expected = after the key", sc.line(j))
+			return 0, 0, fmt.Errorf("line %d: expected = after the key", sc.line(j))
 		}
 		j = sc.skipSpace(j + 1)
 		if len(key) == 1 && key[0] == "spaces" {
 			if j >= len(text) || text[j] != '[' {
-				return "", fmt.Errorf("line %d: spaces is not a list", sc.line(j))
+				return 0, 0, fmt.Errorf("line %d: spaces is not a list", sc.line(j))
 			}
-			return sc.appendItem(j, entry)
+			return j, 0, nil
 		}
 		if sc.i, err = sc.value(j); err != nil {
-			return "", err
+			return 0, 0, err
 		}
 	}
 }
@@ -306,39 +328,54 @@ func (sc *scanner) bracketed(i int) (int, error) {
 	return 0, fmt.Errorf("line %d: a list that does not end", sc.line(i))
 }
 
-// appendItem adds entry to the end of the array that opens at open.
-func (sc *scanner) appendItem(open int, entry string) (string, error) {
+// arrayItem is an item of an array: where its value starts and ends, and the comma after it, -1 for none.
+type arrayItem struct {
+	start, end, comma int
+}
+
+// items are the items of the array that opens at open, and where its closing bracket is.
+func (sc *scanner) items(open int) ([]arrayItem, int, error) {
 	s := sc.s
-	// The last item's start and end, and the comma after it, if any.
-	last, lastEnd, comma := -1, -1, -1
-	closing := -1
-	for j := open + 1; j < len(s) && closing < 0; {
+	var items []arrayItem
+	for j := open + 1; j < len(s); {
 		switch c := s[j]; {
 		case c == ' ' || c == '\t' || c == '\r' || c == '\n':
 			j++
 		case c == '#':
 			j = sc.skipComment(j)
 		case c == ',':
-			if last >= 0 && comma < 0 {
-				comma = j
+			if n := len(items); n > 0 && items[n-1].comma < 0 {
+				items[n-1].comma = j
 			}
 			j++
 		case c == ']':
-			closing = j
+			return items, j, nil
 		case c == '"' || c == '\'' || c == '[' || c == '{':
 			end, err := sc.value(j)
 			if err != nil {
-				return "", err
+				return nil, 0, err
 			}
-			last, lastEnd, comma, j = j, end, -1, end
+			items, j = append(items, arrayItem{j, end, -1}), end
 		default:
 			// A bare value, such as a number: up to what ends an item.
 			end := j + strings.IndexAny(s[j:]+"\n", ",]#\n")
-			last, lastEnd, comma, j = j, j+len(strings.TrimRight(s[j:end], " \t\r")), -1, end
+			items, j = append(items, arrayItem{j, j + len(strings.TrimRight(s[j:end], " \t\r")), -1}), end
 		}
 	}
-	if closing < 0 {
-		return "", fmt.Errorf("line %d: spaces does not end", sc.line(open))
+	return nil, 0, fmt.Errorf("line %d: spaces does not end", sc.line(open))
+}
+
+// appendItem adds entry to the end of the array that opens at open.
+func (sc *scanner) appendItem(open int, entry string) (string, error) {
+	s := sc.s
+	items, closing, err := sc.items(open)
+	if err != nil {
+		return "", err
+	}
+	// The last item's start and end, and the comma after it, if any.
+	last, lastEnd, comma := -1, -1, -1
+	if n := len(items); n > 0 {
+		last, lastEnd, comma = items[n-1].start, items[n-1].end, items[n-1].comma
 	}
 	multi := strings.Contains(s[open:closing], "\n")
 	switch {

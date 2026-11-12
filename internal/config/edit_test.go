@@ -209,3 +209,112 @@ func TestSaveSpace(t *testing.T) {
 		t.Errorf("a new config: %q, %v", data, err)
 	}
 }
+
+// ReorderSpaces moves each entry with the comment lines right above it and the comment after it on its
+// line, and leaves the commas, the layout and the comments that belong to no entry where they were.
+func TestReorderSpaces(t *testing.T) {
+	t.Setenv("HOME", "/home/me")
+	for _, c := range []struct {
+		name, in string
+		order    []string
+		want     string
+	}{
+		{
+			name:  "multi-line with comments",
+			in:    "# Mine.\nspaces = [ # in order\n  # the first\n  # of two lines\n  \"~/a\", # mine\n\n  \"~/b\",\n  # work\n  \"/src/c\", # theirs\n  # \"~/old\",\n] # done\n",
+			order: []string{"/src/c", "/home/me/a", "/home/me/b"},
+			want:  "# Mine.\nspaces = [ # in order\n  # work\n  \"/src/c\", # theirs\n\n  # the first\n  # of two lines\n  \"~/a\", # mine\n  \"~/b\",\n  # \"~/old\",\n] # done\n",
+		},
+		{
+			name:  "multi-line without a trailing comma",
+			in:    "spaces = [\n  \"~/a\", # mine\n  \"~/b\"\n]\n",
+			order: []string{"/home/me/b", "/home/me/a"},
+			want:  "spaces = [\n  \"~/b\",\n  \"~/a\" # mine\n]\n",
+		},
+		{
+			name:  "single-line",
+			in:    "spaces = [\"~/a\", '/src/b', \"~/c\"]  # mine\nsessions = \"~/s\"\n",
+			order: []string{"/src/b", "/home/me/c", "/home/me/a"},
+			want:  "spaces = ['/src/b', \"~/c\", \"~/a\"]  # mine\nsessions = \"~/s\"\n",
+		},
+		{
+			name:  "single-line with a trailing comma",
+			in:    "spaces = [\"~/a\", \"~/b\",]\n",
+			order: []string{"/home/me/b", "/home/me/a"},
+			want:  "spaces = [\"~/b\", \"~/a\",]\n",
+		},
+		{
+			name:  "the first item on the line of the bracket that opens",
+			in:    "spaces = [\"~/a\", # mine\n          \"~/b\", # yours\n]\n",
+			order: []string{"/home/me/b", "/home/me/a"},
+			want:  "spaces = [\"~/b\", # yours\n          \"~/a\", # mine\n]\n",
+		},
+		{
+			name:  "the same order",
+			in:    "spaces = [\"~/a\",   \"~/b\"]\n",
+			order: []string{"/home/me/a", "/home/me/b"},
+			want:  "spaces = [\"~/a\",   \"~/b\"]\n",
+		},
+		{
+			name:  "after other keys and before a table",
+			in:    "launch = [\"spaces = [\", \"~/x\"]\nspaces = [\n\t\"~/a\",\n\t\"~/b\",\n]\n\n[sidebar]\nwidth = 30\n",
+			order: []string{"/home/me/b", "/home/me/a"},
+			want:  "launch = [\"spaces = [\", \"~/x\"]\nspaces = [\n\t\"~/b\",\n\t\"~/a\",\n]\n\n[sidebar]\nwidth = 30\n",
+		},
+	} {
+		got, err := ReorderSpaces(c.in, c.order)
+		if err != nil {
+			t.Errorf("%s: %v", c.name, err)
+			continue
+		}
+		if got != c.want {
+			t.Errorf("%s:\n%s\nwant\n%s", c.name, got, c.want)
+		}
+	}
+
+	for _, c := range []struct {
+		in    string
+		order []string
+	}{
+		// Not the spaces the config lists.
+		{"spaces = [\"~/a\", \"~/b\"]\n", []string{"/home/me/a"}},
+		{"spaces = [\"~/a\", \"~/b\"]\n", []string{"/home/me/a", "/home/me/c"}},
+		// A comment with no line to go to.
+		{"spaces = [\"~/a\", \"~/b\", # b's\n  \"~/c\"]\n", []string{"/home/me/b", "/home/me/a", "/home/me/c"}},
+		{"spaces = [\"~/a\", # mine\n  \"~/b\"]\n", []string{"/home/me/b", "/home/me/a"}},
+		{"spaces = [\"~/a\"\n", []string{"/home/me/a"}},
+	} {
+		if got, err := ReorderSpaces(c.in, c.order); err == nil {
+			t.Errorf("reordering %q to %q gave %q", c.in, c.order, got)
+		}
+	}
+}
+
+// SaveSpacesOrder writes through a symlinked config, as SaveSpace does.
+func TestSaveSpacesOrder(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", "/home/me")
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "config"))
+	target := filepath.Join(dir, "kspaces.toml")
+	if err := os.WriteFile(target, []byte("spaces = [\n  \"~/a\", # mine\n  \"/src/b\",\n]\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "config", "kspaces", "config.toml")
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveSpacesOrder([]string{"/src/b", "/home/me/a"}); err != nil {
+		t.Fatal(err)
+	}
+	dest, _ := os.Readlink(link)
+	info, _ := os.Stat(target)
+	data, _ := os.ReadFile(target)
+	got := []string{dest, info.Mode().Perm().String(), string(data)}
+	want := []string{target, "-rw-------", "spaces = [\n  \"/src/b\",\n  \"~/a\", # mine\n]\n"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+}
