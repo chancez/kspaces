@@ -26,7 +26,7 @@ type CapturedTab struct {
 }
 
 // CaptureSession is wt's session's tabs, and the index among them of this tab: the one window self is
-// in, when it is one of them, such as the sidebar's tab for a form over it, else the one the session
+// in, when it is one of them, such as the sidebar's tab for a form for it, else the one the session
 // focused most recently. A session with no windows is an error.
 func CaptureSession(wt Worktree, self int) ([]CapturedTab, int, error) {
 	tabs, err := kitty.ListTabs()

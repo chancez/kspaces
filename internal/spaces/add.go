@@ -44,16 +44,16 @@ func NewSpaceRoot(roots []string, path string) (string, error) {
 	return top, nil
 }
 
-// AskAddSpace opens the form that adds a space, in an overlay as NewWorktree's, with the repository of the
+// AskAddSpace opens the form that adds a space, in a popup as NewWorktree's, with the repository of the
 // window the sidebar is beside filled in.
-func AskAddSpace(st kitty.State) error {
+func AskAddSpace(cfg config.Config, st kitty.State) error {
 	args := []string{"add"}
 	if st.HomeDir != "" {
 		if top, err := repoRoot(st.HomeDir); err == nil {
 			args = append(args, top)
 		}
 	}
-	return kitty.LaunchForm(st, args...)
+	return launchForm(cfg, st, formPanel, args...)
 }
 
 // repoRoot is the main worktree of the repository dir is in. A space is a repository, listed by its main

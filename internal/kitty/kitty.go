@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync/atomic"
+	"time"
 
 	"github.com/chancez/kspaces/internal/status"
 )
@@ -137,12 +139,13 @@ func ListWindows() ([]OSWindow, error) {
 }
 
 // StateOf is kitty's state in data as seen from the window selfWindowID, or from the focused window when
-// that is FocusedWindow.
+// that is FocusedWindow. In a panel its tab is the one of the window the panel was opened from, see
+// PanelFrom: the panel's own is in no session.
 func StateOf(data []OSWindow, selfWindowID int) State {
 	if selfWindowID == FocusedWindow {
 		selfWindowID = keyboardWindow(data)
 	}
-	return stateFrom(data, selfWindowID)
+	return stateFrom(data, selfWindowID, PanelFrom())
 }
 
 // keyboardWindow is the window that has the keyboard: the active window of the active tab of the focused
@@ -170,17 +173,22 @@ func keyboardWindow(data []OSWindow) int {
 	return 0
 }
 
-func stateFrom(data []OSWindow, selfWindowID int) State {
+// stateFrom is StateOf for the window self, its tab the one of the window from, or self's when from is
+// zero.
+func stateFrom(data []OSWindow, self, from int) State {
+	if from == 0 {
+		from = self
+	}
 	st := State{Sessions: map[string]int{}, Windows: map[string]int{}, Screens: map[string]int{}, Own: map[int]bool{}}
 	lastFocused, screenAt, activeScreen := map[string]float64{}, map[string]float64{}, map[string]int{}
 	st.Focused = lastFocused
 	for _, osw := range data {
 		for _, tab := range osw.Tabs {
-			hasSelf, session := false, ""
+			hasFrom, session := false, ""
 			home, homeAt, homeDir := 0, 0.0, ""
 			for _, w := range tab.Windows {
-				if w.ID == selfWindowID {
-					hasSelf = true
+				if w.ID == from {
+					hasFrom = true
 				}
 				own := ownWindow(w)
 				if own {
@@ -204,7 +212,7 @@ func stateFrom(data []OSWindow, selfWindowID int) State {
 					lastFocused[w.SessionName] = w.LastFocusedAt
 					st.Sessions[w.SessionName] = w.ID
 				}
-				if own || w.ID == selfWindowID {
+				if own || w.ID == self {
 					continue
 				}
 				// goto_session takes the most recently focused, the first of equals. A kitty that gives no
@@ -216,7 +224,7 @@ func stateFrom(data []OSWindow, selfWindowID int) State {
 					activeScreen[w.SessionName] = w.ID
 				}
 			}
-			if hasSelf {
+			if hasFrom {
 				st.Current, st.Home, st.HomeDir = session, home, homeDir
 			}
 		}
@@ -239,20 +247,99 @@ func SelfWindowID() int {
 	return id
 }
 
-// LaunchForm runs this kspaces with args, such as `new ROOT`, in an overlay over the window of the
-// sidebar's tab, for a form the sidebar is too narrow for. The var keeps the overlay out of saved
-// sessions, whose match leaves out var:kspaces.
-func LaunchForm(st State, args ...string) error {
+// FromEnv tells kspaces in a panel which window it was opened from. A panel is an OS window of its own,
+// its tab in no session, so it cannot learn the session it is for from its own tab as an overlay does.
+const FromEnv = "KSPACES_FROM"
+
+// PanelFrom is the window the panel kspaces runs in was opened from, zero when it runs in no panel.
+func PanelFrom() int {
+	id, err := strconv.Atoi(os.Getenv(FromEnv))
+	if err != nil || id <= 0 {
+		return 0
+	}
+	return id
+}
+
+// ThisWindowID is the window kspaces works for: in a panel the one it was opened from, else the one it
+// runs in.
+func ThisWindowID() int {
+	if from := PanelFrom(); from != 0 {
+		return from
+	}
+	return SelfWindowID()
+}
+
+// Popup is where a form or the picker opens.
+type Popup struct {
+	// Panel opens it as a kitty panel, an OS window of its own centered on the screen, Columns by Lines
+	// cells, rather than as an overlay over a window.
+	Panel          bool
+	Columns, Lines int
+}
+
+// LaunchPopup runs this kspaces with args, such as `new ROOT`, in a popup for the window from, marked
+// with the user variable v, kspaces_form or kspaces_picker, which keeps it out of saved sessions, whose
+// match leaves out var:kspaces. An overlay goes over from, or over the active window when from is zero.
+// A panel is told from in FromEnv. When kitty cannot open a panel, as on GNOME's Wayland or before kitty
+// had them, it opens as an overlay, and the error says so.
+func LaunchPopup(p Popup, from int, v string, args ...string) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	launch := []string{"launch", "--type=overlay", "--var=kspaces_form=1"}
-	if st.Home != 0 {
-		launch = append(launch, "--next-to", fmt.Sprintf("id:%d", st.Home))
+	if p.Panel && from != 0 {
+		_, perr := kitten(append(append(panelLaunch(p, from, v), exe), args...)...)
+		if perr == nil {
+			return nil
+		}
+		if _, err := kitten(append(append(overlayLaunch(from, v), exe), args...)...); err != nil {
+			return err
+		}
+		return &PanelRefused{perr}
 	}
-	_, err = kitten(append(append(launch, exe), args...)...)
+	_, err = kitten(append(append(overlayLaunch(from, v), exe), args...)...)
 	return err
+}
+
+// PanelRefused is LaunchPopup's error when kitty could not open a panel, and the popup opened as an
+// overlay instead.
+type PanelRefused struct{ Err error }
+
+func (e *PanelRefused) Error() string {
+	return "opened an overlay, as kitty could not open a panel: " + e.Err.Error()
+}
+
+func (e *PanelRefused) Unwrap() error { return e.Err }
+
+// overlayLaunch is the launch command of an overlay over from, see LaunchPopup.
+func overlayLaunch(from int, v string) []string {
+	launch := []string{"launch", "--type=overlay", "--var=" + v + "=1"}
+	if from != 0 {
+		launch = append(launch, "--next-to", fmt.Sprintf("id:%d", from))
+	}
+	return launch
+}
+
+// panelLaunch is the launch command of p's panel for from, see LaunchPopup. It takes the keyboard while
+// it is open, and sits above other windows, over a full screen one too on Wayland. Nothing puts it in a
+// session, so the watcher docks no sidebar in it, and it saves with none.
+func panelLaunch(p Popup, from int, v string) []string {
+	return []string{
+		"launch", "--type=os-panel",
+		"--os-panel", "edge=center-sized",
+		"--os-panel", fmt.Sprintf("columns=%d", p.Columns),
+		"--os-panel", fmt.Sprintf("lines=%d", p.Lines),
+		"--os-panel", "focus-policy=exclusive",
+		"--os-panel", "layer=overlay",
+		"--var=" + v + "=1",
+		"--env", fmt.Sprintf("%s=%d", FromEnv, from),
+	}
+}
+
+// LaunchForm runs this kspaces with args, such as `new ROOT`, in a popup for the window of the sidebar's
+// tab, for a form the sidebar is too narrow for, see LaunchPopup.
+func LaunchForm(p Popup, st State, args ...string) error {
+	return LaunchPopup(p, st.Home, "kspaces_form", args...)
 }
 
 // LaunchBackground runs this kspaces with args as a kitty background process, with no window, so it
@@ -280,8 +367,59 @@ func CloseSession(session string) error {
 
 // FocusWindow focuses the window id.
 func FocusWindow(id int) error {
+	acted.Store(true)
 	_, err := kitten("focus-window", "--match", fmt.Sprintf("id:%d", id))
 	return err
+}
+
+// acted is whether this process has run a kitty action or focused a window, either of which leaves the
+// keyboard where it wants it.
+var acted atomic.Bool
+
+// Acted says whether this process has run an action or focused a window, see Action and FocusWindow.
+func Acted() bool { return acted.Load() }
+
+// leaveWait is how long LeavePanel waits for kitty to move its focus, a var for tests.
+var leaveWait = time.Second
+
+// LeavePanel gives the keyboard back to the window the panel kspaces runs in was opened from, and waits
+// until kitty has moved its focus to that window's OS window: goto_session loads a session with no
+// windows into the focused OS window, whatever window the action runs on, which would be the panel.
+// Nothing outside a panel.
+func LeavePanel() error {
+	from := PanelFrom()
+	if from == 0 {
+		return nil
+	}
+	if err := FocusWindow(from); err != nil {
+		return err
+	}
+	for deadline := time.Now().Add(leaveWait); ; time.Sleep(20 * time.Millisecond) {
+		data, err := ListWindows()
+		if err != nil {
+			return err
+		}
+		if osWindowFocused(data, from) {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("kitty did not move its focus to window %d, so this panel would have taken the session", from)
+		}
+	}
+}
+
+// osWindowFocused says whether the OS window that has the window id has kitty's focus.
+func osWindowFocused(data []OSWindow, id int) bool {
+	for _, osw := range data {
+		for _, tab := range osw.Tabs {
+			for _, w := range tab.Windows {
+				if w.ID == id {
+					return osw.IsFocused
+				}
+			}
+		}
+	}
+	return false
 }
 
 // GotoLayout sets the layout of the tab window id is in. Remote control rather than the goto_layout
@@ -312,8 +450,14 @@ func ScreenText(id int) (string, error) {
 	return string(out), err
 }
 
-// Action runs a kitty action, such as goto_session PATH.
+// Action runs a kitty action, such as goto_session PATH. In a panel it runs on the window the panel was
+// opened from, unless args start with a --match of their own, as it would run on an overlay over that
+// window: launch puts a tab in the OS window of the window it runs on, which would be the panel's.
 func Action(args ...string) error {
+	if from := PanelFrom(); from != 0 && !strings.HasPrefix(args[0], "--match") {
+		args = append([]string{fmt.Sprintf("--match=id:%d", from)}, args...)
+	}
+	acted.Store(true)
 	_, err := kitten(append([]string{"action"}, args...)...)
 	return err
 }

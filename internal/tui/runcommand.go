@@ -17,7 +17,7 @@ import (
 )
 
 // runForm chooses a configured command, fills in its inputs and runs it in a worktree's session, saying
-// where it opens. It is meant for a kitty overlay, like the new worktree form.
+// where it opens. It is meant for a kitty popup, like the new worktree form.
 type runForm struct {
 	th    *look.Theme
 	cfg   config.Config
@@ -262,7 +262,7 @@ func findRun(global config.Config, dir, name string, inputs map[string]string, o
 }
 
 // RunCommandForm runs the run form for the command called name in the worktree dir is in, its inputs
-// filled in from inputs, meant for a kitty overlay, until the command runs or the form is left. open
+// filled in from inputs, meant for a kitty popup, until the command runs or the form is left. open
 // overrides where it opens when not empty.
 func RunCommandForm(ctx context.Context, global config.Config, dir, name string, inputs map[string]string, open string) error {
 	cfg, space, wt, _, err := findRun(global, dir, name, inputs, open)
@@ -273,7 +273,7 @@ func RunCommandForm(ctx context.Context, global config.Config, dir, name string,
 	if err != nil {
 		return err
 	}
-	if _, err := tea.NewProgram(newRunForm(cfg, space, wt, st, name, inputs, open), tea.WithContext(ctx)).Run(); err != nil {
+	if err := runPopup(ctx, newRunForm(cfg, space, wt, st, name, inputs, open)); err != nil {
 		return fmt.Errorf("running the run form: %w", err)
 	}
 	return nil

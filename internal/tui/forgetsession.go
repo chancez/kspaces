@@ -13,7 +13,7 @@ import (
 )
 
 // forgetSessionForm shows what forgetting a session does and deletes its saved file when confirmed: all
-// that is left of a missing worktree with no windows. It is meant for a kitty overlay, like the close
+// that is left of a missing worktree with no windows. It is meant for a kitty popup, like the close
 // session form.
 type forgetSessionForm struct {
 	th      *look.Theme
@@ -92,7 +92,7 @@ func (f *forgetSessionForm) render() string {
 	return boxed(lines)
 }
 
-// RunForgetSession runs the forget session form for session, meant for a kitty overlay. With yes it
+// RunForgetSession runs the forget session form for session, meant for a kitty popup. With yes it
 // deletes the saved file without asking. A session with windows open is refused: the file is not all
 // there is of it, and closing it is what ends the rest.
 func RunForgetSession(ctx context.Context, cfg config.Config, session string, yes bool) error {
@@ -107,7 +107,7 @@ func RunForgetSession(ctx context.Context, cfg config.Config, session string, ye
 		return spaces.ForgetSession(cfg, session)
 	}
 	f := &forgetSessionForm{th: look.New(true), cfg: cfg, session: session}
-	if _, err := tea.NewProgram(f, tea.WithContext(ctx)).Run(); err != nil {
+	if err := runPopup(ctx, f); err != nil {
 		return fmt.Errorf("running the forget session form: %w", err)
 	}
 	return nil

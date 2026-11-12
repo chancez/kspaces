@@ -16,7 +16,7 @@ import (
 )
 
 // addSpaceForm asks for a repository, shows the root it would add or why it cannot, and adds it to the
-// config's spaces. The sidebars pick it up when they next read the config. It is meant for a kitty overlay,
+// config's spaces. The sidebars pick it up when they next read the config. It is meant for a kitty popup,
 // like the new worktree form.
 type addSpaceForm struct {
 	th *look.Theme
@@ -135,14 +135,14 @@ func (f *addSpaceForm) render() string {
 	return boxed(lines)
 }
 
-// RunAddSpace runs the add space form, meant for a kitty overlay, with path filled in, until the space is
+// RunAddSpace runs the add space form, meant for a kitty popup, with path filled in, until the space is
 // added or the form is left.
 func RunAddSpace(ctx context.Context, path string) error {
 	roots, err := configuredSpaces()
 	if err != nil {
 		return err
 	}
-	if _, err := tea.NewProgram(newAddSpaceForm(roots, path), tea.WithContext(ctx)).Run(); err != nil {
+	if err := runPopup(ctx, newAddSpaceForm(roots, path)); err != nil {
 		return fmt.Errorf("running the add space form: %w", err)
 	}
 	return nil

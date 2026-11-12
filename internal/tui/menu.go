@@ -181,63 +181,63 @@ func (m *sidebar) toggleFold(root string) {
 	m.scrollToCursor()
 }
 
-// newWorktree opens the form that creates a worktree in the space at root, in an overlay over the
-// sidebar's tab: the dock is too narrow to type a name in and read back where it goes.
+// newWorktree opens the form that creates a worktree in the space at root, in a popup for the sidebar's
+// tab: the dock is too narrow to type a name in and read back where it goes.
 func (m *sidebar) newWorktree(root string) tea.Cmd {
-	st := m.kitty
+	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
-		if err := spaces.NewWorktree(st, root); err != nil {
+		if err := spaces.NewWorktree(cfg, st, root); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
 		return nil
 	}
 }
 
-// removeWorktree opens the form that confirms removing the worktree at path, in an overlay as newWorktree's.
+// removeWorktree opens the form that confirms removing the worktree at path, in a popup as newWorktree's.
 func (m *sidebar) removeWorktree(path string) tea.Cmd {
-	st := m.kitty
+	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
-		if err := spaces.AskRemoveWorktree(st, path); err != nil {
+		if err := spaces.AskRemoveWorktree(cfg, st, path); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
 		return nil
 	}
 }
 
-// runCommand opens the form that runs a command in r's worktree, the first of its space's chosen, in an
-// overlay as newWorktree's.
+// runCommand opens the form that runs a command in r's worktree, the first of its space's chosen, in a
+// popup as newWorktree's.
 func (m *sidebar) runCommand(r spaces.Row) tea.Cmd {
-	st, path, name := m.kitty, r.Worktree.Path, r.Space.ConfigOf(m.cfg).Commands[0].Name
+	cfg, st, path, name := m.cfg, m.kitty, r.Worktree.Path, r.Space.ConfigOf(m.cfg).Commands[0].Name
 	return func() tea.Msg {
-		if err := spaces.AskRunCommand(st, name, path); err != nil {
+		if err := spaces.AskRunCommand(cfg, st, name, path); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
 		return nil
 	}
 }
 
-// openLayout opens the form that opens a layout in r's worktree, in an overlay as newWorktree's, with the
+// openLayout opens the form that opens a layout in r's worktree, in a popup as newWorktree's, with the
 // worktree's default layout chosen, else the first, as its space has them.
 func (m *sidebar) openLayout(r spaces.Row) tea.Cmd {
-	st, path, cfg := m.kitty, r.Worktree.Path, r.Space.ConfigOf(m.cfg)
+	global, st, path, cfg := m.cfg, m.kitty, r.Worktree.Path, r.Space.ConfigOf(m.cfg)
 	name := cfg.LayoutFor(r.Space.Name, !r.Main)
 	if name == "" {
 		name = cfg.Layouts[0].Name
 	}
 	return func() tea.Msg {
-		if err := spaces.AskOpenLayout(st, name, path); err != nil {
+		if err := spaces.AskOpenLayout(global, st, name, path); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
 		return nil
 	}
 }
 
-// saveLayout opens the form that saves the session of the worktree at path as a layout, in an overlay as
+// saveLayout opens the form that saves the session of the worktree at path as a layout, in a popup as
 // newWorktree's.
 func (m *sidebar) saveLayout(path string) tea.Cmd {
-	st := m.kitty
+	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
-		if err := spaces.AskSaveLayout(st, path); err != nil {
+		if err := spaces.AskSaveLayout(cfg, st, path); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
 		return nil
@@ -263,22 +263,22 @@ func openPR(dir string, number int) tea.Cmd {
 	}
 }
 
-// closeSession opens the form that confirms closing session, in an overlay as newWorktree's.
+// closeSession opens the form that confirms closing session, in a popup as newWorktree's.
 func (m *sidebar) closeSession(session string) tea.Cmd {
-	st := m.kitty
+	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
-		if err := spaces.AskCloseSession(st, session); err != nil {
+		if err := spaces.AskCloseSession(cfg, st, session); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
 		return nil
 	}
 }
 
-// forgetSession opens the form that confirms forgetting session, in an overlay as newWorktree's.
+// forgetSession opens the form that confirms forgetting session, in a popup as newWorktree's.
 func (m *sidebar) forgetSession(session string) tea.Cmd {
-	st := m.kitty
+	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
-		if err := spaces.AskForgetSession(st, session); err != nil {
+		if err := spaces.AskForgetSession(cfg, st, session); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
 		return nil
@@ -286,23 +286,23 @@ func (m *sidebar) forgetSession(session string) tea.Cmd {
 }
 
 // trustConfig opens the form that shows what the own config of the space at root adds, and trusts it,
-// in an overlay as newWorktree's.
+// in a popup as newWorktree's.
 func (m *sidebar) trustConfig(root string) tea.Cmd {
-	st := m.kitty
+	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
-		if err := spaces.AskTrust(st, root); err != nil {
+		if err := spaces.AskTrust(cfg, st, root); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
 		return nil
 	}
 }
 
-// addSpace opens the form that adds a space, in an overlay as newWorktree's, with the repository of the
+// addSpace opens the form that adds a space, in a popup as newWorktree's, with the repository of the
 // window beside the sidebar filled in.
 func (m *sidebar) addSpace() tea.Cmd {
-	st := m.kitty
+	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
-		if err := spaces.AskAddSpace(st); err != nil {
+		if err := spaces.AskAddSpace(cfg, st); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
 		return nil

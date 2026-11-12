@@ -101,7 +101,7 @@ func closesWhat(n int) string {
 }
 
 // RunCloseSession runs the close session form for session, or for the session of the window with the
-// keyboard when it is empty, meant for a kitty overlay. With yes it closes the session without asking.
+// keyboard when it is empty, meant for a kitty popup. With yes it closes the session without asking.
 func RunCloseSession(ctx context.Context, session string, yes bool) error {
 	self := kitty.SelfWindowID()
 	if session == "" {
@@ -123,7 +123,7 @@ func RunCloseSession(ctx context.Context, session string, yes bool) error {
 		return spaces.CloseSession(session)
 	}
 	f := &closeSessionForm{th: look.New(true), session: session, windows: st.Windows[session]}
-	if _, err := tea.NewProgram(f, tea.WithContext(ctx)).Run(); err != nil {
+	if err := runPopup(ctx, f); err != nil {
 		return fmt.Errorf("running the close session form: %w", err)
 	}
 	return nil

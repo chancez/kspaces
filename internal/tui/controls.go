@@ -97,7 +97,7 @@ func offered[M any](m M, t interact.Target[M], keys []interact.Key[M], a any) (i
 }
 
 // boxed draws a form's lines with a row of padding above and below, and two columns on either side of the
-// widest line, for the forms kitty shows in an overlay.
+// widest line, for the forms kitty shows in a popup.
 func boxed(lines []string) string {
 	inner := 0
 	for _, l := range lines {

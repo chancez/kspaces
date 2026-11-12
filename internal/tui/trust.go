@@ -17,7 +17,7 @@ import (
 )
 
 // trustForm shows what a space's own config would add, the commands it would run, and trusts the file's
-// content when confirmed. It is meant for a kitty overlay, like the forget session form.
+// content when confirmed. It is meant for a kitty popup, like the forget session form.
 type trustForm struct {
 	th     *look.Theme
 	global config.Config
@@ -202,7 +202,7 @@ func findSpace(cfg config.Config, path string) (spaces.Space, error) {
 }
 
 // RunTrust runs the trust form for the space file of the space path is in, or path names, meant for a
-// kitty overlay. With yes it trusts the file as it is without asking; with revoke it forgets it.
+// kitty popup. With yes it trusts the file as it is without asking; with revoke it forgets it.
 func RunTrust(ctx context.Context, cfg config.Config, path string, yes, revoke bool) error {
 	space, err := findSpace(cfg, path)
 	if err != nil {
@@ -226,7 +226,7 @@ func RunTrust(ctx context.Context, cfg config.Config, path string, yes, revoke b
 		}
 		return spaces.Trust(file, data)
 	}
-	if _, err := tea.NewProgram(f, tea.WithContext(ctx)).Run(); err != nil {
+	if err := runPopup(ctx, f); err != nil {
 		return fmt.Errorf("running the trust form: %w", err)
 	}
 	return nil

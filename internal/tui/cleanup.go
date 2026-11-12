@@ -219,7 +219,7 @@ func (f *cleanupForm) render() string {
 	return boxed(lines)
 }
 
-// RunCleanup runs the clean up form for the space at root, or named root, meant for a kitty overlay. A
+// RunCleanup runs the clean up form for the space at root, or named root, meant for a kitty popup. A
 // worktree's PR is what the sidebars' leader last saw, or else asked of gh now.
 func RunCleanup(ctx context.Context, cfg config.Config, root string) error {
 	space, err := spaces.Find(cfg, root)
@@ -238,17 +238,17 @@ func RunCleanup(ctx context.Context, cfg config.Config, root string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := tea.NewProgram(newCleanupForm(space, items), tea.WithContext(ctx)).Run(); err != nil {
+	if err := runPopup(ctx, newCleanupForm(space, items)); err != nil {
 		return fmt.Errorf("running the clean up form: %w", err)
 	}
 	return nil
 }
 
-// cleanup opens the clean up form for the space at root, in an overlay as newWorktree's.
+// cleanup opens the clean up form for the space at root, in a popup as newWorktree's.
 func (m *sidebar) cleanup(root string) tea.Cmd {
-	st := m.kitty
+	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
-		if err := spaces.AskCleanup(st, root); err != nil {
+		if err := spaces.AskCleanup(cfg, st, root); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
 		return nil

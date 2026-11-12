@@ -17,7 +17,7 @@ import (
 
 // newWorktreeForm asks for a branch, or a PR to check out, and, optionally, where its worktree goes and a
 // command to run in it, shows what it will do, creates the worktree and switches to its session. It is
-// meant for a kitty overlay, as the sidebar is too narrow to type a name and read back the path in.
+// meant for a kitty popup, as the sidebar is too narrow to type a name and read back the path in.
 type newWorktreeForm struct {
 	th     *look.Theme
 	cfg    config.Config
@@ -467,9 +467,9 @@ func prDoes(pr spaces.PR) string {
 }
 
 // RunNewWorktree runs the new worktree form for space, with the config as the space sees it, meant for a
-// kitty overlay, until the worktree is created and opened or the form is left.
+// kitty popup, until the worktree is created and opened or the form is left.
 func RunNewWorktree(ctx context.Context, cfg config.Config, space spaces.Space) error {
-	if _, err := tea.NewProgram(newForm(space.ConfigOf(cfg), space), tea.WithContext(ctx)).Run(); err != nil {
+	if err := runPopup(ctx, newForm(space.ConfigOf(cfg), space)); err != nil {
 		return fmt.Errorf("running the new worktree form: %w", err)
 	}
 	return nil

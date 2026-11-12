@@ -18,7 +18,7 @@ import (
 )
 
 // layoutForm chooses a configured layout, fills in its inputs and adds its tabs to a worktree's session,
-// open or not, saying what they hold. It is meant for a kitty overlay, like the run form.
+// open or not, saying what they hold. It is meant for a kitty popup, like the run form.
 type layoutForm struct {
 	th      *look.Theme
 	cfg     config.Config
@@ -250,7 +250,7 @@ func findLayout(global config.Config, dir, name string, inputs map[string]string
 }
 
 // OpenLayoutForm runs the layout form for the layout called name in the worktree dir is in, its inputs
-// filled in from inputs, meant for a kitty overlay, until the layout opens or the form is left.
+// filled in from inputs, meant for a kitty popup, until the layout opens or the form is left.
 func OpenLayoutForm(ctx context.Context, global config.Config, dir, name string, inputs map[string]string) error {
 	cfg, space, wt, _, err := findLayout(global, dir, name, inputs)
 	if err != nil {
@@ -260,7 +260,7 @@ func OpenLayoutForm(ctx context.Context, global config.Config, dir, name string,
 	if err != nil {
 		return err
 	}
-	if _, err := tea.NewProgram(newLayoutForm(cfg, space, wt, st, name, inputs), tea.WithContext(ctx)).Run(); err != nil {
+	if err := runPopup(ctx, newLayoutForm(cfg, space, wt, st, name, inputs)); err != nil {
 		return fmt.Errorf("running the layout form: %w", err)
 	}
 	return nil

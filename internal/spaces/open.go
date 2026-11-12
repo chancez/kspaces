@@ -43,6 +43,12 @@ func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree) error {
 			skipped = fmt.Errorf("opened %s with a shell, as %w", wt.Session, err)
 		}
 	}
+	if _, open := st.Sessions[wt.Session]; !open && len(actions) == 1 {
+		// Restoring from its file, which kitty does into the focused OS window.
+		if err := kitty.LeavePanel(); err != nil {
+			return err
+		}
+	}
 	for _, args := range actions {
 		if err := kitty.Action(args...); err != nil {
 			return err
@@ -186,51 +192,50 @@ func Leave(st kitty.State) error {
 	return kitty.FocusWindow(st.Home)
 }
 
-// NewWorktree opens the form that creates a worktree in the space at root, in an overlay over the
-// sidebar's tab: the dock is too narrow to type a name in and read back where it goes.
-func NewWorktree(st kitty.State, root string) error {
-	return kitty.LaunchForm(st, "new", root)
+// NewWorktree opens the form that creates a worktree in the space at root, in a popup for the sidebar's
+// tab, as cfg says: the dock is too narrow to type a name in and read back where it goes.
+func NewWorktree(cfg config.Config, st kitty.State, root string) error {
+	return launchForm(cfg, st, formPanel, "new", root)
 }
 
-// AskRemoveWorktree opens the form that confirms removing the worktree at path, in an overlay as
+// AskRemoveWorktree opens the form that confirms removing the worktree at path, in a popup as
 // NewWorktree's.
-func AskRemoveWorktree(st kitty.State, path string) error {
-	return kitty.LaunchForm(st, "remove", path)
+func AskRemoveWorktree(cfg config.Config, st kitty.State, path string) error {
+	return launchForm(cfg, st, formPanel, "remove", path)
 }
 
-// AskRunCommand opens the form that runs the command called name in the worktree at path, in an overlay
-// as NewWorktree's.
-func AskRunCommand(st kitty.State, name, path string) error {
-	return kitty.LaunchForm(st, "run", name, path)
+// AskRunCommand opens the form that runs the command called name in the worktree at path, in a popup as
+// NewWorktree's.
+func AskRunCommand(cfg config.Config, st kitty.State, name, path string) error {
+	return launchForm(cfg, st, formPanel, "run", name, path)
 }
 
-// AskOpenLayout opens the form that opens the layout called name in the worktree at path, in an overlay
-// as NewWorktree's.
-func AskOpenLayout(st kitty.State, name, path string) error {
-	return kitty.LaunchForm(st, "layout", name, path)
+// AskOpenLayout opens the form that opens the layout called name in the worktree at path, in a popup as
+// NewWorktree's.
+func AskOpenLayout(cfg config.Config, st kitty.State, name, path string) error {
+	return launchForm(cfg, st, formPanel, "layout", name, path)
 }
 
 // AskSaveLayout opens the form that saves the session of the worktree at path as a layout, its name left
-// to fill in, in an overlay as NewWorktree's. The form's window is in the tab st is seen from, the
+// to fill in, in a popup as NewWorktree's. The form is for the window of the tab st is seen from, the
 // sidebar's, so that is this tab when the session is the sidebar's.
-func AskSaveLayout(st kitty.State, path string) error {
-	return kitty.LaunchForm(st, "layout", "save", "", path)
+func AskSaveLayout(cfg config.Config, st kitty.State, path string) error {
+	return launchForm(cfg, st, listPanel, "layout", "save", "", path)
 }
 
-// AskCloseSession opens the form that confirms closing session, in an overlay as NewWorktree's.
-func AskCloseSession(st kitty.State, session string) error {
-	return kitty.LaunchForm(st, "close", session)
+// AskCloseSession opens the form that confirms closing session, in a popup as NewWorktree's.
+func AskCloseSession(cfg config.Config, st kitty.State, session string) error {
+	return launchForm(cfg, st, formPanel, "close", session)
 }
 
-// AskForgetSession opens the form that confirms forgetting session, in an overlay as NewWorktree's.
-func AskForgetSession(st kitty.State, session string) error {
-	return kitty.LaunchForm(st, "forget", session)
+// AskForgetSession opens the form that confirms forgetting session, in a popup as NewWorktree's.
+func AskForgetSession(cfg config.Config, st kitty.State, session string) error {
+	return launchForm(cfg, st, formPanel, "forget", session)
 }
 
-// AskTrust opens the form that trusts the own config of the space at root, in an overlay as
-// NewWorktree's.
-func AskTrust(st kitty.State, root string) error {
-	return kitty.LaunchForm(st, "trust", root)
+// AskTrust opens the form that trusts the own config of the space at root, in a popup as NewWorktree's.
+func AskTrust(cfg config.Config, st kitty.State, root string) error {
+	return launchForm(cfg, st, listPanel, "trust", root)
 }
 
 // ForgetSession deletes the saved file of session, so kitty does not restore it: for a missing worktree,

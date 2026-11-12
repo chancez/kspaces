@@ -25,7 +25,7 @@ func TestStateFrom(t *testing.T) {
 		{ID: 3, Windows: []Window{{ID: 30, Cwd: "/tmp"}}},
 	}}}
 
-	got := stateFrom(data, 12)
+	got := stateFrom(data, 12, 0)
 	// Home is the tab's most recently focused window that is not a dock, and HomeDir its directory.
 	// Windows counts each session's windows, docks left out, and Focused is when one was last focused.
 	want := State{
@@ -39,10 +39,44 @@ func TestStateFrom(t *testing.T) {
 	}
 
 	// A sidebar in a tab with no session highlights nothing.
-	got = stateFrom(data, 30)
+	got = stateFrom(data, 30, 0)
 	want.Current, want.Home, want.HomeDir = "", 30, "/tmp"
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
+	}
+}
+
+// In a panel, which is in no session, the state is the tab's of the window the panel was opened from,
+// and that window is still a screen to show, as kspaces does not run in it.
+func TestStateInPanel(t *testing.T) {
+	data := []OSWindow{
+		{Tabs: []Tab{{ID: 1, IsActive: true, Windows: []Window{
+			{ID: 10, SessionName: "gr", LastFocusedAt: 5, Cwd: "/src/gr/docs"},
+			{ID: 11, SessionName: "gr", LastFocusedAt: 9, Cwd: "/src/gr", IsActive: true},
+			{ID: 12, SessionName: "gr", UserVars: map[string]string{dockVar: "1"}, Cwd: "/"},
+		}}}},
+		{IsFocused: true, LastFocused: true, Tabs: []Tab{{ID: 2, IsActive: true, Windows: []Window{
+			{ID: 20, LastFocusedAt: 50, IsActive: true, UserVars: map[string]string{"kspaces_form": "1"}},
+		}}}},
+	}
+	inPanel := State{
+		Sessions: map[string]int{"gr": 11}, Windows: map[string]int{"gr": 2}, Focused: map[string]float64{"gr": 9},
+		Current: "gr", Home: 11, HomeDir: "/src/gr",
+		Screens: map[string]int{"gr": 11}, Own: map[int]bool{12: true, 20: true},
+	}
+	t.Setenv(FromEnv, "11")
+	for _, self := range []int{20, FocusedWindow} {
+		if got := StateOf(data, self); !reflect.DeepEqual(got, inPanel) {
+			t.Errorf("from 11 in %d: got %#v\nwant %#v", self, got, inPanel)
+		}
+	}
+
+	// Without it, the panel's own tab, in no session.
+	t.Setenv(FromEnv, "")
+	alone := inPanel
+	alone.Current, alone.Home, alone.HomeDir = "", 20, ""
+	if got := StateOf(data, 20); !reflect.DeepEqual(got, alone) {
+		t.Errorf("alone: got %#v\nwant %#v", got, alone)
 	}
 }
 
@@ -67,7 +101,7 @@ func TestScreens(t *testing.T) {
 		{ID: 5, IsActive: true, Windows: []Window{{ID: 50, SessionName: "notes", LastFocusedAt: 3, IsActive: true}}},
 	}}}
 
-	got := stateFrom(data, 50)
+	got := stateFrom(data, 50, 0)
 	want := State{
 		Sessions: map[string]int{"gr": 14, "kitty": 20, "docs": 40, "notes": 50},
 		Windows:  map[string]int{"gr": 4, "kitty": 4, "docs": 2, "notes": 1},
@@ -108,7 +142,7 @@ func TestStatuses(t *testing.T) {
 		}},
 	}}}
 
-	got := stateFrom(data, 0).Statuses
+	got := stateFrom(data, 0, 0).Statuses
 	// Grouped by state, most urgent first, and within a state the most recent change first: the done
 	// record noted at 300 comes before the one with no time.
 	want := []status.Status{

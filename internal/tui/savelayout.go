@@ -20,7 +20,7 @@ import (
 
 // saveLayoutForm saves a session's tabs, as kitty has them, as a layout in the config: a name, this tab or
 // every tab, where to save it, the space's own file or the global config, and for each pane what the
-// layout runs there, prefilled from what runs there now. It is meant for a kitty overlay, like the run
+// layout runs there, prefilled from what runs there now. It is meant for a kitty popup, like the run
 // form.
 type saveLayoutForm struct {
 	th *look.Theme
@@ -458,7 +458,7 @@ func (f *saveLayoutForm) render() string {
 }
 
 // SaveLayoutForm runs the save form for the session of the worktree dir is in, its name filled in with
-// name, saving this tab alone at first when only says so, meant for a kitty overlay, until the layout is
+// name, saving this tab alone at first when only says so, meant for a kitty popup, until the layout is
 // saved or the form is left.
 func SaveLayoutForm(ctx context.Context, cfg config.Config, dir, name string, only bool) error {
 	top, err := git.TopLevel(dir)
@@ -469,11 +469,11 @@ func SaveLayoutForm(ctx context.Context, cfg config.Config, dir, name string, on
 	if err != nil {
 		return err
 	}
-	tabs, this, err := spaces.CaptureSession(wt, kitty.SelfWindowID())
+	tabs, this, err := spaces.CaptureSession(wt, kitty.ThisWindowID())
 	if err != nil {
 		return err
 	}
-	if _, err := tea.NewProgram(newSaveLayoutForm(cfg, space, wt, tabs, this, name, only), tea.WithContext(ctx)).Run(); err != nil {
+	if err := runPopup(ctx, newSaveLayoutForm(cfg, space, wt, tabs, this, name, only)); err != nil {
 		return fmt.Errorf("running the save layout form: %w", err)
 	}
 	return nil

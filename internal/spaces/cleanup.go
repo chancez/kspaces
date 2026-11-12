@@ -3,6 +3,7 @@ package spaces
 import (
 	"fmt"
 
+	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
@@ -78,9 +79,9 @@ func Cleanups(space Space, pr func(Worktree) *gitstate.PR) ([]Cleanup, error) {
 }
 
 // AskCleanup opens the form that offers removing the worktrees of the space at root that look done with,
-// in an overlay as NewWorktree's.
-func AskCleanup(st kitty.State, root string) error {
-	return kitty.LaunchForm(st, "cleanup", root)
+// in a popup as NewWorktree's.
+func AskCleanup(cfg config.Config, st kitty.State, root string) error {
+	return launchForm(cfg, st, listPanel, "cleanup", root)
 }
 
 // RemoveAllInBackground runs `kspaces remove --yes` for the worktrees at paths, one after another, as a

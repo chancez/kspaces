@@ -97,7 +97,9 @@ type picker struct {
 	width   int
 	height  int
 	err     error
-	screen  pickScreen
+	// choosing is whether a choice is being switched to.
+	choosing bool
+	screen   pickScreen
 	// getText fetches a window's screen, kitty.ScreenText but in tests.
 	getText func(window int) (string, error)
 }
@@ -134,15 +136,16 @@ func (m *picker) filter() {
 	m.cursor = min(m.cursor, max(len(m.matches)-1, 0))
 }
 
-// choose switches to the chosen item and exits, which closes the overlay the picker runs in.
+// choose switches to the chosen item and exits, which closes the popup the picker runs in.
 func (m *picker) choose() tea.Cmd {
 	if m.cursor >= len(m.matches) || m.snap.Config == nil {
 		return nil
 	}
 	it, cfg, st := m.items[m.matches[m.cursor].Index], *m.snap.Config, m.snap.Kitty
-	// The overlay is the window that has focus, so there is no window of the tab to hand back to: the
-	// tab's own window gets focus again when the overlay closes.
+	// The picker's window has focus, so there is no window of the tab to hand back to: the tab's own
+	// window gets focus again when an overlay closes, and the popup gives it back from a panel.
 	st.Home = 0
+	m.choosing = true
 	return func() tea.Msg {
 		var err error
 		switch {
@@ -183,7 +186,7 @@ func (m *picker) update(msg tea.Msg) tea.Cmd {
 		m.input.SetWidth(max(m.width-ansi.StringWidth(m.input.Prompt)-1, 1))
 		return nil
 	case spaces.Snapshot:
-		m.err = msg.Err
+		m.err, m.choosing = msg.Err, false
 		if msg.Config != nil {
 			m.snap, m.items = msg, pickItemsFrom(msg)
 			m.filter()
@@ -288,9 +291,9 @@ func (m *picker) render() string {
 	return strings.Join(append(lines, status), "\n")
 }
 
-// RunPicker runs the picker, meant for a kitty overlay, until something is chosen or it is left.
+// RunPicker runs the picker, meant for a kitty popup, until something is chosen or it is left.
 func RunPicker(ctx context.Context) error {
-	if _, err := tea.NewProgram(newPicker(kitty.SelfWindowID()), tea.WithContext(ctx)).Run(); err != nil {
+	if err := runPopup(ctx, newPicker(kitty.SelfWindowID())); err != nil {
 		return fmt.Errorf("running the picker: %w", err)
 	}
 	return nil
