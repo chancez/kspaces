@@ -126,6 +126,9 @@ func (f *layoutForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return f, nil
 	case tea.KeyPressMsg:
+		if keptBy(f.focused(), msg) {
+			break
+		}
 		if cmd, ok := runOn(f, msg, theLayoutForm.Target(layoutSubject{})); ok {
 			return f, cmd
 		}
@@ -218,6 +221,7 @@ func (f *layoutForm) render() string {
 	if f.onLayout() {
 		spans = append(spans, choiceHints("layout")...)
 	}
+	spans = append(spans, newlineHints(f.focused())...)
 	return boxed(append(lines, line(spans...)))
 }
 

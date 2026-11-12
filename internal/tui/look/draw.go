@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/help"
-	"charm.land/bubbles/v2/textarea"
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 
@@ -163,20 +162,6 @@ func (t *Theme) StyleHelp(h *help.Model) {
 	h.Styles.ShortKey, h.Styles.FullKey = key, key
 	h.Styles.ShortDesc, h.Styles.FullDesc = desc, desc
 	h.Styles.ShortSeparator, h.Styles.FullSeparator = sep, sep
-}
-
-// EditorStyles are a text area's styles in the theme: text, and muted placeholder and prompt.
-func (t *Theme) EditorStyles() textarea.Styles {
-	styles := textarea.DefaultStyles(t.isDark)
-	text, muted := t.style(elText, 0, Plain), t.style(elMuted, 0, Plain)
-	for _, state := range []*textarea.StyleState{&styles.Focused, &styles.Blurred} {
-		state.Text = text
-		state.Placeholder = muted
-		state.CursorLine = text
-		state.EndOfBuffer = muted
-		state.Prompt = muted
-	}
-	return styles
 }
 
 // Fit cuts or pads s, already styled, to exactly width cells. The padding is unstyled.

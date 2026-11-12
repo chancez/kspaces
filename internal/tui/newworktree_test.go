@@ -201,6 +201,7 @@ run = ["gr"]
 		t.Fatal("created with the prompt empty")
 	}
 	want = screen([]string{"  command    < claude >", "  Prompt     required"}, "", "Runs claude in the first tab", "", "claude needs Prompt")
+	want[len(want)-2] += "  shift+enter newline"
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("prompt missing:\n%q\nwant\n%q", got, want)
 	}

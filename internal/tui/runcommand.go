@@ -161,6 +161,9 @@ func (f *runForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return f, nil
 	case tea.KeyPressMsg:
+		if keptBy(f.focused(), msg) {
+			break
+		}
 		if cmd, ok := runOn(f, msg, theRunForm.Target(runSubject{})); ok {
 			return f, cmd
 		}
@@ -226,6 +229,7 @@ func (f *runForm) render() string {
 	if f.onCommand() {
 		spans = append(spans, choiceHints("command")...)
 	}
+	spans = append(spans, newlineHints(f.focused())...)
 	return boxed(append(lines, line(spans...)))
 }
 

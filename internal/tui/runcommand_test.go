@@ -40,7 +40,8 @@ open = "split"
 }
 
 // fakeKittenLs puts a kitten on PATH that answers `kitten @ ls` with ls and records every other call, its
-// arguments one a line and -- after each, and returns those calls.
+// arguments and -- after each, and returns those calls. They are recorded ended by NULs, so an argument
+// with a newline stays one.
 func fakeKittenLs(t *testing.T, ls string) func() []string {
 	t.Helper()
 	dir := t.TempDir()
@@ -49,7 +50,7 @@ func fakeKittenLs(t *testing.T, ls string) func() []string {
 		t.Fatal(err)
 	}
 	script := "#!/bin/sh\n[ \"$2\" = ls ] && exec cat " + filepath.Join(dir, "ls.json") + "\n" +
-		"{ for a; do printf '%s\\n' \"$a\"; done; echo --; } >> " + log + "\n"
+		"{ for a; do printf '%s\\0' \"$a\"; done; printf -- '--\\0'; } >> " + log + "\n"
 	if err := os.WriteFile(filepath.Join(dir, "kitten"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +62,7 @@ func fakeKittenLs(t *testing.T, ls string) func() []string {
 		if err != nil {
 			return nil
 		}
-		return strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
+		return strings.Split(strings.TrimSuffix(string(data), "\x00"), "\x00")
 	}
 }
 
@@ -162,7 +163,7 @@ func TestRunForm(t *testing.T) {
 	f.Update(keyMsg("tab"))
 	f.Update(keyMsg("enter"))
 	want = screen([]string{"  command    < claude >", "  Prompt     required"}, "Runs claude", "Opens in a new tab in gr@fix", "",
-		"claude needs Prompt", "", " Run enter    Cancel esc   tab next field", "")
+		"claude needs Prompt", "", " Run enter    Cancel esc   tab next field  shift+enter newline", "")
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("claude, its prompt empty:\n%q\nwant\n%q", got, want)
 	}

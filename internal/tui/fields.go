@@ -5,6 +5,8 @@ import (
 	"image/color"
 	"strings"
 
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -25,6 +27,8 @@ type field interface {
 	update(tea.Msg) tea.Cmd
 	// place puts the cursor where a click on cell x of row y of the box, as View draws it, lands.
 	place(x, y int)
+	// keeps says whether the box takes msg rather than the form, as up and down between its lines.
+	keeps(msg tea.KeyPressMsg) bool
 }
 
 // lineField is one line of text, which scrolls sideways, for a branch, a path or a name.
@@ -66,6 +70,73 @@ func (f *lineField) place(x, _ int) {
 		at++
 	}
 	f.SetCursor(at)
+}
+
+func (*lineField) keeps(tea.KeyPressMsg) bool { return false }
+
+// textField is text that can take several lines, for the inputs of commands and layouts, which go to a
+// program as they are. shift+enter starts a line, or alt+enter or ctrl+j, for a terminal that sends
+// shift+enter as enter, which the form keeps for submitting. The box grows to show the lines, wrapped, up
+// to textLines, then scrolls with the cursor.
+type textField struct{ textarea.Model }
+
+// textLines is the most lines a text field shows.
+const textLines = 6
+
+// newTextField is a text field in th's styles showing placeholder while empty.
+func newTextField(th *look.Theme, placeholder string) textField {
+	in := textarea.New()
+	in.Prompt = ""
+	in.ShowLineNumbers = false
+	in.Placeholder = placeholder
+	in.DynamicHeight = true
+	in.MaxHeight = textLines
+	// Unset, MaxHeight would also stop the lines at textLines; this is textarea's own limit.
+	in.MaxContentHeight = 10000
+	in.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter", "alt+enter", "ctrl+j"))
+	in.SetStyles(th.AreaStyles())
+	return textField{in}
+}
+
+func (f *textField) fill(s string) {
+	f.SetValue(s)
+	f.MoveToEnd()
+}
+
+func (f *textField) update(msg tea.Msg) tea.Cmd {
+	var cmd tea.Cmd
+	f.Model, cmd = f.Model.Update(msg)
+	return cmd
+}
+
+// place puts the cursor where the click lands, which textarea works out through wrapping and scrolling.
+func (f *textField) place(x, y int) {
+	f.BeginSelection(x, y)
+	f.EndSelection()
+}
+
+// keeps up and down while they move between the box's lines, so only up on its first and down on its
+// last go on to the form, to the field above or below.
+func (f *textField) keeps(msg tea.KeyPressMsg) bool {
+	li := f.LineInfo()
+	switch msg.String() {
+	case "up":
+		return f.Line() > 0 || li.RowOffset > 0
+	case "down":
+		return f.Line() < f.LineCount()-1 || li.RowOffset < li.Height-1
+	}
+	return false
+}
+
+// keptBy says whether fl, the focused field, nil for a choice, keeps msg from the form's keys.
+func keptBy(fl field, msg tea.KeyPressMsg) bool { return fl != nil && fl.keeps(msg) }
+
+// newlineHints are the keys that start a line in fl, for a form's key hints, when it takes several.
+func newlineHints(fl field) []look.Span {
+	if _, ok := fl.(*textField); !ok {
+		return nil
+	}
+	return []look.Span{look.Text("  "), look.Key("shift+enter"), look.KeyDesc(" newline")}
 }
 
 // fieldZone is the zone fl's row is drawn in: its address, as every field has its own.

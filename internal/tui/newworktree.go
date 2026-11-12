@@ -298,6 +298,9 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		f.followBranch()
 		return f, nil
 	case tea.KeyPressMsg:
+		if keptBy(f.focused(), msg) {
+			break
+		}
 		if cmd, ok := runOn(f, msg, theForm.Target(formSubject{})); ok {
 			return f, cmd
 		}
@@ -438,6 +441,7 @@ func (f *newWorktreeForm) render() string {
 	case f.onCommand():
 		hints = append(hints, choiceHints("command")...)
 	}
+	hints = append(hints, newlineHints(f.focused())...)
 	lines = append(lines, line(append(buttons, hints...)...))
 	return boxed(lines)
 }

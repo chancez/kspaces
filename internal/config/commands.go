@@ -35,7 +35,7 @@ type Command struct {
 type Input struct {
 	// What its placeholder is, [a-z][a-z0-9_]*, and not a built-in's.
 	Name string `toml:"name"`
-	// InputString, the only type so far, and the default: one line of text.
+	// InputString, the only type so far, and the default: text, which can take several lines.
 	Type string `toml:"type"`
 	// What the form calls it, the name by default.
 	Label   string `toml:"label"`
@@ -44,7 +44,7 @@ type Input struct {
 	Required bool `toml:"required"`
 }
 
-// InputString is an input of one line of text.
+// InputString is an input of text, which can take several lines.
 const InputString = "string"
 
 // OpenTab is where a command opens by default: a new tab in the session.

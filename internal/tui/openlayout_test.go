@@ -220,7 +220,7 @@ func TestLayoutForm(t *testing.T) {
 	f.Update(keyMsg("tab"))
 	f.Update(keyMsg("enter"))
 	want = screen([]string{"  layout     < agent >", "  Prompt     required"}, "A tab of claude, review, a shell", "Adds its tabs to gr@fix", "",
-		"agent needs Prompt", "", " Open enter    Cancel esc   tab next field", "")
+		"agent needs Prompt", "", " Open enter    Cancel esc   tab next field  shift+enter newline", "")
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("agent, its prompt empty:\n%q\nwant\n%q", got, want)
 	}

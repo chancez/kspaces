@@ -41,20 +41,21 @@ const (
 	layoutZone  = "layout"
 )
 
-// newCommandFields are the fields for cmds, see newChoiceFields. The list says what each runs.
+// newCommandFields are the fields for cmds, see newChoiceFields, their inputs taking several lines. The
+// list says what each runs.
 func newCommandFields(th *look.Theme, cmds []config.Command, optional bool, name string, values map[string]string) choiceFields[config.Command] {
 	return newChoiceFields(th, commandZone, cmds, func(c config.Command) string { return c.Name },
-		func(c config.Command) []config.Input { return c.Inputs }, commandDetail, optional, name, values)
+		func(c config.Command) []config.Input { return c.Inputs }, commandDetail, true, optional, name, values)
 }
 
 // commandDetail is the command line c runs.
 func commandDetail(c config.Command) string { return strings.Join(c.Run, " ") }
 
-// newLayoutFields are the fields for layouts, see newChoiceFields. The list says how many tabs and panes
-// each has.
+// newLayoutFields are the fields for layouts, see newChoiceFields, their inputs taking several lines. The
+// list says how many tabs and panes each has.
 func newLayoutFields(th *look.Theme, layouts []config.Layout, optional bool, name string, values map[string]string) choiceFields[config.Layout] {
 	return newChoiceFields(th, layoutZone, layouts, func(l config.Layout) string { return l.Name },
-		func(l config.Layout) []config.Input { return l.Inputs }, layoutDetail, optional, name, values)
+		func(l config.Layout) []config.Input { return l.Inputs }, layoutDetail, true, optional, name, values)
 }
 
 // layoutDetail is how many tabs and panes l has.
@@ -67,8 +68,9 @@ func layoutDetail(l config.Layout) string {
 }
 
 // newChoiceFields are the fields for choices, with the one called name chosen, or none or the first when
-// there is no such choice, and its inputs filled in from values, the rest with their defaults.
-func newChoiceFields[T any](th *look.Theme, label string, choices []T, nameOf func(T) string, inputOf func(T) []config.Input, detailOf func(T) string, optional bool, name string, values map[string]string) choiceFields[T] {
+// there is no such choice, and its inputs filled in from values, the rest with their defaults. Each input
+// is a textField when multiline says so, else a lineField.
+func newChoiceFields[T any](th *look.Theme, label string, choices []T, nameOf func(T) string, inputOf func(T) []config.Input, detailOf func(T) string, multiline, optional bool, name string, values map[string]string) choiceFields[T] {
 	c := choiceFields[T]{th: th, label: label, zone: label, choices: choices, nameOf: nameOf, inputOf: inputOf, detailOf: detailOf, optional: optional, sel: -1}
 	if !optional && len(choices) > 0 {
 		c.sel = 0
@@ -80,13 +82,20 @@ func newChoiceFields[T any](th *look.Theme, label string, choices []T, nameOf fu
 			if in.Required {
 				placeholder = "required"
 			}
-			box := newLineField(th, placeholder)
+			var box field
+			if multiline {
+				b := newTextField(th, placeholder)
+				box = &b
+			} else {
+				b := newLineField(th, placeholder)
+				box = &b
+			}
 			v := in.Default
 			if given, ok := values[in.Name]; ok && nameOf(ch) == name {
 				v = given
 			}
 			box.fill(v)
-			ins = append(ins, &box)
+			ins = append(ins, box)
 		}
 		if nameOf(ch) == name {
 			c.sel = i

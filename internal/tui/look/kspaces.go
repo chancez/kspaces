@@ -3,6 +3,7 @@ package look
 import (
 	"strings"
 
+	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -99,5 +100,16 @@ func (t *Theme) InputStyles() textinput.Styles {
 		Focused: state,
 		Blurred: state,
 		Cursor:  textinput.CursorStyle{Color: lipgloss.NoColor{}, Shape: tea.CursorBlock, Blink: true},
+	}
+}
+
+// AreaStyles are a text area's styles in the theme, as InputStyles are a text input's, so the two look
+// alike side by side.
+func (t *Theme) AreaStyles() textarea.Styles {
+	state := textarea.StyleState{Placeholder: lipgloss.NewStyle().Foreground(lipgloss.Color("240"))}
+	return textarea.Styles{
+		Focused: state,
+		Blurred: state,
+		Cursor:  textarea.CursorStyle{Color: lipgloss.NoColor{}, Shape: tea.CursorBlock, Blink: true},
 	}
 }
