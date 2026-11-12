@@ -115,7 +115,7 @@ var (
 		},
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
-			return m.openWorktreeCmd(*s.row.Worktree)
+			return m.openWorktreeCmd(*s.row.Worktree, spaces.OpenOptions{})
 		},
 	}
 	actFold = &interact.Action[*sidebar, entrySubject]{

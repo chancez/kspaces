@@ -184,7 +184,8 @@ the status list and the keys.
 kspaces [sidebar]        the sidebar, run in a kitty dock
 kspaces pick             a fuzzy picker over sessions, worktrees and status entries, with a preview
 kspaces list             every space's worktrees and their sessions, and a space's own config not in use
-kspaces open PATH        switch to the session of the worktree at PATH
+kspaces open [PATH]      switch to the session of the worktree at PATH or the current directory;
+  --no-layout            --no-layout opens one tab where the default layout would open
 kspaces next, prev       switch to the next or previous session with windows open
   --attention            or to the next or previous window that is blocked, failed or done
 kspaces new [SPACE]      create a worktree, in a form

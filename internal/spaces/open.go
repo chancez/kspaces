@@ -12,11 +12,18 @@ import (
 	"github.com/chancez/kspaces/internal/kitty"
 )
 
+// OpenOptions are how OpenWorktree opens a session with no windows.
+type OpenOptions struct {
+	// NoLayout opens one tab in the worktree in place of its default layout. A saved file that opens
+	// windows still restores the session: the default layout only ever stands in for its first tab.
+	NoLayout bool
+}
+
 // OpenWorktree switches to the worktree's session. When it has no windows, the session is restored from its
-// saved file if that opens any, and otherwise opened with its default layout, see freshLayout, or with one
-// tab in the worktree, or in the home directory for a session in no space. A default layout that needs
-// inputs is not opened: the tab is, and the error says so.
-func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree) error {
+// saved file if that opens any, and otherwise opened with its default layout, see freshLayout, unless
+// opts.NoLayout, or with one tab in the worktree, or in the home directory for a session in no space. A
+// default layout that needs inputs is not opened: the tab is, and the error says so.
+func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree, opts OpenOptions) error {
 	if st.Home != 0 {
 		// Hand this tab's focus back to its own window before leaving, so coming back to the tab lands
 		// there rather than in the sidebar, which took focus when it was clicked or focused to pick.
@@ -34,7 +41,7 @@ func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree) error {
 	}
 	// More than the switch is a fresh session's first tab, which the default layout stands in for.
 	var skipped error
-	if len(actions) > 1 {
+	if len(actions) > 1 && !opts.NoLayout {
 		spaceCfg, space, found, lr, ok, err := freshLayout(cfg, wt)
 		if ok {
 			return OpenLayout(spaceCfg, st, space, found, lr)
@@ -61,10 +68,7 @@ func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree) error {
 func openActions(cfg config.Config, st kitty.State, wt Worktree) ([][]string, error) {
 	path := SessionFile(cfg, wt.Session)
 	goTo := []string{"goto_session", path}
-	if _, open := st.Sessions[wt.Session]; open {
-		return [][]string{goTo}, nil
-	}
-	if cfg.SessionsDir != "" && opensWindows(path) {
+	if !opensAfresh(cfg, st, wt) {
 		return [][]string{goTo}, nil
 	}
 	cwd := wt.Path
@@ -77,6 +81,31 @@ func openActions(cfg config.Config, st kitty.State, wt Worktree) ([][]string, er
 	}
 	// The new tab is the session's only window, so going to it only records the switch, see gotoSession.
 	return [][]string{firstTab(cfg, cwd, wt.Session), goTo}, nil
+}
+
+// opensAfresh says whether wt's session has neither windows nor a saved file that opens any, so opening it
+// makes its first tab, or its default layout.
+func opensAfresh(cfg config.Config, st kitty.State, wt Worktree) bool {
+	if _, open := st.Sessions[wt.Session]; open {
+		return false
+	}
+	return cfg.SessionsDir == "" || !opensWindows(SessionFile(cfg, wt.Session))
+}
+
+// OpensDefaultLayout says whether OpenWorktree would open wt, a worktree of space as listed, with its
+// default layout, so that OpenOptions.NoLayout changes what it opens. A default that needs inputs is not
+// opened anyway.
+func OpensDefaultLayout(cfg config.Config, st kitty.State, space Space, wt Worktree) bool {
+	if wt.Path == "" || len(space.Worktrees) == 0 || !opensAfresh(cfg, st, wt) {
+		return false
+	}
+	cfg = space.ConfigOf(cfg)
+	l, ok := cfg.Layout(cfg.LayoutFor(space.Name, space.Worktrees[0].Path != wt.Path))
+	if !ok {
+		return false
+	}
+	_, err := NewLayoutRun(l, nil)
+	return err == nil
 }
 
 // firstTab is the launch action that opens a session's first tab, in cwd.
@@ -139,13 +168,13 @@ func OpenWindow(cfg config.Config, st kitty.State, id int, session string) error
 // OpenFromOverlay switches to the worktree's session from an overlay that has focus, such as the new
 // worktree form. There is no window of the tab to hand back to: the tab's own window gets focus again
 // when the overlay closes.
-func OpenFromOverlay(cfg config.Config, wt Worktree) error {
+func OpenFromOverlay(cfg config.Config, wt Worktree, opts OpenOptions) error {
 	st, err := kitty.LoadState(kitty.SelfWindowID())
 	if err != nil {
 		return err
 	}
 	st.Home = 0
-	return OpenWorktree(cfg, st, wt)
+	return OpenWorktree(cfg, st, wt, opts)
 }
 
 // FindWorktree is the worktree at path and its space, from any of the configured spaces, its file read as
@@ -171,8 +200,8 @@ func FindWorktree(cfg config.Config, path string) (Space, Worktree, error) {
 	return Space{}, Worktree{}, fmt.Errorf("%s is not a worktree of any configured space", path)
 }
 
-// OpenPath switches to the session of the worktree at path, creating it if needed.
-func OpenPath(cfg config.Config, path string) error {
+// OpenPath switches to the session of the worktree at path, creating it if needed, as opts says.
+func OpenPath(cfg config.Config, path string, opts OpenOptions) error {
 	_, wt, err := FindWorktree(cfg, path)
 	if err != nil {
 		return err
@@ -181,7 +210,7 @@ func OpenPath(cfg config.Config, path string) error {
 	if err != nil {
 		return err
 	}
-	return OpenWorktree(cfg, st, wt)
+	return OpenWorktree(cfg, st, wt, opts)
 }
 
 // Leave gives keyboard focus back to the window of the tab the sidebar took it from, if it is known.

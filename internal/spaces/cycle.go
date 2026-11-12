@@ -31,7 +31,7 @@ func Cycle(delta int) error {
 	if len(open) == 0 {
 		return fmt.Errorf("no session has windows open")
 	}
-	return OpenWorktree(*snap.Config, snap.Kitty, open[cycleIndex(len(open), current, delta)])
+	return OpenWorktree(*snap.Config, snap.Kitty, open[cycleIndex(len(open), current, delta)], OpenOptions{})
 }
 
 // cycleIndex steps delta places from current among n, wrapping around. From outside the list, current -1,

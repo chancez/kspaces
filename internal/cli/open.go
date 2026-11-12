@@ -8,16 +8,23 @@ import (
 )
 
 func (a *app) openCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "open PATH",
-		Short: "Switch to the session of the worktree at PATH, creating it if needed",
-		Args:  cobra.ExactArgs(1),
+	var noLayout bool
+	cmd := &cobra.Command{
+		Use:   "open [PATH]",
+		Short: "Switch to the session of the worktree at PATH, the current directory's by default, creating it if needed",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			cfg, err := config.Load()
 			if err != nil {
 				return err
 			}
-			return spaces.OpenPath(cfg, args[0])
+			dir := "."
+			if len(args) > 0 {
+				dir = args[0]
+			}
+			return spaces.OpenPath(cfg, dir, spaces.OpenOptions{NoLayout: noLayout})
 		},
 	}
+	cmd.Flags().BoolVar(&noLayout, "no-layout", false, "open a session that has no windows and nothing saved to restore with one tab, not its default layout")
+	return cmd
 }

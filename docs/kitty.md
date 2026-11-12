@@ -11,7 +11,7 @@ Opening a worktree:
 1. focuses its session's most recently focused window, if it has windows open;
 2. otherwise loads `SESSION.kitty-session` from the `sessions` directory with `goto_session`, if there is one
    that opens any window (has a `launch` line);
-3. otherwise opens it with its [default layout](#layouts), if it has one;
+3. otherwise opens it with its [default layout](#layouts), if it has one, unless opened without it;
 4. otherwise runs the `launch` action with `--type=tab --cwd=WORKTREE --add-to-session=SESSION`, in the home
    directory for a session in no space, such as `default`.
 
@@ -167,6 +167,10 @@ worktree_layout = "agent"
 A default layout with an input that is required and has no default is not opened without asking: the
 session opens with its one tab, and the sidebar's last line says why. The new worktree form, **Open layout**
 and `kspaces layout NAME [PATH]`, with `--input NAME=VALUE` and `--yes` as `kspaces run`, ask for it.
+
+`kspaces open --no-layout [PATH]` opens the one tab instead of the default layout. It replaces only the
+default layout, so a session with windows is switched to, and one with a saved file that opens windows is
+restored from it, as ever.
 
 ### Saving a layout
 

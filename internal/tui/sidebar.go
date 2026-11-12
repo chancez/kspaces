@@ -144,10 +144,10 @@ func (m *sidebar) openWindowCmd(s status.Status) tea.Cmd {
 	}
 }
 
-func (m *sidebar) openWorktreeCmd(wt spaces.Worktree) tea.Cmd {
+func (m *sidebar) openWorktreeCmd(wt spaces.Worktree, opts spaces.OpenOptions) tea.Cmd {
 	cfg, st, self, p := m.cfg, m.kitty, m.self, m.poller
 	return func() tea.Msg {
-		if err := spaces.OpenWorktree(cfg, st, wt); err != nil {
+		if err := spaces.OpenWorktree(cfg, st, wt, opts); err != nil {
 			return spaces.Snapshot{Err: err}
 		}
 		return p.Poll(true).View(self)

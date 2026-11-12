@@ -157,7 +157,7 @@ func (m *picker) choose() tea.Cmd {
 			// Opening it would make it afresh in a directory that is gone.
 			err = fmt.Errorf("the worktree directory of %s is gone", it.row.Worktree.Session)
 		default:
-			err = spaces.OpenWorktree(cfg, st, *it.row.Worktree)
+			err = spaces.OpenWorktree(cfg, st, *it.row.Worktree, spaces.OpenOptions{})
 		}
 		if err != nil {
 			return spaces.Snapshot{Err: err}

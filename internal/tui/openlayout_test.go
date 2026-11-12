@@ -545,7 +545,7 @@ func TestOpenWorktreeLayout(t *testing.T) {
 	var got []result
 	for _, w := range []spaces.Worktree{space.Worktrees[0], wt} {
 		calls := fakeKittenWindows(t, w.Session)
-		err := spaces.OpenPath(cfg, w.Path)
+		err := spaces.OpenPath(cfg, w.Path, spaces.OpenOptions{})
 		got = append(got, result{errString(err), calls()})
 	}
 	at := func(wt spaces.Worktree) []string {
@@ -559,6 +559,51 @@ func TestOpenWorktreeLayout(t *testing.T) {
 			"@", "action", "goto_session", main.Session + ".kitty-session", "--"})},
 		{"opened " + wt.Session + " with a shell, as agent needs Prompt", slices.Concat([]string{"@", "action", "launch", "--type=tab"}, at(wt), []string{"--",
 			"@", "action", "goto_session", wt.Session + ".kitty-session", "--"})},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+}
+
+// Opening without the layout opens the one tab where the default layout would open, and changes nothing
+// where a saved file restores the session or there is no default.
+func TestOpenWithoutLayout(t *testing.T) {
+	root := mainRepo(t)
+	space := spaces.LoadSpace(root)
+	wt := space.Worktrees[0]
+	saved := t.TempDir()
+	if err := os.WriteFile(filepath.Join(saved, wt.Session+".kitty-session"), []byte("launch\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	withDefault := testLayouts(t)
+	withDefault.Spaces = []string{root}
+	withDefault.Space = map[string]config.SpaceSettings{space.Name: {Layout: "plain"}}
+	restores := withDefault
+	restores.SessionsDir = saved
+	noDefault := withDefault
+	noDefault.Space = nil
+	type result struct {
+		Err   string
+		Calls []string
+	}
+	var got []result
+	for _, cfg := range []config.Config{withDefault, restores, noDefault} {
+		for _, opts := range []spaces.OpenOptions{{}, {NoLayout: true}} {
+			calls := fakeKittenWindows(t, wt.Session)
+			err := spaces.OpenPath(cfg, wt.Path, opts)
+			got = append(got, result{errString(err), calls()})
+		}
+	}
+	tab := []string{"@", "action", "launch", "--type=tab", "--cwd=" + wt.Path, "--add-to-session=" + wt.Session, "--"}
+	goTo := []string{"@", "action", "goto_session", wt.Session + ".kitty-session", "--"}
+	plain := result{"<nil>", slices.Concat(tab, goTo)}
+	restored := result{"<nil>", []string{"@", "action", "goto_session", filepath.Join(saved, wt.Session+".kitty-session"), "--"}}
+	want := []result{
+		{"<nil>", slices.Concat(tab, []string{"@", "goto-layout", "--match=window_id:11", "splits", "--",
+			"@", "focus-window", "--match", "id:11", "--"}, goTo)},
+		plain,
+		restored, restored,
+		plain, plain,
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q\nwant %q", got, want)
