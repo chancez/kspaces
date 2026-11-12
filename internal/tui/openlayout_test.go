@@ -610,6 +610,114 @@ func TestOpenWithoutLayout(t *testing.T) {
 	}
 }
 
+// Open without layout is on the menu, and o its key, only on a worktree whose session has no windows,
+// no saved file that would restore it and a default layout to open; o opens the one tab.
+func TestOpenWithoutLayoutMenu(t *testing.T) {
+	e := newSidebarEnv(t)
+	gittest.Isolate(t)
+	toml := "layout = \"two\"\n\n[[layouts]]\nname = \"two\"\ntabs = [{ panes = [{}, { split = \"right\" }] }]\n"
+	cfg, err := config.Parse(toml)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// What o loads once it has opened the session.
+	dir := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "kspaces")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(toml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	load := func(cfg config.Config) {
+		snap := fixture(time.Now())
+		snap.Config = &cfg
+		snap.Spaces[0].Missing = []spaces.Worktree{{Session: "gr@gone"}}
+		e.m.Update(snap)
+		e.m.render()
+	}
+	menu := func(session string) []string {
+		t.Helper()
+		row := e.row(session)
+		e.click(fmt.Sprintf(entryZone, row), tea.MouseRight)
+		_, y := e.zone(fmt.Sprintf(entryZone, row))
+		got := e.screen()[y+1 : y+1+e.m.menu.height()]
+		e.press("esc")
+		return got
+	}
+	linked := func(session ...string) []string {
+		return slices.Concat([]string{menuRule("Session"), " Open"}, session, []string{" Open layout",
+			menuRule("Worktree"), " Remove worktree",
+			menuRule("Space"), " New worktree", " Fold worktrees", " Add space", menuRule("")})
+	}
+	main := func(session ...string) []string {
+		return slices.Concat([]string{menuRule("Session"), " Open"}, session, []string{" Open layout",
+			menuRule("Space"), " New worktree", " Add space", menuRule("")})
+	}
+	type result struct {
+		Session string
+		Menu    []string
+	}
+	check := func(name string, want []result) {
+		t.Helper()
+		var got []result
+		for _, w := range want {
+			got = append(got, result{w.Session, menu(w.Session)})
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("%s:\n%q\nwant\n%q", name, got, want)
+		}
+	}
+
+	load(cfg)
+	check("the default layout", []result{
+		{"gr@fix", linked(" Open without layout")},
+		{"kitty", main(" Open without layout")},
+		// With windows open, there is no default layout to skip.
+		{"gr", []string{menuRule("Session"), " Open", " Open layout", " Save as layout", " Close session",
+			menuRule("Space"), " New worktree", " Fold worktrees", " Clean up worktrees", " Add space", menuRule("")}},
+		{"default", []string{menuRule("Session"), " Open", " Close session", menuRule("Space"), " Add space", menuRule("")}},
+		{"gr@gone", []string{menuRule(""), " Fold worktrees", " Add space", menuRule("")}},
+	})
+
+	// kitty's saved file restores it, and gr@fix's empty one would not.
+	saved := t.TempDir()
+	for session, data := range map[string]string{"kitty": "launch\n", "gr@fix": ""} {
+		if err := os.WriteFile(filepath.Join(saved, session+".kitty-session"), []byte(data), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	restores := cfg
+	restores.SessionsDir = saved
+	load(restores)
+	check("saved files", []result{{"gr@fix", linked(" Open without layout")}, {"kitty", main()}})
+
+	noDefault := cfg
+	noDefault.DefaultLayout = ""
+	load(noDefault)
+	check("no default layout", []result{{"gr@fix", linked()}, {"kitty", main()}})
+
+	load(cfg)
+	e.m.cursor = e.row("gr")
+	if _, ok := runOn(e.m, keyMsg("o"), e.m.chain()...); ok {
+		t.Error("o ran something on a session with windows")
+	}
+	calls := fakeKittenWindows(t, "gr@fix")
+	e.m.cursor = e.row("gr@fix")
+	cmd, ok := runOn(e.m, keyMsg("o"), e.m.chain()...)
+	if !ok || cmd == nil {
+		t.Fatal("o ran nothing on gr@fix")
+	}
+	if msg, ok := cmd().(spaces.Snapshot); !ok || msg.Err != nil {
+		t.Fatalf("o said %v", msg.Err)
+	}
+	want := []string{"@", "focus-window", "--match", "id:11", "--",
+		"@", "action", "launch", "--type=tab", "--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix", "--",
+		"@", "action", "goto_session", "gr@fix.kitty-session", "--"}
+	if got := calls(); !reflect.DeepEqual(got, want) {
+		t.Errorf("o ran kitten as\n%q\nwant\n%q", got, want)
+	}
+}
+
 // A space's own layouts, once its file is trusted, are its alone: its worktrees' layout form lists them
 // after the global ones, and another space's does not, nor does its own before the file is trusted.
 func TestSpaceFileLayouts(t *testing.T) {

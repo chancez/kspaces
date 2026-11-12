@@ -168,9 +168,10 @@ A default layout with an input that is required and has no default is not opened
 session opens with its one tab, and the sidebar's last line says why. The new worktree form, **Open layout**
 and `kspaces layout NAME [PATH]`, with `--input NAME=VALUE` and `--yes` as `kspaces run`, ask for it.
 
-`kspaces open --no-layout [PATH]` opens the one tab instead of the default layout. It replaces only the
-default layout, so a session with windows is switched to, and one with a saved file that opens windows is
-restored from it, as ever.
+**Open without layout** (`o`) on a row of the sidebar, or `kspaces open --no-layout [PATH]`, opens the one
+tab instead of the default layout. It replaces only the default layout, so a session with windows is
+switched to, and one with a saved file that opens windows is restored from it, as ever; the sidebar
+offers it only where the default layout would open.
 
 ### Saving a layout
 

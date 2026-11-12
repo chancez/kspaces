@@ -118,6 +118,19 @@ var (
 			return m.openWorktreeCmd(*s.row.Worktree, spaces.OpenOptions{})
 		},
 	}
+	actOpenPlain = &interact.Action[*sidebar, entrySubject]{
+		Title:   "Open without layout",
+		Section: sectionSession,
+		// Only where the default layout would open: elsewhere it opens just as Open does.
+		Applies: func(m *sidebar, s entrySubject) bool {
+			return !s.row.Other && !s.row.Missing && s.row.Worktree != nil &&
+				spaces.OpensDefaultLayout(m.cfg, m.kitty, *s.row.Space, *s.row.Worktree)
+		},
+		Run: func(m *sidebar, s entrySubject) tea.Cmd {
+			m.remote = false
+			return m.openWorktreeCmd(*s.row.Worktree, spaces.OpenOptions{NoLayout: true})
+		},
+	}
 	actFold = &interact.Action[*sidebar, entrySubject]{
 		Title:   "Fold worktrees",
 		Section: sectionSpace,
@@ -757,12 +770,13 @@ func init() {
 	spacesKind.Bind(actAddSpace, "a", "add space", "a")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actFold, actUnfold, actCleanup, actTrustConfig)
+		actOpenWorktree, actOpenPlain, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actFold, actUnfold, actCleanup, actTrustConfig)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
 	entryKind.Bind(actRunCommand, "R", "run a command", "R")
 	entryKind.Bind(actOpenLayout, "L", "open a layout", "L")
+	entryKind.Bind(actOpenPlain, "o", "open without the default layout", "o")
 	entryKind.Bind(actCloseSession, "c", "close session", "c")
 	entryKind.Bind(actOpenPR, "b", "open the PR in the browser", "b")
 	entryKind.Bind(actRemoveWorktree, "x", "remove worktree", "x")

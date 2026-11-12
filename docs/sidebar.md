@@ -98,6 +98,7 @@ only.
 | Section | Item | Key | Does |
 |---|---|---|---|
 | Session | Open | `enter` | switch to the session |
+| Session | Open without layout | `o` | switch to the session, opening one tab rather than its [default layout](kitty.md#layouts); on a worktree whose session has no windows and no saved file that would restore it, with a default layout |
 | Session | Run | `R` | run a configured command in the worktree's session, in a form; with `[[commands]]` configured |
 | Session | Open layout | `L` | add a configured layout's tabs to the worktree's session, in a form; with `[[layouts]]` configured |
 | Session | Save as layout | | save the session's tabs as a layout in config.toml, in a form; on a worktree's session with windows open |
@@ -277,6 +278,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `p` | clean up the space's worktrees, on a space's row |
 | `R` | run a command in the worktree, with commands configured |
 | `L` | open a layout in the worktree's session, with layouts configured |
+| `o` | open without the default layout, where it would open |
 | `b` | open the worktree's PR in the browser, when its row shows one |
 | `a` | add a space, wherever the cursor is |
 | `!` | focus the window that needs you most, wherever the cursor is |
