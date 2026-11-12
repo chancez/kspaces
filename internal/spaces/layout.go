@@ -101,6 +101,27 @@ func OpenLayout(cfg config.Config, st kitty.State, space Space, wt Worktree, lr 
 	return err
 }
 
+// OpenShell adds one tab to wt's session, a shell in the worktree, and switches to it, as a layout of one
+// plain tab would but in kitty's layout for a new tab: in a session with windows by the window switching
+// to it focuses; in one with none as OpenWorktree's first tab, see OpenOptions.NoLayout.
+func OpenShell(cfg config.Config, st kitty.State, wt Worktree) error {
+	goTo := []string{"goto_session", SessionFile(cfg, wt.Session)}
+	actions := [][]string{firstTab(cfg, wt.Path, wt.Session), goTo}
+	if anchor, open := st.Sessions[wt.Session]; open {
+		tab := firstTab(cfg, wt.Path, wt.Session)
+		if anchor != 0 {
+			tab = append([]string{fmt.Sprintf("--match=id:%d", anchor)}, tab...)
+		}
+		actions = [][]string{goTo, tab}
+	}
+	for _, args := range actions {
+		if err := kitty.Action(args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // buildLayout opens lr's tabs in wt's session with k, and says the window it leaves focused. Each tab is
 // a launch action of its first pane with --type=tab, set to its kitty layout, then one of each other pane
 // with --type=window: in splits the --location for its side and --bias for its size, on the window of
@@ -217,12 +238,7 @@ func freshLayout(global config.Config, wt Worktree) (cfg config.Config, space Sp
 func OpenNew(cfg config.Config, space Space, wt Worktree, lr *LayoutRun, r *Run) error {
 	if lr == nil {
 		if r == nil {
-			for _, args := range [][]string{firstTab(cfg, wt.Path, wt.Session), {"goto_session", SessionFile(cfg, wt.Session)}} {
-				if err := kitty.Action(args...); err != nil {
-					return err
-				}
-			}
-			return nil
+			return OpenShell(cfg, kitty.State{}, wt)
 		}
 		return RunCommand(cfg, kitty.State{}, space, wt, *r)
 	}

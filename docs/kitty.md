@@ -172,6 +172,8 @@ and `kspaces layout NAME [PATH]`, with `--input NAME=VALUE` and `--yes` as `kspa
 `kspaces open --no-layout [PATH]` opens the one tab instead of the default layout. It replaces only the
 default layout, so a session with windows is switched to, and one with a saved file that opens windows is
 restored from it, as ever; the sidebar and the picker offer it only where the default layout would open.
+The new worktree form and **Open layout** list `shell` before the layouts: one tab in the worktree, a
+shell, added to a session with windows as a layout's first tab would be.
 
 ### Saving a layout
 

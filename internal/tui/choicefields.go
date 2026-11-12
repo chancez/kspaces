@@ -26,14 +26,23 @@ type choiceFields[T any] struct {
 	inputOf func(T) []config.Input
 	// detailOf says a little about a choice, after its name in the list; nil for nothing.
 	detailOf func(T) string
-	// optional offers none, the first choice, as the new worktree form does.
-	optional bool
+	// none is the choice of none of them, first, as the new worktree form offers; nil for no such choice.
+	none *noChoice
 	// sel is the chosen one's index in choices, -1 for none.
 	sel    int
 	inputs [][]field
 	// list is the list of choices, while it is open.
 	list *choiceList
 }
+
+// noChoice is choosing none of a field's choices, by what that does: its name, and its detail in the list.
+type noChoice struct{ name, detail string }
+
+// noCommand runs no command; shellLayout opens one tab, a shell, as a session has without a layout.
+var (
+	noCommand   = &noChoice{name: "none"}
+	shellLayout = &noChoice{name: "shell", detail: "1 tab, a shell"}
+)
 
 // The zones the choices are drawn in.
 const (
@@ -42,20 +51,28 @@ const (
 )
 
 // newCommandFields are the fields for cmds, see newChoiceFields, their inputs taking several lines. The
-// list says what each runs.
+// list says what each runs. optional offers none of them.
 func newCommandFields(th *look.Theme, cmds []config.Command, optional bool, name string, values map[string]string) choiceFields[config.Command] {
+	var none *noChoice
+	if optional {
+		none = noCommand
+	}
 	return newChoiceFields(th, commandZone, cmds, func(c config.Command) string { return c.Name },
-		func(c config.Command) []config.Input { return c.Inputs }, commandDetail, true, optional, name, values)
+		func(c config.Command) []config.Input { return c.Inputs }, commandDetail, true, none, name, values)
 }
 
 // commandDetail is the command line c runs.
 func commandDetail(c config.Command) string { return strings.Join(c.Run, " ") }
 
 // newLayoutFields are the fields for layouts, see newChoiceFields, their inputs taking several lines. The
-// list says how many tabs and panes each has.
+// list says how many tabs and panes each has. optional offers a shell tab in place of them.
 func newLayoutFields(th *look.Theme, layouts []config.Layout, optional bool, name string, values map[string]string) choiceFields[config.Layout] {
+	var none *noChoice
+	if optional {
+		none = shellLayout
+	}
 	return newChoiceFields(th, layoutZone, layouts, func(l config.Layout) string { return l.Name },
-		func(l config.Layout) []config.Input { return l.Inputs }, layoutDetail, true, optional, name, values)
+		func(l config.Layout) []config.Input { return l.Inputs }, layoutDetail, true, none, name, values)
 }
 
 // layoutDetail is how many tabs and panes l has.
@@ -67,12 +84,12 @@ func layoutDetail(l config.Layout) string {
 	return fmt.Sprintf("%s, %s", plural(len(l.Tabs), "tab"), plural(panes, "pane"))
 }
 
-// newChoiceFields are the fields for choices, with the one called name chosen, or none or the first when
-// there is no such choice, and its inputs filled in from values, the rest with their defaults. Each input
-// is a textField when multiline says so, else a lineField.
-func newChoiceFields[T any](th *look.Theme, label string, choices []T, nameOf func(T) string, inputOf func(T) []config.Input, detailOf func(T) string, multiline, optional bool, name string, values map[string]string) choiceFields[T] {
-	c := choiceFields[T]{th: th, label: label, zone: label, choices: choices, nameOf: nameOf, inputOf: inputOf, detailOf: detailOf, optional: optional, sel: -1}
-	if !optional && len(choices) > 0 {
+// newChoiceFields are the fields for choices, with the one called name chosen, or none, when it is a
+// choice, or the first when there is no such choice, and its inputs filled in from values, the rest with
+// their defaults. Each input is a textField when multiline says so, else a lineField.
+func newChoiceFields[T any](th *look.Theme, label string, choices []T, nameOf func(T) string, inputOf func(T) []config.Input, detailOf func(T) string, multiline bool, none *noChoice, name string, values map[string]string) choiceFields[T] {
+	c := choiceFields[T]{th: th, label: label, zone: label, choices: choices, nameOf: nameOf, inputOf: inputOf, detailOf: detailOf, none: none, sel: -1}
+	if none == nil && len(choices) > 0 {
 		c.sel = 0
 	}
 	for i, ch := range choices {
@@ -107,7 +124,7 @@ func newChoiceFields[T any](th *look.Theme, label string, choices []T, nameOf fu
 
 // picks says whether there is a choice to show.
 func (c *choiceFields[T]) picks() bool {
-	return len(c.choices) > 1 || (c.optional && len(c.choices) > 0)
+	return len(c.choices) > 1 || (c.none != nil && len(c.choices) > 0)
 }
 
 // chosen is the one chosen, if any.
@@ -122,7 +139,7 @@ func (c *choiceFields[T]) chosen() (T, bool) {
 // cycle chooses the next, or the one before, round through none when that is a choice.
 func (c *choiceFields[T]) cycle(delta int) {
 	n, first := len(c.choices), 0
-	if c.optional {
+	if c.none != nil {
 		n, first = n+1, -1
 	}
 	if n == 0 {
@@ -166,9 +183,11 @@ func (c *choiceFields[T]) lines(selFocused bool, width int) []string {
 	th := c.th
 	var out []string
 	if c.picks() {
-		name := "none"
+		var name string
 		if ch, ok := c.chosen(); ok {
 			name = c.nameOf(ch)
+		} else {
+			name = c.none.name
 		}
 		arrow := look.Muted
 		if selFocused {
@@ -191,8 +210,8 @@ func (c *choiceFields[T]) lines(selFocused bool, width int) []string {
 // openList opens the list of choices, the one chosen selected.
 func (c *choiceFields[T]) openList() {
 	var names, details []string
-	if c.optional {
-		names, details = append(names, "none"), append(details, "")
+	if c.none != nil {
+		names, details = append(names, c.none.name), append(details, c.none.detail)
 	}
 	for _, ch := range c.choices {
 		d := ""
@@ -206,7 +225,7 @@ func (c *choiceFields[T]) openList() {
 
 // first is the index in the list of the first choice: none comes before it when it is a choice.
 func (c *choiceFields[T]) first() int {
-	if c.optional {
+	if c.none != nil {
 		return 1
 	}
 	return 0

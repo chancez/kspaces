@@ -100,7 +100,7 @@ only.
 | Session | Open | `enter` | switch to the session |
 | Session | Open without layout | `o` | switch to the session, opening one tab rather than its [default layout](kitty.md#layouts); on a worktree whose session has no windows and no saved file that would restore it, with a default layout |
 | Session | Run | `R` | run a configured command in the worktree's session, in a form; with `[[commands]]` configured |
-| Session | Open layout | `L` | add a configured layout's tabs to the worktree's session, in a form; with `[[layouts]]` configured |
+| Session | Open layout | `L` | add a configured layout's tabs, or one shell tab, to the worktree's session, in a form; with `[[layouts]]` configured |
 | Session | Save as layout | | save the session's tabs as a layout in config.toml, in a form; on a worktree's session with windows open |
 | Session | Close session | `c` | close every window of the session, on a session with windows open |
 | Worktree | Open PR #N | `b` | open the branch's PR in the browser with `gh browse N`, on a worktree whose row shows a PR |
@@ -160,19 +160,22 @@ move down. `up` and `down` move between its lines, and leave it only from the fi
 has focus the keys row lists `shift+enter newline`. Every form with an input, below, has these.
 
 With [layouts](kitty.md#layouts) configured, a `layout` field comes before `command`, set at first to the
-space's layout for its linked worktrees, else `none`, and below it a field for each of its inputs. With a
-layout chosen the session opens with its tabs rather than one shell tab; with a command too, the command
-then runs where its `open` says, by the pane the layout left focused.
+space's layout for its linked worktrees, else `shell`, listed first as `shell  1 tab, a shell`, and below it
+a field for each of its inputs. With a layout chosen the session opens with its tabs rather than one shell
+tab; with a command too, the command then runs where its `open` says, by the pane the layout left focused.
 
 **Run** chooses a command, with the same `command` field when there is more than one, and has a field for
 each input of the one chosen. It says where the command opens: as the session's first tab when the session
 has no windows, else where the command's `open` says, beside the window switching to the session focuses.
 Run switches to the session and opens it there.
 
-**Open layout** chooses a layout, the worktree's default at first, else the first configured, with a
-`layout` field when there is more than one, and has a field for each of its inputs. It says what each tab
-holds, and whether the tabs go after the session's own or, for a session with no windows, open it. Open
-builds them, as [layouts](kitty.md#layouts) says, and switches to the session.
+**Open layout** chooses a layout, the worktree's default at first, else the first configured, or `shell`,
+listed first as in the new worktree form, for one tab in the worktree that is a shell, with a `layout`
+field, and has a field for each of its inputs. It says what each tab holds, and whether the tabs go after
+the session's own or, for a session with no windows, open it. Open builds them, as
+[layouts](kitty.md#layouts) says, and switches to the session; `shell` adds a tab as `launch` opens it,
+by the window switching to the session focuses, or opens a session with no windows with it alone, as
+**Open without layout** does.
 
 **Save as layout** saves the session's tabs, as kitty has them, as a [layout](kitty.md#saving-a-layout):
 a `name` field, then `save`, `every tab` at first or `this tab`, which is the tab the sidebar is in for its

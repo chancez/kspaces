@@ -227,11 +227,18 @@ func TestLayoutForm(t *testing.T) {
 	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	f.err = nil
+	want = screen([]string{"  layout     < shell >  left/right change  enter list"}, "A tab of a shell", "Adds its tabs to gr@fix", "",
+		" Open    Cancel esc   left/right layout  enter/space list", "")
+	if got := formScreen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("shell:\n%q\nwant\n%q", got, want)
+	}
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	want = screen([]string{"  layout     < plain >  left/right change  enter list"}, "A tab of a shell", "Adds its tabs to gr@fix", "",
 		" Open    Cancel esc   left/right layout  enter/space list", "")
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("plain:\n%q\nwant\n%q", got, want)
 	}
+	f.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
 	f.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
 
 	// Prefilled, and with the session closed.
@@ -239,10 +246,11 @@ func TestLayoutForm(t *testing.T) {
 		[]string{focused, "  Prompt     hi", "", "  A tab of claude, review, a shell", "  Opens gr@fix with its tabs, as it has no windows", ""}; !reflect.DeepEqual(got, want) {
 		t.Errorf("prefilled:\n%q\nwant\n%q", got, want)
 	}
-	// With one layout there is nothing to choose.
+	// With one layout there is still the shell to choose.
 	one := cfg
 	one.Layouts = cfg.Layouts[:1]
-	if got, want := formScreen(sized(newLayoutForm(one, space, wt, open, "plain", nil)))[1:6], []string{"  Open a layout in gr@fix", "", "  A tab of a shell", "  Adds its tabs to gr@fix", ""}; !reflect.DeepEqual(got, want) {
+	if got, want := formScreen(sized(newLayoutForm(one, space, wt, open, "plain", nil)))[1:8], []string{"  Open a layout in gr@fix", "",
+		"  layout     < plain >  left/right change  enter list", "", "  A tab of a shell", "  Adds its tabs to gr@fix", ""}; !reflect.DeepEqual(got, want) {
 		t.Errorf("one layout:\n%q\nwant\n%q", got, want)
 	}
 
@@ -258,6 +266,52 @@ func TestLayoutForm(t *testing.T) {
 	want = slices.Concat([]string{"@", "action", "goto_session", "gr@fix.kitty-session", "--"}, agentCalls("/src/gr", wt, "--match=id:7"))
 	if got := calls(); !reflect.DeepEqual(got, want) {
 		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
+	}
+}
+
+// The layout form's shell adds one tab in the worktree to a session with windows, by the window switching
+// to it focuses, and opens one with none with it, as opening it without a layout does.
+func TestLayoutFormShell(t *testing.T) {
+	cfg := testLayouts(t)
+	space := spaces.Space{Name: "gr", Root: "/src/gr", Worktrees: []spaces.Worktree{{Path: "/src/gr", Branch: "main", Session: "gr"}}}
+	wt := spaces.Worktree{Path: "/src/gr/.worktrees/fix", Branch: "fix", Session: "gr@fix"}
+	tab := []string{"@", "action", "launch", "--type=tab", "--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix", "--"}
+	goTo := []string{"@", "action", "goto_session", "gr@fix.kitty-session", "--"}
+	type result struct {
+		Screen []string
+		Calls  []string
+	}
+	var got []result
+	for _, ids := range [][]int{{7}, nil} {
+		calls := fakeKittenWindows(t, "gr@fix", ids...)
+		st := kitty.State{}
+		if ids != nil {
+			st.Sessions = map[string]int{"gr@fix": 7}
+		}
+		f := newLayoutForm(cfg, space, wt, st, "plain", nil)
+		f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+		f.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
+		screen := formScreen(f)
+		// enter on the choice opens its list, so the button.
+		cmd := clickOn(t, f, "Open    Cancel")
+		if cmd == nil {
+			t.Fatal("Open ran nothing")
+		}
+		if _, quit := f.Update(cmd()); quit == nil || f.err != nil {
+			t.Fatalf("the form stayed: %v", f.err)
+		}
+		got = append(got, result{screen, calls()})
+	}
+	screen := func(says string) []string {
+		return []string{"", "  Open a layout in gr@fix", "", "  layout     < shell >  left/right change  enter list", "",
+			"  A tab of a shell", "  " + says, "", "   Open    Cancel esc   left/right layout  enter/space list", ""}
+	}
+	want := []result{
+		{screen("Adds its tabs to gr@fix"), slices.Concat(goTo, []string{"@", "action", "--match=id:7"}, tab[2:])},
+		{screen("Opens gr@fix with its tabs, as it has no windows"), slices.Concat(tab, goTo)},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got\n%q\nwant\n%q", got, want)
 	}
 }
 
@@ -303,7 +357,7 @@ func TestLayoutFormList(t *testing.T) {
 			t.Errorf("%s: %s selected, want %s", what, selected(), sel)
 		}
 	}
-	all := open("plain", listRule(""), listRow(true, "plain  1 tab, 1 pane"), listRow(false, "agent  1 tab, 3 panes"),
+	all := open("plain", listRule(""), listRow(false, "shell  1 tab, a shell"), listRow(true, "plain  1 tab, 1 pane"), listRow(false, "agent  1 tab, 3 panes"),
 		listRow(false, "review  2 tabs, 3 panes"), listRule(""))
 	f.Update(keyMsg("enter"))
 	check("open", all, "plain")
@@ -327,11 +381,12 @@ func TestLayoutFormList(t *testing.T) {
 	// Typed, j and k filter like any letter.
 	f.Update(keyMsg("enter"))
 	typeInto(f, "e")
-	check("filtered", open("plain", listRule("e"), listRow(false, "agent  1 tab, 3 panes"), listRow(false, "review  2 tabs, 3 panes"), listRule("")), "agent")
+	check("filtered", open("plain", listRule("e"), listRow(false, "shell  1 tab, a shell"), listRow(false, "agent  1 tab, 3 panes"), listRow(false, "review  2 tabs, 3 panes"), listRule("")), "shell")
 	typeInto(f, "j")
 	f.Update(keyMsg("enter"))
 	check("no match", open("plain", listRule("ej"), "              no matches", listRule(""), ""), "")
 	f.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	f.Update(keyMsg("down"))
 	f.Update(keyMsg("down"))
 	// enter chooses rather than opening the layout.
 	if f.Update(keyMsg("enter")); f.busy || f.layouts.listOpen() {
@@ -374,14 +429,14 @@ func TestLayoutFormListScrolls(t *testing.T) {
 		lines := append([]string{"", "  Open a layout in gr@fix", "", "  layout     < l1 >  left/right change  enter list", listRule("")}, rows...)
 		return append(lines, listRule(""), "  up/down move  type filter  enter choose  esc close", "")
 	}
-	want := screen("", listRow(true, "l1  1 tab, 1 pane"), listRow(false, "l2  1 tab, 1 pane"), "              \u25be 4 more")
+	want := screen("", listRow(false, "shell  1 tab, a shell"), listRow(true, "l1  1 tab, 1 pane"), "              \u25be 5 more")
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("top:\n%q\nwant\n%q", got, want)
 	}
 	for range 3 {
 		f.Update(keyMsg("down"))
 	}
-	want = screen("              \u25b4 2 more", listRow(false, "l3  1 tab, 1 pane"), listRow(false, "l4  1 tab, 1 pane"), "              \u25be 2 more")
+	want = screen("              \u25b4 3 more", listRow(false, "l3  1 tab, 1 pane"), listRow(false, "l4  1 tab, 1 pane"), "              \u25be 2 more")
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("scrolled:\n%q\nwant\n%q", got, want)
 	}
@@ -469,9 +524,9 @@ func TestNewWorktreeFormLayout(t *testing.T) {
 	f.Update(keyMsg("tab"))
 	f.Update(keyMsg("tab"))
 	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	if got, want := formScreen(f), screen([]string{"  layout     < none >  left/right change  enter list", "  command    < none >"},
+	if got, want := formScreen(f), screen([]string{"  layout     < shell >  left/right change  enter list", "  command    < none >"},
 		"   Create    Cancel esc   tab next field  left/right layout  enter/space list"); !reflect.DeepEqual(got, want) {
-		t.Errorf("none:\n%q\nwant\n%q", got, want)
+		t.Errorf("shell:\n%q\nwant\n%q", got, want)
 	}
 	// With no room below, the command's list opens above it.
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 12})
@@ -485,12 +540,12 @@ func TestNewWorktreeFormLayout(t *testing.T) {
 	f.Update(keyMsg("esc"))
 	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
-	// A click opens the list, none first as it is a choice, and a click on one chooses it.
-	clickOn(t, f, "< none >")
+	// A click opens the list, the shell first as it is a choice, and a click on one chooses it.
+	clickOn(t, f, "< shell >")
 	rule := "             " + strings.Repeat("\u2500", 55)
 	want := []string{"", "  New worktree in " + space.Name, "", "  branch     fix", "  directory  .worktrees/fix",
-		"  layout     < none >  left/right change  enter list",
-		rule, "             \uf00c none", "               plain  1 tab, 1 pane", "               agent  1 tab, 3 panes", rule,
+		"  layout     < shell >  left/right change  enter list",
+		rule, "             \uf00c shell  1 tab, a shell", "               plain  1 tab, 1 pane", "               agent  1 tab, 3 panes", rule,
 		"  up/down move  type filter  enter choose  esc close", ""}
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("the list:\n%q\nwant\n%q", got, want)
@@ -743,7 +798,7 @@ func TestSpaceFileLayouts(t *testing.T) {
 	}
 	screen := func(root string, rows ...string) []string {
 		lines := append([]string{"", "  Open a layout in " + filepath.Base(root), "", "  layout     < plain >  left/right change  enter list", listRule(""),
-			listRow(true, "plain  1 tab, 1 pane"), listRow(false, "agent  1 tab, 3 panes")}, rows...)
+			listRow(false, "shell  1 tab, a shell"), listRow(true, "plain  1 tab, 1 pane"), listRow(false, "agent  1 tab, 3 panes")}, rows...)
 		return append(lines, listRule(""), "  up/down move  type filter  enter choose  esc close", "")
 	}
 	if got, want := list(mine), screen(mine); !reflect.DeepEqual(got, want) {

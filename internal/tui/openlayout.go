@@ -17,8 +17,8 @@ import (
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
-// layoutForm chooses a configured layout, fills in its inputs and adds its tabs to a worktree's session,
-// open or not, saying what they hold. It is meant for a kitty popup, like the run form.
+// layoutForm chooses a configured layout, or a shell tab, fills in its inputs and adds its tabs to a
+// worktree's session, open or not, saying what they hold. It is meant for a kitty popup, like the run form.
 type layoutForm struct {
 	th      *look.Theme
 	cfg     config.Config
@@ -46,14 +46,14 @@ func newLayoutForm(cfg config.Config, space spaces.Space, wt spaces.Worktree, st
 	th := look.New(true)
 	_, windows := st.Sessions[wt.Session]
 	f := &layoutForm{th: th, cfg: cfg, space: space, wt: wt, windows: windows,
-		layouts: newLayoutFields(th, cfg.Layouts, false, name, inputs)}
+		layouts: newLayoutFields(th, cfg.Layouts, true, name, inputs)}
 	moveFocus(f.fields(), &f.focus, 0)
 	return f
 }
 
 func (f *layoutForm) Init() tea.Cmd { return textinput.Blink }
 
-// fields are the form's fields in order: the choice of layout, nil, with more than one, and the chosen
+// fields are the form's fields in order: the choice of layout, nil, with any layout, and the chosen
 // layout's inputs.
 func (f *layoutForm) fields() []field {
 	var out []field
@@ -85,11 +85,11 @@ func (f *layoutForm) cycleLayout(delta int) tea.Cmd {
 	return moveFocus(f.fields(), &f.focus, 0)
 }
 
-// open opens the chosen layout and leaves, or says why it cannot.
+// open opens the chosen layout, or the shell tab, and leaves, or says why it cannot.
 func (f *layoutForm) open() tea.Cmd {
-	l, _ := f.layouts.chosen()
+	l, layout := f.layouts.chosen()
 	lr, err := spaces.NewLayoutRun(l, f.layouts.values())
-	if err != nil {
+	if layout && err != nil {
 		f.err = err
 		return nil
 	}
@@ -100,6 +100,9 @@ func (f *layoutForm) open() tea.Cmd {
 		st, err := kitty.LoadState(kitty.SelfWindowID())
 		if err != nil {
 			return layoutOpenedMsg{err}
+		}
+		if !layout {
+			return layoutOpenedMsg{spaces.OpenShell(cfg, st, wt)}
 		}
 		return layoutOpenedMsg{spaces.OpenLayout(cfg, st, space, wt, lr)}
 	}
@@ -190,8 +193,11 @@ func (f *layoutForm) render() string {
 	if fields := f.layouts.lines(f.onLayout(), width); len(fields) > 0 {
 		lines = append(append(lines, fields...), "")
 	}
-	l, _ := f.layouts.chosen()
-	for _, s := range layoutTabs(l) {
+	tabs := []string{"A tab of a shell"}
+	if l, ok := f.layouts.chosen(); ok {
+		tabs = layoutTabs(l)
+	}
+	for _, s := range tabs {
 		lines = append(lines, muted(s))
 	}
 	if f.windows {
