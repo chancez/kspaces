@@ -83,8 +83,8 @@ tab_bar_filter session:~ or session:^$
 map f4 kspaces_toggle
 ```
 
-[docs/kitty.md](docs/kitty.md) has the rest: the actions to map, keeping the files up to date, and the
-session saver.
+[docs/kitty.md](docs/kitty.md) has the rest: the actions to map, keeping the files up to date, the session
+saver, commands and layouts.
 
 Then list your spaces in `~/.config/kspaces/config.toml`:
 
@@ -118,6 +118,26 @@ name = "gr"
 run = ["gr"]
 open = "split"
 
+# Layouts: tabs split into panes, each running a command, a command line, or your shell. A pane splits one
+# before it, right or below, at a size in percent of what that pane had. A session's Save as layout, or
+# kspaces layout save, writes one from the tabs as they are.
+[[layouts]]
+name = "agent"
+[[layouts.tabs]]
+title = "{branch}"
+panes = [
+  { command = "claude" },
+  { command = "gr", split = "right", size = 35 },
+  { split = "below", of = 1, size = 30 },
+]
+
+# Per space, by name: the layout its linked worktrees' sessions open with afresh, when there is no saved
+# session to restore, and the new worktree form's at first. `layout` is the main worktree's, and a
+# top-level `layout`, before any table, the default for every space. A layout needing an input with no
+# default, as claude's prompt, is opened afresh as one shell tab, and the sidebar says so.
+[space.gr]
+worktree_layout = "agent"
+
 # The sidebar's width in columns, 12 to 120.
 [sidebar]
 width = 28
@@ -145,6 +165,9 @@ kspaces next, prev       switch to the next or previous session with windows ope
 kspaces new [SPACE]      create a worktree, in a form
 kspaces run NAME [PATH]  run a configured command in the worktree at PATH or the current directory,
   --input K=V, --yes     in a form, with inputs filled in; --yes without asking
+kspaces layout NAME [PATH]  open a configured layout's tabs in the worktree's session, in a form, as run
+kspaces layout save [NAME] [PATH]  save the session's tabs as a layout, choosing what each pane runs in a
+  --tab                  form; --tab saves only this tab
 kspaces close [SESSION]  close every window of a session, after confirming
 kspaces forget SESSION   delete the saved file of a session with no windows, after confirming
 kspaces remove PATH      close a linked worktree's session and remove the worktree, after confirming

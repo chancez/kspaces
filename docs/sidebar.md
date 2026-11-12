@@ -29,10 +29,10 @@ closed as any session; one with only a saved file cannot be opened, as that woul
 directory that is gone, and Forget deletes the file. A space whose worktrees could not be listed has no
 missing worktrees: its sessions are listed above the spaces as before.
 
-Clicking a row, or `enter` on it, switches to its session, creating it the first time, but for a missing
-worktree with no windows. Clicking a space's triangle, or `space` on its row, folds its linked worktrees
-into the space's row. Folded spaces are kept in `$XDG_STATE_HOME/kspaces/folded`, so every tab's sidebar
-agrees.
+Clicking a row, or `enter` on it, switches to its session, creating it the first time, with its
+[default layout](kitty.md#layouts) if it has one, but for a missing worktree with no windows. Clicking a
+space's triangle, or `space` on its row, folds its linked worktrees into the space's row. Folded spaces are
+kept in `$XDG_STATE_HOME/kspaces/folded`, so every tab's sidebar agrees.
 
 `/` filters the list. The query goes on the row under the SPACES title, so the list keeps all its rows and
 the query stays put as the list narrows. A space shows when its name, its branch, or a linked worktree's
@@ -92,6 +92,8 @@ only.
 |---|---|---|---|
 | Session | Open | `enter` | switch to the session |
 | Session | Run | `R` | run a configured command in the worktree's session, in a form; with `[[commands]]` configured |
+| Session | Open layout | `L` | add a configured layout's tabs to the worktree's session, in a form; with `[[layouts]]` configured |
+| Session | Save as layout | | save the session's tabs as a layout in config.toml, in a form; on a worktree's session with windows open |
 | Session | Close session | `c` | close every window of the session, on a session with windows open |
 | Worktree | Open PR #N | `b` | open the branch's PR in the browser with `gh browse N`, on a worktree whose row shows a PR |
 | Worktree | Remove worktree | `x` | close the session and remove a linked worktree |
@@ -124,14 +126,47 @@ is not on GitHub, the form shows gh's error as it does git's.
 
 With [commands](kitty.md#running-commands) configured, the form has a `command` field below the directory,
 `none` at first, and below it a field for each input of the command chosen. `tab` and `shift+tab` go round
-all the fields; on `command`, `left` and `right` choose another, and so does a click on it. With a command
-chosen, the new session's first tab runs it rather than a shell, and starts your shell once it exits. A
-required input left empty refuses to create.
+all the fields. A choice like `command` is drawn `< claude >`, and while it has focus says
+`left/right change  enter list` after it, and the keys row lists `left/right` and `enter/space`:
+`left` and `right` go to the one before or after; `enter`, `space` or a click opens a list below the
+field, or above it when it would run off the bottom, of every choice, the one chosen marked and
+selected, a layout with how many tabs and panes it has and a command with its command line. In the list
+`up`, `down`, and `j` and `k` before anything is typed, move; typing keeps the choices with what is typed
+in their names, shown on the list's top rule, and `backspace` takes it back; `enter` or a click chooses;
+`esc` or a click outside the list closes it as it was. A list longer than the screen has room for
+scrolls, with how many are out of view above and below. While it is open the form's keys are the list's,
+so `enter` there never submits the form, nor `esc` cancels it; and as `enter` on a choice opens its list,
+the form's button says no key there, and `enter` submits from the other fields. Every form with a choice,
+below, has these. With a command chosen, the new session's first tab runs it rather than a shell, and
+starts your shell once it exits. A required input left empty refuses to create.
+
+With [layouts](kitty.md#layouts) configured, a `layout` field comes before `command`, set at first to the
+space's layout for its linked worktrees, else `none`, and below it a field for each of its inputs. With a
+layout chosen the session opens with its tabs rather than one shell tab; with a command too, the command
+then runs where its `open` says, by the pane the layout left focused.
 
 **Run** chooses a command, with the same `command` field when there is more than one, and has a field for
 each input of the one chosen. It says where the command opens: as the session's first tab when the session
 has no windows, else where the command's `open` says, beside the window switching to the session focuses.
 Run switches to the session and opens it there.
+
+**Open layout** chooses a layout, the worktree's default at first, else the first configured, with a
+`layout` field when there is more than one, and has a field for each of its inputs. It says what each tab
+holds, and whether the tabs go after the session's own or, for a session with no windows, open it. Open
+builds them, as [layouts](kitty.md#layouts) says, and switches to the session.
+
+**Save as layout** saves the session's tabs, as kitty has them, as a [layout](kitty.md#saving-a-layout):
+a `name` field, then `save`, `every tab` at first or `this tab`, which is the tab the sidebar is in for its
+own session, else the session's most recently focused. Below them a line for each pane of the tabs saved,
+`tab 1, pane 2: claude --resume abc`, saying what runs there now, then `runs`, chosen as `command` is in
+the forms above: a configured command, at first the one whose program is what runs there, as
+`claude --resume abc` is the `claude` command; `run`, at first for anything else, with a `run` field
+holding its command line, a template, to edit; or `shell`, at first for a pane at its prompt. Save adds
+the layout at the end of config.toml as text, so the rest of the file stays as it was, and writes through
+a symlinked config to its target. A name the config has already asks whether to replace it, `y` or `n`;
+Replace puts the new layout where the old one's lines were. `kspaces layout save [NAME] [PATH]` opens the
+same form for the worktree PATH, or the current directory, is in, its name filled in, with `--tab` for
+this tab at first: the one kspaces runs in, if it is the session's.
 
 **Close session** closes every window the way closing them by hand does, so whatever kitty.conf runs when a
 window closes still runs.
@@ -211,6 +246,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `n`, `c`, `x` | new worktree, close session, remove worktree (forget, on a missing worktree) |
 | `p` | clean up the space's worktrees, on a space's row |
 | `R` | run a command in the worktree, with commands configured |
+| `L` | open a layout in the worktree's session, with layouts configured |
 | `b` | open the worktree's PR in the browser, when its row shows one |
 | `a` | add a space, wherever the cursor is |
 | `!` | focus the window that needs you most, wherever the cursor is |

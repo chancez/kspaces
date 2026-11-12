@@ -11,7 +11,8 @@ Opening a worktree:
 1. focuses its session's most recently focused window, if it has windows open;
 2. otherwise loads `SESSION.kitty-session` from the `sessions` directory with `goto_session`, if there is one
    that opens any window (has a `launch` line);
-3. otherwise runs the `launch` action with `--type=tab --cwd=WORKTREE --add-to-session=SESSION`, in the home
+3. otherwise opens it with its [default layout](#layouts), if it has one;
+4. otherwise runs the `launch` action with `--type=tab --cwd=WORKTREE --add-to-session=SESSION`, in the home
    directory for a session in no space, such as `default`.
 
 `launch` in the config is that action, `["launch"]` by default. Every window kspaces opens in a session
@@ -81,6 +82,122 @@ it, and restoring the session runs it again with the same inputs.
 `kspaces run NAME [PATH]` opens the same form for the worktree PATH, or the current directory, is in, with
 `--input NAME=VALUE` filling inputs in and `--open=WHERE` overriding `open` once. `--yes` runs it without
 the form, refusing a required input that is empty.
+
+## Layouts
+
+A layout is tabs split into panes, each running a command, a command line or your shell, which kspaces
+builds window by window through the `launch` action:
+
+```toml
+[[layouts]]
+name = "agent"                 # shown in the forms; unique
+[[layouts.tabs]]
+title = "{branch}"             # optional, a template; kitty's title by default
+panes = [
+  { command = "claude" },                               # pane 1, the tab's first window
+  { command = "review", split = "right", size = 35 },   # right of pane 1, 35% of the width pane 1 had
+  { split = "below", of = 1, size = 30 },               # below pane 1, 30% of its height: your shell
+]
+```
+
+A pane has one of `command`, a configured command with its env and inputs, or `run`, a command line as a
+command's, a template too, or neither, for your shell. `cwd` is where it starts, a template,
+`{worktree}` by default, such as `{worktree}/docs`. A pane after the first has `split`, `right` or
+`below`, and splits pane `of`, from 1, the one before it by default; `size` is its share in percent of
+what that pane had, 50 by default. `focus = true` on one pane of a tab leaves it focused rather than the
+first. More `[[layouts.tabs]]` are more tabs. Anything wrong with a layout is an error when the config
+loads.
+
+There is no `left` or `above`: kitty's splits layout puts a new window after the one it splits. A pane on
+the left of or above another is the earlier one, and the other splits it `right` or `below`; any
+arrangement of splits can be built that way, the top left pane first.
+
+A tab is in kitty's `splits` layout unless its `layout` names another of kitty's: `tall`, `fat`, `grid`,
+`horizontal`, `vertical` or `stack`. In those the layout arranges the windows, so the panes are listed in
+order, with no `split`, `of` or `size`, which are an error there:
+
+```toml
+[[layouts.tabs]]
+layout = "tall"
+panes = [{ run = ["make", "watch"] }, {}, { cwd = "{worktree}/docs" }]
+```
+
+kitty only switches a tab to a layout in `enabled_layouts`, so opening a layout whose tab names one that
+is not there fails, saying so.
+
+A layout's inputs are those of its panes' commands, in order, one input for a name two commands share, as
+long as they define it the same. `run`, `cwd` and `title` can use them, and the built-ins.
+
+Each tab is, for the agent layout:
+
+```
+launch --type=tab --cwd=WORKTREE --add-to-session=SESSION --tab-title=BRANCH --env=K=V... --hold claude 'the prompt'
+kitten @ goto-layout --match=window_id:N splits
+launch --type=window --location=vsplit --next-to=id:N --bias=35 --cwd=... --add-to-session=... --env=... --hold gr
+launch --type=window --location=hsplit --next-to=id:N --bias=30 --cwd=... --add-to-session=...
+```
+
+each split run with `kitten @ action --match=id:N` on window N of the pane it splits, so a kitten acts on
+it too. A pane running a command has its `--env` options and `--hold`, as a command's tab does. kitty says
+nothing back from an action, and a kitten standing in for launch need not either, so N, the window a
+launch opened, is the one of the session's windows `kitten @ ls` did not list before it. The tab is set to
+its layout, `splits` by default, which has to be in `enabled_layouts`; `--bias` is a percentage in it. In
+any other layout each pane after the first is `--location=after --next-to=id:N` of the pane before it,
+so they keep their order. In a session with windows the tabs go after the session's tabs, by the window
+switching to it focuses, as a command's do.
+
+A worktree whose session has no windows and no saved file to restore opens with its default layout: for a
+linked worktree its space's `worktree_layout`, else the space's `layout`, else the top-level `layout`; for
+the main worktree the space's `layout`, else the top-level one; else the one tab it always had.
+
+```toml
+layout = "agent"            # before any table
+
+[space.gr]                  # by the space's name
+layout = "plain"
+worktree_layout = "agent"
+```
+
+A default layout with an input that is required and has no default is not opened without asking: the
+session opens with its one tab, and the sidebar's last line says why. The new worktree form, **Open layout**
+and `kspaces layout NAME [PATH]`, with `--input NAME=VALUE` and `--yes` as `kspaces run`, ask for it.
+
+### Saving a layout
+
+A session's **Save as layout**, in the sidebar's menu, and `kspaces layout save [NAME] [--tab] [PATH]`
+write a layout from the session's tabs as kitty has them, read from `kitten @ ls`, after a
+[form](sidebar.md#the-menu) chooses what each pane runs. Each tab becomes a `[[layouts.tabs]]`:
+
+- In `splits`, kitty's tree of splits becomes panes built top down. A pair of splits has its first window,
+  the first of its first side; the first window of its second side splits that `right` when the two are
+  side by side, else `below`, with `size` the second side's share, `round((1 - bias) * 100)`, from 1 to 99;
+  then each side is built the same way from its first window. kitty's `--bias` on a split sets that
+  pair's bias, so building the layout makes the same tree, each pair at its share to the percent. A window
+  that is maximized is saved at the sizes it had before.
+- In any other layout, `layout` is its name and the panes are its windows in order.
+- kspaces' own windows are left out: the docks, the forms and the picker, which carry a `kspaces*` user
+  variable. An overlay is left out for the window it is over.
+- `title` is the tab's only when it was set, with `--tab-title` or `set_tab_title`, with the worktree's
+  branch as `{branch}`; otherwise kitty titles it as it does any tab.
+- `cwd` is left out for the worktree itself, is `{worktree}/SUB` inside it, else the path.
+- `focus = true` marks the tab's active window, unless it is pane 1.
+
+What runs in a pane, which the form offers, is the command its shell reports running, with kitty's shell
+integration; else for a window running `cm attach NAME`, what `cm list --json` says session NAME runs,
+and its cwd is cm's; else the program in the window's foreground, when that is not a shell; else the shell
+at its prompt.
+
+The layout goes at the end of config.toml as a `[[layouts]]` block, its panes inline a line each, and the
+rest of the file is kept byte for byte. Replacing a layout puts the block where the old one's lines were,
+from its `[[layouts]]` to the next table that is not one of its own, keeping the comments right above
+that table; that needs the layouts to be `[[layouts]]` tables, not an inline `layouts = [...]`. The
+result is parsed back and must have the layout as saved and nothing else changed, or the file is left as
+it was. A symlinked config has its target written, by a rename from a file beside it.
+
+Not everything kitty arranges can be saved: the biases of `tall`, `fat` and the other layouts, and a
+`splits` tab's sizes finer than a percent, come back at the layout's defaults and to the percent; a
+session's tabs in another OS window come back as tabs of the one it opens in; a pane's scrollback, and what
+a program does when it starts again, are not kept.
 
 ## Installing the kitty files
 
