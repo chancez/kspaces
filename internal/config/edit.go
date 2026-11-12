@@ -45,19 +45,24 @@ func SaveSpace(root string) error {
 	return editFile(func(text string) (string, error) { return AddSpace(text, root) })
 }
 
-// editFile rewrites the config file Load reads with edit. A symlinked config, as from dotfiles, has its
-// target written, so it stays a symlink. The write is a rename from a temporary file beside it, so a
-// sidebar refreshing meanwhile reads the old config or the new one, never half. A missing config is
-// edited as empty, and created unless the edit leaves it so.
+// editFile rewrites the config file Load reads with edit, see EditFile.
 func editFile(edit func(text string) (string, error)) error {
 	path, err := filePath()
 	if err != nil {
 		return err
 	}
+	return EditFile(path, edit)
+}
+
+// EditFile rewrites the config file at path, the global config or a space's, with edit. A symlinked
+// file, as from dotfiles, has its target written, so it stays a symlink. The write is a rename from a
+// temporary file beside it, so a sidebar refreshing meanwhile reads the old file or the new one, never
+// half. A missing file is edited as empty, and created unless the edit leaves it so.
+func EditFile(path string, edit func(text string) (string, error)) error {
 	data, err := os.ReadFile(path)
 	missing := errors.Is(err, fs.ErrNotExist)
 	if err != nil && !missing {
-		return fmt.Errorf("reading the config: %w", err)
+		return fmt.Errorf("reading %s: %w", Tilde(path), err)
 	}
 	out, err := edit(string(data))
 	if err != nil {

@@ -110,6 +110,13 @@ func TopLevel(dir string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// CommonDir is the git directory the worktrees of the repository dir is in share, absolute: where
+// info/exclude is, which ignores files for every worktree without a .gitignore to commit.
+func CommonDir(dir string) (string, error) {
+	out, err := output("-C", dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	return strings.TrimSpace(out), err
+}
+
 // Changes is how many files git status reports in the worktree at dir: changed, staged or untracked.
 // Removing a worktree with any loses them.
 func Changes(dir string) (int, error) {

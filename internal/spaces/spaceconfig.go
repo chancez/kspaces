@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/git"
 )
 
 // A space's .kspaces.toml is a repository's own file, often committed, so a clone, a pull or a branch
@@ -202,4 +203,66 @@ func editTrust(edit func(map[string]string)) error {
 		fmt.Fprintf(&b, "%s  %s\n", t[path], path)
 	}
 	return writeState(trustFile, []byte(b.String()))
+}
+
+// ErrUntrusted is why a layout is not saved to a space's file that is not trusted: what it has would be
+// trusted with the layout, unseen.
+var ErrUntrusted = errors.New("it is not trusted; trust it first, to see what it has")
+
+// SaveSpaceLayout adds l to space's own file, or replaces the one the file has called the same when
+// replace says to, see config.AddSpaceLayout, with global the config it merges with. A missing file is
+// created, and with exclude added to the repository's info/exclude, so git leaves it out. An untrusted
+// file is refused. What is written is trusted before it is in place, as kspaces wrote it.
+func SaveSpaceLayout(global config.Config, space Space, l config.Layout, replace, exclude bool) error {
+	path := space.ConfigPath()
+	_, err := os.Stat(path)
+	created := errors.Is(err, fs.ErrNotExist)
+	err = config.EditFile(path, func(text string) (string, error) {
+		if !created && !Trusted(path, []byte(text)) {
+			return "", ErrUntrusted
+		}
+		out, err := config.AddSpaceLayout(text, global, space.Name, l, replace)
+		if err != nil {
+			return "", err
+		}
+		return out, Trust(path, []byte(out))
+	})
+	if err != nil || !created || !exclude {
+		return err
+	}
+	return excludeFile(space.Root, "/"+config.SpaceFileName)
+}
+
+// excludeFile adds pattern to info/exclude of the repository at root, once, making the file if it is
+// missing.
+func excludeFile(root, pattern string) error {
+	dir, err := git.CommonDir(root)
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(dir, "info", "exclude")
+	data, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	for line := range strings.Lines(string(data)) {
+		if strings.TrimSpace(line) == pattern {
+			return nil
+		}
+	}
+	if len(data) > 0 && !strings.HasSuffix(string(data), "\n") {
+		pattern = "\n" + pattern
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := f.WriteString(pattern + "\n"); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }

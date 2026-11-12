@@ -122,3 +122,86 @@ func TestBrokenSpaceFile(t *testing.T) {
 		t.Errorf("seen from a sidebar: %v", got)
 	}
 }
+
+// Saving a layout to a space's file creates the file, trusted as written, and keeps it out of git once in
+// info/exclude; then appends, and replaces in place. A file changed since it was trusted is refused, and
+// so is saving in place of a layout without saying to replace it.
+func TestSaveSpaceLayout(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	r := gittest.New(t)
+	r.Commit("first")
+	linked := r.Worktree("dev", ".worktrees/dev")
+	global, err := config.Parse(fmt.Sprintf("spaces = [%q]\n\n[[commands]]\nname = \"review\"\nrun = [\"gr\"]\n", r.Dir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	space := ReadSpace(global, r.Dir)
+	file := filepath.Join(r.Dir, config.SpaceFileName)
+	exclude := filepath.Join(r.Dir, ".git", "info", "exclude")
+	if err := os.WriteFile(exclude, []byte("# mine\n*.log"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	read := func(path string) string {
+		t.Helper()
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	review := config.Layout{Name: "review", Tabs: []config.LayoutTab{{Panes: []config.Pane{{Command: "review"}}}}}
+	shell := config.Layout{Name: "shell", Tabs: []config.LayoutTab{{Panes: []config.Pane{{}}}}}
+	if err := SaveSpaceLayout(global, space, review, false, true); err != nil {
+		t.Fatal(err)
+	}
+	block := "[[layouts]]\nname = \"review\"\n[[layouts.tabs]]\npanes = [\n  { command = \"review\" },\n]\n"
+	if got := read(file); got != block {
+		t.Errorf("created:\n%s\nwant\n%s", got, block)
+	}
+	if got, want := read(exclude), "# mine\n*.log\n/.kspaces.toml\n"; got != want {
+		t.Errorf("exclude %q, want %q", got, want)
+	}
+	// In use as written, by the linked worktrees too.
+	if got, _, err := FindWorktree(global, linked.Dir); err != nil || got.Untrusted || got.Config == nil {
+		t.Errorf("not in use as written: %v, untrusted %v, %v", err, got.Untrusted, got.ConfigErr)
+	}
+	// Made again, the line is there already.
+	if err := os.Remove(file); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveSpaceLayout(global, space, review, false, true); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := read(exclude), "# mine\n*.log\n/.kspaces.toml\n"; got != want {
+		t.Errorf("exclude made again %q, want %q", got, want)
+	}
+	if err := SaveSpaceLayout(global, space, shell, false, true); err != nil {
+		t.Fatal(err)
+	}
+	shellBlock := "[[layouts]]\nname = \"shell\"\n[[layouts.tabs]]\npanes = [\n  {},\n]\n"
+	if got, want := read(file), block+"\n"+shellBlock; got != want {
+		t.Errorf("appended:\n%s\nwant\n%s", got, want)
+	}
+	other := config.Layout{Name: "review", Tabs: []config.LayoutTab{{Panes: []config.Pane{{Run: []string{"gr", "--watch"}}}}}}
+	err = SaveSpaceLayout(global, space, other, false, true)
+	if want := file + ": a layout called review exists"; err == nil || err.Error() != want {
+		t.Errorf("without replacing: %v, want %s", err, want)
+	}
+	if err := SaveSpaceLayout(global, space, other, true, true); err != nil {
+		t.Fatal(err)
+	}
+	replaced := "[[layouts]]\nname = \"review\"\n[[layouts.tabs]]\npanes = [\n  { run = [\"gr\", \"--watch\"] },\n]\n\n" + shellBlock
+	if got := read(file); got != replaced {
+		t.Errorf("replaced:\n%s\nwant\n%s", got, replaced)
+	}
+	if err := os.WriteFile(file, []byte(replaced+"# edited\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	err = SaveSpaceLayout(global, space, shell, true, true)
+	if want := file + ": " + ErrUntrusted.Error(); err == nil || err.Error() != want {
+		t.Errorf("untrusted: %v, want %s", err, want)
+	}
+	if got := read(file); got != replaced+"# edited\n" {
+		t.Errorf("untrusted, the file became:\n%s", got)
+	}
+}

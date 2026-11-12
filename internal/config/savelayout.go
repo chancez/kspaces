@@ -16,7 +16,30 @@ import (
 // result is parsed back and must have l as it is, where it goes, and nothing else changed, so a mistake in
 // the edit is an error rather than a broken config.
 func AddLayout(text string, l Layout, replace bool) (string, error) {
-	before, err := Parse(text)
+	return addLayout(text, l, replace, func(text string) (Config, []string, error) {
+		cfg, err := Parse(text)
+		return cfg, layoutNames(cfg.Layouts), err
+	})
+}
+
+// AddSpaceLayout is AddLayout for the text of a space's file, the space called space with global as its
+// global config: replace is of a layout the file has, and one only the global config has is added to the
+// file, to take its place in the space. It is checked as merged with global.
+func AddSpaceLayout(text string, global Config, space string, l Layout, replace bool) (string, error) {
+	return addLayout(text, l, replace, func(text string) (Config, []string, error) {
+		f, err := ParseSpaceFile(text)
+		if err != nil {
+			return Config{}, nil, err
+		}
+		cfg, err := global.WithSpace(space, f)
+		return cfg, layoutNames(f.Layouts), err
+	})
+}
+
+// addLayout is AddLayout with parse reading a text as the config it makes and the names of the layouts the
+// text itself has, in order.
+func addLayout(text string, l Layout, replace bool, parse func(string) (Config, []string, error)) (string, error) {
+	before, own, err := parse(text)
 	if err != nil {
 		return "", fmt.Errorf("the config has an error to fix first: %w", err)
 	}
@@ -24,19 +47,24 @@ func AddLayout(text string, l Layout, replace bool) (string, error) {
 	want := before
 	want.Layouts = slices.Clone(before.Layouts)
 	var out string
-	switch at := slices.IndexFunc(before.Layouts, func(x Layout) bool { return x.Name == l.Name }); {
+	switch at := slices.Index(own, l.Name); {
 	case at < 0:
 		out = appendBlock(text, block)
-		want.Layouts = append(want.Layouts, l)
+		// A layout of the same name from elsewhere, the global config's, is taken the place of.
+		if i := slices.IndexFunc(want.Layouts, func(x Layout) bool { return x.Name == l.Name }); i >= 0 {
+			want.Layouts[i] = l
+		} else {
+			want.Layouts = append(want.Layouts, l)
+		}
 	case !replace:
 		return "", fmt.Errorf("a layout called %s exists", l.Name)
 	default:
-		if out, err = replaceLayout(text, at, len(before.Layouts), block); err != nil {
+		if out, err = replaceLayout(text, at, len(own), block); err != nil {
 			return "", err
 		}
-		want.Layouts[at] = l
+		want.Layouts[slices.IndexFunc(want.Layouts, func(x Layout) bool { return x.Name == l.Name })] = l
 	}
-	after, err := Parse(out)
+	after, _, err := parse(out)
 	if err != nil {
 		return "", fmt.Errorf("saving layout %s would break the config, so it was left as is: %w", l.Name, err)
 	}
@@ -50,6 +78,14 @@ func AddLayout(text string, l Layout, replace bool) (string, error) {
 		return "", fmt.Errorf("saving layout %s would change more of the config than it, so the config was left as is", l.Name)
 	}
 	return out, nil
+}
+
+func layoutNames(ls []Layout) []string {
+	names := make([]string, len(ls))
+	for i, l := range ls {
+		names[i] = l.Name
+	}
+	return names
 }
 
 // SaveLayout adds l to the config file Load reads, or replaces the one called the same when replace says

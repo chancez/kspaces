@@ -182,3 +182,21 @@ func TestSpaceFileErrors(t *testing.T) {
 		}
 	}
 }
+
+// A layout saved to a space's file under a global layout's name is added to the file, to take that one's
+// place in the space, rather than asking to replace it; one the file has is replaced only when asked.
+func TestAddSpaceLayout(t *testing.T) {
+	global := mustParse(t, spaceGlobal)
+	l := Layout{Name: "plain", Tabs: []LayoutTab{{Panes: []Pane{{Command: "review"}}}}}
+	got, err := AddSpaceLayout("# gr's\n", global, "gr", l, false)
+	want := "# gr's\n\n[[layouts]]\nname = \"plain\"\n[[layouts.tabs]]\npanes = [\n  { command = \"review\" },\n]\n"
+	if err != nil || got != want {
+		t.Errorf("over the global one: %v\n%s\nwant\n%s", err, got, want)
+	}
+	if _, err := AddSpaceLayout(got, global, "gr", l, false); err == nil || err.Error() != "a layout called plain exists" {
+		t.Errorf("again: %v", err)
+	}
+	if _, err := AddSpaceLayout("nope = 1\n", global, "gr", l, false); err == nil || err.Error() != "the config has an error to fix first: unknown keys: nope" {
+		t.Errorf("broken: %v", err)
+	}
+}
