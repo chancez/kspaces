@@ -5,7 +5,8 @@
 - One `kspaces sidebar` per tab, because kitty can only dock to one tab. They share one poller, so only one
   of them runs `kitten @ ls` and `git worktree list`, but each is a process, with its own screen to draw.
   A dock for the whole OS window would fix that.
-- Three kitty bugs, worked around in kspaces' bundled kitty scripts until a kitty release fixes them:
+- Three kitty bugs, fixed upstream after 0.50.0 and worked around in kspaces' bundled kitty scripts until a
+  release has the fixes:
   - `save_as_session --match` writes `new_os_window` before a space's file depending on which OS window had
     focus, so with several OS windows each space was restored in a window of its own. `save_sessions.py`
     serializes with the bug fixed instead.
@@ -42,9 +43,10 @@
 One thing at a time upstream, each kept short, describing the use case only as switching between sets of
 tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/kitty/.research/drafts/`.
 
-1. `save_as_session --match`, the first two bugs above: kovidgoyal/kitty#10844, merged; the workaround in
+1. `save_as_session --match`, the first two bugs above: kovidgoyal/kitty#10844, merged. The workaround in
    `save_sessions.py` comes out once a release has it.
-2. `detach_tab` and window moves losing their session: draft PR kovidgoyal/kitty#10851.
+2. `detach_tab` and window moves losing their session: #10851 closed, fixed by the maintainer in b261b08b7
+   instead, more broadly. `repair_session` in `kspaces_watcher.py` comes out once a release has it.
 3. Watcher events (a close reason on `on_close`, an event for a window's directory changing): commented on
    discussion #10828, offering PRs.
 4. Watcher calls each taking a timer, and the macOS and Linux tables of 128: issue kovidgoyal/kitty#10853.
