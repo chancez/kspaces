@@ -564,3 +564,48 @@ func TestOpenWorktreeLayout(t *testing.T) {
 		t.Errorf("got %q\nwant %q", got, want)
 	}
 }
+
+// A space's own layouts, once its file is trusted, are its alone: its worktrees' layout form lists them
+// after the global ones, and another space's does not, nor does its own before the file is trusted.
+func TestSpaceFileLayouts(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	mine, other := mainRepo(t), mainRepo(t)
+	global := testLayouts(t)
+	global.Spaces, global.Space = []string{mine, other}, nil
+	file := filepath.Join(mine, config.SpaceFileName)
+	data := []byte("[[commands]]\nname = \"test\"\nrun = [\"make\", \"test\"]\n\n[[layouts]]\nname = \"tests\"\ntabs = [{ panes = [{ command = \"test\" }, { command = \"review\", split = \"right\" }] }]\n")
+	if err := os.WriteFile(file, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	list := func(root string) []string {
+		t.Helper()
+		cfg, space, wt, _, err := findLayout(global, root, "plain", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f := newLayoutForm(cfg, space, wt, kitty.State{}, "plain", nil)
+		f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+		f.Update(keyMsg("enter"))
+		return formScreen(f)
+	}
+	screen := func(root string, rows ...string) []string {
+		lines := append([]string{"", "  Open a layout in " + filepath.Base(root), "", "  layout     < plain >  left/right change  enter list", listRule(""),
+			listRow(true, "plain  1 tab, 1 pane"), listRow(false, "agent  1 tab, 3 panes")}, rows...)
+		return append(lines, listRule(""), "  up/down move  type filter  enter choose  esc close", "")
+	}
+	if got, want := list(mine), screen(mine); !reflect.DeepEqual(got, want) {
+		t.Errorf("untrusted:\n%q\nwant\n%q", got, want)
+	}
+	if err := spaces.Trust(file, data); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := list(mine), screen(mine, listRow(false, "tests  1 tab, 2 panes")); !reflect.DeepEqual(got, want) {
+		t.Errorf("trusted:\n%q\nwant\n%q", got, want)
+	}
+	if got, want := list(other), screen(other); !reflect.DeepEqual(got, want) {
+		t.Errorf("the other space:\n%q\nwant\n%q", got, want)
+	}
+	if _, _, _, _, err := findLayout(global, other, "tests", nil); errString(err) != "no layout tests in the config" {
+		t.Errorf("tests in the other space: %v", err)
+	}
+}

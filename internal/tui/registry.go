@@ -161,18 +161,18 @@ var (
 		Title:   "Run",
 		Section: sectionSession,
 		Applies: func(m *sidebar, s entrySubject) bool {
-			return !s.row.Other && !s.row.Missing && s.row.Worktree != nil && len(m.cfg.Commands) > 0
+			return !s.row.Other && !s.row.Missing && s.row.Worktree != nil && len(s.row.Space.ConfigOf(m.cfg).Commands) > 0
 		},
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
-			return m.runCommand(s.row.Worktree.Path)
+			return m.runCommand(s.row)
 		},
 	}
 	actOpenLayout = &interact.Action[*sidebar, entrySubject]{
 		Title:   "Open layout",
 		Section: sectionSession,
 		Applies: func(m *sidebar, s entrySubject) bool {
-			return !s.row.Other && !s.row.Missing && s.row.Worktree != nil && len(m.cfg.Layouts) > 0
+			return !s.row.Other && !s.row.Missing && s.row.Worktree != nil && len(s.row.Space.ConfigOf(m.cfg).Layouts) > 0
 		},
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false

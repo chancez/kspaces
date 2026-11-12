@@ -379,7 +379,7 @@ func SaveLayoutForm(ctx context.Context, cfg config.Config, dir, name string, on
 	if err != nil {
 		return err
 	}
-	_, wt, err := spaces.FindWorktree(cfg, top)
+	space, wt, err := spaces.FindWorktree(cfg, top)
 	if err != nil {
 		return err
 	}
@@ -387,7 +387,7 @@ func SaveLayoutForm(ctx context.Context, cfg config.Config, dir, name string, on
 	if err != nil {
 		return err
 	}
-	if _, err := tea.NewProgram(newSaveLayoutForm(cfg, wt, tabs, this, name, only), tea.WithContext(ctx)).Run(); err != nil {
+	if _, err := tea.NewProgram(newSaveLayoutForm(space.ConfigOf(cfg), wt, tabs, this, name, only), tea.WithContext(ctx)).Run(); err != nil {
 		return fmt.Errorf("running the save layout form: %w", err)
 	}
 	return nil

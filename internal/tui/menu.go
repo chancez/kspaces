@@ -204,10 +204,10 @@ func (m *sidebar) removeWorktree(path string) tea.Cmd {
 	}
 }
 
-// runCommand opens the form that runs a command in the worktree at path, the first command chosen, in an
+// runCommand opens the form that runs a command in r's worktree, the first of its space's chosen, in an
 // overlay as newWorktree's.
-func (m *sidebar) runCommand(path string) tea.Cmd {
-	st, name := m.kitty, m.cfg.Commands[0].Name
+func (m *sidebar) runCommand(r spaces.Row) tea.Cmd {
+	st, path, name := m.kitty, r.Worktree.Path, r.Space.ConfigOf(m.cfg).Commands[0].Name
 	return func() tea.Msg {
 		if err := spaces.AskRunCommand(st, name, path); err != nil {
 			return spaces.Snapshot{Err: err}
@@ -217,12 +217,12 @@ func (m *sidebar) runCommand(path string) tea.Cmd {
 }
 
 // openLayout opens the form that opens a layout in r's worktree, in an overlay as newWorktree's, with the
-// worktree's default layout chosen, else the first.
+// worktree's default layout chosen, else the first, as its space has them.
 func (m *sidebar) openLayout(r spaces.Row) tea.Cmd {
-	st, path := m.kitty, r.Worktree.Path
-	name := m.cfg.LayoutFor(r.Space.Name, !r.Main)
+	st, path, cfg := m.kitty, r.Worktree.Path, r.Space.ConfigOf(m.cfg)
+	name := cfg.LayoutFor(r.Space.Name, !r.Main)
 	if name == "" {
-		name = m.cfg.Layouts[0].Name
+		name = cfg.Layouts[0].Name
 	}
 	return func() tea.Msg {
 		if err := spaces.AskOpenLayout(st, name, path); err != nil {

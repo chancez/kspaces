@@ -227,34 +227,39 @@ func (f *runForm) render() string {
 	return boxed(append(lines, line(spans...)))
 }
 
-// findRun is the worktree the directory dir is in, its space, and the command called name, with inputs
-// it has, opening where open says, one of config.Opens, or where configured when empty.
-func findRun(cfg config.Config, dir, name string, inputs map[string]string, open string) (spaces.Space, spaces.Worktree, config.Command, error) {
-	cmd, ok := cfg.Command(name)
-	switch {
-	case !ok:
-		return spaces.Space{}, spaces.Worktree{}, config.Command{}, fmt.Errorf("no command %s in the config", name)
-	case open != "" && !slices.Contains(config.Opens, open):
-		return spaces.Space{}, spaces.Worktree{}, config.Command{}, fmt.Errorf("--open is %q, it must be one of %s", open, strings.Join(config.Opens, ", "))
-	}
-	for k := range inputs {
-		if !slices.ContainsFunc(cmd.Inputs, func(in config.Input) bool { return in.Name == k }) {
-			return spaces.Space{}, spaces.Worktree{}, config.Command{}, fmt.Errorf("%s has no input %s", name, k)
-		}
+// findRun is the worktree the directory dir is in, its space, the config as the space sees it, and its
+// command called name, with inputs it has, opening where open says, one of config.Opens, or where
+// configured when empty.
+func findRun(global config.Config, dir, name string, inputs map[string]string, open string) (config.Config, spaces.Space, spaces.Worktree, config.Command, error) {
+	if open != "" && !slices.Contains(config.Opens, open) {
+		return config.Config{}, spaces.Space{}, spaces.Worktree{}, config.Command{}, fmt.Errorf("--open is %q, it must be one of %s", open, strings.Join(config.Opens, ", "))
 	}
 	top, err := git.TopLevel(dir)
 	if err != nil {
-		return spaces.Space{}, spaces.Worktree{}, config.Command{}, err
+		return config.Config{}, spaces.Space{}, spaces.Worktree{}, config.Command{}, err
 	}
-	space, wt, err := spaces.FindWorktree(cfg, top)
-	return space, wt, cmd, err
+	space, wt, err := spaces.FindWorktree(global, top)
+	if err != nil {
+		return config.Config{}, spaces.Space{}, spaces.Worktree{}, config.Command{}, err
+	}
+	cfg := space.ConfigOf(global)
+	cmd, ok := cfg.Command(name)
+	if !ok {
+		return config.Config{}, spaces.Space{}, spaces.Worktree{}, config.Command{}, fmt.Errorf("no command %s in the config", name)
+	}
+	for k := range inputs {
+		if !slices.ContainsFunc(cmd.Inputs, func(in config.Input) bool { return in.Name == k }) {
+			return config.Config{}, spaces.Space{}, spaces.Worktree{}, config.Command{}, fmt.Errorf("%s has no input %s", name, k)
+		}
+	}
+	return cfg, space, wt, cmd, nil
 }
 
 // RunCommandForm runs the run form for the command called name in the worktree dir is in, its inputs
 // filled in from inputs, meant for a kitty overlay, until the command runs or the form is left. open
 // overrides where it opens when not empty.
-func RunCommandForm(ctx context.Context, cfg config.Config, dir, name string, inputs map[string]string, open string) error {
-	space, wt, _, err := findRun(cfg, dir, name, inputs, open)
+func RunCommandForm(ctx context.Context, global config.Config, dir, name string, inputs map[string]string, open string) error {
+	cfg, space, wt, _, err := findRun(global, dir, name, inputs, open)
 	if err != nil {
 		return err
 	}
@@ -270,8 +275,8 @@ func RunCommandForm(ctx context.Context, cfg config.Config, dir, name string, in
 
 // RunCommandNow runs the command called name in the worktree dir is in, with inputs, without asking. A
 // required input that is not given, and has no default, is an error.
-func RunCommandNow(cfg config.Config, dir, name string, inputs map[string]string, open string) error {
-	space, wt, cmd, err := findRun(cfg, dir, name, inputs, open)
+func RunCommandNow(global config.Config, dir, name string, inputs map[string]string, open string) error {
+	cfg, space, wt, cmd, err := findRun(global, dir, name, inputs, open)
 	if err != nil {
 		return err
 	}

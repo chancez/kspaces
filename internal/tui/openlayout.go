@@ -219,30 +219,34 @@ func (f *layoutForm) render() string {
 	return boxed(append(lines, line(spans...)))
 }
 
-// findLayout is the worktree the directory dir is in, its space, and the layout called name, with inputs
-// it has.
-func findLayout(cfg config.Config, dir, name string, inputs map[string]string) (spaces.Space, spaces.Worktree, config.Layout, error) {
+// findLayout is the worktree the directory dir is in, its space, the config as the space sees it, and its
+// layout called name, with inputs it has.
+func findLayout(global config.Config, dir, name string, inputs map[string]string) (config.Config, spaces.Space, spaces.Worktree, config.Layout, error) {
+	top, err := git.TopLevel(dir)
+	if err != nil {
+		return config.Config{}, spaces.Space{}, spaces.Worktree{}, config.Layout{}, err
+	}
+	space, wt, err := spaces.FindWorktree(global, top)
+	if err != nil {
+		return config.Config{}, spaces.Space{}, spaces.Worktree{}, config.Layout{}, err
+	}
+	cfg := space.ConfigOf(global)
 	l, ok := cfg.Layout(name)
 	if !ok {
-		return spaces.Space{}, spaces.Worktree{}, config.Layout{}, fmt.Errorf("no layout %s in the config", name)
+		return config.Config{}, spaces.Space{}, spaces.Worktree{}, config.Layout{}, fmt.Errorf("no layout %s in the config", name)
 	}
 	for k := range inputs {
 		if !slices.ContainsFunc(l.Inputs, func(in config.Input) bool { return in.Name == k }) {
-			return spaces.Space{}, spaces.Worktree{}, config.Layout{}, fmt.Errorf("%s has no input %s", name, k)
+			return config.Config{}, spaces.Space{}, spaces.Worktree{}, config.Layout{}, fmt.Errorf("%s has no input %s", name, k)
 		}
 	}
-	top, err := git.TopLevel(dir)
-	if err != nil {
-		return spaces.Space{}, spaces.Worktree{}, config.Layout{}, err
-	}
-	space, wt, err := spaces.FindWorktree(cfg, top)
-	return space, wt, l, err
+	return cfg, space, wt, l, nil
 }
 
 // OpenLayoutForm runs the layout form for the layout called name in the worktree dir is in, its inputs
 // filled in from inputs, meant for a kitty overlay, until the layout opens or the form is left.
-func OpenLayoutForm(ctx context.Context, cfg config.Config, dir, name string, inputs map[string]string) error {
-	space, wt, _, err := findLayout(cfg, dir, name, inputs)
+func OpenLayoutForm(ctx context.Context, global config.Config, dir, name string, inputs map[string]string) error {
+	cfg, space, wt, _, err := findLayout(global, dir, name, inputs)
 	if err != nil {
 		return err
 	}
@@ -258,8 +262,8 @@ func OpenLayoutForm(ctx context.Context, cfg config.Config, dir, name string, in
 
 // OpenLayoutNow opens the layout called name in the worktree dir is in, with inputs, without asking. A
 // required input that is not given, and has no default, is an error.
-func OpenLayoutNow(cfg config.Config, dir, name string, inputs map[string]string) error {
-	space, wt, l, err := findLayout(cfg, dir, name, inputs)
+func OpenLayoutNow(global config.Config, dir, name string, inputs map[string]string) error {
+	cfg, space, wt, l, err := findLayout(global, dir, name, inputs)
 	if err != nil {
 		return err
 	}

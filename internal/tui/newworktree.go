@@ -464,10 +464,10 @@ func prDoes(pr spaces.PR) string {
 	}
 }
 
-// RunNewWorktree runs the new worktree form for space, meant for a kitty overlay, until the worktree is
-// created and opened or the form is left.
+// RunNewWorktree runs the new worktree form for space, with the config as the space sees it, meant for a
+// kitty overlay, until the worktree is created and opened or the form is left.
 func RunNewWorktree(ctx context.Context, cfg config.Config, space spaces.Space) error {
-	if _, err := tea.NewProgram(newForm(cfg, space), tea.WithContext(ctx)).Run(); err != nil {
+	if _, err := tea.NewProgram(newForm(space.ConfigOf(cfg), space), tea.WithContext(ctx)).Run(); err != nil {
 		return fmt.Errorf("running the new worktree form: %w", err)
 	}
 	return nil
