@@ -29,10 +29,11 @@ type runForm struct {
 	// windows says whether the session has windows, without which the command is its first tab.
 	windows bool
 	// focus is the index in fields of the field that has focus.
-	focus int
-	busy  bool
-	err   error
-	width int
+	focus  int
+	busy   bool
+	err    error
+	width  int
+	height int
 	// zones and buttons are where the last frame drew its buttons, and what each runs, for a click.
 	zones   map[string][]look.Zone
 	buttons controls[*runForm]
@@ -140,9 +141,17 @@ func (f *runForm) run() tea.Cmd {
 }
 
 func (f *runForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// While the list is open, keys and the mouse are its.
+	if f.cmds.listOpen() && isInput(msg) {
+		cmd, picked := f.cmds.updateList(msg, f.zones)
+		if picked {
+			return f, tea.Batch(cmd, f.cycleCommand(0))
+		}
+		return f, cmd
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		f.width = msg.Width
+		f.width, f.height = msg.Width, msg.Height
 		f.cmds.setWidth(max(f.width-4-labelWidth-1, 1))
 		return f, nil
 	case ranMsg:
@@ -160,7 +169,8 @@ func (f *runForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return f, cmd
 		}
 		if clickedChoice(f.zones, commandZone, msg) {
-			return f, f.cycleCommand(1)
+			f.cmds.openList()
+			return f, f.cycleCommand(0)
 		}
 	}
 	in := f.focused()
@@ -186,7 +196,8 @@ func (f *runForm) render() string {
 	line := func(spans ...look.Span) string { return th.Render(look.Plain, spans...) }
 	muted := func(s string) string { return line(th.Cut(width, look.Muted(s))...) }
 	lines := []string{line(look.Heading("Run in " + f.wt.Session)), ""}
-	if fields := f.cmds.lines(f.onCommand()); len(fields) > 0 {
+	at := len(lines)
+	if fields := f.cmds.lines(f.onCommand(), width); len(fields) > 0 {
 		lines = append(append(lines, fields...), "")
 	}
 	cmd, _ := f.cmds.chosen()
@@ -201,6 +212,9 @@ func (f *runForm) render() string {
 		lines = append(lines, "")
 	}
 	f.buttons = controls[*runForm]{}
+	if f.cmds.listOpen() {
+		return boxed(append(f.cmds.drawList(lines, at, width, f.height), line(listHints()...)))
+	}
 	spans := f.buttons.draw(f, theRunForm.Target(runSubject{}),
 		control{action: actRun, label: "Run"},
 		control{action: actRunCancel, label: "Cancel"})
@@ -208,7 +222,7 @@ func (f *runForm) render() string {
 		spans = append(spans, look.Text("  "), look.Key("tab"), look.KeyDesc(" next field"))
 	}
 	if f.onCommand() {
-		spans = append(spans, look.Text("  "), look.Key("left/right"), look.KeyDesc(" command"))
+		spans = append(spans, choiceHints("command")...)
 	}
 	return boxed(append(lines, line(spans...)))
 }

@@ -143,22 +143,33 @@ func TestRunForm(t *testing.T) {
 		return f
 	}
 	f := sized(newRunForm(cfg, space, wt, open, "gr", nil, ""))
-	want := screen([]string{"  command    < gr >"}, "Runs gr", "Opens in a split beside gr@fix's window", "",
-		" Run enter    Cancel esc   left/right command", "")
+	want := screen([]string{"  command    < gr >  left/right change  enter list"}, "Runs gr", "Opens in a split beside gr@fix's window", "",
+		" Run    Cancel esc   left/right command  enter/space list", "")
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("gr:\n%q\nwant\n%q", got, want)
 	}
+	// The list says what each command runs.
+	f.Update(keyMsg("enter"))
+	rule := "             " + strings.Repeat("\u2500", 55)
+	want = []string{"", "  Run in gr@fix", "", "  command    < gr >  left/right change  enter list",
+		rule, "               claude  claude {prompt}", "             \uf00c gr  gr", rule,
+		"  up/down move  type filter  enter choose  esc close", ""}
+	if got := formScreen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("the list:\n%q\nwant\n%q", got, want)
+	}
+	f.Update(keyMsg("esc"))
 	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	f.Update(keyMsg("tab"))
 	f.Update(keyMsg("enter"))
 	want = screen([]string{"  command    < claude >", "  Prompt     required"}, "Runs claude", "Opens in a new tab in gr@fix", "",
-		"claude needs Prompt", "", " Run enter    Cancel esc   tab next field  left/right command", "")
+		"claude needs Prompt", "", " Run enter    Cancel esc   tab next field", "")
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("claude, its prompt empty:\n%q\nwant\n%q", got, want)
 	}
 
 	// Prefilled, for one run in an overlay, and with the session closed.
 	if got, want := formScreen(sized(newRunForm(cfg, space, wt, open, "claude", map[string]string{"prompt": "hi"}, "overlay")))[3:8],
-		[]string{"  command    < claude >", "  Prompt     hi", "", "  Runs claude", "  Opens over gr@fix's window, closing back to it"}; !reflect.DeepEqual(got, want) {
+		[]string{"  command    < claude >  left/right change  enter list", "  Prompt     hi", "", "  Runs claude", "  Opens over gr@fix's window, closing back to it"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("prefilled:\n%q\nwant\n%q", got, want)
 	}
 	if got, want := formScreen(sized(newRunForm(cfg, space, wt, kitty.State{}, "gr", nil, "")))[6], "  Opens as the first tab of gr@fix, which has no windows"; got != want {
@@ -171,7 +182,6 @@ func TestRunForm(t *testing.T) {
 		t.Errorf("one command:\n%q\nwant\n%q", got, want)
 	}
 
-	f.Update(keyMsg("tab"))
 	typeInto(f, "fix it")
 	_, cmd := f.Update(keyMsg("enter"))
 	if cmd == nil {

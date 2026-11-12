@@ -61,6 +61,9 @@ type layoutSubject struct{}
 // saveSubject is the save layout form.
 type saveSubject struct{}
 
+// listSubject is a choice field's open list.
+type listSubject struct{}
+
 // filterSubject is the spaces list's filter, while it is open.
 type filterSubject struct{}
 
@@ -358,6 +361,41 @@ var (
 	actMenuQuit = quit[*sidebar, menuSubject]()
 )
 
+// A choice field's open list's. Typing filters it, so j and k move only before anything is typed.
+var (
+	actListDown = &interact.Action[*choiceList, listSubject]{
+		Title: "down",
+		Run:   do[*choiceList, listSubject](func(l *choiceList) { l.move(1) }),
+	}
+	actListUp = &interact.Action[*choiceList, listSubject]{
+		Title: "up",
+		Run:   do[*choiceList, listSubject](func(l *choiceList) { l.move(-1) }),
+	}
+	actListJ = &interact.Action[*choiceList, listSubject]{
+		Title:   "down",
+		Applies: func(l *choiceList, _ listSubject) bool { return l.filter == "" },
+		Run:     do[*choiceList, listSubject](func(l *choiceList) { l.move(1) }),
+	}
+	actListK = &interact.Action[*choiceList, listSubject]{
+		Title:   "up",
+		Applies: func(l *choiceList, _ listSubject) bool { return l.filter == "" },
+		Run:     do[*choiceList, listSubject](func(l *choiceList) { l.move(-1) }),
+	}
+	actListPick = &interact.Action[*choiceList, listSubject]{
+		Title: "choose",
+		Run:   do[*choiceList, listSubject]((*choiceList).pick),
+	}
+	actListErase = &interact.Action[*choiceList, listSubject]{
+		Title: "erase",
+		Run:   do[*choiceList, listSubject]((*choiceList).erase),
+	}
+	actListClose = &interact.Action[*choiceList, listSubject]{
+		Title: "close",
+		Run:   do[*choiceList, listSubject]((*choiceList).close),
+	}
+	actListQuit = quit[*choiceList, listSubject]()
+)
+
 // The picker's.
 var (
 	actPickDown = &interact.Action[*picker, pickerSubject]{
@@ -395,6 +433,11 @@ var (
 		Title:   "previous choice",
 		Applies: func(f *newWorktreeForm, _ formSubject) bool { return f.onLayout() || f.onCommand() },
 		Run:     func(f *newWorktreeForm, _ formSubject) tea.Cmd { return f.cycleChoice(-1) },
+	}
+	actFormList = &interact.Action[*newWorktreeForm, formSubject]{
+		Title:   "list",
+		Applies: func(f *newWorktreeForm, _ formSubject) bool { return !f.busy && (f.onLayout() || f.onCommand()) },
+		Run:     do[*newWorktreeForm, formSubject]((*newWorktreeForm).openList),
 	}
 	actCreate = &interact.Action[*newWorktreeForm, formSubject]{
 		Title:   "create",
@@ -515,6 +558,11 @@ var (
 		Applies: func(f *runForm, _ runSubject) bool { return f.onCommand() },
 		Run:     func(f *runForm, _ runSubject) tea.Cmd { return f.cycleCommand(-1) },
 	}
+	actRunList = &interact.Action[*runForm, runSubject]{
+		Title:   "list",
+		Applies: func(f *runForm, _ runSubject) bool { return !f.busy && f.onCommand() },
+		Run:     do[*runForm, runSubject](func(f *runForm) { f.cmds.openList() }),
+	}
 	actRun = &interact.Action[*runForm, runSubject]{
 		Title:   "run",
 		Applies: func(f *runForm, _ runSubject) bool { return !f.busy },
@@ -547,6 +595,11 @@ var (
 		Title:   "previous layout",
 		Applies: func(f *layoutForm, _ layoutSubject) bool { return f.onLayout() },
 		Run:     func(f *layoutForm, _ layoutSubject) tea.Cmd { return f.cycleLayout(-1) },
+	}
+	actLayoutList = &interact.Action[*layoutForm, layoutSubject]{
+		Title:   "list",
+		Applies: func(f *layoutForm, _ layoutSubject) bool { return !f.busy && f.onLayout() },
+		Run:     do[*layoutForm, layoutSubject](func(f *layoutForm) { f.layouts.openList() }),
 	}
 	actOpenLayoutNow = &interact.Action[*layoutForm, layoutSubject]{
 		Title:   "open",
@@ -583,6 +636,11 @@ var (
 		Title:   "previous choice",
 		Applies: func(f *saveLayoutForm, _ saveSubject) bool { return !f.confirm && f.onChoice() },
 		Run:     func(f *saveLayoutForm, _ saveSubject) tea.Cmd { return f.cycleChoice(-1) },
+	}
+	actSaveList = &interact.Action[*saveLayoutForm, saveSubject]{
+		Title:   "list",
+		Applies: func(f *saveLayoutForm, _ saveSubject) bool { return !f.busy && !f.confirm && f.onChoice() },
+		Run:     do[*saveLayoutForm, saveSubject](func(f *saveLayoutForm) { f.focused().choice.openList() }),
 	}
 	actSaveLayout = &interact.Action[*saveLayoutForm, saveSubject]{
 		Title:   "save",
@@ -634,6 +692,7 @@ var (
 	layoutKind *interact.Kind[*layoutForm, layoutSubject]
 	saveKind   *interact.Kind[*saveLayoutForm, saveSubject]
 	filterKind *interact.Kind[*sidebar, filterSubject]
+	listKind   *interact.Kind[*choiceList, listSubject]
 	sortKind   *interact.Kind[*sidebar, sortSubject]
 
 	spacesList    *interact.Place[*sidebar, entrySubject]
@@ -652,6 +711,7 @@ var (
 	theSaveForm   *interact.Place[*saveLayoutForm, saveSubject]
 	theFilter     *interact.Place[*sidebar, filterSubject]
 	theSort       *interact.Place[*sidebar, sortSubject]
+	theChoiceList *interact.Place[*choiceList, listSubject]
 )
 
 // Kinds and places are made in init, as their actions run code that reads them.
@@ -719,11 +779,12 @@ func init() {
 	thePicker = interact.List(pickerKind)
 
 	formKind = interact.NewKind(func(formSubject) string { return "New worktree" },
-		actSwitchField, actPrevField, actNextChoice, actPrevChoice, actCreate, actCancel)
+		actSwitchField, actPrevField, actNextChoice, actPrevChoice, actFormList, actCreate, actCancel)
 	formKind.Bind(actSwitchField, "tab", "next field", "tab", "down")
 	formKind.Bind(actPrevField, "shift+tab", "previous field", "shift+tab", "up")
 	formKind.Bind(actNextChoice, "left/right", "choose", "right")
 	formKind.Bind(actPrevChoice, "", "", "left")
+	formKind.Bind(actFormList, "enter/space", "list", "enter", "space")
 	formKind.Bind(actCreate, "enter", "create", "enter")
 	formKind.BindQuiet(actWaitForCreate, "enter")
 	formKind.Bind(actCancel, "esc", "cancel", "esc", "ctrl+c")
@@ -766,33 +827,36 @@ func init() {
 	theAddForm = interact.List(addKind)
 
 	runKind = interact.NewKind(func(runSubject) string { return "Run" },
-		actRunNextField, actRunPrevField, actRunNextCommand, actRunPrevCommand, actRun, actRunCancel)
+		actRunNextField, actRunPrevField, actRunNextCommand, actRunPrevCommand, actRunList, actRun, actRunCancel)
 	runKind.Bind(actRunNextField, "tab", "next field", "tab", "down")
 	runKind.Bind(actRunPrevField, "shift+tab", "previous field", "shift+tab", "up")
 	runKind.Bind(actRunNextCommand, "left/right", "command", "right")
 	runKind.Bind(actRunPrevCommand, "", "", "left")
+	runKind.Bind(actRunList, "enter/space", "list", "enter", "space")
 	runKind.Bind(actRun, "enter", "run", "enter")
 	runKind.BindQuiet(actWaitForRun, "enter")
 	runKind.Bind(actRunCancel, "esc", "cancel", "esc", "ctrl+c")
 	theRunForm = interact.List(runKind)
 
 	layoutKind = interact.NewKind(func(layoutSubject) string { return "Open layout" },
-		actLayoutNextField, actLayoutPrevField, actNextLayout, actPrevLayout, actOpenLayoutNow, actLayoutCancel)
+		actLayoutNextField, actLayoutPrevField, actNextLayout, actPrevLayout, actLayoutList, actOpenLayoutNow, actLayoutCancel)
 	layoutKind.Bind(actLayoutNextField, "tab", "next field", "tab", "down")
 	layoutKind.Bind(actLayoutPrevField, "shift+tab", "previous field", "shift+tab", "up")
 	layoutKind.Bind(actNextLayout, "left/right", "layout", "right")
 	layoutKind.Bind(actPrevLayout, "", "", "left")
+	layoutKind.Bind(actLayoutList, "enter/space", "list", "enter", "space")
 	layoutKind.Bind(actOpenLayoutNow, "enter", "open", "enter")
 	layoutKind.BindQuiet(actWaitForLayout, "enter")
 	layoutKind.Bind(actLayoutCancel, "esc", "cancel", "esc", "ctrl+c")
 	theLayoutForm = interact.List(layoutKind)
 
 	saveKind = interact.NewKind(func(saveSubject) string { return "Save layout" },
-		actSaveNextField, actSavePrevField, actSaveNextChoice, actSavePrevChoice, actSaveLayout, actSaveReplace, actSaveKeep, actSaveCancel)
+		actSaveNextField, actSavePrevField, actSaveNextChoice, actSavePrevChoice, actSaveList, actSaveLayout, actSaveReplace, actSaveKeep, actSaveCancel)
 	saveKind.Bind(actSaveNextField, "tab", "next field", "tab", "down")
 	saveKind.Bind(actSavePrevField, "shift+tab", "previous field", "shift+tab", "up")
 	saveKind.Bind(actSaveNextChoice, "left/right", "choose", "right")
 	saveKind.Bind(actSavePrevChoice, "", "", "left")
+	saveKind.Bind(actSaveList, "enter/space", "list", "enter", "space")
 	saveKind.Bind(actSaveLayout, "enter", "save", "enter")
 	saveKind.Bind(actSaveReplace, "y", "replace", "y")
 	saveKind.Bind(actSaveKeep, "n/esc", "keep it", "n", "esc")
@@ -813,6 +877,18 @@ func init() {
 	sortKind = interact.NewKind(func(sortSubject) string { return "Sort" },
 		sortActions[spaces.SortManual], sortActions[spaces.SortActivity], sortActions[spaces.SortStatus])
 	theSort = interact.List(sortKind)
+
+	listKind = interact.NewKind(func(listSubject) string { return "Choices" },
+		actListDown, actListUp, actListPick, actListErase, actListClose, actListQuit)
+	listKind.Bind(actListDown, "up/down", "move", "down", "ctrl+n", "ctrl+j")
+	listKind.Bind(actListUp, "", "", "up", "ctrl+p", "ctrl+k")
+	listKind.BindQuiet(actListJ, "j")
+	listKind.BindQuiet(actListK, "k")
+	listKind.Bind(actListPick, "enter", "choose", "enter")
+	listKind.Bind(actListErase, "backspace", "erase", "backspace")
+	listKind.Bind(actListClose, "esc", "close", "esc")
+	listKind.Bind(actListQuit, "ctrl+c", "quit", "ctrl+c")
+	theChoiceList = interact.List(listKind)
 }
 
 // Targets: the subjects on screen, each in its place.

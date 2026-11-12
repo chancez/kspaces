@@ -164,7 +164,12 @@ run = ["gr"]
 			}
 			lines = append(lines, s)
 		}
-		return append(lines, "", "   Create enter    Cancel esc   tab next field"+hint, "")
+		// On a choice enter opens its list rather than creating.
+		keys := "   Create enter    Cancel esc   tab next field"
+		if hint != "" {
+			keys = "   Create    Cancel esc   tab next field" + hint
+		}
+		return append(lines, "", keys, "")
 	}
 	typeInto(f, "fix")
 	if got, want := formScreen(f), screen([]string{"  command    < none >"}, ""); !reflect.DeepEqual(got, want) {
@@ -174,31 +179,32 @@ run = ["gr"]
 	f.Update(keyMsg("tab"))
 	f.Update(keyMsg("tab"))
 	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	want := screen([]string{"  command    < claude >", "  Prompt     required"}, "  left/right command", "Runs claude in the first tab")
+	hint := "  left/right command  enter/space list"
+	want := screen([]string{"  command    < claude >  left/right change  enter list", "  Prompt     required"}, hint, "Runs claude in the first tab")
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("claude chosen:\n%q\nwant\n%q", got, want)
 	}
-	// Round through gr and none, by key and by click, back to claude.
+	// Round through gr and none, by key and from the list, back to claude.
 	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	if got, want := formScreen(f), screen([]string{"  command    < gr >"}, "  left/right command", "Runs gr in the first tab"); !reflect.DeepEqual(got, want) {
+	if got, want := formScreen(f), screen([]string{"  command    < gr >  left/right change  enter list"}, hint, "Runs gr in the first tab"); !reflect.DeepEqual(got, want) {
 		t.Errorf("gr chosen:\n%q\nwant\n%q", got, want)
 	}
 	clickOn(t, f, "< gr >")
-	f.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
-	f.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
+	clickOn(t, f, "none")
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	if c, _ := f.cmds.chosen(); c.Name != "claude" {
 		t.Fatalf("chose %q, want claude", c.Name)
 	}
 
+	f.Update(keyMsg("tab"))
 	if _, cmd := f.Update(keyMsg("enter")); cmd != nil || f.busy {
 		t.Fatal("created with the prompt empty")
 	}
-	want = screen([]string{"  command    < claude >", "  Prompt     required"}, "  left/right command", "Runs claude in the first tab", "", "claude needs Prompt")
+	want = screen([]string{"  command    < claude >", "  Prompt     required"}, "", "Runs claude in the first tab", "", "claude needs Prompt")
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("prompt missing:\n%q\nwant\n%q", got, want)
 	}
 
-	f.Update(keyMsg("tab"))
 	typeInto(f, `fix "it" in $HOME`)
 	_, cmd := f.Update(keyMsg("enter"))
 	if cmd == nil {

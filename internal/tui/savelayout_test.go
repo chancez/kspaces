@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -109,7 +110,8 @@ func right(f tea.Model) { f.Update(tea.KeyPressMsg{Code: tea.KeyRight}) }
 
 // The form has the name, then whether to save this tab or every tab, then what each pane runs, chosen as
 // a command is: a configured command when what runs there is its program, the command line as run, its
-// braces doubled, else the shell. Left and right change the choice that has focus, as a click does.
+// braces doubled, else the shell. Left and right change the choice that has focus, and a click opens its
+// list.
 func TestSaveLayoutFormChoices(t *testing.T) {
 	f, _ := saveEnv(t, "", false)
 	keys := "   Save enter    Cancel esc   tab next field"
@@ -138,12 +140,12 @@ func TestSaveLayoutFormChoices(t *testing.T) {
 	thisTab := []string{
 		"", "  Save gr@fix as a layout", "",
 		"  name       required",
-		"  save       < this tab >",
+		"  save       < this tab >  left/right change  enter list",
 		"  tab 1, pane 1: make watch {x}",
 		"  runs       < run >",
 		"  run        make watch {{x}}",
 		"", "  Adds 1 tab to the config's layouts", "",
-		keys + "  left/right choose", "",
+		"   Save    Cancel esc   tab next field  left/right choose  enter/space list", "",
 	}
 	if got := formScreen(f); !reflect.DeepEqual(got, thisTab) {
 		t.Errorf("this tab:\n%q\nwant\n%q", got, thisTab)
@@ -151,20 +153,35 @@ func TestSaveLayoutFormChoices(t *testing.T) {
 	// Its pane to the shell, past every choice: run, shell, then the commands.
 	f.Update(keyMsg("tab"))
 	right(f)
-	if got := formScreen(f)[6]; got != "  runs       < shell >" {
+	if got := formScreen(f)[6]; got != "  runs       < shell >  left/right change  enter list" {
 		t.Errorf("after run: %q", got)
 	}
 	right(f)
 	right(f)
-	if got := formScreen(f)[6:8]; !reflect.DeepEqual(got, []string{"  runs       < review >", ""}) {
+	if got := formScreen(f)[6:8]; !reflect.DeepEqual(got, []string{"  runs       < review >  left/right change  enter list", ""}) {
 		t.Errorf("round to the commands: %q", got)
 	}
-	// A click cycles a choice too.
+	// A click opens the list, with no more than the names, and typing finds one.
 	f.View()
 	x, y := f.zones["pane:1:0"][0].X, f.zones["pane:1:0"][0].Y
 	f.Update(tea.MouseClickMsg{Button: tea.MouseLeft, X: x, Y: y})
-	if got := formScreen(f)[6:8]; !reflect.DeepEqual(got, []string{"  runs       < run >", "  run        make watch {{x}}"}) {
-		t.Errorf("after a click: %q", got)
+	rule := "             " + strings.Repeat("\u2500", 55)
+	want = []string{
+		"", "  Save gr@fix as a layout", "",
+		"  name       required",
+		"  save       < this tab >",
+		"  tab 1, pane 1: make watch {x}",
+		"  runs       < review >  left/right change  enter list",
+		rule, "               claude", "             \uf00c review", "               run", "               shell", rule,
+		"  up/down move  type filter  enter choose  esc close", "",
+	}
+	if got := formScreen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("the list:\n%q\nwant\n%q", got, want)
+	}
+	typeInto(f, "ru")
+	f.Update(keyMsg("enter"))
+	if got := formScreen(f)[6:8]; !reflect.DeepEqual(got, []string{"  runs       < run >  left/right change  enter list", "  run        make watch {{x}}"}) {
+		t.Errorf("after the list: %q", got)
 	}
 	// Prefilled from the command line, this tab first.
 	g, _ := saveEnv(t, "watch", true)

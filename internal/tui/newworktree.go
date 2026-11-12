@@ -45,6 +45,7 @@ type newWorktreeForm struct {
 	busy    bool
 	err     error
 	width   int
+	height  int
 	// zones and buttons are where the last frame drew its buttons, and what each runs, for a click.
 	zones   map[string][]look.Zone
 	buttons controls[*newWorktreeForm]
@@ -236,10 +237,36 @@ func (f *newWorktreeForm) cycleChoice(delta int) tea.Cmd {
 	return f.cycleCommand(delta)
 }
 
+// openList opens the list of the choice that has focus.
+func (f *newWorktreeForm) openList() {
+	if f.onLayout() {
+		f.layouts.openList()
+	} else {
+		f.cmds.openList()
+	}
+}
+
 func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// While a list is open, keys and the mouse are its.
+	if isInput(msg) {
+		switch {
+		case f.layouts.listOpen():
+			cmd, picked := f.layouts.updateList(msg, f.zones)
+			if picked {
+				return f, tea.Batch(cmd, f.cycleLayout(0))
+			}
+			return f, cmd
+		case f.cmds.listOpen():
+			cmd, picked := f.cmds.updateList(msg, f.zones)
+			if picked {
+				return f, tea.Batch(cmd, f.cycleCommand(0))
+			}
+			return f, cmd
+		}
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		f.width = msg.Width
+		f.width, f.height = msg.Width, msg.Height
 		// bubbles v2 draws only the first character of a placeholder without a width. The fields start
 		// after the padding and their labels, and the cursor takes a cell past the text.
 		f.branch.SetWidth(max(f.width-4-labelWidth-1, 1))
@@ -280,10 +307,12 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return f, cmd
 		}
 		if clickedChoice(f.zones, layoutZone, msg) {
-			return f, f.cycleLayout(1)
+			f.layouts.openList()
+			return f, f.cycleLayout(0)
 		}
 		if clickedChoice(f.zones, commandZone, msg) {
-			return f, f.cycleCommand(1)
+			f.cmds.openList()
+			return f, f.cycleCommand(0)
 		}
 	}
 	// Everything else is typing in the field that has focus.
@@ -344,8 +373,10 @@ func (f *newWorktreeForm) render() string {
 		th.Draw(look.Plain, labelWidth, look.Label("branch")) + f.branch.View(),
 		th.Draw(look.Plain, labelWidth, look.Label("directory")) + f.dir.View(),
 	}
-	lines = append(lines, f.layouts.lines(f.onLayout())...)
-	lines = append(append(lines, f.cmds.lines(f.onCommand())...), "")
+	layoutAt := len(lines)
+	lines = append(lines, f.layouts.lines(f.onLayout(), width)...)
+	commandAt := len(lines)
+	lines = append(append(lines, f.cmds.lines(f.onCommand(), width)...), "")
 	failed := f.err
 	if l, ok := f.lookup(); ok {
 		pr := fmt.Sprintf("PR #%d", f.pr.Number)
@@ -394,15 +425,20 @@ func (f *newWorktreeForm) render() string {
 		lines = append(lines, "")
 	}
 	f.buttons = controls[*newWorktreeForm]{}
+	if f.layouts.listOpen() || f.cmds.listOpen() {
+		lines = f.layouts.drawList(lines, layoutAt, width, f.height)
+		lines = f.cmds.drawList(lines, commandAt, width, f.height)
+		return boxed(append(lines, line(listHints()...)))
+	}
 	buttons := f.buttons.draw(f, theForm.Target(formSubject{}),
 		control{action: actCreate, label: "Create"},
 		control{action: actCancel, label: "Cancel"})
 	hints := []look.Span{look.Text("  "), look.Key("tab"), look.KeyDesc(" next field")}
 	switch {
 	case f.onLayout():
-		hints = append(hints, look.Text("  "), look.Key("left/right"), look.KeyDesc(" layout"))
+		hints = append(hints, choiceHints("layout")...)
 	case f.onCommand():
-		hints = append(hints, look.Text("  "), look.Key("left/right"), look.KeyDesc(" command"))
+		hints = append(hints, choiceHints("command")...)
 	}
 	lines = append(lines, line(append(buttons, hints...)...))
 	return boxed(lines)

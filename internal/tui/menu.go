@@ -158,19 +158,12 @@ func (m *sidebar) drawMenu(lines []string) {
 	}
 }
 
-// menuRule is a rule width cells long with head, a section's name, muted on it after a dash. The name is
-// cut to fit, and left out with no room for a letter of it, so the rule always spans the menu.
+// menuRule is a rule width cells long with head, a section's name, muted on it, as ruleWith draws it.
 func (m *sidebar) menuRule(head string, width int) string {
-	th := m.th
-	// A dash and a space before the name, and a space and at least a dash after it.
-	room := width - 4
-	if head == "" || room < 1 {
-		return th.Render(look.Plain, look.Rule(width, true))
+	if head == "" {
+		return m.th.Render(look.Plain, ruleWith(m.th, width)...)
 	}
-	name := th.Cut(room, look.Muted(head))
-	spans := append([]look.Span{look.Border("\u2500 ", true)}, name...)
-	spans = append(spans, look.Border(" ", true), look.Rule(width-3-th.Width(name...), true))
-	return th.Render(look.Plain, spans...)
+	return m.th.Render(look.Plain, ruleWith(m.th, width, look.Muted(head))...)
 }
 
 // toggleFold hides or shows the linked worktrees of the space at root, in every sidebar.

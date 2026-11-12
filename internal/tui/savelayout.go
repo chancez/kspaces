@@ -38,6 +38,7 @@ type saveLayoutForm struct {
 	busy    bool
 	err     error
 	width   int
+	height  int
 	// zones and buttons are where the last frame drew its buttons, and what each runs, for a click.
 	zones   map[string][]look.Zone
 	buttons controls[*saveLayoutForm]
@@ -84,7 +85,7 @@ func newSaveLayoutForm(cfg config.Config, wt spaces.Worktree, tabs []spaces.Capt
 		scope = thisTab
 	}
 	f.scope = newChoiceFields(th, scopeZone, []string{thisTab, everyTab}, func(s string) string { return s },
-		func(string) []config.Input { return nil }, false, scope, nil)
+		func(string) []config.Input { return nil }, nil, false, scope, nil)
 	choices := make([]paneChoice, 0, len(cfg.Commands)+2)
 	for _, c := range cfg.Commands {
 		choices = append(choices, paneChoice{command: c.Name})
@@ -99,7 +100,7 @@ func newSaveLayoutForm(cfg config.Config, wt spaces.Worktree, tabs []spaces.Capt
 					return runInput
 				}
 				return nil
-			}, false, prefill(cfg, prog), nil)
+			}, nil, false, prefill(cfg, prog), nil)
 			c.zone = fmt.Sprintf("pane:%d:%d", t, p)
 			// The run box has the command line whatever is chosen, for switching to it.
 			box := &c.inputs[len(choices)-2][0]
@@ -150,6 +151,9 @@ type saveField struct {
 	choice interface {
 		cycle(int)
 		zoneName() string
+		openList()
+		listOpen() bool
+		updateList(tea.Msg, map[string][]look.Zone) (tea.Cmd, bool)
 	}
 }
 
@@ -245,9 +249,17 @@ func (f *saveLayoutForm) save(replace bool) tea.Cmd {
 }
 
 func (f *saveLayoutForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// While a list is open, keys and the mouse are its. Only the focused choice opens one.
+	if on := f.focused().choice; on != nil && on.listOpen() && isInput(msg) {
+		cmd, picked := on.updateList(msg, f.zones)
+		if picked {
+			return f, tea.Batch(cmd, f.cycleChoice(0))
+		}
+		return f, cmd
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		f.width = msg.Width
+		f.width, f.height = msg.Width, msg.Height
 		w := max(f.width-4-labelWidth-1, 1)
 		f.name.SetWidth(w)
 		for t := range f.panes {
@@ -274,7 +286,8 @@ func (f *saveLayoutForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		for i, fl := range f.fields() {
 			if fl.choice != nil && clickedChoice(f.zones, fl.choice.zoneName(), msg) {
 				f.focus = i
-				return f, f.cycleChoice(1)
+				fl.choice.openList()
+				return f, f.cycleChoice(0)
 			}
 		}
 	}
@@ -305,7 +318,13 @@ func (f *saveLayoutForm) render() string {
 		line(look.Heading("Save " + f.wt.Session + " as a layout")), "",
 		th.Draw(look.Plain, labelWidth, look.Label("name")) + f.name.View(),
 	}
-	lines = append(lines, f.scope.lines(on == &f.scope)...)
+	// list draws the open list, if any, over the lines once they are all there.
+	list := func(lines []string) []string { return lines }
+	if f.scope.listOpen() {
+		at := len(lines)
+		list = func(lines []string) []string { return f.scope.drawList(lines, at, width, f.height) }
+	}
+	lines = append(lines, f.scope.lines(on == &f.scope, width)...)
 	saved := f.saved()
 	for n, t := range saved {
 		for p, prog := range f.tabs[t].Programs {
@@ -314,7 +333,11 @@ func (f *saveLayoutForm) render() string {
 			}
 			c := &f.panes[t][p]
 			lines = append(lines, line(th.Cut(width, look.Text(fmt.Sprintf("tab %d, pane %d: %s", n+1, p+1, prog)))...))
-			lines = append(lines, c.lines(on == c)...)
+			if c.listOpen() {
+				at := len(lines)
+				list = func(lines []string) []string { return c.drawList(lines, at, width, f.height) }
+			}
+			lines = append(lines, c.lines(on == c, width)...)
 		}
 	}
 	lines = append(lines, "", muted(fmt.Sprintf("Adds %s to the config's layouts", plural(len(saved), "tab"))), "")
@@ -328,6 +351,9 @@ func (f *saveLayoutForm) render() string {
 		lines = append(lines, "")
 	}
 	f.buttons = controls[*saveLayoutForm]{}
+	if on != nil && on.listOpen() {
+		return boxed(append(list(lines), line(listHints()...)))
+	}
 	t := theSaveForm.Target(saveSubject{})
 	if f.confirm {
 		lines = append(lines, line(th.Cut(width, look.Text("A layout called "+strings.TrimSpace(f.name.Value())+" exists. Replace it?"))...), "")
@@ -340,7 +366,7 @@ func (f *saveLayoutForm) render() string {
 		control{action: actSaveCancel, label: "Cancel"})
 	spans = append(spans, look.Text("  "), look.Key("tab"), look.KeyDesc(" next field"))
 	if on != nil {
-		spans = append(spans, look.Text("  "), look.Key("left/right"), look.KeyDesc(" choose"))
+		spans = append(spans, choiceHints("choose")...)
 	}
 	return boxed(append(lines, line(spans...)))
 }
