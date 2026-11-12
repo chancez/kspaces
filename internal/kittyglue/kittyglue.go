@@ -87,6 +87,11 @@ func conf(cfg config.Config, dir string) string {
 		fmt.Fprintf(&b, "# Save each session to its own file, at quit and as its windows change, and restore them at startup.\nwatcher %s\n", path(sessionsScript))
 		fmt.Fprintf(&b, "action_alias kspaces_save_sessions kitten %s\n\n", path(sessionsScript))
 	}
+	// A panel is opened by kspaces, told the window it is for, which only kspaces can fall back from.
+	pick := "launch --type=overlay --var=kspaces_picker=1 kspaces pick"
+	if cfg.Sidebar.Popup == config.PopupPanel {
+		pick = "launch --type=background --allow-remote-control kspaces pick --from @active-kitty-window-id"
+	}
 	fmt.Fprintf(&b, `# Dock a sidebar in every tab that belongs to a session.
 watcher %s
 
@@ -95,7 +100,7 @@ action_alias kspaces_toggle kitten %s
 action_alias kspaces_focus kitten %s
 
 # The picker, and the next and previous session with windows open.
-action_alias kspaces_pick launch --type=overlay --var=kspaces_picker=1 kspaces pick
+action_alias kspaces_pick %s
 action_alias kspaces_next launch --type=background --allow-remote-control kspaces next
 action_alias kspaces_prev launch --type=background --allow-remote-control kspaces prev
 
@@ -105,7 +110,7 @@ action_alias kspaces_attention_prev launch --type=background --allow-remote-cont
 
 # Send a key to this tab's sidebar without focusing it, as in: map --mode spaces j kspaces_key j
 action_alias kspaces_key remote_control send-key --match "var:^kspaces$ and state:parent_focused"
-`, path("kspaces_watcher.py"), path("kspaces_toggle.py"), path("kspaces_focus.py"))
+`, path("kspaces_watcher.py"), path("kspaces_toggle.py"), path("kspaces_focus.py"), pick)
 	return b.String()
 }
 
