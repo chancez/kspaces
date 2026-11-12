@@ -366,6 +366,11 @@ var (
 		Applies: func(f *removeWorktreeForm, _ removeSubject) bool { return !f.busy },
 		Run:     func(*removeWorktreeForm, removeSubject) tea.Cmd { return tea.Quit },
 	}
+	actRemoveDeleteBranch = &interact.Action[*removeWorktreeForm, removeSubject]{
+		Title:   "delete branch",
+		Applies: func(f *removeWorktreeForm, _ removeSubject) bool { return !f.busy && f.branch.Offered() },
+		Run:     do[*removeWorktreeForm, removeSubject](func(f *removeWorktreeForm) { f.deleteBranch = !f.deleteBranch }),
+	}
 	actRemoveQuit = quit[*removeWorktreeForm, removeSubject]()
 )
 
@@ -572,9 +577,11 @@ func init() {
 	formKind.Bind(actCancel, "esc", "cancel", "esc", "ctrl+c")
 	theForm = interact.List(formKind)
 
-	removeKind = interact.NewKind(func(removeSubject) string { return "Remove worktree" }, actRemove, actRemoveCancel, actRemoveQuit)
+	removeKind = interact.NewKind(func(removeSubject) string { return "Remove worktree" },
+		actRemove, actRemoveCancel, actRemoveDeleteBranch, actRemoveQuit)
 	removeKind.Bind(actRemove, "y", "remove", "y")
 	removeKind.Bind(actRemoveCancel, "n/esc", "cancel", "n", "esc")
+	removeKind.Bind(actRemoveDeleteBranch, "d", "delete branch", "d")
 	removeKind.Bind(actRemoveQuit, "ctrl+c", "quit", "ctrl+c")
 	theRemoveForm = interact.List(removeKind)
 

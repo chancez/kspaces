@@ -103,8 +103,17 @@ window closes still runs.
 
 **Remove worktree** shows the directory, the session's windows and the files that are not committed, which
 are lost. It closes the session, waits for its windows to go, deletes the session's saved file and runs
-`git worktree remove`. The branch is kept. What git would refuse, such as a locked worktree, is said before
-you confirm. The removal runs as a kitty background process, so an error after that is shown by kitty.
+`git worktree remove`. What git would refuse, such as a locked worktree, is said before you confirm. The
+removal runs as a kitty background process, so an error after that is shown by kitty.
+
+The branch is kept unless you tick **Delete branch**, off at first, with `d` or a click. The box is not
+there for a detached HEAD, the default branch, or a branch another worktree has checked out. It says what
+deleting loses: nothing when the default branch or the branch's upstream has all its commits, or when the
+branch's PR, as the sidebar last saw it, is merged though its commits are not, as after a squash;
+otherwise how many commits only the branch has, which are lost. The branch goes after the worktree, with
+`git branch -d`, or `-D` only when the form said commits are lost or the PR is merged. A remote branch is
+never deleted. If git refuses after the worktree is gone, as `-d` does a branch its upstream lacks, kitty
+shows why and the worktree stays removed.
 
 **Clean up worktrees** lists the space's linked worktrees whose branch's PR is merged, whose upstream is
 gone, or whose branch is merged into the main worktree's, each with why and the files it has not

@@ -148,6 +148,7 @@ kspaces run NAME [PATH]  run a configured command in the worktree at PATH or the
 kspaces close [SESSION]  close every window of a session, after confirming
 kspaces forget SESSION   delete the saved file of a session with no windows, after confirming
 kspaces remove PATH      close a linked worktree's session and remove the worktree, after confirming
+  --delete-branch        and then its branch, if merged; --force-branch even if not, losing its commits
 kspaces cleanup SPACE    remove the worktrees whose PR is merged, upstream gone or branch merged, in a form
 kspaces add [PATH]       add the repository at PATH to the spaces, in a form; --yes without asking
 kspaces kitty install    install the files kitty needs; kspaces kitty check says if they are current

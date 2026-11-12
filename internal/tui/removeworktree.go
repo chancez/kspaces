@@ -11,8 +11,10 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/git"
+	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/tui/interact"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
@@ -27,7 +29,10 @@ type removeWorktreeForm struct {
 	changes int
 	// windows is how many windows the worktree's session has open, which removing it closes.
 	windows int
-	busy    bool
+	// branch is the worktree's branch as deleting it would find it, which deleteBranch does after removing.
+	branch       spaces.Branch
+	deleteBranch bool
+	busy         bool
 	// err is why starting the removal failed.
 	err   error
 	width int
@@ -36,16 +41,21 @@ type removeWorktreeForm struct {
 	buttons controls[*removeWorktreeForm]
 }
 
+// removeBranchZone is the delete branch box.
+const removeBranchZone = "remove:branch"
+
 type removedMsg struct{ err error }
 
 func (f *removeWorktreeForm) Init() tea.Cmd { return nil }
 
 // remove hands the removal to a background process and leaves: removing closes the worktree's windows
 // first, and this form may be over one of them. git is forced when the worktree has changes, as the form
-// has said they are lost; the background process shows anything else that goes wrong in kitty.
+// has said they are lost, and for the branch when it has commits not merged, which the form said too;
+// the background process shows anything else that goes wrong in kitty.
 func (f *removeWorktreeForm) remove() tea.Cmd {
 	f.busy, f.err = true, nil
-	path, opts := f.wt.Path, spaces.RemoveOptions{Force: f.changes > 0}
+	path := f.wt.Path
+	opts := spaces.RemoveOptions{Force: f.changes > 0, DeleteBranch: f.deleteBranch, ForceBranch: f.deleteBranch && f.branch.Unmerged > 0}
 	return func() tea.Msg { return removedMsg{spaces.RemoveInBackground(path, opts)} }
 }
 
@@ -65,6 +75,11 @@ func (f *removeWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseClickMsg:
 		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
 			return f, cmd
+		}
+		for _, z := range f.zones[removeBranchZone] {
+			if msg.Button == tea.MouseLeft && z.Contains(msg.X, msg.Y) && actRemoveDeleteBranch.Applies(f, removeSubject{}) {
+				f.deleteBranch = !f.deleteBranch
+			}
 		}
 	}
 	return f, nil
@@ -105,13 +120,26 @@ func (f *removeWorktreeForm) render() string {
 	if f.changes > 0 {
 		changes = look.Error(fmt.Sprintf("%s not committed, lost", plural(f.changes, "file")))
 	}
+	fate := look.Muted(" kept")
+	if f.deleteBranch {
+		fate = look.Muted(" deleted")
+	}
+	target := theRemoveForm.Target(removeSubject{})
 	lines := []string{
 		line(look.Heading(fmt.Sprintf("Remove worktree %s from %s", filepath.Base(f.wt.Path), f.space.Name))), "",
 		field("directory", look.Text(dir)),
-		field("branch", look.Text(branch), look.Muted(" kept")),
+		field("branch", look.Text(branch), fate),
 		field("session", windows),
 		field("changes", changes),
 		"",
+	}
+	if f.branch.Offered() {
+		spans := []look.Span{look.Checkbox(f.deleteBranch, f.busy), look.Text(" Delete branch " + f.branch.Name)}
+		if _, key, ok := offered(f, target, interact.Keys(f, target), actRemoveDeleteBranch); ok && key != "" {
+			spans = append(spans, look.Default(" "), look.Muted(key))
+		}
+		spans = append(spans, look.Default("  "), branchFate(f.branch, true))
+		lines = append(lines, th.DrawZone(removeBranchZone, look.Plain, width, th.Cut(width, spans...)...), "")
 	}
 	// What git would refuse is said before y, as the background process that removes has no screen.
 	refused := spaces.CanRemove(f.space, f.wt)
@@ -129,10 +157,24 @@ func (f *removeWorktreeForm) render() string {
 		lines = append(lines, "")
 	}
 	f.buttons = controls[*removeWorktreeForm]{}
-	lines = append(lines, line(f.buttons.draw(f, theRemoveForm.Target(removeSubject{}),
+	lines = append(lines, line(f.buttons.draw(f, target,
 		control{action: actRemove, label: "Remove", danger: true, off: !f.busy && refused != nil},
 		control{action: actRemoveCancel, label: "Cancel"})...))
 	return boxed(lines)
+}
+
+// branchFate is what deleting b loses, for the forms that offer it: nothing when it is merged or its PR is,
+// else its commits not merged, said to be lost if lost.
+func branchFate(b spaces.Branch, lost bool) look.Span {
+	switch {
+	case b.Unmerged == 0:
+		return look.Muted("merged into " + b.Into + ", nothing lost")
+	case b.PR > 0:
+		return look.Muted(fmt.Sprintf("merged by PR #%d, nothing lost", b.PR))
+	case lost:
+		return look.Error(plural(b.Unmerged, "commit") + " not merged, lost")
+	}
+	return look.Text(plural(b.Unmerged, "commit") + " not merged")
 }
 
 func plural(n int, what string) string {
@@ -142,18 +184,22 @@ func plural(n int, what string) string {
 	return fmt.Sprintf("%d %ss", n, what)
 }
 
-// newRemoveForm is the form for removing wt from space, with what kitty and git say about it now.
-func newRemoveForm(cfg config.Config, space spaces.Space, wt spaces.Worktree, st kitty.State) (*removeWorktreeForm, error) {
+// newRemoveForm is the form for removing wt from space, with what kitty and git say about it now. pr is
+// the branch's PR, nil for none or not known. deleteBranch ticks deleting the branch, if it is offered.
+func newRemoveForm(cfg config.Config, space spaces.Space, wt spaces.Worktree, st kitty.State, pr *gitstate.PR, deleteBranch bool) (*removeWorktreeForm, error) {
 	changes, err := git.Changes(wt.Path)
 	if err != nil {
 		return nil, fmt.Errorf("checking %s for changes: %w", wt.Path, err)
 	}
-	return &removeWorktreeForm{th: look.New(true), cfg: cfg, space: space, wt: wt, changes: changes, windows: st.Windows[wt.Session]}, nil
+	branch := spaces.BranchOf(space, git.DefaultBranch(space.Root), wt, pr)
+	return &removeWorktreeForm{th: look.New(true), cfg: cfg, space: space, wt: wt, changes: changes, windows: st.Windows[wt.Session],
+		branch: branch, deleteBranch: deleteBranch && branch.Offered()}, nil
 }
 
 // RunRemoveWorktree runs the remove worktree form for the worktree at path, meant for a kitty overlay,
-// until the worktree is removed or the form is left.
-func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string) error {
+// until the worktree is removed or the form is left. The branch's PR is what the sidebars' leader last saw;
+// deleteBranch ticks deleting the branch at first.
+func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string, deleteBranch bool) error {
 	space, wt, err := spaces.FindWorktree(cfg, path)
 	if err != nil {
 		return err
@@ -165,7 +211,11 @@ func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string) erro
 	if err != nil {
 		return err
 	}
-	f, err := newRemoveForm(cfg, space, wt, st)
+	var pr *gitstate.PR
+	if known, ok := spaces.NewPoller().Git()[wt.Path]; ok && known.PRBranch == wt.Branch && !known.PRAt.IsZero() {
+		pr = known.PR
+	}
+	f, err := newRemoveForm(cfg, space, wt, st, pr, deleteBranch)
 	if err != nil {
 		return err
 	}
