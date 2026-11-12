@@ -89,7 +89,7 @@ session saver.
 Then list your spaces in `~/.config/kspaces/config.toml`:
 
 ```toml
-# Repositories, in display order. ~/ is expanded.
+# Repositories, in the sidebar's manual order, which moving a space there rewrites. ~/ is expanded.
 spaces = ["~/projects/gr", "~/projects/kitty"]
 
 # Where kitty session files are kept, as SESSION.kitty-session, to reopen a worktree's session from.
@@ -132,8 +132,8 @@ Every key is optional. An unknown key is an error.
 
 ## Usage
 
-[docs/sidebar.md](docs/sidebar.md) covers the sidebar: its rows, the menu and its forms, the status list
-and the keys.
+[docs/sidebar.md](docs/sidebar.md) covers the sidebar: its rows and their order, the menu and its forms,
+the status list and the keys.
 
 ```
 kspaces [sidebar]        the sidebar, run in a kitty dock

@@ -46,6 +46,41 @@ cursor stays on its row while it shows, and goes to the first row shown when the
 puts it back on its row, or on the folded space that holds it. The filter also goes when navigating ends:
 when the sidebar loses focus, or keys sent without focus stop.
 
+## Order
+
+The button left of the plus on the SPACES title shows how the list is sorted, and a click on it goes on
+to the next way, as `s` does; a right click opens a menu of the three, the one in use ticked.
+
+| Mode | Icon | Order |
+|---|---|---|
+| Manual | bars; a triple bar in Unicode, `=` in ASCII | the spaces as config.toml lists them, and each space's linked worktrees as they were moved, any not moved yet after them in git's order |
+| Activity | a clock; a clock face in Unicode, `@` in ASCII | the session focused most recently first, a space by its most recent session; sessions with no windows last, in manual order |
+| Status | a warning sign; `!` in Unicode and ASCII | the most urgent status first, as the status list ranks them, blocked, failed, done, working, idle, then none; a space by its most urgent session, ties by activity |
+
+In every mode a space's main worktree stays its own row, first, and its missing worktrees last; only its
+linked worktrees move within it. The sessions in no space stay above the spaces, ordered the same way, by
+name when manual. Activity is when one of a session's windows, docks left out, was last focused, as
+kitty's `ls` reports it. The mode is kept in `$XDG_STATE_HOME/kspaces/sort`, manual until one is chosen,
+so every tab's sidebar sorts the same way.
+
+The automatic modes sort again at each refresh, and the cursor stays on its row wherever that goes. While
+the mouse is pressed on a row or a menu is open the rows stay where they are, so what is under the mouse
+does not move from under it.
+
+Dragging a space's row moves the space, and dragging a linked worktree's row moves it among its space's.
+The rows show where it goes as the mouse moves, the dragged row lit, and letting go keeps it there; `esc`
+or a right click while dragging puts it back. A press let go of on the row it was on is a click, which is
+why a row opens when the mouse is let go rather than pressed. `K` and `J` move the cursor's row up and
+down the same way. A session in no space and a missing worktree do not move, and neither does anything
+while filtering. Moving a space rewrites the order of `spaces` in config.toml, as text, each entry with
+the comments on the lines right above it and after it on its line, through a symlinked config to its
+target. Moving a worktree keeps its space's order, by the worktrees' directories, in
+`$XDG_STATE_HOME/kspaces/order`. Either moves the order of every sidebar.
+
+Moving in activity or status switches to manual, starting from the order shown: the spaces are written to
+config.toml as they were shown and every space's worktrees saved as they were shown, then the move is
+made.
+
 ## The menu
 
 Right-click a row, or press `m` on it. The menu lists what applies to the row, in sections, each named on
@@ -180,6 +215,8 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `a` | add a space, wherever the cursor is |
 | `!` | focus the window that needs you most, wherever the cursor is |
 | `/` | filter the spaces list; see [Spaces](#spaces) |
+| `s` | sort the list the next way; see [Order](#order) |
+| `K` / `J` | move the cursor's space, or linked worktree within its space, up / down |
 | `r` | refresh, which also happens every two seconds |
 | `esc` / `q` | give focus back to the window it came from |
 
@@ -189,9 +226,9 @@ clicking that row scrolls a page.
 ## The picker
 
 `kspaces pick`, which kitty.conf's `kspaces_pick` runs in an overlay, lists the status entries and then
-every session and worktree, narrowed by a fuzzy query. `enter` switches to the entry under the cursor. A
-missing worktree has the sidebar's icon for it and `gone` for its branch, and is not switched to without
-windows open.
+every session and worktree in the sidebar's order, narrowed by a fuzzy query. `enter` switches to the
+entry under the cursor. A missing worktree has the sidebar's icon for it and `gone` for its branch, and is
+not switched to without windows open.
 
 Beside the list in an overlay 90 columns or wider, and below it in a narrower one, a preview shows the
 entry under the cursor: a status entry in full, as the sidebar's opened entry; a worktree's space, path,
