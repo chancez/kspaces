@@ -27,9 +27,11 @@ above the spaces.
 
 A session named `SPACE@DIR` after a space that matches none of its worktrees, open or saved, is a missing
 worktree of that space: its directory is gone, as when `git worktree remove` runs while its session still
-has windows. It is listed under the space after its linked worktrees, faint whether open or not, with a
-broken link (a cross in Unicode and ASCII) for its icon and `gone` where the branch goes, and folds with
-the linked worktrees. git is not asked about it. A missing worktree with windows open can be opened and
+has windows. It is listed under the space after its linked worktrees, with a broken link (a cross in
+Unicode and ASCII) for its icon and `gone` where the branch goes, and folds with the linked worktrees.
+While its session has windows it is drawn as an open session is, but with its icon in yellow, or its
+status's icon when it reports one; with only a saved file it is faint.
+git is not asked about it. A missing worktree with windows open can be opened and
 closed as any session; one with only a saved file cannot be opened, as that would make it afresh in a
 directory that is gone, and Forget deletes the file. A space whose worktrees could not be listed has no
 missing worktrees: its sessions are listed above the spaces as before.

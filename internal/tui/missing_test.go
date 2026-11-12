@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/tui/cells"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
@@ -58,9 +60,9 @@ func newMissingEnv(t *testing.T, sessionsDir string) *sidebarEnv {
 	return e
 }
 
-// A space's missing worktrees are under it after its linked ones, faint with the gone marker and `gone`
-// for a branch, open or not; a session of a space that is not configured stays with default. Folding the
-// space hides them with its linked worktrees.
+// A space's missing worktrees are under it after its linked ones, with the gone marker and `gone` for a
+// branch, faint once their session has no windows; a session of a space that is not configured stays with
+// default. Folding the space hides them with its linked worktrees.
 func TestMissingWorktreesOnScreen(t *testing.T) {
 	e := newMissingEnv(t, "")
 	want := []string{
@@ -84,11 +86,23 @@ func TestMissingWorktreesOnScreen(t *testing.T) {
 	if got := e.screen(); !reflect.DeepEqual(got, want) {
 		t.Errorf("screen:\n%q\nwant\n%q", got, want)
 	}
-	// Faint even with windows open, where an open worktree is not.
-	line := strings.Split(e.m.render(), "\n")[7]
-	faint := e.m.th.Render(look.Plain, look.DimIf(true, look.MissingWorktree(e.m.rows[e.row("gr@open")]))...)
-	if !strings.Contains(line, faint) {
-		t.Errorf("gr@open is not faint: %q", line)
+	// One with windows open is drawn as open, its marker yellow, so it does not read as finished; one with
+	// only a saved file is faint.
+	lines := strings.Split(e.m.render(), "\n")
+	row := func(session string, open bool) string {
+		r := e.m.rows[e.row(session)]
+		spans := slices.Concat([]look.Span{look.NoCaret()}, look.DimIf(!open, look.GoneMarker(open)...),
+			look.DimIf(!open, look.MissingWorktree(r)), []look.Span{look.Muted(" ")}, look.DimIf(!open, look.Gone()))
+		return e.m.th.Draw(look.Plain, e.m.contentWidth(), spans...)
+	}
+	for i, c := range []struct {
+		session string
+		open    bool
+	}{{"gr@open", true}, {"gr@saved", false}} {
+		line := ansi.Truncate(lines[7+i], e.m.contentWidth(), "")
+		if got, want := cells.Parse(line), cells.Parse(row(c.session, c.open)); !reflect.DeepEqual(got, want) {
+			t.Errorf("%s:\n%q\nwant\n%q", c.session, line, row(c.session, c.open))
+		}
 	}
 
 	e.click(fmt.Sprintf(caretZone, e.row("gr")), tea.MouseLeft)

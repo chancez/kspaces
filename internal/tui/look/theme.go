@@ -67,6 +67,9 @@ const (
 	// elSession marks a session that is current or open.
 	elSession
 	elBroken
+	// elGone marks a missing worktree whose session still has windows: running, but in a directory that
+	// is gone.
+	elGone
 	elStateBlocked
 	elStateError
 	elStateDone
@@ -111,6 +114,7 @@ var elementNames = [numElements]string{
 	elCaret:        "caret",
 	elSession:      "session",
 	elBroken:       "broken",
+	elGone:         "gone",
 	elStateBlocked: "state.blocked",
 	elStateError:   "state.error",
 	elStateDone:    "state.done",
@@ -206,6 +210,7 @@ func New(isDark bool) *Theme {
 		elCaret:        fg(p.muted),
 		elSession:      fg(p.success),
 		elBroken:       fg(p.danger),
+		elGone:         fg(p.attention),
 		elStateBlocked: bold(p.attention),
 		elStateError:   fg(p.danger),
 		elStateDone:    fg(p.success),

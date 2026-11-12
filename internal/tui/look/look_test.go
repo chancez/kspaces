@@ -71,6 +71,25 @@ func TestThemeDraw(t *testing.T) {
 	}
 }
 
+// A missing worktree's marker is yellow while its session has windows, so it reads as running but not
+// right, and muted once it has none.
+func TestGoneMarker(t *testing.T) {
+	th := New(true)
+	th.SetGlyphs(GlyphsASCII)
+	p := th.roles
+	for _, c := range []struct {
+		open bool
+		want string
+	}{
+		{true, lipgloss.NewStyle().Foreground(p.attention).Render("x  ")},
+		{false, lipgloss.NewStyle().Foreground(p.muted).Render("x  ")},
+	} {
+		if got := th.Render(Plain, GoneMarker(c.open)...); !reflect.DeepEqual(cells.Parse(got), cells.Parse(c.want)) {
+			t.Errorf("open %v:\ngot  %q\nwant %q", c.open, got, c.want)
+		}
+	}
+}
+
 func TestCut(t *testing.T) {
 	th := New(true)
 	wt := spaces.Worktree{Path: "/src/gr/.worktrees/release", Branch: "main"}

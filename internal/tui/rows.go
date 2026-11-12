@@ -51,7 +51,7 @@ func rowHolds(r spaces.Row, session string) bool {
 // renderRow draws row i of the spaces list, marked as its entry: the fold caret, or as wide a blank, which
 // indents linked worktrees under their space, then the row's icon and its name. The icon says what the row
 // is, and is replaced by the most urgent status of its sessions' windows; see look.RowIcon. A missing
-// worktree is faint whatever its windows, with the gone marker and `gone` for its branch.
+// worktree has the gone marker and `gone` for its branch, faint only once its session has no windows.
 func (m *sidebar) renderRow(i int) string {
 	r, width, th := m.rows[i], m.contentWidth(), m.th
 	if r.Space == nil {
@@ -82,12 +82,12 @@ func (m *sidebar) renderRow(i int) string {
 	}
 	icon := look.RowIcon(kind, state, open, r.Worktree == nil)
 	switch {
-	case r.Missing:
-		icon = look.DimIf(true, look.GoneMarker()...)
+	case r.Missing && state == "":
+		icon = look.DimIf(!open, look.GoneMarker(open)...)
 	case state == "" && r.Worktree != nil:
 		icon = look.DimIf(!open, icon...)
 	}
-	faint := !open || r.Missing
+	faint := !open
 	head := append(caret, icon...)
 	spans := append(head, look.DimIf(faint, th.Cut(max(width-th.Width(head...), 0), label)...)...)
 	rest := width - th.Width(spans...)
@@ -105,7 +105,7 @@ func (m *sidebar) renderRow(i int) string {
 	}
 	switch {
 	case r.Missing && rest > 2:
-		spans = append(append(spans, look.Muted(" ")), look.DimIf(true, th.Cut(rest-1, look.Gone())...)...)
+		spans = append(append(spans, look.Muted(" ")), look.DimIf(faint, th.Cut(rest-1, look.Gone())...)...)
 	case r.Worktree != nil && r.Worktree.Branch != "" && rest > 2:
 		spans = append(append(spans, look.Muted(" ")), th.Cut(rest-1, look.Branch(*r.Worktree))...)
 	}

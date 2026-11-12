@@ -63,8 +63,10 @@ func pickItemsFrom(snap spaces.Snapshot) pickItems {
 		}
 		icon, detail := []look.Span{look.NoMarker()}, r.Worktree.Branch
 		switch state := status.OfSession(snap.Kitty.Statuses, r.Worktree.Session); {
+		case r.Missing && state == "":
+			icon, detail = look.GoneMarker(snap.Kitty.Sessions[r.Worktree.Session] != 0), "gone"
 		case r.Missing:
-			icon, detail = look.GoneMarker(), "gone"
+			icon, detail = look.StateMarker(state), "gone"
 		case state != "":
 			icon = look.StateMarker(state)
 		case r.Worktree.Session == snap.Kitty.Current:

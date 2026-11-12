@@ -53,8 +53,14 @@ func SessionMarker() []Span { return marker(elSession, GlyphSession) }
 // BrokenMarker marks a space whose worktrees could not be listed.
 func BrokenMarker() []Span { return marker(elBroken, GlyphBroken) }
 
-// GoneMarker marks a missing worktree, one whose directory is gone: muted, as the rest of its row.
-func GoneMarker() []Span { return marker(elMuted, GlyphGone) }
+// GoneMarker marks a missing worktree, one whose directory is gone: in the attention color while its
+// session still has windows, so it does not read as finished, else muted, as the rest of its row.
+func GoneMarker(open bool) []Span {
+	if open {
+		return marker(elGone, GlyphGone)
+	}
+	return marker(elMuted, GlyphGone)
+}
 
 // Caret heads a space with linked worktrees: pointing down while they are shown, right when folded.
 func Caret(folded bool) []Span {
