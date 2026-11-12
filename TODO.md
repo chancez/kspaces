@@ -61,8 +61,9 @@ tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/
    program of every new window, such as `launch_wrapper cm-attach {session_name}`, or that names a kitten
    to run in place of `launch`, would make kitty's defaults and every mapping go through it. Check how
    `shell`, `--hold` and `startup_session` interact first; a proposal, after the others.
-
-Dropped: resizable docks, which the maintainer turned down in #2391; `[sidebar] width` covers it.
+8. Resizing docks by dragging their inner border and with `resize_window`, or else not offering a drag
+   that does nothing: issue kovidgoyal/kitty#10857. #2391 had said docks need no resizing, before they
+   existed.
 
 When a kitty release has a fix, drop its workaround behind a check of kitty's version, as older kittys
 still need it. Going back to kitty's `save_as_session --match` for the saver: since c5e6bdf1f it fails
