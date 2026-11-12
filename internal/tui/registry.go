@@ -370,16 +370,16 @@ var (
 		Title: "previous field",
 		Run:   cmd[*newWorktreeForm, formSubject]((*newWorktreeForm).prevField),
 	}
-	// On the choice of command only, so left and right move the cursor in a text field.
-	actNextCommand = &interact.Action[*newWorktreeForm, formSubject]{
-		Title:   "next command",
-		Applies: func(f *newWorktreeForm, _ formSubject) bool { return f.onCommand() },
-		Run:     func(f *newWorktreeForm, _ formSubject) tea.Cmd { return f.cycleCommand(1) },
+	// On a choice, of layout or command, only, so left and right move the cursor in a text field.
+	actNextChoice = &interact.Action[*newWorktreeForm, formSubject]{
+		Title:   "next choice",
+		Applies: func(f *newWorktreeForm, _ formSubject) bool { return f.onLayout() || f.onCommand() },
+		Run:     func(f *newWorktreeForm, _ formSubject) tea.Cmd { return f.cycleChoice(1) },
 	}
-	actPrevCommand = &interact.Action[*newWorktreeForm, formSubject]{
-		Title:   "previous command",
-		Applies: func(f *newWorktreeForm, _ formSubject) bool { return f.onCommand() },
-		Run:     func(f *newWorktreeForm, _ formSubject) tea.Cmd { return f.cycleCommand(-1) },
+	actPrevChoice = &interact.Action[*newWorktreeForm, formSubject]{
+		Title:   "previous choice",
+		Applies: func(f *newWorktreeForm, _ formSubject) bool { return f.onLayout() || f.onCommand() },
+		Run:     func(f *newWorktreeForm, _ formSubject) tea.Cmd { return f.cycleChoice(-1) },
 	}
 	actCreate = &interact.Action[*newWorktreeForm, formSubject]{
 		Title:   "create",
@@ -656,11 +656,11 @@ func init() {
 	thePicker = interact.List(pickerKind)
 
 	formKind = interact.NewKind(func(formSubject) string { return "New worktree" },
-		actSwitchField, actPrevField, actNextCommand, actPrevCommand, actCreate, actCancel)
+		actSwitchField, actPrevField, actNextChoice, actPrevChoice, actCreate, actCancel)
 	formKind.Bind(actSwitchField, "tab", "next field", "tab", "down")
 	formKind.Bind(actPrevField, "shift+tab", "previous field", "shift+tab", "up")
-	formKind.Bind(actNextCommand, "left/right", "command", "right")
-	formKind.Bind(actPrevCommand, "", "", "left")
+	formKind.Bind(actNextChoice, "left/right", "choose", "right")
+	formKind.Bind(actPrevChoice, "", "", "left")
 	formKind.Bind(actCreate, "enter", "create", "enter")
 	formKind.BindQuiet(actWaitForCreate, "enter")
 	formKind.Bind(actCancel, "esc", "cancel", "esc", "ctrl+c")

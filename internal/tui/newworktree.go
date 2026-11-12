@@ -11,7 +11,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/config"
-	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
@@ -26,7 +25,11 @@ type newWorktreeForm struct {
 	branch textinput.Model
 	// Empty for the default, which spaces.WorktreeDir derives from the branch and the placeholder shows.
 	dir textinput.Model
-	// The command the first tab runs, none for a shell, and its inputs. Only with commands configured.
+	// The layout the session opens with, none for a shell tab, and its inputs. Only with layouts
+	// configured, the space's worktree layout chosen at first.
+	layouts choiceFields[config.Layout]
+	// The command to run, none for none, and its inputs: as the first tab without a layout, else after
+	// it, where the command opens. Only with commands configured.
 	cmds choiceFields[config.Command]
 	// focus is the index in fields of the field that has focus.
 	focus int
@@ -79,6 +82,7 @@ func newForm(cfg config.Config, space spaces.Space) *newWorktreeForm {
 	branch.CursorEnd()
 	branch.Focus()
 	f := &newWorktreeForm{th: th, cfg: cfg, space: space, branch: branch, dir: newInput(th, ""), lookups: map[string]prLookup{}}
+	f.layouts = newLayoutFields(th, cfg.Layouts, true, cfg.LayoutFor(space.Name, true), nil)
 	f.cmds = newCommandFields(th, cfg.Commands, true, "", nil)
 	f.followBranch()
 	return f
@@ -109,6 +113,15 @@ func (f *newWorktreeForm) plan() (branch, dir string) {
 }
 
 func (f *newWorktreeForm) create() tea.Cmd {
+	var layout *spaces.LayoutRun
+	if l, ok := f.layouts.chosen(); ok {
+		lr, err := spaces.NewLayoutRun(l, f.layouts.values())
+		if err != nil {
+			f.err = err
+			return nil
+		}
+		layout = &lr
+	}
 	var run *spaces.Run
 	if cmd, ok := f.cmds.chosen(); ok {
 		r, err := spaces.NewRun(cmd, f.cmds.values())
@@ -120,14 +133,20 @@ func (f *newWorktreeForm) create() tea.Cmd {
 	}
 	f.busy, f.err = true, nil
 	cfg, space := f.cfg, f.space
-	// The new session has no windows, so a command runs as its first tab, with no state to ask kitty for.
 	open := func(wt spaces.Worktree, pr int) error {
-		if run == nil {
-			return spaces.OpenFromOverlay(cfg, wt)
+		var lr *spaces.LayoutRun
+		if layout != nil {
+			v := *layout
+			v.PR = pr
+			lr = &v
 		}
-		r := *run
-		r.PR = pr
-		return spaces.RunCommand(cfg, kitty.State{}, space, wt, r)
+		var r *spaces.Run
+		if run != nil {
+			v := *run
+			v.PR = pr
+			r = &v
+		}
+		return spaces.OpenNew(cfg, space, wt, lr, r)
 	}
 	if l, ok := f.lookup(); ok {
 		ref, dir := f.pr, f.dir.Value()
@@ -157,17 +176,31 @@ func (f *newWorktreeForm) create() tea.Cmd {
 	}
 }
 
-// fields are the form's fields in order: the branch, the directory, the choice of command, nil, when there
-// is one, and the chosen command's inputs.
+// fields are the form's fields in order: the branch, the directory, the choice of layout, nil, when there
+// is one, the chosen layout's inputs, then the same for the command.
 func (f *newWorktreeForm) fields() []*textinput.Model {
 	out := []*textinput.Model{&f.branch, &f.dir}
+	if f.layouts.picks() {
+		out = append(out, nil)
+	}
+	out = append(out, f.layouts.fields()...)
 	if f.cmds.picks() {
 		out = append(out, nil)
 	}
 	return append(out, f.cmds.fields()...)
 }
 
-// focused is the field typing goes to, nil for the choice of command.
+// layoutAt and commandAt are where in fields the choices of layout and command are, when there are.
+func (f *newWorktreeForm) layoutAt() int { return 2 }
+func (f *newWorktreeForm) commandAt() int {
+	at := 2 + len(f.layouts.fields())
+	if f.layouts.picks() {
+		at++
+	}
+	return at
+}
+
+// focused is the field typing goes to, nil for a choice.
 func (f *newWorktreeForm) focused() *textinput.Model {
 	fields := f.fields()
 	return fields[min(f.focus, len(fields)-1)]
@@ -177,15 +210,30 @@ func (f *newWorktreeForm) focused() *textinput.Model {
 func (f *newWorktreeForm) nextField() tea.Cmd { return moveFocus(f.fields(), &f.focus, 1) }
 func (f *newWorktreeForm) prevField() tea.Cmd { return moveFocus(f.fields(), &f.focus, -1) }
 
-// onCommand says whether the choice of command has focus.
-func (f *newWorktreeForm) onCommand() bool { return f.cmds.picks() && f.focused() == nil }
+// onLayout and onCommand say whether the choice of layout or of command has focus.
+func (f *newWorktreeForm) onLayout() bool  { return f.layouts.picks() && f.focus == f.layoutAt() }
+func (f *newWorktreeForm) onCommand() bool { return f.cmds.picks() && f.focus == f.commandAt() }
 
-// cycleCommand chooses the next command, or the one before, and focuses the choice, as the inputs below it
-// change with it.
+// cycleLayout and cycleCommand choose the next layout or command, or the one before, and focus the
+// choice, as the inputs below it change with it.
+func (f *newWorktreeForm) cycleLayout(delta int) tea.Cmd {
+	f.layouts.cycle(delta)
+	f.focus = f.layoutAt()
+	return moveFocus(f.fields(), &f.focus, 0)
+}
+
 func (f *newWorktreeForm) cycleCommand(delta int) tea.Cmd {
 	f.cmds.cycle(delta)
-	f.focus = 2
+	f.focus = f.commandAt()
 	return moveFocus(f.fields(), &f.focus, 0)
+}
+
+// cycleChoice changes the choice that has focus.
+func (f *newWorktreeForm) cycleChoice(delta int) tea.Cmd {
+	if f.onLayout() {
+		return f.cycleLayout(delta)
+	}
+	return f.cycleCommand(delta)
 }
 
 func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -196,6 +244,7 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// after the padding and their labels, and the cursor takes a cell past the text.
 		f.branch.SetWidth(max(f.width-4-labelWidth-1, 1))
 		f.dir.SetWidth(max(f.width-4-labelWidth-1, 1))
+		f.layouts.setWidth(max(f.width-4-labelWidth-1, 1))
 		f.cmds.setWidth(max(f.width-4-labelWidth-1, 1))
 		return f, nil
 	case createdMsg:
@@ -229,6 +278,9 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseClickMsg:
 		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
 			return f, cmd
+		}
+		if clickedChoice(f.zones, layoutZone, msg) {
+			return f, f.cycleLayout(1)
 		}
 		if clickedChoice(f.zones, commandZone, msg) {
 			return f, f.cycleCommand(1)
@@ -292,6 +344,7 @@ func (f *newWorktreeForm) render() string {
 		th.Draw(look.Plain, labelWidth, look.Label("branch")) + f.branch.View(),
 		th.Draw(look.Plain, labelWidth, look.Label("directory")) + f.dir.View(),
 	}
+	lines = append(lines, f.layouts.lines(f.onLayout())...)
 	lines = append(append(lines, f.cmds.lines(f.onCommand())...), "")
 	failed := f.err
 	if l, ok := f.lookup(); ok {
@@ -319,8 +372,16 @@ func (f *newWorktreeForm) render() string {
 			lines = append(lines, muted("Creates "+branch))
 		}
 	}
+	l, layout := f.layouts.chosen()
+	if layout {
+		lines = append(lines, muted("Opens with the "+l.Name+" layout"))
+	}
 	if cmd, ok := f.cmds.chosen(); ok {
-		lines = append(lines, muted("Runs "+cmd.Name+" in the first tab"))
+		if layout {
+			lines = append(lines, muted("Then runs "+cmd.Name+" in "+opensIn[cmd.Open]))
+		} else {
+			lines = append(lines, muted("Runs "+cmd.Name+" in the first tab"))
+		}
 	}
 	lines = append(lines, "")
 	switch {
@@ -337,11 +398,20 @@ func (f *newWorktreeForm) render() string {
 		control{action: actCreate, label: "Create"},
 		control{action: actCancel, label: "Cancel"})
 	hints := []look.Span{look.Text("  "), look.Key("tab"), look.KeyDesc(" next field")}
-	if f.onCommand() {
+	switch {
+	case f.onLayout():
+		hints = append(hints, look.Text("  "), look.Key("left/right"), look.KeyDesc(" layout"))
+	case f.onCommand():
 		hints = append(hints, look.Text("  "), look.Key("left/right"), look.KeyDesc(" command"))
 	}
 	lines = append(lines, line(append(buttons, hints...)...))
 	return boxed(lines)
+}
+
+// opensIn says where a command opens in a session with windows, by its open.
+var opensIn = map[string]string{
+	"tab": "a new tab", "split": "a split", "hsplit": "a horizontal split", "vsplit": "a vertical split",
+	"overlay": "an overlay", "window": "a new OS window",
 }
 
 // prDoes is what creating the worktree does with pr.

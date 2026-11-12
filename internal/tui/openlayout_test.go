@@ -296,6 +296,66 @@ func TestOpenLayoutNow(t *testing.T) {
 	}
 }
 
+// With layouts configured the new worktree form chooses one, the space's worktree layout at first, with a
+// field for each of its inputs, before the choice of command. Created, the session opens with the layout,
+// then the command runs where it opens, by the window the layout left focused.
+func TestNewWorktreeFormLayout(t *testing.T) {
+	root := mainRepo(t)
+	calls := fakeKittenWindows(t, filepath.Base(root)+"@fix")
+	cfg := testLayouts(t)
+	cfg.Spaces = []string{root}
+	cfg.Space = map[string]config.SpaceSettings{filepath.Base(root): {WorktreeLayout: "agent"}}
+	space := spaces.LoadSpace(root)
+	f := newForm(cfg, space)
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	screen := func(fields []string, hint string, says ...string) []string {
+		lines := append([]string{"", "  New worktree in " + space.Name, "", "  branch     fix", "  directory  .worktrees/fix"}, fields...)
+		lines = append(lines, "", "  Creates fix from main")
+		for _, s := range says {
+			lines = append(lines, "  "+s)
+		}
+		return append(lines, "", "   Create enter    Cancel esc   tab next field"+hint, "")
+	}
+	typeInto(f, "fix")
+	agent := []string{"  layout     < agent >", "  Prompt     required"}
+	if got, want := formScreen(f), screen(append(agent, "  command    < none >"), "", "Opens with the agent layout"); !reflect.DeepEqual(got, want) {
+		t.Errorf("form:\n%q\nwant\n%q", got, want)
+	}
+	f.Update(keyMsg("tab"))
+	f.Update(keyMsg("tab"))
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	if got, want := formScreen(f), screen([]string{"  layout     < none >", "  command    < none >"}, "  left/right layout"); !reflect.DeepEqual(got, want) {
+		t.Errorf("none:\n%q\nwant\n%q", got, want)
+	}
+	clickOn(t, f, "< none >")
+	clickOn(t, f, "< plain >")
+	f.Update(keyMsg("tab"))
+	typeInto(f, "fix it")
+	f.Update(keyMsg("tab"))
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	want := screen(append(agent[:1:1], "  Prompt     fix it", "  command    < review >"), "  left/right command",
+		"Opens with the agent layout", "Then runs review in a new tab")
+	if got := formScreen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("agent and review:\n%q\nwant\n%q", got, want)
+	}
+	_, cmd := f.Update(keyMsg("enter"))
+	if cmd == nil {
+		t.Fatal("enter created nothing")
+	}
+	if _, quit := f.Update(cmd()); quit == nil || f.err != nil {
+		t.Fatalf("the form stayed: %v", f.err)
+	}
+	wt := spaces.LoadSpace(root).Worktrees[1]
+	goTo := []string{"@", "action", "goto_session", wt.Session + ".kitty-session", "--"}
+	want = slices.Concat(agentCalls(root, wt), goTo, goTo,
+		[]string{"@", "action", "--match=id:11", "launch", "--type=tab", "--cwd=" + wt.Path, "--add-to-session=" + wt.Session},
+		envOf(root, wt), []string{"--hold", "gr", "--"})
+	if got := calls(); !reflect.DeepEqual(got, want) {
+		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
+	}
+}
+
 // Opening a worktree afresh opens its default layout; a default that needs an input it has no default for
 // opens the shell tab instead, and says so.
 func TestOpenWorktreeLayout(t *testing.T) {
