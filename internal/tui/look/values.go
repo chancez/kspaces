@@ -336,6 +336,31 @@ func AheadBehind(ahead, behind int) []Span {
 	return out
 }
 
+// The words a config marker says, the most first, for as much as there is room for.
+var (
+	UntrustedWords = []string{"untrusted config", "untrusted", ""}
+	BrokenWords    = []string{"config error", ""}
+)
+
+// UntrustedConfig marks a space whose own config is not trusted, so not in use, where its git state goes:
+// muted, a lock and words, one of UntrustedWords, two spaces after the lock, as after a marker.
+func UntrustedConfig(words string) []Span {
+	return configMark(elMuted, elMuted, GlyphUntrusted, words)
+}
+
+// BrokenConfig marks a space whose own config has an error, so is not in use, as UntrustedConfig does:
+// the cross of a broken space and words, one of BrokenWords.
+func BrokenConfig(words string) []Span {
+	return configMark(elBroken, elError, GlyphBroken, words)
+}
+
+func configMark(mark, text element, g Glyph, words string) []Span {
+	if words == "" {
+		return []Span{glyph(mark, g, false)}
+	}
+	return []Span{glyph(mark, g, false), sp(text, "  "+words)}
+}
+
 // prStates are the elements of a pull request's states.
 var prStates = map[string]element{"open": elPROpen, "draft": elPRDraft, "merged": elPRMerged, "closed": elPRClosed}
 

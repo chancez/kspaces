@@ -285,6 +285,18 @@ func (m *sidebar) forgetSession(session string) tea.Cmd {
 	}
 }
 
+// trustConfig opens the form that shows what the own config of the space at root adds, and trusts it,
+// in an overlay as newWorktree's.
+func (m *sidebar) trustConfig(root string) tea.Cmd {
+	st := m.kitty
+	return func() tea.Msg {
+		if err := spaces.AskTrust(st, root); err != nil {
+			return spaces.Snapshot{Err: err}
+		}
+		return nil
+	}
+}
+
 // addSpace opens the form that adds a space, in an overlay as newWorktree's, with the repository of the
 // window beside the sidebar filled in.
 func (m *sidebar) addSpace() tea.Cmd {

@@ -91,9 +91,13 @@ func (m *sidebar) renderRow(i int) string {
 	head := append(caret, icon...)
 	spans := append(head, look.DimIf(faint, th.Cut(max(width-th.Width(head...), 0), label)...)...)
 	rest := width - th.Width(spans...)
-	// The git state takes the right end, after a space, and the branch what is left between.
+	// The git state takes the right end, after a space, and the branch what is left between. A space whose
+	// own config is not in use says so there instead, on its own row.
 	var git []look.Span
-	if r.Worktree != nil && !r.Folded && !r.Other && !r.Missing {
+	switch {
+	case r.Main && !r.Other && (r.Space.Untrusted || r.Space.ConfigErr != nil):
+		git = look.DimIf(!open, m.configSpans(*r.Space, rest-1)...)
+	case r.Worktree != nil && !r.Folded && !r.Other && !r.Missing:
 		git = look.DimIf(!open, m.gitSpans(m.git[r.Worktree.Path], rest-1)...)
 	}
 	if w := th.Width(git...); w > 0 {
@@ -118,6 +122,21 @@ func (m *sidebar) renderRow(i int) string {
 		surface = look.Current
 	}
 	return th.DrawZone(fmt.Sprintf(entryZone, i), surface, width, spans...)
+}
+
+// configSpans mark a space whose own config is not in use, untrusted or broken, in at most width cells:
+// what it is, in fewer words, or only its mark, when that does not fit.
+func (m *sidebar) configSpans(s spaces.Space, width int) []look.Span {
+	mark, words := look.BrokenConfig, look.BrokenWords
+	if s.Untrusted {
+		mark, words = look.UntrustedConfig, look.UntrustedWords
+	}
+	for _, w := range words {
+		if out := mark(w); m.th.Width(out...) <= width {
+			return out
+		}
+	}
+	return nil
 }
 
 // gitSpans is a worktree's git state in at most width cells: the files it has not committed, how far it

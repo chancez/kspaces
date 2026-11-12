@@ -44,6 +44,8 @@ const (
 	GlyphChanges
 	GlyphAhead
 	GlyphBehind
+	// GlyphUntrusted marks a space whose own config is not trusted, so not in use.
+	GlyphUntrusted
 	numGlyphs
 )
 
@@ -77,6 +79,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphChanges:      "*",
 		GlyphAhead:        "+",
 		GlyphBehind:       "-",
+		GlyphUntrusted:    "?",
 	},
 	GlyphsUnicode: {
 		GlyphOpen:         "\u25bc", // black down-pointing triangle
@@ -104,6 +107,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphChanges:      "\u25cf", // black circle
 		GlyphAhead:        "\u2191", // upwards arrow
 		GlyphBehind:       "\u2193", // downwards arrow
+		GlyphUntrusted:    "?",
 	},
 	GlyphsNerd: {
 		// The triangles, not Font Awesome's chevrons, which are drawn wider than their cell and thin.
@@ -135,5 +139,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphChanges: "\u25cf",
 		GlyphAhead:   "\u2191",
 		GlyphBehind:  "\u2193",
+		// Followed by two spaces, as a marker is, since kitty draws it over the first.
+		GlyphUntrusted: "\uf023", // lock
 	},
 }

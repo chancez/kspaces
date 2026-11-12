@@ -61,6 +61,9 @@ type layoutSubject struct{}
 // saveSubject is the save layout form.
 type saveSubject struct{}
 
+// trustSubject is the trust space config form.
+type trustSubject struct{}
+
 // listSubject is a choice field's open list.
 type listSubject struct{}
 
@@ -224,6 +227,16 @@ var (
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			return m.cleanup(s.row.Space.Root)
+		},
+	}
+	actTrustConfig = &interact.Action[*sidebar, entrySubject]{
+		Title:   "Trust space config",
+		Section: sectionSpace,
+		// Its file is there, but not trusted as it is: never, or not since it changed.
+		Applies: func(_ *sidebar, s entrySubject) bool { return !s.row.Other && s.row.Space.Untrusted },
+		Run: func(m *sidebar, s entrySubject) tea.Cmd {
+			m.remote = false
+			return m.trustConfig(s.row.Space.Root)
 		},
 	}
 )
@@ -665,6 +678,21 @@ var (
 	actSaveCancel = quit[*saveLayoutForm, saveSubject]()
 )
 
+// The trust space config form's.
+var (
+	actTrust = &interact.Action[*trustForm, trustSubject]{
+		Title:   "trust",
+		Applies: func(f *trustForm, _ trustSubject) bool { return !f.busy && f.bad == nil },
+		Run:     cmd[*trustForm, trustSubject]((*trustForm).trust),
+	}
+	actTrustCancel = &interact.Action[*trustForm, trustSubject]{
+		Title:   "cancel",
+		Applies: func(f *trustForm, _ trustSubject) bool { return !f.busy },
+		Run:     func(*trustForm, trustSubject) tea.Cmd { return tea.Quit },
+	}
+	actTrustQuit = quit[*trustForm, trustSubject]()
+)
+
 // The add space form's.
 var (
 	actAdd = &interact.Action[*addSpaceForm, addSubject]{
@@ -691,6 +719,7 @@ var (
 	runKind    *interact.Kind[*runForm, runSubject]
 	layoutKind *interact.Kind[*layoutForm, layoutSubject]
 	saveKind   *interact.Kind[*saveLayoutForm, saveSubject]
+	trustKind  *interact.Kind[*trustForm, trustSubject]
 	filterKind *interact.Kind[*sidebar, filterSubject]
 	listKind   *interact.Kind[*choiceList, listSubject]
 	sortKind   *interact.Kind[*sidebar, sortSubject]
@@ -709,6 +738,7 @@ var (
 	theRunForm    *interact.Place[*runForm, runSubject]
 	theLayoutForm *interact.Place[*layoutForm, layoutSubject]
 	theSaveForm   *interact.Place[*saveLayoutForm, saveSubject]
+	theTrustForm  *interact.Place[*trustForm, trustSubject]
 	theFilter     *interact.Place[*sidebar, filterSubject]
 	theSort       *interact.Place[*sidebar, sortSubject]
 	theChoiceList *interact.Place[*choiceList, listSubject]
@@ -722,7 +752,7 @@ func init() {
 	spacesKind.Bind(actAddSpace, "a", "add space", "a")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actFold, actUnfold, actCleanup)
+		actOpenWorktree, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actFold, actUnfold, actCleanup, actTrustConfig)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
@@ -820,6 +850,12 @@ func init() {
 	forgetKind.Bind(actForgetCancel, "n/esc", "cancel", "n", "esc")
 	forgetKind.Bind(actForgetQuit, "ctrl+c", "quit", "ctrl+c")
 	theForgetForm = interact.List(forgetKind)
+
+	trustKind = interact.NewKind(func(trustSubject) string { return "Trust space config" }, actTrust, actTrustCancel, actTrustQuit)
+	trustKind.Bind(actTrust, "y", "trust", "y")
+	trustKind.Bind(actTrustCancel, "n/esc", "cancel", "n", "esc")
+	trustKind.Bind(actTrustQuit, "ctrl+c", "quit", "ctrl+c")
+	theTrustForm = interact.List(trustKind)
 
 	addKind = interact.NewKind(func(addSubject) string { return "Add space" }, actAdd, actAddCancel)
 	addKind.Bind(actAdd, "enter", "add", "enter")

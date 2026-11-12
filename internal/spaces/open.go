@@ -227,6 +227,12 @@ func AskForgetSession(st kitty.State, session string) error {
 	return kitty.LaunchForm(st, "forget", session)
 }
 
+// AskTrust opens the form that trusts the own config of the space at root, in an overlay as
+// NewWorktree's.
+func AskTrust(st kitty.State, root string) error {
+	return kitty.LaunchForm(st, "trust", root)
+}
+
 // ForgetSession deletes the saved file of session, so kitty does not restore it: for a missing worktree,
 // whose directory is gone, that is all that is left of it.
 func ForgetSession(cfg config.Config, session string) error {
