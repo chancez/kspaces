@@ -334,6 +334,9 @@ kitty can dock a window to one tab only, so a sidebar in every tab is one `kspac
 - docks `kspaces sidebar` at the left of every tab that belongs to a session, with the `kspaces` user
   variable and `--keep-focus`;
 - sizes the docks to `[sidebar] width`, and resizes them when it changes;
+- hides the tab bar of the panels kspaces opens, marked with the `kspaces_popup` user variable: kitty has
+  no option for one OS window's tab bar, and `tab_bar_filter` always shows the active tab, so it sets
+  kitty's own flag for it, which a config reload resets and its next check, within two seconds, sets again;
 - notes when each program status record changed state, in the window's `program_status_at` user variable,
   which the status list's ages come from.
 
@@ -375,15 +378,18 @@ popup = "panel"
 
   ```
   launch --type=os-panel --os-panel edge=center-sized --os-panel columns=90 --os-panel lines=24
-         --os-panel focus-policy=exclusive --os-panel layer=overlay --env KSPACES_FROM=ID ...
+         --os-panel focus-policy=exclusive --os-panel layer=overlay
+         --var=kspaces_form=1 --var=kspaces_popup=1 --env KSPACES_FROM=ID ...
   ```
 
   A form is 90 by 24 cells; Save as layout, clean up and Trust space config, which list what they act on,
-  100 by 32; the picker 120 by 32, room for its preview beside the list. A panel closes when it loses
-  focus, so none is left behind, unseen, in another window's way; one that is working, such as switching
-  sessions, which moves the keyboard itself, finishes first, and one that then fails takes the keyboard
-  back to say why. Closing one any other way, with `esc` or by finishing without switching anywhere,
-  gives the keyboard back to the window it was opened from.
+  100 by 32; the picker 120 by 32, room for its preview beside the list. A panel is drawn in a rounded
+  border in the accent, `+`, `-` and `|` in ASCII, a form's heading set into its top and its buttons and
+  keys on the row above its bottom; the watcher hides its tab bar. An overlay is drawn as it always was.
+  A panel closes when it loses focus, so none is left behind, unseen, in another window's way; one that is
+  working, such as switching sessions, which moves the keyboard itself, finishes first, and one that then
+  fails takes the keyboard back to say why. Closing one any other way, with `esc` or by finishing without
+  switching anywhere, gives the keyboard back to the window it was opened from.
 
 A panel is in no session's tab, so it is told the window it was opened from in `KSPACES_FROM`, and works
 as an overlay over that window would: the current session is that window's, Save as layout's "this tab"

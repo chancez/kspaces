@@ -9,6 +9,8 @@
 #
 # kspaces_toggle.py hides and shows the sidebars by setting boss.kspaces_hidden.
 #
+# It hides the tab bar of a kspaces popup's panel, see hide_popup_tab_bar.
+#
 # It also notes when each program status record (OSC 7501) of a window last changed state, which kitty
 # does not report, so the sidebar can show how long a program has been blocked or working.
 #
