@@ -284,6 +284,28 @@ func FocusWindow(id int) error {
 	return err
 }
 
+// GotoLayout sets the layout of the tab window id is in. Remote control rather than the goto_layout
+// action, which only logs a layout that is not in enabled_layouts.
+func GotoLayout(id int, layout string) error {
+	_, err := kitten("goto-layout", fmt.Sprintf("--match=window_id:%d", id), layout)
+	return err
+}
+
+// SessionWindows are the ids of session's windows in data, leaving out kspaces' own.
+func SessionWindows(data []OSWindow, session string) []int {
+	var out []int
+	for _, osw := range data {
+		for _, tab := range osw.Tabs {
+			for _, w := range tab.Windows {
+				if w.SessionName == session && !ownWindow(w) {
+					out = append(out, w.ID)
+				}
+			}
+		}
+	}
+	return out
+}
+
 // ScreenText is what window id has on its screen, its colors and styles as SGR sequences.
 func ScreenText(id int) (string, error) {
 	out, err := kitten("get-text", "--match", fmt.Sprintf("id:%d", id), "--ansi", "--extent", "screen")

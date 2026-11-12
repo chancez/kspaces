@@ -100,14 +100,7 @@ func commandVars(space Space, wt Worktree, r Run) map[string]string {
 // back to the window it was over.
 func runActions(cfg config.Config, st kitty.State, space Space, wt Worktree, r Run) [][]string {
 	vars := commandVars(space, wt, r)
-	var env, argv []string
-	for _, e := range r.Command.Environ(vars) {
-		// launch expands $VAR in --env values itself, after kitty has in the action's words.
-		env = append(env, kitty.Quote("--env="+strings.ReplaceAll(e, "$", "$$")))
-	}
-	for _, arg := range r.Command.Argv(vars) {
-		argv = append(argv, kitty.Quote(arg))
-	}
+	env, argv := commandWords(r.Command, vars)
 	goTo := []string{"goto_session", SessionFile(cfg, wt.Session)}
 	id, open := st.Sessions[wt.Session]
 	if !open {
@@ -132,4 +125,17 @@ func runActions(cfg config.Config, st kitty.State, space Space, wt Worktree, r R
 		launch = append(launch, "--hold")
 	}
 	return [][]string{goTo, append(launch, argv...)}
+}
+
+// commandWords are cmd's --env options and its command line with vars, each word quoted for a kitty
+// action to pass on as it is.
+func commandWords(cmd config.Command, vars map[string]string) (env, argv []string) {
+	for _, e := range cmd.Environ(vars) {
+		// launch expands $VAR in --env values itself, after kitty has in the action's words.
+		env = append(env, kitty.Quote("--env="+strings.ReplaceAll(e, "$", "$$")))
+	}
+	for _, arg := range cmd.Argv(vars) {
+		argv = append(argv, kitty.Quote(arg))
+	}
+	return env, argv
 }

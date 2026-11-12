@@ -13,8 +13,9 @@ import (
 )
 
 // OpenWorktree switches to the worktree's session. When it has no windows, the session is restored from its
-// saved file if that opens any, and otherwise created with one tab in the worktree, or in the home directory
-// for a session in no space.
+// saved file if that opens any, and otherwise opened with its default layout, see freshLayout, or with one
+// tab in the worktree, or in the home directory for a session in no space. A default layout that needs
+// inputs is not opened: the tab is, and the error says so.
 func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree) error {
 	if st.Home != 0 {
 		// Hand this tab's focus back to its own window before leaving, so coming back to the tab lands
@@ -31,12 +32,23 @@ func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree) error {
 	if err != nil {
 		return err
 	}
+	// More than the switch is a fresh session's first tab, which the default layout stands in for.
+	var skipped error
+	if len(actions) > 1 {
+		space, found, lr, ok, err := freshLayout(cfg, wt)
+		if ok {
+			return OpenLayout(cfg, st, space, found, lr)
+		}
+		if err != nil {
+			skipped = fmt.Errorf("opened %s with a shell, as %w", wt.Session, err)
+		}
+	}
 	for _, args := range actions {
 		if err := kitty.Action(args...); err != nil {
 			return err
 		}
 	}
-	return nil
+	return skipped
 }
 
 // openActions are the kitty actions that switch to wt's session, see OpenWorktree.
