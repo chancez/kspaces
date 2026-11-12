@@ -39,19 +39,16 @@
 
 ## kitty work
 
-One at a time: a small bug fix PR, its feedback, then the next. Proposals wait until the PRs have landed.
-Drafts are in `~/projects/kitty/.research/drafts/`. Each describes the use case only as switching between
-sets of tabs with sessions and `tab_bar_filter`; the proposals still name kspaces and need trimming first.
+One thing at a time upstream, each kept short, describing the use case only as switching between sets of
+tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/kitty/.research/drafts/`.
 
-1. `save_as_session --match`, the first two bugs above: draft PR kovidgoyal/kitty#10844, branch
-   `pr/chancez/save-as-session-match`.
-2. `detach_tab` and window moves losing their session: branch `pr/chancez/detach-tab-session`, local, to
-   open once #10844 has feedback.
-3. Watcher events (a close reason on `on_close`, an event for a window's directory changing): the
-   maintainer asked which are missing in discussion #10828, so as a comment there.
-4. Watcher calls each taking a timer, and the macOS and Linux tables of 128: an issue, as the fix is a
-   design choice in kitty's event loop.
-5. A dock for the whole OS window, the fix for the first known issue: a proposal, last.
+1. `save_as_session --match`, the first two bugs above: kovidgoyal/kitty#10844, merged; the workaround in
+   `save_sessions.py` comes out once a release has it.
+2. `detach_tab` and window moves losing their session: draft PR kovidgoyal/kitty#10851.
+3. Watcher events (a close reason on `on_close`, an event for a window's directory changing): commented on
+   discussion #10828, offering PRs.
+4. Watcher calls each taking a timer, and the macOS and Linux tables of 128: issue kovidgoyal/kitty#10853.
+5. A dock for the whole OS window, the fix for the first known issue: issue kovidgoyal/kitty#10854.
 6. Toggling a dock: show and hide a dock running a given program, such as `gr` for reviews beside the
    current window, from one mapping, keeping the program running while hidden rather than restarting it.
    kitty has no such action; kspaces_toggle.py only closes and re-adds kspaces' own docks. In the interim,
