@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/config"
@@ -31,7 +30,7 @@ type choiceFields[T any] struct {
 	optional bool
 	// sel is the chosen one's index in choices, -1 for none.
 	sel    int
-	inputs [][]textinput.Model
+	inputs [][]field
 	// list is the list of choices, while it is open.
 	list *choiceList
 }
@@ -75,19 +74,19 @@ func newChoiceFields[T any](th *look.Theme, label string, choices []T, nameOf fu
 		c.sel = 0
 	}
 	for i, ch := range choices {
-		var ins []textinput.Model
+		var ins []field
 		for _, in := range inputOf(ch) {
-			box := newInput(th, "")
+			placeholder := ""
+			if in.Required {
+				placeholder = "required"
+			}
+			box := newLineField(th, placeholder)
 			v := in.Default
 			if given, ok := values[in.Name]; ok && nameOf(ch) == name {
 				v = given
 			}
-			box.SetValue(v)
-			box.CursorEnd()
-			if in.Required {
-				box.Placeholder = "required"
-			}
-			ins = append(ins, box)
+			box.fill(v)
+			ins = append(ins, &box)
 		}
 		if nameOf(ch) == name {
 			c.sel = i
@@ -124,15 +123,11 @@ func (c *choiceFields[T]) cycle(delta int) {
 }
 
 // fields are the chosen one's text boxes, in order.
-func (c *choiceFields[T]) fields() []*textinput.Model {
+func (c *choiceFields[T]) fields() []field {
 	if c.sel < 0 {
 		return nil
 	}
-	out := make([]*textinput.Model, len(c.inputs[c.sel]))
-	for i := range c.inputs[c.sel] {
-		out[i] = &c.inputs[c.sel][i]
-	}
-	return out
+	return c.inputs[c.sel]
 }
 
 func (c *choiceFields[T]) setWidth(w int) {
@@ -280,22 +275,4 @@ func clickedChoice(zones map[string][]look.Zone, zone string, msg tea.MouseClick
 		}
 	}
 	return false
-}
-
-// moveFocus moves focus by delta over fields, round from the last to the first, from *focus, which it
-// updates. A nil field is a choice, which takes no typing.
-func moveFocus(fields []*textinput.Model, focus *int, delta int) tea.Cmd {
-	for _, in := range fields {
-		if in != nil {
-			in.Blur()
-		}
-	}
-	if len(fields) == 0 {
-		return nil
-	}
-	*focus = ((*focus+delta)%len(fields) + len(fields)) % len(fields)
-	if in := fields[*focus]; in != nil {
-		return in.Focus()
-	}
-	return nil
 }

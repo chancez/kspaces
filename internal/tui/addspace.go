@@ -22,7 +22,7 @@ type addSpaceForm struct {
 	th *look.Theme
 	// The configured spaces, to refuse one already there.
 	roots []string
-	path  textinput.Model
+	path  lineField
 	// root is what the path adds, or problem why it cannot be added, for the path as typed.
 	root    string
 	problem error
@@ -37,10 +37,8 @@ type addSpaceForm struct {
 // short.
 func newAddSpaceForm(roots []string, path string) *addSpaceForm {
 	th := look.New(true)
-	in := newInput(th, "")
-	in.Placeholder = "a directory in a git repository"
-	in.SetValue(config.Tilde(path))
-	in.CursorEnd()
+	in := newLineField(th, "a directory in a git repository")
+	in.fill(config.Tilde(path))
 	in.Focus()
 	f := &addSpaceForm{th: th, roots: roots, path: in}
 	f.check()
@@ -85,9 +83,8 @@ func (f *addSpaceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return f, cmd
 		}
 	}
-	var cmd tea.Cmd
 	before := f.path.Value()
-	f.path, cmd = f.path.Update(msg)
+	cmd := f.path.update(msg)
 	if f.path.Value() != before {
 		f.check()
 	}

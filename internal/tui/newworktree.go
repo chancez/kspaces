@@ -22,9 +22,9 @@ type newWorktreeForm struct {
 	th     *look.Theme
 	cfg    config.Config
 	space  spaces.Space
-	branch textinput.Model
+	branch lineField
 	// Empty for the default, which spaces.WorktreeDir derives from the branch and the placeholder shows.
-	dir textinput.Model
+	dir lineField
 	// The layout the session opens with, none for a shell tab, and its inputs. Only with layouts
 	// configured, the space's worktree layout chosen at first.
 	layouts choiceFields[config.Layout]
@@ -78,11 +78,10 @@ type prFoundMsg struct {
 // just the name gives PREFIX/NAME; deleting it makes a branch without one.
 func newForm(cfg config.Config, space spaces.Space) *newWorktreeForm {
 	th := look.New(true)
-	branch := newInput(th, "")
-	branch.SetValue(spaces.BranchStart(cfg))
-	branch.CursorEnd()
+	branch := newLineField(th, "")
+	branch.fill(spaces.BranchStart(cfg))
 	branch.Focus()
-	f := &newWorktreeForm{th: th, cfg: cfg, space: space, branch: branch, dir: newInput(th, ""), lookups: map[string]prLookup{}}
+	f := &newWorktreeForm{th: th, cfg: cfg, space: space, branch: branch, dir: newLineField(th, ""), lookups: map[string]prLookup{}}
 	f.layouts = newLayoutFields(th, cfg.Layouts, true, cfg.LayoutFor(space.Name, true), nil)
 	f.cmds = newCommandFields(th, cfg.Commands, true, "", nil)
 	f.followBranch()
@@ -179,8 +178,8 @@ func (f *newWorktreeForm) create() tea.Cmd {
 
 // fields are the form's fields in order: the branch, the directory, the choice of layout, nil, when there
 // is one, the chosen layout's inputs, then the same for the command.
-func (f *newWorktreeForm) fields() []*textinput.Model {
-	out := []*textinput.Model{&f.branch, &f.dir}
+func (f *newWorktreeForm) fields() []field {
+	out := []field{&f.branch, &f.dir}
 	if f.layouts.picks() {
 		out = append(out, nil)
 	}
@@ -202,7 +201,7 @@ func (f *newWorktreeForm) commandAt() int {
 }
 
 // focused is the field typing goes to, nil for a choice.
-func (f *newWorktreeForm) focused() *textinput.Model {
+func (f *newWorktreeForm) focused() field {
 	fields := f.fields()
 	return fields[min(f.focus, len(fields)-1)]
 }
@@ -320,9 +319,7 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if in == nil {
 		return f, nil
 	}
-	var cmd tea.Cmd
-	*in, cmd = in.Update(msg)
-	return f, tea.Batch(cmd, f.followBranch())
+	return f, tea.Batch(in.update(msg), f.followBranch())
 }
 
 // followBranch works out whether the branch field names a PR, and makes the directory's placeholder the

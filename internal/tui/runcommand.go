@@ -57,8 +57,8 @@ func (f *runForm) Init() tea.Cmd { return textinput.Blink }
 
 // fields are the form's fields in order: the choice of command, nil, with more than one, and the chosen
 // command's inputs.
-func (f *runForm) fields() []*textinput.Model {
-	var out []*textinput.Model
+func (f *runForm) fields() []field {
+	var out []field
 	if f.cmds.picks() {
 		out = append(out, nil)
 	}
@@ -66,7 +66,7 @@ func (f *runForm) fields() []*textinput.Model {
 }
 
 // focused is the field typing goes to, nil for the choice of command or when there are no fields.
-func (f *runForm) focused() *textinput.Model {
+func (f *runForm) focused() field {
 	fields := f.fields()
 	if len(fields) == 0 {
 		return nil
@@ -177,9 +177,7 @@ func (f *runForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if in == nil {
 		return f, nil
 	}
-	var cmd tea.Cmd
-	*in, cmd = in.Update(msg)
-	return f, cmd
+	return f, in.update(msg)
 }
 
 func (f *runForm) View() tea.View {

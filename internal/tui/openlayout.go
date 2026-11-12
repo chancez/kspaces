@@ -55,8 +55,8 @@ func (f *layoutForm) Init() tea.Cmd { return textinput.Blink }
 
 // fields are the form's fields in order: the choice of layout, nil, with more than one, and the chosen
 // layout's inputs.
-func (f *layoutForm) fields() []*textinput.Model {
-	var out []*textinput.Model
+func (f *layoutForm) fields() []field {
+	var out []field
 	if f.layouts.picks() {
 		out = append(out, nil)
 	}
@@ -64,7 +64,7 @@ func (f *layoutForm) fields() []*textinput.Model {
 }
 
 // focused is the field typing goes to, nil for the choice of layout or when there are no fields.
-func (f *layoutForm) focused() *textinput.Model {
+func (f *layoutForm) focused() field {
 	fields := f.fields()
 	if len(fields) == 0 {
 		return nil
@@ -142,9 +142,7 @@ func (f *layoutForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if in == nil {
 		return f, nil
 	}
-	var cmd tea.Cmd
-	*in, cmd = in.Update(msg)
-	return f, cmd
+	return f, in.update(msg)
 }
 
 func (f *layoutForm) View() tea.View {

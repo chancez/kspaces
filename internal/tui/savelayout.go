@@ -33,7 +33,7 @@ type saveLayoutForm struct {
 	tabs   []spaces.CapturedTab
 	// this is the index in tabs of this tab, the one saved alone.
 	this   int
-	name   textinput.Model
+	name   lineField
 	scope  choiceFields[string]
 	target choiceFields[string]
 	// own is the space's file as it was when the form opened: whether it is there, and the layouts it has.
@@ -95,10 +95,8 @@ type layoutSavedMsg struct{ err error }
 // name, this tab alone when only says so, with global the global config.
 func newSaveLayoutForm(global config.Config, space spaces.Space, wt spaces.Worktree, tabs []spaces.CapturedTab, this int, name string, only bool) *saveLayoutForm {
 	th, cfg := look.New(true), space.ConfigOf(global)
-	f := &saveLayoutForm{th: th, cfg: cfg, global: global, space: space, wt: wt, tabs: tabs, this: this, name: newInput(th, ""), exclude: true}
-	f.name.SetValue(name)
-	f.name.CursorEnd()
-	f.name.Placeholder = "required"
+	f := &saveLayoutForm{th: th, cfg: cfg, global: global, space: space, wt: wt, tabs: tabs, this: this, name: newLineField(th, "required"), exclude: true}
+	f.name.fill(name)
 	scope := everyTab
 	if only {
 		scope = thisTab
@@ -133,9 +131,7 @@ func newSaveLayoutForm(global config.Config, space spaces.Space, wt spaces.Workt
 			}, nil, false, prefill(cfg, prog), nil)
 			c.zone = fmt.Sprintf("pane:%d:%d", t, p)
 			// The run box has the command line whatever is chosen, for switching to it.
-			box := &c.inputs[len(choices)-2][0]
-			box.SetValue(strings.NewReplacer("{", "{{", "}", "}}").Replace(prog))
-			box.CursorEnd()
+			c.inputs[len(choices)-2][0].fill(strings.NewReplacer("{", "{{", "}", "}}").Replace(prog))
 			row = append(row, c)
 		}
 		f.panes = append(f.panes, row)
@@ -177,7 +173,7 @@ func (f *saveLayoutForm) saved() []int {
 
 // saveField is a field of the form: a text box, a choice, or a box to tick.
 type saveField struct {
-	in     *textinput.Model
+	in     field
 	choice interface {
 		cycle(int)
 		zoneName() string
@@ -221,9 +217,9 @@ func (f *saveLayoutForm) fields() []saveField {
 }
 
 // boxes are the fields as moveFocus takes them, nil for a choice.
-func (f *saveLayoutForm) boxes() []*textinput.Model {
+func (f *saveLayoutForm) boxes() []field {
 	fields := f.fields()
-	out := make([]*textinput.Model, len(fields))
+	out := make([]field, len(fields))
 	for i, fl := range fields {
 		out[i] = fl.in
 	}
@@ -362,9 +358,7 @@ func (f *saveLayoutForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if in == nil {
 		return f, nil
 	}
-	var cmd tea.Cmd
-	*in, cmd = in.Update(msg)
-	return f, cmd
+	return f, in.update(msg)
 }
 
 func (f *saveLayoutForm) View() tea.View {
