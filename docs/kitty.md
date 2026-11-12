@@ -36,12 +36,13 @@ open = "tab"                  # optional: tab, split, hsplit, vsplit, overlay or
 inputs = [{ name = "prompt", label = "Prompt", required = true }]
 ```
 
-`inputs` are what the forms ask for, a text box each, in order. An input has:
+`inputs` are what the forms ask for, a text box each, in order, which takes several lines, `shift+enter`
+starting a new one, as the [forms](sidebar.md#the-menu) say. An input has:
 
 - `name`: lowercase letters, digits and `_`, used as `{name}` in templates;
-- `type`: optional, `string`, one line of text, the only type so far;
+- `type`: optional, `string`, text, of one line or several, the only type so far;
 - `label`: optional, the name by default;
-- `default`: optional;
+- `default`: optional; a multi-line TOML string, `"""` to `"""`, for several lines;
 - `required`: optional; an empty required input refuses to run.
 
 A command with several inputs or long ones can list them as tables of their own instead, each
@@ -50,8 +51,9 @@ A command with several inputs or long ones can list them as tables of their own 
 `run` and the values of `env` are templates. `{NAME}` is replaced, as text within the argument, by an
 input's value or a built-in: `{space}`, `{root}`, `{worktree}` (its path), `{branch}`, `{base}` (the main
 worktree's branch), `{session}` and `{pr}`, the PR's number when the worktree was created from one or its
-branch pulls from a PR's head, else empty. Values are never split or expanded, whatever is in them. `{{` and
-`}}` are a literal brace. Anything else in braces, a bad input or an unknown `open` is an error when the
+branch pulls from a PR's head, else empty. Values are never split or expanded, whatever is in them: a
+value's newlines stay in its word, so `claude {prompt}` gets a prompt of several lines as one argument. `{{`
+and `}}` are a literal brace. Anything else in braces, a bad input or an unknown `open` is an error when the
 config loads.
 
 The command also gets `KSPACES_SPACE`, `KSPACES_ROOT`, `KSPACES_WORKTREE`, `KSPACES_BRANCH`, `KSPACES_BASE`,
@@ -81,8 +83,9 @@ window stays usable. The window's program is the command rather than a shell, so
 it, and restoring the session runs it again with the same inputs.
 
 `kspaces run NAME [PATH]` opens the same form for the worktree PATH, or the current directory, is in, with
-`--input NAME=VALUE` filling inputs in and `--open=WHERE` overriding `open` once. `--yes` runs it without
-the form, refusing a required input that is empty.
+`--input NAME=VALUE` filling inputs in, a value's newlines kept, as in `--input "prompt=$(cat task.md)"`,
+and `--open=WHERE` overriding `open` once. `--yes` runs it without the form, refusing a required input
+that is empty.
 
 ## Layouts
 
@@ -127,7 +130,8 @@ kitty only switches a tab to a layout in `enabled_layouts`, so opening a layout 
 is not there fails, saying so.
 
 A layout's inputs are those of its panes' commands, in order, one input for a name two commands share, as
-long as they define it the same. `run`, `cwd` and `title` can use them, and the built-ins.
+long as they define it the same. `run`, `cwd` and `title` can use them, and the built-ins. A tab's title is
+one line, so a newline in a value there is a space.
 
 Each tab is, for the agent layout:
 

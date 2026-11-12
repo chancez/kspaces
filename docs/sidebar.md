@@ -110,6 +110,8 @@ only.
 | Space | Add space | `a` | add a repository to the spaces, in a form; on every row |
 
 Each item that changes something opens a form in an overlay, with buttons and keys to confirm or cancel.
+A click on a text field, its label or its box, gives it focus, as `tab` and `shift+tab` do, and a click in
+its text puts the cursor there; in a one-line field too long for its box, which may be scrolled, at its end.
 
 **Open PR** is the PR the row shows, which needs gh signed in. gh runs in the worktree, in the
 background, so the sidebar does not wait for it; what it says when it fails shows on the sidebar's last
@@ -145,6 +147,12 @@ so `enter` there never submits the form, nor `esc` cancels it; and as `enter` on
 the form's button says no key there, and `enter` submits from the other fields. Every form with a choice,
 below, has these. With a command chosen, the new session's first tab runs it rather than a shell, and
 starts your shell once it exits. A required input left empty refuses to create.
+
+An input's field takes several lines, for a prompt: `shift+enter` starts a new one, as do `alt+enter` and
+`ctrl+j`, for a terminal that sends `shift+enter` as `enter`, and `enter` still submits the form. The field
+grows to show its lines, a long one wrapped, up to six, then scrolls with the cursor, and the rows below it
+move down. `up` and `down` move between its lines, and leave it only from the first or the last. While it
+has focus the keys row lists `shift+enter newline`. Every form with an input, below, has these.
 
 With [layouts](kitty.md#layouts) configured, a `layout` field comes before `command`, set at first to the
 space's layout for its linked worktrees, else `none`, and below it a field for each of its inputs. With a
