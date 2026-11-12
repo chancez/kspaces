@@ -138,9 +138,12 @@ panes = [
 [space.gr]
 worktree_layout = "agent"
 
-# The sidebar's width in columns, 12 to 120.
+# The sidebar's width in columns, 12 to 120, and where its forms and the picker open: "overlay", over the
+# window they are for, or "panel", a centered OS window of a fixed size (macOS, Wayland with layer shell,
+# X11), which needs kspaces kitty install again. See docs/kitty.md.
 [sidebar]
 width = 28
+popup = "overlay"
 
 # Rewrite the installed kitty files when another kspaces is installed, and install the session saver.
 [kitty]

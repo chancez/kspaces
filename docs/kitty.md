@@ -289,7 +289,7 @@ auto_install = true
 save_sessions = true
 ```
 
-Changing `[kitty]` changes what install writes, so it makes the files out of date too.
+Changing `[kitty]`, or `[sidebar] popup`, changes what install writes, so it makes the files out of date too.
 
 ## kitty.conf
 
@@ -356,6 +356,55 @@ is `startup_session`'s, emptied. Windows in no session are saved with the defaul
 demand only. The files go next to kitty's `startup_session`, so point kspaces' `sessions` at that
 directory. `kspaces_save_sessions` saves them on demand. The docks, the forms kspaces opens and the picker
 carry a `kspaces*` user variable, and are never saved.
+
+## Popups: overlays and panels
+
+The forms and the picker open in a popup, by `[sidebar] popup`:
+
+```toml
+[sidebar]
+# "overlay", the default, or "panel".
+popup = "panel"
+```
+
+- `overlay` opens each over a window, as `launch --type=overlay`: a form over the window beside the
+  sidebar, the picker over the window `kspaces_pick` was pressed in. It is that window's size, which over
+  a small split is cramped, and closing it gives the keyboard back to that window, as kitty does.
+- `panel` opens each as a kitty panel, an OS window of its own of a fixed size, centered on the screen,
+  above other windows, which takes the keyboard while it is open:
+
+  ```
+  launch --type=os-panel --os-panel edge=center-sized --os-panel columns=90 --os-panel lines=24
+         --os-panel focus-policy=exclusive --os-panel layer=overlay --env KSPACES_FROM=ID ...
+  ```
+
+  A form is 90 by 24 cells; Save as layout, clean up and Trust space config, which list what they act on,
+  100 by 32; the picker 120 by 32, room for its preview beside the list. A panel closes when it loses
+  focus, so none is left behind, unseen, in another window's way; one that is working, such as switching
+  sessions, which moves the keyboard itself, finishes first, and one that then fails takes the keyboard
+  back to say why. Closing one any other way, with `esc` or by finishing without switching anywhere,
+  gives the keyboard back to the window it was opened from.
+
+A panel is in no session's tab, so it is told the window it was opened from in `KSPACES_FROM`, and works
+as an overlay over that window would: the current session is that window's, Save as layout's "this tab"
+is its tab, and kitty actions run on it, so a tab a form opens goes in that window's OS window rather than
+the panel's. kitty loads a session restored from its file into the focused OS window, so before that a
+panel hands the keyboard back to the window it was opened from, and waits up to a second for kitty to
+have moved its focus; if kitty does not, it refuses with an error rather than fill the panel.
+
+The picker's panel is opened by kspaces, not kitty: with `popup = "panel"` kspaces.conf's `kspaces_pick`
+is `launch --type=background kspaces pick --from @active-kitty-window-id`, which opens the panel for that
+window. Run `kspaces kitty install`, and restart kitty, after changing `popup`; until then `kspaces kitty
+check` reports kspaces.conf out of date, and `kspaces_pick` keeps the old kind.
+
+Panels need kitty 0.42 or later, on a platform kitty can make them on: macOS; Wayland with a compositor
+that has the layer shell protocol, which GNOME's does not; X11 with a window manager that has the EWMH
+window types and states. Where kitty refuses, a popup opens as an overlay instead, and says so once: in the
+sidebar's last line for a form, in kitty's log for the picker. A panel is in no session, so the watcher
+docks no sidebar in it and the session saver never saves it, and it carries the `kspaces_form` or
+`kspaces_picker` user variable as an overlay does. While one has focus no window in a session has, as for
+any other OS window: `tab_bar_filter`'s `session:~` above keeps the tab bar on the session last switched
+to.
 
 ## Keys without focusing the sidebar
 

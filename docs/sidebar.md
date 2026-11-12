@@ -111,7 +111,9 @@ only.
 | Space | Trust space config | | show what the space's own config adds, and trust it, in a form; while its `.kspaces.toml` is untrusted or changed |
 | Space | Add space | `a` | add a repository to the spaces, in a form; on every row |
 
-Each item that changes something opens a form in an overlay, with buttons and keys to confirm or cancel.
+Each item that changes something opens a form in a popup, with buttons and keys to confirm or cancel: an
+overlay over the window beside the sidebar, or with `[sidebar] popup = "panel"` a centered panel of its own,
+which closes when it loses focus; [docs/kitty.md](kitty.md#popups-overlays-and-panels) has the details.
 A click on a text field, its label or its box, gives it focus, as `tab` and `shift+tab` do, and a click in
 its text puts the cursor there; in a one-line field too long for its box, which may be scrolled, at its end.
 
@@ -289,16 +291,17 @@ clicking that row scrolls a page.
 
 ## The picker
 
-`kspaces pick`, which kitty.conf's `kspaces_pick` runs in an overlay, lists the status entries and then
+`kspaces pick`, which kitty.conf's `kspaces_pick` runs in a popup, an overlay over the window the key was
+pressed in or a 120 by 32 panel for it, as `[sidebar] popup` says, lists the status entries and then
 every session and worktree in the sidebar's order, narrowed by a fuzzy query. `enter` switches to the
 entry under the cursor. A missing worktree has the sidebar's icon for it and `gone` for its branch, and is
 not switched to without windows open.
 
-Beside the list in an overlay 90 columns or wider, and below it in a narrower one, a preview shows the
+Beside the list in a popup 90 columns or wider, and below it in a narrower one, a preview shows the
 entry under the cursor: a status entry in full, as the sidebar's opened entry; a worktree's space, path,
 branch, its changes, upstream and PR as its row shows them, its session, how many windows it has open,
 whether it has a saved session file, and its status entries. A missing worktree's path says its directory
-is gone, with no branch or git state. An overlay too short for both shows only the list.
+is gone, with no branch or git state. A popup too short for both shows only the list.
 
 Under what it says of the entry, where there is room, the preview shows the bottom of a window's screen,
 with its colors, under a rule: a status entry's own window, or for a session with windows open the one
