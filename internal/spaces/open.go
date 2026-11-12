@@ -202,6 +202,12 @@ func AskRunCommand(st kitty.State, name, path string) error {
 	return kitty.LaunchForm(st, "run", name, path)
 }
 
+// AskOpenLayout opens the form that opens the layout called name in the worktree at path, in an overlay
+// as NewWorktree's.
+func AskOpenLayout(st kitty.State, name, path string) error {
+	return kitty.LaunchForm(st, "layout", name, path)
+}
+
 // AskCloseSession opens the form that confirms closing session, in an overlay as NewWorktree's.
 func AskCloseSession(st kitty.State, session string) error {
 	return kitty.LaunchForm(st, "close", session)

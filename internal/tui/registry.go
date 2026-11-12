@@ -55,6 +55,9 @@ type cleanupSubject struct{}
 // runSubject is the run form.
 type runSubject struct{}
 
+// layoutSubject is the layout form.
+type layoutSubject struct{}
+
 // filterSubject is the spaces list's filter, while it is open.
 type filterSubject struct{}
 
@@ -157,6 +160,17 @@ var (
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			return m.runCommand(s.row.Worktree.Path)
+		},
+	}
+	actOpenLayout = &interact.Action[*sidebar, entrySubject]{
+		Title:   "Open layout",
+		Section: sectionSession,
+		Applies: func(m *sidebar, s entrySubject) bool {
+			return !s.row.Other && !s.row.Missing && s.row.Worktree != nil && len(m.cfg.Layouts) > 0
+		},
+		Run: func(m *sidebar, s entrySubject) tea.Cmd {
+			m.remote = false
+			return m.openLayout(s.row)
 		},
 	}
 	actCloseSession = &interact.Action[*sidebar, entrySubject]{
@@ -499,6 +513,39 @@ var (
 	actRunCancel = quit[*runForm, runSubject]()
 )
 
+// The layout form's.
+var (
+	actLayoutNextField = &interact.Action[*layoutForm, layoutSubject]{
+		Title: "next field",
+		Run:   cmd[*layoutForm, layoutSubject]((*layoutForm).nextField),
+	}
+	actLayoutPrevField = &interact.Action[*layoutForm, layoutSubject]{
+		Title: "previous field",
+		Run:   cmd[*layoutForm, layoutSubject]((*layoutForm).prevField),
+	}
+	actNextLayout = &interact.Action[*layoutForm, layoutSubject]{
+		Title:   "next layout",
+		Applies: func(f *layoutForm, _ layoutSubject) bool { return f.onLayout() },
+		Run:     func(f *layoutForm, _ layoutSubject) tea.Cmd { return f.cycleLayout(1) },
+	}
+	actPrevLayout = &interact.Action[*layoutForm, layoutSubject]{
+		Title:   "previous layout",
+		Applies: func(f *layoutForm, _ layoutSubject) bool { return f.onLayout() },
+		Run:     func(f *layoutForm, _ layoutSubject) tea.Cmd { return f.cycleLayout(-1) },
+	}
+	actOpenLayoutNow = &interact.Action[*layoutForm, layoutSubject]{
+		Title:   "open",
+		Applies: func(f *layoutForm, _ layoutSubject) bool { return !f.busy },
+		Run:     cmd[*layoutForm, layoutSubject]((*layoutForm).open),
+	}
+	// actWaitForLayout is enter while the layout is being opened, which does nothing.
+	actWaitForLayout = &interact.Action[*layoutForm, layoutSubject]{
+		Title: "opening",
+		Run:   func(*layoutForm, layoutSubject) tea.Cmd { return nil },
+	}
+	actLayoutCancel = quit[*layoutForm, layoutSubject]()
+)
+
 // The add space form's.
 var (
 	actAdd = &interact.Action[*addSpaceForm, addSubject]{
@@ -523,6 +570,7 @@ var (
 	addKind    *interact.Kind[*addSpaceForm, addSubject]
 	cleanKind  *interact.Kind[*cleanupForm, cleanupSubject]
 	runKind    *interact.Kind[*runForm, runSubject]
+	layoutKind *interact.Kind[*layoutForm, layoutSubject]
 	filterKind *interact.Kind[*sidebar, filterSubject]
 	sortKind   *interact.Kind[*sidebar, sortSubject]
 
@@ -538,6 +586,7 @@ var (
 	theAddForm    *interact.Place[*addSpaceForm, addSubject]
 	theCleanup    *interact.Place[*cleanupForm, cleanupSubject]
 	theRunForm    *interact.Place[*runForm, runSubject]
+	theLayoutForm *interact.Place[*layoutForm, layoutSubject]
 	theFilter     *interact.Place[*sidebar, filterSubject]
 	theSort       *interact.Place[*sidebar, sortSubject]
 )
@@ -550,11 +599,12 @@ func init() {
 	spacesKind.Bind(actAddSpace, "a", "add space", "a")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actRunCommand, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actFold, actUnfold, actCleanup)
+		actOpenWorktree, actRunCommand, actOpenLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actFold, actUnfold, actCleanup)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
 	entryKind.Bind(actRunCommand, "R", "run a command", "R")
+	entryKind.Bind(actOpenLayout, "L", "open a layout", "L")
 	entryKind.Bind(actCloseSession, "c", "close session", "c")
 	entryKind.Bind(actOpenPR, "b", "open the PR in the browser", "b")
 	entryKind.Bind(actRemoveWorktree, "x", "remove worktree", "x")
@@ -662,6 +712,17 @@ func init() {
 	runKind.BindQuiet(actWaitForRun, "enter")
 	runKind.Bind(actRunCancel, "esc", "cancel", "esc", "ctrl+c")
 	theRunForm = interact.List(runKind)
+
+	layoutKind = interact.NewKind(func(layoutSubject) string { return "Open layout" },
+		actLayoutNextField, actLayoutPrevField, actNextLayout, actPrevLayout, actOpenLayoutNow, actLayoutCancel)
+	layoutKind.Bind(actLayoutNextField, "tab", "next field", "tab", "down")
+	layoutKind.Bind(actLayoutPrevField, "shift+tab", "previous field", "shift+tab", "up")
+	layoutKind.Bind(actNextLayout, "left/right", "layout", "right")
+	layoutKind.Bind(actPrevLayout, "", "", "left")
+	layoutKind.Bind(actOpenLayoutNow, "enter", "open", "enter")
+	layoutKind.BindQuiet(actWaitForLayout, "enter")
+	layoutKind.Bind(actLayoutCancel, "esc", "cancel", "esc", "ctrl+c")
+	theLayoutForm = interact.List(layoutKind)
 
 	// j and k type, as worktrees are named with them, so only arrows and the picker's ctrl keys move.
 	filterKind = interact.NewKind(func(filterSubject) string { return "Filter" },

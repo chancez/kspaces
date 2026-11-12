@@ -223,6 +223,22 @@ func (m *sidebar) runCommand(path string) tea.Cmd {
 	}
 }
 
+// openLayout opens the form that opens a layout in r's worktree, in an overlay as newWorktree's, with the
+// worktree's default layout chosen, else the first.
+func (m *sidebar) openLayout(r spaces.Row) tea.Cmd {
+	st, path := m.kitty, r.Worktree.Path
+	name := m.cfg.LayoutFor(r.Space.Name, !r.Main)
+	if name == "" {
+		name = m.cfg.Layouts[0].Name
+	}
+	return func() tea.Msg {
+		if err := spaces.AskOpenLayout(st, name, path); err != nil {
+			return spaces.Snapshot{Err: err}
+		}
+		return nil
+	}
+}
+
 // rowPR is the PR of r's worktree's branch the poller found, the one its row shows, nil for none.
 func (m *sidebar) rowPR(r spaces.Row) *gitstate.PR {
 	if r.Worktree == nil {
