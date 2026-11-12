@@ -762,3 +762,53 @@ func TestSpaceFileLayouts(t *testing.T) {
 		t.Errorf("tests in the other space: %v", err)
 	}
 }
+
+// In the picker shift+enter, or alt+enter, opens the entry under the cursor without its default layout,
+// and the count line says so, only while that is what the entry would open with.
+func TestPickWithoutLayout(t *testing.T) {
+	cfg, err := config.Parse("layout = \"two\"\n\n[[layouts]]\nname = \"two\"\ntabs = [{ panes = [{}, { split = \"right\" }] }]\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap := fixture(time.Now())
+	snap.Config = &cfg
+	m := newPicker(0)
+	m.getText = func(int) (string, error) { return "", nil }
+	m.Update(tea.WindowSizeMsg{Width: 50, Height: 6})
+	m.Update(snap)
+	typeInto(m, "kitty")
+	screen := func(query, count string, list ...string) []string {
+		return append(append([]string{"\uf002  " + query, strings.Repeat("\u2500", 50)}, list...), count)
+	}
+	if got, want := pickerScreen(m), screen("kitty", "1/11  shift+enter switch without layout", "   kitty  master", "", ""); !reflect.DeepEqual(got, want) {
+		t.Errorf("kitty:\n%q\nwant\n%q", got, want)
+	}
+	for _, k := range []tea.KeyPressMsg{{Code: tea.KeyEnter, Mod: tea.ModShift}, {Code: tea.KeyEnter, Mod: tea.ModAlt}} {
+		calls := fakeKittenWindows(t, "kitty")
+		_, cmd := m.Update(k)
+		if cmd == nil {
+			t.Fatalf("%s chose nothing", k)
+		}
+		if msg := cmd(); msg != (tea.QuitMsg{}) {
+			t.Fatalf("%s said %v", k, msg)
+		}
+		want := []string{"@", "action", "launch", "--type=tab", "--cwd=/src/kitty", "--add-to-session=kitty", "--",
+			"@", "action", "goto_session", "kitty.kitty-session", "--"}
+		if got := calls(); !reflect.DeepEqual(got, want) {
+			t.Errorf("%s ran kitten as\n%q\nwant\n%q", k, got, want)
+		}
+		m.choosing = false
+	}
+
+	// gr has windows open: no hint, and shift+enter chooses nothing.
+	for range 5 {
+		m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	}
+	typeInto(m, "gr  main")
+	if got, want := pickerScreen(m), screen("gr  main", "1/11", open+"gr  main", "", ""); !reflect.DeepEqual(got, want) {
+		t.Errorf("gr:\n%q\nwant\n%q", got, want)
+	}
+	if _, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter, Mod: tea.ModShift}); m.choosing {
+		t.Errorf("shift+enter chose gr: %v", cmd != nil)
+	}
+}

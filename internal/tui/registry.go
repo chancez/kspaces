@@ -434,7 +434,12 @@ var (
 	}
 	actPick = &interact.Action[*picker, pickerSubject]{
 		Title: "switch",
-		Run:   cmd[*picker, pickerSubject]((*picker).choose),
+		Run:   func(m *picker, _ pickerSubject) tea.Cmd { return m.choose(spaces.OpenOptions{}) },
+	}
+	actPickPlain = &interact.Action[*picker, pickerSubject]{
+		Title:   "switch without layout",
+		Applies: func(m *picker, _ pickerSubject) bool { return m.opensLayout() },
+		Run:     func(m *picker, _ pickerSubject) tea.Cmd { return m.choose(spaces.OpenOptions{NoLayout: true}) },
 	}
 	actPickQuit = quit[*picker, pickerSubject]()
 )
@@ -820,10 +825,12 @@ func init() {
 	menuKind.Bind(actMenuQuit, "ctrl+c", "quit", "ctrl+c")
 	theMenu = interact.List(menuKind)
 
-	pickerKind = interact.NewKind(func(pickerSubject) string { return "Picker" }, actPickDown, actPickUp, actPick, actPickQuit)
+	pickerKind = interact.NewKind(func(pickerSubject) string { return "Picker" }, actPickDown, actPickUp, actPick, actPickPlain, actPickQuit)
 	pickerKind.Bind(actPickDown, "down/up", "down/up", "down", "ctrl+n", "ctrl+j")
 	pickerKind.Bind(actPickUp, "", "", "up", "ctrl+p", "ctrl+k")
 	pickerKind.Bind(actPick, "enter", "switch", "enter")
+	// alt+enter for a terminal that sends shift+enter as enter, as a form's newline takes it.
+	pickerKind.Bind(actPickPlain, "shift+enter", "switch without layout", "shift+enter", "alt+enter")
 	pickerKind.Bind(actPickQuit, "esc", "cancel", "esc", "ctrl+c")
 	thePicker = interact.List(pickerKind)
 

@@ -296,7 +296,10 @@ clicking that row scrolls a page.
 `kspaces pick`, which kitty.conf's `kspaces_pick` runs in a popup, an overlay over the window the key was
 pressed in or a 120 by 32 panel for it, as `[sidebar] popup` says, lists the status entries and then
 every session and worktree in the sidebar's order, narrowed by a fuzzy query. `enter` switches to the
-entry under the cursor. A missing worktree has the sidebar's icon for it and `gone` for its branch, and is
+entry under the cursor. `shift+enter`, or `alt+enter` for a terminal that sends `shift+enter` as `enter`,
+switches to it without its [default layout](kitty.md#layouts), as **Open without layout** does; the last
+line says `shift+enter switch without layout` after the count while that is what the entry would open
+with. A missing worktree has the sidebar's icon for it and `gone` for its branch, and is
 not switched to without windows open.
 
 Beside the list in a popup 90 columns or wider, and below it in a narrower one, a preview shows the

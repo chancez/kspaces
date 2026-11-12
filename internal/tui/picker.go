@@ -136,12 +136,14 @@ func (m *picker) filter() {
 	m.cursor = min(m.cursor, max(len(m.matches)-1, 0))
 }
 
-// choose switches to the chosen item and exits, which closes the popup the picker runs in.
-func (m *picker) choose() tea.Cmd {
-	if m.cursor >= len(m.matches) || m.snap.Config == nil {
+// choose switches to the chosen item, opening it as opts says, and exits, which closes the popup the
+// picker runs in.
+func (m *picker) choose(opts spaces.OpenOptions) tea.Cmd {
+	it, ok := m.chosen()
+	if !ok {
 		return nil
 	}
-	it, cfg, st := m.items[m.matches[m.cursor].Index], *m.snap.Config, m.snap.Kitty
+	cfg, st := *m.snap.Config, m.snap.Kitty
 	// The picker's window has focus, so there is no window of the tab to hand back to: the tab's own
 	// window gets focus again when an overlay closes, and the popup gives it back from a panel.
 	st.Home = 0
@@ -157,13 +159,28 @@ func (m *picker) choose() tea.Cmd {
 			// Opening it would make it afresh in a directory that is gone.
 			err = fmt.Errorf("the worktree directory of %s is gone", it.row.Worktree.Session)
 		default:
-			err = spaces.OpenWorktree(cfg, st, *it.row.Worktree, spaces.OpenOptions{})
+			err = spaces.OpenWorktree(cfg, st, *it.row.Worktree, opts)
 		}
 		if err != nil {
 			return spaces.Snapshot{Err: err}
 		}
 		return tea.QuitMsg{}
 	}
+}
+
+// chosen is the item under the cursor, once loaded.
+func (m *picker) chosen() (pickItem, bool) {
+	if m.cursor >= len(m.matches) || m.snap.Config == nil {
+		return pickItem{}, false
+	}
+	return m.items[m.matches[m.cursor].Index], true
+}
+
+// opensLayout says whether the item under the cursor would open with its default layout, which
+// choosing it without one skips.
+func (m *picker) opensLayout() bool {
+	it, ok := m.chosen()
+	return ok && it.status == nil && spaces.OpensDefaultLayout(*m.snap.Config, m.snap.Kitty, *it.row.Space, *it.row.Worktree)
 }
 
 // Update follows the cursor's entry with the preview's screen after whatever moved it: a key, the query,
@@ -284,7 +301,11 @@ func (m *picker) render() string {
 	for len(lines) < m.height-1 {
 		lines = append(lines, "")
 	}
-	status := th.Render(look.Plain, th.Cut(width, look.Muted(fmt.Sprintf("%d/%d", len(m.matches), len(m.items))))...)
+	spans := []look.Span{look.Muted(fmt.Sprintf("%d/%d", len(m.matches), len(m.items)))}
+	if m.opensLayout() {
+		spans = append(spans, look.Text("  "), look.Key("shift+enter"), look.KeyDesc(" switch without layout"))
+	}
+	status := th.Render(look.Plain, th.Cut(width, spans...)...)
 	if m.err != nil {
 		status = th.Render(look.Plain, th.Cut(width, look.Error(m.err.Error()))...)
 	}
