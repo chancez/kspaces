@@ -37,5 +37,31 @@ func (a *app) layoutCommand() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "open without the form; a required input not given is an error")
 	cmd.Flags().StringArrayVar(&inputs, "input", nil, "an input's value, as NAME=VALUE; repeat for more")
+	cmd.AddCommand(a.layoutSaveCommand())
+	return cmd
+}
+
+func (a *app) layoutSaveCommand() *cobra.Command {
+	var tab bool
+	cmd := &cobra.Command{
+		Use:   "save [NAME] [PATH]",
+		Short: "Save the tabs of the session of the worktree at PATH, the current directory's by default, as the layout NAME in the config, after choosing what each pane runs in a form",
+		Args:  cobra.MaximumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+			name, dir := "", "."
+			if len(args) > 0 {
+				name = args[0]
+			}
+			if len(args) > 1 {
+				dir = args[1]
+			}
+			return tui.SaveLayoutForm(cmd.Context(), cfg, dir, name, tab)
+		},
+	}
+	cmd.Flags().BoolVar(&tab, "tab", false, "save this tab alone: the one kspaces runs in, if the session's, else the session's most recently focused")
 	return cmd
 }

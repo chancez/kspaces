@@ -239,6 +239,18 @@ func (m *sidebar) openLayout(r spaces.Row) tea.Cmd {
 	}
 }
 
+// saveLayout opens the form that saves the session of the worktree at path as a layout, in an overlay as
+// newWorktree's.
+func (m *sidebar) saveLayout(path string) tea.Cmd {
+	st := m.kitty
+	return func() tea.Msg {
+		if err := spaces.AskSaveLayout(st, path); err != nil {
+			return spaces.Snapshot{Err: err}
+		}
+		return nil
+	}
+}
+
 // rowPR is the PR of r's worktree's branch the poller found, the one its row shows, nil for none.
 func (m *sidebar) rowPR(r spaces.Row) *gitstate.PR {
 	if r.Worktree == nil {

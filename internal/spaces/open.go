@@ -208,6 +208,13 @@ func AskOpenLayout(st kitty.State, name, path string) error {
 	return kitty.LaunchForm(st, "layout", name, path)
 }
 
+// AskSaveLayout opens the form that saves the session of the worktree at path as a layout, its name left
+// to fill in, in an overlay as NewWorktree's. The form's window is in the tab st is seen from, the
+// sidebar's, so that is this tab when the session is the sidebar's.
+func AskSaveLayout(st kitty.State, path string) error {
+	return kitty.LaunchForm(st, "layout", "save", "", path)
+}
+
 // AskCloseSession opens the form that confirms closing session, in an overlay as NewWorktree's.
 func AskCloseSession(st kitty.State, session string) error {
 	return kitty.LaunchForm(st, "close", session)

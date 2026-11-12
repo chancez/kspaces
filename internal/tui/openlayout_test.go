@@ -151,12 +151,12 @@ func TestLayoutKey(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	want := []string{
-		menuRule("Session"), " Open", " Run", " Open layout", " Close session",
+		menuRule("Session"), " Open", " Run", " Open layout", " Save as layout", " Close session",
 		menuRule("Worktree"), " Remove worktree",
 		menuRule("Space"), " New worktree", " Fold worktrees", " Add space",
 		menuRule(""),
 	}
-	if got := e.screen()[y+1 : y+13]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[y+1 : y+14]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	e.press("esc")

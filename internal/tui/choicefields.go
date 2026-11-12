@@ -13,8 +13,11 @@ import (
 // between them loses nothing typed.
 type choiceFields[T any] struct {
 	th *look.Theme
-	// label is what the form calls the choice, and the zone it is drawn in, which a click changes.
-	label   string
+	// label is what the form calls the choice.
+	label string
+	// zone is the zone it is drawn in, which a click changes: the label, unless a form has several choices
+	// with the same label.
+	zone    string
 	choices []T
 	nameOf  func(T) string
 	inputOf func(T) []config.Input
@@ -46,7 +49,7 @@ func newLayoutFields(th *look.Theme, layouts []config.Layout, optional bool, nam
 // newChoiceFields are the fields for choices, with the one called name chosen, or none or the first when
 // there is no such choice, and its inputs filled in from values, the rest with their defaults.
 func newChoiceFields[T any](th *look.Theme, label string, choices []T, nameOf func(T) string, inputOf func(T) []config.Input, optional bool, name string, values map[string]string) choiceFields[T] {
-	c := choiceFields[T]{th: th, label: label, choices: choices, nameOf: nameOf, inputOf: inputOf, optional: optional, sel: -1}
+	c := choiceFields[T]{th: th, label: label, zone: label, choices: choices, nameOf: nameOf, inputOf: inputOf, optional: optional, sel: -1}
 	if !optional && len(choices) > 0 {
 		c.sel = 0
 	}
@@ -146,7 +149,7 @@ func (c *choiceFields[T]) lines(selFocused bool) []string {
 		if selFocused {
 			arrow = look.Key
 		}
-		spans := look.Mark(c.label, arrow("<"), look.Text(" "+name+" "), arrow(">"))
+		spans := look.Mark(c.zone, arrow("<"), look.Text(" "+name+" "), arrow(">"))
 		out = append(out, label(c.label)+th.Render(look.Plain, spans...))
 	}
 	if ch, ok := c.chosen(); ok {
@@ -156,6 +159,9 @@ func (c *choiceFields[T]) lines(selFocused bool) []string {
 	}
 	return out
 }
+
+// zoneName is the zone the choice is drawn in.
+func (c *choiceFields[T]) zoneName() string { return c.zone }
 
 // clickedChoice says whether msg is a click on the choice drawn in zone, in the frame zones were scanned
 // from.

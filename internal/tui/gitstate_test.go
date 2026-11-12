@@ -180,12 +180,12 @@ func TestOpenPR(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	want := []string{
-		menuRule("Session"), " Open", " Close session",
+		menuRule("Session"), " Open", " Save as layout", " Close session",
 		menuRule("Worktree"), " Open PR #123", " Remove worktree",
 		menuRule("Space"), " New worktree", " Fold worktrees", " Add space",
 		menuRule(""),
 	}
-	if got := e.screen()[y+1 : y+12]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[y+1 : y+13]; !reflect.DeepEqual(got, want) {
 		t.Errorf("dev's menu:\n%q\nwant\n%q", got, want)
 	}
 	e.press("esc")

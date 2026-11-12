@@ -58,6 +58,9 @@ type runSubject struct{}
 // layoutSubject is the layout form.
 type layoutSubject struct{}
 
+// saveSubject is the save layout form.
+type saveSubject struct{}
+
 // filterSubject is the spaces list's filter, while it is open.
 type filterSubject struct{}
 
@@ -171,6 +174,18 @@ var (
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			return m.openLayout(s.row)
+		},
+	}
+	actSaveAsLayout = &interact.Action[*sidebar, entrySubject]{
+		Title:   "Save as layout",
+		Section: sectionSession,
+		// A worktree's session with windows to save, whose cwds are templates of the worktree's.
+		Applies: func(m *sidebar, s entrySubject) bool {
+			return !s.row.Other && !s.row.Missing && s.row.Worktree != nil && m.kitty.Windows[s.row.Worktree.Session] > 0
+		},
+		Run: func(m *sidebar, s entrySubject) tea.Cmd {
+			m.remote = false
+			return m.saveLayout(s.row.Worktree.Path)
 		},
 	}
 	actCloseSession = &interact.Action[*sidebar, entrySubject]{
@@ -546,6 +561,52 @@ var (
 	actLayoutCancel = quit[*layoutForm, layoutSubject]()
 )
 
+// The save layout form's. Typing goes to the name and run boxes, so y and n only answer the question
+// whether to replace a layout, while it is asked.
+var (
+	actSaveNextField = &interact.Action[*saveLayoutForm, saveSubject]{
+		Title:   "next field",
+		Applies: func(f *saveLayoutForm, _ saveSubject) bool { return !f.confirm },
+		Run:     cmd[*saveLayoutForm, saveSubject]((*saveLayoutForm).nextField),
+	}
+	actSavePrevField = &interact.Action[*saveLayoutForm, saveSubject]{
+		Title:   "previous field",
+		Applies: func(f *saveLayoutForm, _ saveSubject) bool { return !f.confirm },
+		Run:     cmd[*saveLayoutForm, saveSubject]((*saveLayoutForm).prevField),
+	}
+	actSaveNextChoice = &interact.Action[*saveLayoutForm, saveSubject]{
+		Title:   "next choice",
+		Applies: func(f *saveLayoutForm, _ saveSubject) bool { return !f.confirm && f.onChoice() },
+		Run:     func(f *saveLayoutForm, _ saveSubject) tea.Cmd { return f.cycleChoice(1) },
+	}
+	actSavePrevChoice = &interact.Action[*saveLayoutForm, saveSubject]{
+		Title:   "previous choice",
+		Applies: func(f *saveLayoutForm, _ saveSubject) bool { return !f.confirm && f.onChoice() },
+		Run:     func(f *saveLayoutForm, _ saveSubject) tea.Cmd { return f.cycleChoice(-1) },
+	}
+	actSaveLayout = &interact.Action[*saveLayoutForm, saveSubject]{
+		Title:   "save",
+		Applies: func(f *saveLayoutForm, _ saveSubject) bool { return !f.busy && !f.confirm },
+		Run:     func(f *saveLayoutForm, _ saveSubject) tea.Cmd { return f.save(false) },
+	}
+	// actWaitForSave is enter while the layout is being saved, or the question asked, which does nothing.
+	actWaitForSave = &interact.Action[*saveLayoutForm, saveSubject]{
+		Title: "saving",
+		Run:   func(*saveLayoutForm, saveSubject) tea.Cmd { return nil },
+	}
+	actSaveReplace = &interact.Action[*saveLayoutForm, saveSubject]{
+		Title:   "replace",
+		Applies: func(f *saveLayoutForm, _ saveSubject) bool { return f.confirm && !f.busy },
+		Run:     func(f *saveLayoutForm, _ saveSubject) tea.Cmd { return f.save(true) },
+	}
+	actSaveKeep = &interact.Action[*saveLayoutForm, saveSubject]{
+		Title:   "keep it",
+		Applies: func(f *saveLayoutForm, _ saveSubject) bool { return f.confirm && !f.busy },
+		Run:     do[*saveLayoutForm, saveSubject](func(f *saveLayoutForm) { f.confirm = false }),
+	}
+	actSaveCancel = quit[*saveLayoutForm, saveSubject]()
+)
+
 // The add space form's.
 var (
 	actAdd = &interact.Action[*addSpaceForm, addSubject]{
@@ -571,6 +632,7 @@ var (
 	cleanKind  *interact.Kind[*cleanupForm, cleanupSubject]
 	runKind    *interact.Kind[*runForm, runSubject]
 	layoutKind *interact.Kind[*layoutForm, layoutSubject]
+	saveKind   *interact.Kind[*saveLayoutForm, saveSubject]
 	filterKind *interact.Kind[*sidebar, filterSubject]
 	sortKind   *interact.Kind[*sidebar, sortSubject]
 
@@ -587,6 +649,7 @@ var (
 	theCleanup    *interact.Place[*cleanupForm, cleanupSubject]
 	theRunForm    *interact.Place[*runForm, runSubject]
 	theLayoutForm *interact.Place[*layoutForm, layoutSubject]
+	theSaveForm   *interact.Place[*saveLayoutForm, saveSubject]
 	theFilter     *interact.Place[*sidebar, filterSubject]
 	theSort       *interact.Place[*sidebar, sortSubject]
 )
@@ -599,7 +662,7 @@ func init() {
 	spacesKind.Bind(actAddSpace, "a", "add space", "a")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actRunCommand, actOpenLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actFold, actUnfold, actCleanup)
+		actOpenWorktree, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actFold, actUnfold, actCleanup)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
@@ -723,6 +786,19 @@ func init() {
 	layoutKind.BindQuiet(actWaitForLayout, "enter")
 	layoutKind.Bind(actLayoutCancel, "esc", "cancel", "esc", "ctrl+c")
 	theLayoutForm = interact.List(layoutKind)
+
+	saveKind = interact.NewKind(func(saveSubject) string { return "Save layout" },
+		actSaveNextField, actSavePrevField, actSaveNextChoice, actSavePrevChoice, actSaveLayout, actSaveReplace, actSaveKeep, actSaveCancel)
+	saveKind.Bind(actSaveNextField, "tab", "next field", "tab", "down")
+	saveKind.Bind(actSavePrevField, "shift+tab", "previous field", "shift+tab", "up")
+	saveKind.Bind(actSaveNextChoice, "left/right", "choose", "right")
+	saveKind.Bind(actSavePrevChoice, "", "", "left")
+	saveKind.Bind(actSaveLayout, "enter", "save", "enter")
+	saveKind.Bind(actSaveReplace, "y", "replace", "y")
+	saveKind.Bind(actSaveKeep, "n/esc", "keep it", "n", "esc")
+	saveKind.BindQuiet(actWaitForSave, "enter")
+	saveKind.Bind(actSaveCancel, "esc", "cancel", "esc", "ctrl+c")
+	theSaveForm = interact.List(saveKind)
 
 	// j and k type, as worktrees are named with them, so only arrows and the picker's ctrl keys move.
 	filterKind = interact.NewKind(func(filterSubject) string { return "Filter" },

@@ -367,22 +367,22 @@ func TestRightClickMenu(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	want := []string{
-		menuRule("Session"), " Open", " Close session",
+		menuRule("Session"), " Open", " Save as layout", " Close session",
 		menuRule("Worktree"), " Remove worktree",
 		menuRule("Space"), " New worktree", " Fold worktrees", " Add space",
 		menuRule(""),
 	}
-	if got := e.screen()[y+1 : y+11]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[y+1 : y+12]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{" Open"}) {
 		t.Errorf("highlighted %q, want the first item", got)
 	}
-	e.hover(fmt.Sprintf(menuZone, 4))
+	e.hover(fmt.Sprintf(menuZone, 5))
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{" Fold worktrees"}) {
 		t.Errorf("highlighted %q after moving onto Fold worktrees", got)
 	}
-	if cmd := e.click(fmt.Sprintf(menuZone, 4), tea.MouseLeft); cmd != nil || e.m.menu != nil {
+	if cmd := e.click(fmt.Sprintf(menuZone, 5), tea.MouseLeft); cmd != nil || e.m.menu != nil {
 		t.Errorf("running Fold worktrees: cmd %v, menu still open %v", cmd != nil, e.m.menu != nil)
 	}
 	if !e.has("\u25b6 "+blocked+"gr main") || e.m.cursor != e.row("gr") {
@@ -431,12 +431,12 @@ func TestMenuNarrow(t *testing.T) {
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	rule := strings.Repeat("\u2500", 11)
 	want := []string{
-		"\u2500 Session \u2500", " Open", " Close s...",
+		"\u2500 Session \u2500", " Open", " Save as...", " Close s...",
 		"\u2500 Work... \u2500", " Remove ...",
 		"\u2500 Space \u2500\u2500\u2500", " New wor...", " Fold wo...", " Add space",
 		rule,
 	}
-	if got := e.screen()[y+1 : y+11]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[y+1 : y+12]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 }
@@ -454,7 +454,7 @@ func TestMenuKeys(t *testing.T) {
 	if e.m.menu != nil || e.m.cursor != e.row("gr@dev") {
 		t.Errorf("menu open %v, cursor %d", e.m.menu != nil, e.m.cursor)
 	}
-	e.press("m", "j", "j", "j", "j", "enter")
+	e.press("m", "j", "j", "j", "j", "j", "enter")
 	if !e.has("\u25b6 " + blocked + "gr main") {
 		t.Errorf("enter on Fold worktrees did not fold gr:\n%s", strings.Join(e.screen(), "\n"))
 	}
@@ -465,7 +465,7 @@ func TestMenuKeys(t *testing.T) {
 func TestMenuSkipsSections(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.FocusMsg{})
-	e.press("m", "j", "j")
+	e.press("m", "j", "j", "j")
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree"}) {
 		t.Errorf("j past Session's last item: highlighted %q", got)
 	}
@@ -473,7 +473,7 @@ func TestMenuSkipsSections(t *testing.T) {
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree"}) {
 		t.Errorf("k from Space's first item: highlighted %q", got)
 	}
-	_, y := e.zone(fmt.Sprintf(menuZone, 2))
+	_, y := e.zone(fmt.Sprintf(menuZone, 3))
 	head := y - 1
 	if got := e.screen()[head]; got != menuRule("Worktree") {
 		t.Fatalf("above Remove worktree is %q, want Worktree's rule", got)
@@ -483,7 +483,7 @@ func TestMenuSkipsSections(t *testing.T) {
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree"}) {
 		t.Errorf("mouse on Worktree's name: highlighted %q", got)
 	}
-	if cmd := e.clickAt(3, head, tea.MouseLeft); cmd != nil || e.m.menu == nil || e.m.menu.sel != 2 {
+	if cmd := e.clickAt(3, head, tea.MouseLeft); cmd != nil || e.m.menu == nil || e.m.menu.sel != 3 {
 		t.Errorf("click on Worktree's name: cmd %v, menu open %v", cmd != nil, e.m.menu != nil)
 	}
 }
