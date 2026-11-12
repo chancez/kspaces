@@ -46,6 +46,13 @@ const (
 	GlyphBehind
 	// GlyphUntrusted marks a space whose own config is not trusted, so not in use.
 	GlyphUntrusted
+	// The corners and sides of the border a popup in a panel is drawn in.
+	GlyphFrameTopLeft
+	GlyphFrameTopRight
+	GlyphFrameBottomLeft
+	GlyphFrameBottomRight
+	GlyphFrameHorizontal
+	GlyphFrameVertical
 	numGlyphs
 )
 
@@ -54,60 +61,72 @@ const (
 // keeps them at.
 var glyphSets = map[Glyphs][numGlyphs]string{
 	GlyphsASCII: {
-		GlyphOpen:         "v",
-		GlyphFolded:       ">",
-		GlyphBlocked:      "!",
-		GlyphError:        "x",
-		GlyphDone:         "+",
-		GlyphWorking:      "*",
-		GlyphIdle:         "o",
-		GlyphCurrent:      ">",
-		GlyphSession:      "*",
-		GlyphBroken:       "x",
-		GlyphGone:         "x",
-		GlyphSpace:        "#",
-		GlyphWorktree:     "-",
-		GlyphOther:        "$",
-		GlyphSearch:       "/",
-		GlyphMoreAbove:    "^",
-		GlyphMoreBelow:    "v",
-		GlyphAdd:          "+",
-		GlyphSortManual:   "=",
-		GlyphSortActivity: "@",
-		GlyphSortStatus:   "!",
-		GlyphChosen:       "*",
-		GlyphChanges:      "*",
-		GlyphAhead:        "+",
-		GlyphBehind:       "-",
-		GlyphUntrusted:    "?",
+		GlyphOpen:             "v",
+		GlyphFolded:           ">",
+		GlyphBlocked:          "!",
+		GlyphError:            "x",
+		GlyphDone:             "+",
+		GlyphWorking:          "*",
+		GlyphIdle:             "o",
+		GlyphCurrent:          ">",
+		GlyphSession:          "*",
+		GlyphBroken:           "x",
+		GlyphGone:             "x",
+		GlyphSpace:            "#",
+		GlyphWorktree:         "-",
+		GlyphOther:            "$",
+		GlyphSearch:           "/",
+		GlyphMoreAbove:        "^",
+		GlyphMoreBelow:        "v",
+		GlyphAdd:              "+",
+		GlyphSortManual:       "=",
+		GlyphSortActivity:     "@",
+		GlyphSortStatus:       "!",
+		GlyphChosen:           "*",
+		GlyphChanges:          "*",
+		GlyphAhead:            "+",
+		GlyphBehind:           "-",
+		GlyphUntrusted:        "?",
+		GlyphFrameTopLeft:     "+",
+		GlyphFrameTopRight:    "+",
+		GlyphFrameBottomLeft:  "+",
+		GlyphFrameBottomRight: "+",
+		GlyphFrameHorizontal:  "-",
+		GlyphFrameVertical:    "|",
 	},
 	GlyphsUnicode: {
-		GlyphOpen:         "\u25bc", // black down-pointing triangle
-		GlyphFolded:       "\u25b6", // black right-pointing triangle
-		GlyphBlocked:      "!",
-		GlyphError:        "\u2717", // ballot x
-		GlyphDone:         "\u2713", // check mark
-		GlyphWorking:      "\u2026", // horizontal ellipsis
-		GlyphIdle:         "\u25cb", // white circle
-		GlyphCurrent:      "\u203a", // single right angle quote
-		GlyphSession:      "\u2022", // bullet
-		GlyphBroken:       "\u2717",
-		GlyphGone:         "\u2715", // multiplication x
-		GlyphSpace:        "\u25a0", // black square
-		GlyphWorktree:     "\u2514", // box drawings up and right
-		GlyphOther:        "\u25aa", // black small square
-		GlyphSearch:       "/",
-		GlyphMoreAbove:    "\u25b4", // small up triangle
-		GlyphMoreBelow:    "\u25be", // small down triangle
-		GlyphAdd:          "+",
-		GlyphSortManual:   "\u2261", // identical to
-		GlyphSortActivity: "\u25f7", // white circle with upper right quadrant, a clock face
-		GlyphSortStatus:   "!",
-		GlyphChosen:       "\u2713", // check mark
-		GlyphChanges:      "\u25cf", // black circle
-		GlyphAhead:        "\u2191", // upwards arrow
-		GlyphBehind:       "\u2193", // downwards arrow
-		GlyphUntrusted:    "?",
+		GlyphOpen:             "\u25bc", // black down-pointing triangle
+		GlyphFolded:           "\u25b6", // black right-pointing triangle
+		GlyphBlocked:          "!",
+		GlyphError:            "\u2717", // ballot x
+		GlyphDone:             "\u2713", // check mark
+		GlyphWorking:          "\u2026", // horizontal ellipsis
+		GlyphIdle:             "\u25cb", // white circle
+		GlyphCurrent:          "\u203a", // single right angle quote
+		GlyphSession:          "\u2022", // bullet
+		GlyphBroken:           "\u2717",
+		GlyphGone:             "\u2715", // multiplication x
+		GlyphSpace:            "\u25a0", // black square
+		GlyphWorktree:         "\u2514", // box drawings up and right
+		GlyphOther:            "\u25aa", // black small square
+		GlyphSearch:           "/",
+		GlyphMoreAbove:        "\u25b4", // small up triangle
+		GlyphMoreBelow:        "\u25be", // small down triangle
+		GlyphAdd:              "+",
+		GlyphSortManual:       "\u2261", // identical to
+		GlyphSortActivity:     "\u25f7", // white circle with upper right quadrant, a clock face
+		GlyphSortStatus:       "!",
+		GlyphChosen:           "\u2713", // check mark
+		GlyphChanges:          "\u25cf", // black circle
+		GlyphAhead:            "\u2191", // upwards arrow
+		GlyphBehind:           "\u2193", // downwards arrow
+		GlyphUntrusted:        "?",
+		GlyphFrameTopLeft:     "\u256d", // box drawings light arc down and right
+		GlyphFrameTopRight:    "\u256e", // box drawings light arc down and left
+		GlyphFrameBottomLeft:  "\u2570", // box drawings light arc up and right
+		GlyphFrameBottomRight: "\u256f", // box drawings light arc up and left
+		GlyphFrameHorizontal:  "\u2500", // box drawings light horizontal
+		GlyphFrameVertical:    "\u2502", // box drawings light vertical
 	},
 	GlyphsNerd: {
 		// The triangles, not Font Awesome's chevrons, which are drawn wider than their cell and thin.
@@ -141,5 +160,12 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphBehind:  "\u2193",
 		// Followed by two spaces, as a marker is, since kitty draws it over the first.
 		GlyphUntrusted: "\uf023", // lock
+		// Box drawings, as Unicode's: kitty draws them itself, joined.
+		GlyphFrameTopLeft:     "\u256d",
+		GlyphFrameTopRight:    "\u256e",
+		GlyphFrameBottomLeft:  "\u2570",
+		GlyphFrameBottomRight: "\u256f",
+		GlyphFrameHorizontal:  "\u2500",
+		GlyphFrameVertical:    "\u2502",
 	},
 }
