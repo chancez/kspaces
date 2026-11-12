@@ -125,10 +125,13 @@ def save_all(boss):
 #
 # Not while kitty quits, which closes every window after on_quit has saved them, nor for the windows of an
 # OS window closed as a whole, which kitty also closes one by one: either would remove every file. The
-# sessions keep what was saved before, as when the last of them took focus.
+# sessions keep what was saved before, as when the last of them took focus. That is decided in on_close
+# itself: kitty drops an OS window closed as a whole from os_window_map before closing its windows, while
+# closing an OS window's last tab closes the OS window only afterwards, so by the time the timer fires both
+# look the same, and that session kept a stale file.
 SAVE_DELAY = 0.5
 _quitting = False
-# Session names waiting to be saved, each with the OS windows its windows closed in.
+# Session names waiting to be saved, each True if one of its windows closed with its OS window.
 _pending = {}
 _timer = None
 
@@ -138,9 +141,8 @@ def note_change(boss, window, closed):
     name = window.created_in_session_name
     if _quitting or not name or not startup_path() or any(k.startswith('kspaces') for k in window.user_vars):
         return
-    os_windows = _pending.setdefault(name, set())
-    if closed:
-        os_windows.add(window.os_window_id)
+    torn_down = closed and window.os_window_id not in boss.os_window_map
+    _pending[name] = _pending.get(name, False) or torn_down
     if _timer is None:
         # kitty's timers are a fixed table on macOS, and add_timer returns 0, never to call back, when it is
         # full, as it can be at startup with every watcher call taking one. Keeping 0 would wait for that
@@ -154,8 +156,8 @@ def save_pending(boss):
     if _quitting or not boss.os_window_map:
         return
     main = main_os_window(boss, set(boss.all_loaded_session_names) - {default_name()})
-    for name, closed_in in pending.items():
-        if any(i not in boss.os_window_map for i in closed_in):
+    for name, torn_down in pending.items():
+        if torn_down:
             continue
         match = session_match(name)
         if any(True for _ in boss.match_windows(match)):

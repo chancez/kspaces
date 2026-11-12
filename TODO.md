@@ -16,15 +16,8 @@
   - Moving a tab to another OS window (`detach_tab`) drops the tab's session name, so the tab bar filter
     shows the moved tab in every session. `kspaces_watcher.py` puts it back from the tab's windows.
 - `save_sessions.py` saves a session when one of its windows closes or takes focus, and removes its file
-  with its last window, but kitty's watchers miss some changes:
-  - Nothing says an OS window is closing as a whole, so its windows' closes are told from a user closing
-    them only by the OS window being gone, and skipped. A space alone in its own OS window keeps a stale
-    file when its last tab closes, as that closes the OS window too. Fixable without kitty: inside
-    `on_close` the OS window is already gone from `boss.os_window_map` when it closes as a whole or kitty
-    quits, and `current_application_quit_request()` tells the two apart; the saver checks only later, from
-    a timer.
-  - Nothing says a window's directory changed, so a `cd` is saved only at the next focus change, close or
-    quit.
+  with its last window, but nothing says a window's directory changed, so a `cd` is saved only at the next
+  focus change, close or quit.
 - On macOS kitty keeps timers in a table of 128 (glfw/cocoa_init.m), and `add_timer` returns 0 when it is
   full, never calling back. kitty fills it itself: `call_watchers` takes a 0s timer for every window resize
   and focus change, listened to or not, and none fire until the code that caused them returns. Restoring 9
