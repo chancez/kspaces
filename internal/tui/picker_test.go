@@ -453,10 +453,16 @@ func TestCloseSessionForm(t *testing.T) {
 // clickOn clicks the first cell of label on the form's screen, as the last View drew it.
 func clickOn(t *testing.T, f tea.Model, label string) tea.Cmd {
 	t.Helper()
+	return clickInto(t, f, label, 0)
+}
+
+// clickInto clicks the cell n cells into the first label on the form's screen, as the last View drew it.
+func clickInto(t *testing.T, f tea.Model, label string, n int) tea.Cmd {
+	t.Helper()
 	frame := f.View().Content
 	for y, l := range strings.Split(ansi.Strip(frame), "\n") {
 		if x := strings.Index(l, label); x >= 0 {
-			_, cmd := f.Update(tea.MouseClickMsg{X: ansi.StringWidth(l[:x]), Y: y, Button: tea.MouseLeft})
+			_, cmd := f.Update(tea.MouseClickMsg{X: ansi.StringWidth(l[:x]) + n, Y: y, Button: tea.MouseLeft})
 			return cmd
 		}
 	}

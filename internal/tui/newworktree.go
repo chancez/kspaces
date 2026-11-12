@@ -313,6 +313,10 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			f.cmds.openList()
 			return f, f.cycleCommand(0)
 		}
+		if i, ok := clickedField(f.fields(), f.zones, msg); ok {
+			f.focus = i
+			return f, moveFocus(f.fields(), &f.focus, 0)
+		}
 	}
 	// Everything else is typing in the field that has focus.
 	in := f.focused()
@@ -365,11 +369,8 @@ func (f *newWorktreeForm) render() string {
 	line := func(spans ...look.Span) string { return th.Render(look.Plain, spans...) }
 	muted := func(s string) string { return line(th.Cut(width, look.Muted(s))...) }
 	branch, _ := f.plan()
-	lines := []string{
-		line(look.Heading("New worktree in " + f.space.Name)), "",
-		th.Draw(look.Plain, labelWidth, look.Label("branch")) + f.branch.View(),
-		th.Draw(look.Plain, labelWidth, look.Label("directory")) + f.dir.View(),
-	}
+	lines := []string{line(look.Heading("New worktree in " + f.space.Name)), ""}
+	lines = append(append(lines, fieldLines(th, "branch", &f.branch, width)...), fieldLines(th, "directory", &f.dir, width)...)
 	layoutAt := len(lines)
 	lines = append(lines, f.layouts.lines(f.onLayout(), width)...)
 	commandAt := len(lines)

@@ -82,6 +82,10 @@ func (f *addSpaceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
 			return f, cmd
 		}
+		// The path is the only field, so it has focus already.
+		if _, ok := clickedField([]field{&f.path}, f.zones, msg); ok {
+			return f, nil
+		}
 	}
 	before := f.path.Value()
 	cmd := f.path.update(msg)
@@ -103,11 +107,8 @@ func (f *addSpaceForm) View() tea.View {
 func (f *addSpaceForm) render() string {
 	th, width := f.th, max(f.width-4, 20)
 	line := func(spans ...look.Span) string { return th.Render(look.Plain, spans...) }
-	lines := []string{
-		line(look.Heading("Add a space")), "",
-		th.Draw(look.Plain, labelWidth, look.Label("repository")) + f.path.View(),
-		"",
-	}
+	lines := append([]string{line(look.Heading("Add a space")), ""}, fieldLines(th, "repository", &f.path, width)...)
+	lines = append(lines, "")
 	switch {
 	case strings.TrimSpace(f.path.Value()) == "":
 		lines = append(lines, line(look.Muted("Name a directory in the repository to add")))

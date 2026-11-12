@@ -137,6 +137,10 @@ func (f *layoutForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			f.layouts.openList()
 			return f, f.cycleLayout(0)
 		}
+		if i, ok := clickedField(f.fields(), f.zones, msg); ok {
+			f.focus = i
+			return f, moveFocus(f.fields(), &f.focus, 0)
+		}
 	}
 	in := f.focused()
 	if in == nil {

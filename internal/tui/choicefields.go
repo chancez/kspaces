@@ -155,7 +155,6 @@ func (c *choiceFields[T]) values() map[string]string {
 // The focused choice says how to change it, as width leaves room.
 func (c *choiceFields[T]) lines(selFocused bool, width int) []string {
 	th := c.th
-	label := func(s string) string { return th.DrawCut(look.Plain, labelWidth-1, look.Label(s)) + " " }
 	var out []string
 	if c.picks() {
 		name := "none"
@@ -170,11 +169,11 @@ func (c *choiceFields[T]) lines(selFocused bool, width int) []string {
 		if room := width - labelWidth - th.Width(spans...); selFocused && room > 0 {
 			spans = append(spans, th.Cut(room, look.Muted("  left/right change  enter list"))...)
 		}
-		out = append(out, label(c.label)+th.Render(look.Plain, spans...))
+		out = append(out, th.DrawCut(look.Plain, labelWidth-1, look.Label(c.label))+" "+th.Render(look.Plain, spans...))
 	}
 	if ch, ok := c.chosen(); ok {
 		for i, in := range c.inputOf(ch) {
-			out = append(out, label(in.Label)+c.inputs[c.sel][i].View())
+			out = append(out, fieldLines(th, in.Label, c.inputs[c.sel][i], width)...)
 		}
 	}
 	return out

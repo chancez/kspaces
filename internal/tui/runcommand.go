@@ -172,6 +172,10 @@ func (f *runForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			f.cmds.openList()
 			return f, f.cycleCommand(0)
 		}
+		if i, ok := clickedField(f.fields(), f.zones, msg); ok {
+			f.focus = i
+			return f, moveFocus(f.fields(), &f.focus, 0)
+		}
 	}
 	in := f.focused()
 	if in == nil {

@@ -353,6 +353,10 @@ func (f *saveLayoutForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return f, moveFocus(f.boxes(), &f.focus, 0)
 			}
 		}
+		if i, ok := clickedField(f.boxes(), f.zones, msg); ok {
+			f.focus = i
+			return f, moveFocus(f.boxes(), &f.focus, 0)
+		}
 	}
 	in := f.focused().in
 	if in == nil {
@@ -375,10 +379,7 @@ func (f *saveLayoutForm) render() string {
 	line := func(spans ...look.Span) string { return th.Render(look.Plain, spans...) }
 	muted := func(s string) string { return line(th.Cut(width, look.Muted(s))...) }
 	on := f.focused().choice
-	lines := []string{
-		line(look.Heading("Save " + f.wt.Session + " as a layout")), "",
-		th.Draw(look.Plain, labelWidth, look.Label("name")) + f.name.View(),
-	}
+	lines := append([]string{line(look.Heading("Save " + f.wt.Session + " as a layout")), ""}, fieldLines(th, "name", &f.name, width)...)
 	// list draws the open list, if any, over the lines once they are all there.
 	list := func(lines []string) []string { return lines }
 	if f.scope.listOpen() {
