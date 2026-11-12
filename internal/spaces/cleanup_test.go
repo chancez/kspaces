@@ -6,13 +6,14 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/gittest"
 )
 
 // A linked worktree looks done with when its PR is merged, its upstream is gone, or its branch is merged
 // into the main worktree's after having moved; not when it was only just made. Its changes are counted,
-// and a locked one is offered refused.
+// and what deleting its branch loses, and a locked one is offered refused.
 func TestCleanups(t *testing.T) {
 	remote := gittest.Bare(t)
 	r := gittest.New(t)
@@ -48,10 +49,11 @@ func TestCleanups(t *testing.T) {
 	}
 	// In the order git lists them.
 	want := []Cleanup{
-		{Worktree: byBranch["gone"], Reasons: []string{"upstream gone"}, Changes: 1},
+		{Worktree: byBranch["gone"], Reasons: []string{"upstream gone"}, Changes: 1, Branch: Branch{Name: "gone", Merge: git.Merge{Unmerged: 1}}},
 		{Worktree: byBranch["locked"], Reasons: []string{"merged into main"}, Refused: errors.New(wt("locked") + " is locked; git worktree unlock it first")},
-		{Worktree: byBranch["merged"], Reasons: []string{"merged into main"}},
-		{Worktree: byBranch["pr"], Reasons: []string{"PR #12 merged"}},
+		{Worktree: byBranch["merged"], Reasons: []string{"merged into main"}, Branch: Branch{Name: "merged", Merge: git.Merge{Into: "main"}}},
+		// Its PR is merged, as by a squash, though its commit is not.
+		{Worktree: byBranch["pr"], Reasons: []string{"PR #12 merged"}, Branch: Branch{Name: "pr", Merge: git.Merge{Unmerged: 1}, PR: 12}},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got\n%#v\nwant\n%#v", got, want)

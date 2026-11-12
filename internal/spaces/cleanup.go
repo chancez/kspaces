@@ -18,6 +18,8 @@ type Cleanup struct {
 	Changes int
 	// Refused is why it cannot be removed, as CanRemove says, or why its changes could not be counted.
 	Refused error
+	// Branch is its branch as deleting it with the worktree would find it, unless Refused.
+	Branch Branch
 }
 
 // Cleanups are the linked worktrees of space that look done with. pr is the PR of a worktree's branch,
@@ -40,6 +42,7 @@ func Cleanups(space Space, pr func(Worktree) *gitstate.PR) ([]Cleanup, error) {
 			return nil, err
 		}
 	}
+	def := git.DefaultBranch(space.Root)
 	var ans []Cleanup
 	for _, wt := range space.Worktrees[1:] {
 		// A detached HEAD has no branch to say it is done.
@@ -47,7 +50,8 @@ func Cleanups(space Space, pr func(Worktree) *gitstate.PR) ([]Cleanup, error) {
 			continue
 		}
 		var reasons []string
-		if p := pr(wt); p != nil && p.State == "merged" {
+		p := pr(wt)
+		if p != nil && p.State == "merged" {
 			reasons = append(reasons, fmt.Sprintf("PR #%d merged", p.Number))
 		}
 		if gone[wt.Branch] {
@@ -64,6 +68,9 @@ func Cleanups(space Space, pr func(Worktree) *gitstate.PR) ([]Cleanup, error) {
 			if c.Changes, err = git.Changes(wt.Path); err != nil {
 				c.Refused = fmt.Errorf("checking %s for changes: %w", wt.Path, err)
 			}
+		}
+		if c.Refused == nil {
+			c.Branch = BranchOf(space, def, wt, p)
 		}
 		ans = append(ans, c)
 	}

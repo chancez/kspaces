@@ -124,6 +124,11 @@ removes the ticked ones one after another, each as Remove worktree does, in one 
 git is forced only for those the form said have changes. The PR is the one the sidebar shows, or looked
 up with gh as the form opens when the sidebar has none yet.
 
+**Also delete their branches**, off at first, `d` or a click, deletes each removed worktree's branch by
+Remove worktree's rules, and gives each worktree a line saying what deleting its branch loses, or why it is
+kept. A branch whose commits are not merged is deleted with `-D`, its line saying the commits are lost once
+its worktree is ticked; one whose PR is merged, as after a squash, says so and loses nothing.
+
 **Forget** shows the saved session file of a missing worktree with no windows open, and Delete deletes it,
 so kitty does not restore the session. `kspaces forget SESSION` does the same for any session with no
 windows open; `--yes` without asking.

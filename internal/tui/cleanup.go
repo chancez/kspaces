@@ -11,6 +11,7 @@ import (
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/tui/interact"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
@@ -23,8 +24,10 @@ type cleanupForm struct {
 	items []spaces.Cleanup
 	// checked are the items to remove: at first all but those with changes and those git would refuse.
 	checked []bool
-	cursor  int
-	busy    bool
+	// deleteBranches deletes the branches of the items removed, those that can go.
+	deleteBranches bool
+	cursor         int
+	busy           bool
 	// err is why starting the removal failed.
 	err   error
 	width int
@@ -33,8 +36,11 @@ type cleanupForm struct {
 	buttons controls[*cleanupForm]
 }
 
-// cleanupZone is row i of the form's list.
-const cleanupZone = "cleanup:%d"
+// cleanupZone is row i of the form's list, and cleanupBranchesZone the box that deletes their branches.
+const (
+	cleanupZone         = "cleanup:%d"
+	cleanupBranchesZone = "cleanup:branches"
+)
 
 type cleanedMsg struct{ err error }
 
@@ -55,6 +61,16 @@ func (f *cleanupForm) toggle(i int) {
 	}
 }
 
+// branches reports whether any item has a branch that can go with it, for the box that deletes them.
+func (f *cleanupForm) branches() bool {
+	for _, c := range f.items {
+		if c.Branch.Offered() {
+			return true
+		}
+	}
+	return false
+}
+
 // chosen are the ticked items.
 func (f *cleanupForm) chosen() []spaces.Cleanup {
 	var out []spaces.Cleanup
@@ -68,14 +84,15 @@ func (f *cleanupForm) chosen() []spaces.Cleanup {
 
 // remove hands the ticked worktrees to one background process, which removes them one after another, and
 // leaves, as the remove worktree form does. git is forced for those with changes, which the form said are
-// lost.
+// lost, and for the branches with commits not merged, which it said are lost or merged by their PR.
 func (f *cleanupForm) remove() tea.Cmd {
 	f.busy, f.err = true, nil
 	var paths []string
 	opts := map[string]spaces.RemoveOptions{}
 	for _, c := range f.chosen() {
 		paths = append(paths, c.Worktree.Path)
-		opts[c.Worktree.Path] = spaces.RemoveOptions{Force: c.Changes > 0}
+		branch := f.deleteBranches && c.Branch.Offered()
+		opts[c.Worktree.Path] = spaces.RemoveOptions{Force: c.Changes > 0, DeleteBranch: branch, ForceBranch: branch && c.Branch.Unmerged > 0}
 	}
 	return func() tea.Msg { return cleanedMsg{spaces.RemoveAllInBackground(paths, opts)} }
 }
@@ -103,6 +120,11 @@ func (f *cleanupForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					f.cursor = i
 					f.toggle(i)
 				}
+			}
+		}
+		for _, z := range f.zones[cleanupBranchesZone] {
+			if msg.Button == tea.MouseLeft && z.Contains(msg.X, msg.Y) && actCleanupBranches.Applies(f, cleanupSubject{}) {
+				f.deleteBranches = !f.deleteBranches
 			}
 		}
 	}
@@ -153,10 +175,32 @@ func (f *cleanupForm) render() string {
 		if i == f.cursor {
 			surface = look.Cursor
 		}
-		lines = append(lines, th.DrawZone(fmt.Sprintf(cleanupZone, i), surface, width, th.Cut(width, spans...)...))
+		zone := fmt.Sprintf(cleanupZone, i)
+		lines = append(lines, th.DrawZone(zone, surface, width, th.Cut(width, spans...)...))
+		// The branch has a line of its own, under the name, so a long reason does not cut off what it loses.
+		if f.deleteBranches && c.Refused == nil && c.Branch.Name != "" {
+			fate := look.Muted("kept, as " + c.Branch.Kept)
+			if c.Branch.Offered() {
+				fate = branchFate(c.Branch, f.checked[i])
+			}
+			lines = append(lines, th.DrawZone(zone, surface, width, th.Cut(width, look.Default("    "), look.Muted("branch: "), fate)...))
+		}
 	}
 	if len(f.items) > 0 {
-		lines = append(lines, "", line(th.Cut(width, look.Muted("Each closes its session and is removed; its branch is kept."))...), "")
+		lines = append(lines, "")
+		note := "Each closes its session and is removed; its branch is kept."
+		if f.branches() {
+			target := theCleanup.Target(cleanupSubject{})
+			spans := []look.Span{look.Checkbox(f.deleteBranches, f.busy), look.Text(" Also delete their branches")}
+			if _, key, ok := offered(f, target, interact.Keys(f, target), actCleanupBranches); ok && key != "" {
+				spans = append(spans, look.Default(" "), look.Muted(key))
+			}
+			lines = append(lines, th.DrawZone(cleanupBranchesZone, look.Plain, width, th.Cut(width, spans...)...))
+			if f.deleteBranches {
+				note = "Each closes its session and is removed, and its branch deleted."
+			}
+		}
+		lines = append(lines, line(th.Cut(width, look.Muted(note))...), "")
 	}
 	switch {
 	case f.busy:

@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/spaces"
 )
 
@@ -92,6 +93,107 @@ func TestCleanupForm(t *testing.T) {
 		"--force-path", "/src/gr/.worktrees/fix", "--", "/src/gr/.worktrees/dev", "/src/gr/.worktrees/fix"}
 	if got := launched(); !reflect.DeepEqual(got, wantArgs) {
 		t.Errorf("launched %q, want %q", got, wantArgs)
+	}
+}
+
+// Also delete their branches, off at first, puts each worktree's branch on a line of its own: merged, its PR
+// merged, kept, or its commits not merged, said lost once the worktree is ticked. y deletes those that can
+// go, forcing git for the commits not merged, which the form said are lost or merged by the PR.
+func TestCleanupFormBranches(t *testing.T) {
+	launched := fakeKitten(t)
+	space, items := cleanupFixture()
+	items[0].Branch = spaces.Branch{Name: "pr/me/dev", Merge: git.Merge{Unmerged: 3}, PR: 12}
+	items[1].Branch = spaces.Branch{Name: "fix", Merge: git.Merge{Unmerged: 2}}
+	done := spaces.Worktree{Path: "/src/gr/.worktrees/done", Branch: "done", Session: "gr@done"}
+	trunk := spaces.Worktree{Path: "/src/gr/.worktrees/trunk", Branch: "trunk", Session: "gr@trunk"}
+	items = append(items,
+		spaces.Cleanup{Worktree: done, Reasons: []string{"merged into main"}, Branch: spaces.Branch{Name: "done", Merge: git.Merge{Into: "main"}}},
+		spaces.Cleanup{Worktree: trunk, Reasons: []string{"upstream gone"}, Branch: spaces.Branch{Name: "trunk", Kept: "it is the default branch"}})
+	f := newCleanupForm(space, items)
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	want := []string{
+		"",
+		"  Clean up worktrees of gr",
+		"",
+		"  [x] dev    PR #12 merged",
+		"  [ ] fix    upstream gone; 2 files not committed",
+		"  [-] old    merged into main; locked",
+		"  [x] done   merged into main",
+		"  [x] trunk  upstream gone",
+		"",
+		"  [ ] Also delete their branches d",
+		"  Each closes its session and is removed; its branch is kept.",
+		"",
+		"   Remove 3 worktrees y    Cancel n",
+		"",
+	}
+	if got := cleanupScreen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("off:\n%q\nwant\n%q", got, want)
+	}
+	f.Update(keyMsg("d"))
+	want = []string{
+		"",
+		"  Clean up worktrees of gr",
+		"",
+		"  [x] dev    PR #12 merged",
+		"      branch: merged by PR #12, nothing lost",
+		"  [ ] fix    upstream gone; 2 files not committed",
+		"      branch: 2 commits not merged",
+		"  [-] old    merged into main; locked",
+		"  [x] done   merged into main",
+		"      branch: merged into main, nothing lost",
+		"  [x] trunk  upstream gone",
+		"      branch: kept, as it is the default branch",
+		"",
+		"  [x] Also delete their branches d",
+		"  Each closes its session and is removed, and its branch deleted.",
+		"",
+		"   Remove 3 worktrees y    Cancel n",
+		"",
+	}
+	if got := cleanupScreen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("on:\n%q\nwant\n%q", got, want)
+	}
+	// A click on fix's branch line ticks fix, as one on its row does.
+	f.View()
+	clickOn(t, f, "2 commits not merged")
+	want[5] = "  [x] fix    upstream gone; 2 files not committed, lost"
+	want[6] = "      branch: 2 commits not merged, lost"
+	want[16] = "   Remove 4 worktrees y    Cancel n"
+	if got := cleanupScreen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("fix ticked:\n%q\nwant\n%q", got, want)
+	}
+
+	_, cmd := f.Update(keyMsg("y"))
+	if msg := cmd(); msg != (cleanedMsg{}) {
+		t.Errorf("removing said %v", msg)
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantArgs := []string{"@", "launch", "--type=background", "--allow-remote-control", exe, "remove", "--yes",
+		"--delete-branch-path", "/src/gr/.worktrees/dev", "--force-branch-path", "/src/gr/.worktrees/dev",
+		"--force-path", "/src/gr/.worktrees/fix", "--delete-branch-path", "/src/gr/.worktrees/fix", "--force-branch-path", "/src/gr/.worktrees/fix",
+		"--delete-branch-path", "/src/gr/.worktrees/done",
+		"--", "/src/gr/.worktrees/dev", "/src/gr/.worktrees/fix", "/src/gr/.worktrees/done", "/src/gr/.worktrees/trunk"}
+	if got := launched(); !reflect.DeepEqual(got, wantArgs) {
+		t.Errorf("launched\n%q\nwant\n%q", got, wantArgs)
+	}
+
+	// Off again, nothing but the worktrees goes.
+	f = newCleanupForm(space, items)
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	f.Update(keyMsg("d"))
+	f.View()
+	clickOn(t, f, "Also delete their branches")
+	if _, cmd := f.Update(keyMsg("y")); cmd() != (cleanedMsg{}) {
+		t.Error("removing failed")
+	}
+	wantArgs = []string{"@", "launch", "--type=background", "--allow-remote-control", exe, "remove", "--yes",
+		"--", "/src/gr/.worktrees/dev", "/src/gr/.worktrees/done", "/src/gr/.worktrees/trunk"}
+	if got := launched(); !reflect.DeepEqual(got, wantArgs) {
+		t.Errorf("launched with the box clicked off\n%q\nwant\n%q", got, wantArgs)
 	}
 }
 
