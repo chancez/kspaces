@@ -1,6 +1,7 @@
 package git
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -233,5 +234,83 @@ func TestDefaultBranch(t *testing.T) {
 				t.Errorf("DefaultBranch = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// A branch is merged when the default branch, local or the base remote's, or its upstream has all its
+// commits, and says which; otherwise the commits neither has are counted. A gone upstream counts as none.
+func TestMergeOf(t *testing.T) {
+	r := gittest.New(t)
+	r.Commit("first")
+	r.Git("remote", "add", "origin", r.Dir)
+	branch := func(name string, commits int) {
+		r.Git("checkout", "-q", "-b", name, "main")
+		for i := range commits {
+			r.Commit(fmt.Sprintf("%s %d", name, i))
+		}
+		r.Git("checkout", "-q", "main")
+	}
+	upstream := func(name string) {
+		r.Git("config", "branch."+name+".remote", "origin")
+		r.Git("config", "branch."+name+".merge", "refs/heads/"+name)
+	}
+	branch("fresh", 0)
+	branch("merged", 2)
+	r.Git("merge", "-q", "--no-edit", "--no-ff", "merged")
+	branch("remote", 1)
+	r.Git("update-ref", "refs/remotes/origin/main", "remote")
+	branch("pushed", 2)
+	upstream("pushed")
+	r.Git("update-ref", "refs/remotes/origin/pushed", "pushed")
+	branch("ahead", 2)
+	upstream("ahead")
+	r.Git("update-ref", "refs/remotes/origin/ahead", "ahead~1")
+	branch("gone", 1)
+	upstream("gone")
+
+	got := map[string]Merge{}
+	for _, b := range []string{"fresh", "merged", "remote", "pushed", "ahead", "gone"} {
+		m, err := MergeOf(r.Dir, b, "main")
+		if err != nil {
+			t.Fatal(err)
+		}
+		got[b] = m
+	}
+	want := map[string]Merge{
+		"fresh":  {Into: "main"},
+		"merged": {Into: "main"},
+		"remote": {Into: "main"},
+		"pushed": {Into: "origin/pushed"},
+		"ahead":  {Unmerged: 1},
+		"gone":   {Unmerged: 1},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v\nwant %#v", got, want)
+	}
+}
+
+// git branch -d refuses a branch not merged, and -D deletes it.
+func TestDeleteBranch(t *testing.T) {
+	r := gittest.New(t)
+	r.Commit("first")
+	r.Git("branch", "merged")
+	r.Git("checkout", "-q", "-b", "unmerged")
+	r.Commit("work")
+	r.Git("checkout", "-q", "main")
+	type result struct {
+		Err      bool
+		Branches string
+	}
+	var got []result
+	for _, step := range []struct {
+		branch string
+		force  bool
+	}{{"merged", false}, {"unmerged", false}, {"unmerged", true}} {
+		err := DeleteBranch(r.Dir, step.branch, step.force)
+		got = append(got, result{err != nil, r.Git("branch", "--format=%(refname:short)")})
+	}
+	want := []result{{false, "main\nunmerged"}, {true, "main\nunmerged"}, {false, "main"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v\nwant %#v", got, want)
 	}
 }

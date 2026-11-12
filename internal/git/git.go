@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -130,6 +131,72 @@ func RemoveWorktree(root, dir string, force bool) error {
 		args = append(args, "--force")
 	}
 	if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+		return fmt.Errorf("%s", strings.TrimSpace(string(out)))
+	}
+	return nil
+}
+
+// Merge is how much of a branch its default branch and upstream have, which says what deleting it loses.
+type Merge struct {
+	// Unmerged is how many of the branch's commits neither the default branch, local or its base remote's,
+	// nor the branch's upstream has.
+	Unmerged int
+	// Into is what has all the branch's commits when Unmerged is 0: the default branch, else the upstream.
+	// One of them does, as its tip is in one.
+	Into string
+}
+
+// MergeOf is how much of branch, in the repository at root, base, the default branch, and branch's
+// upstream have. An upstream that is gone counts as none.
+func MergeOf(root, branch, base string) (Merge, error) {
+	var defaults []string
+	if base != "" {
+		refs := []string{"refs/heads/" + base}
+		if remote := baseRemote(root); remote != "" {
+			refs = append(refs, "refs/remotes/"+remote+"/"+base)
+		}
+		for _, ref := range refs {
+			if refExists(root, ref) {
+				defaults = append(defaults, ref)
+			}
+		}
+	}
+	upstream, err := line("-C", root, "for-each-ref", "--format=%(upstream)", "refs/heads/"+branch)
+	if err != nil {
+		return Merge{}, err
+	}
+	var upstreams []string
+	if upstream != "" && refExists(root, upstream) {
+		upstreams = []string{upstream}
+	}
+	count := func(not ...string) (int, error) {
+		args := append([]string{"-C", root, "rev-list", "--count", "refs/heads/" + branch, "--not"}, not...)
+		out, err := line(append(args, "--")...)
+		if err != nil {
+			return 0, err
+		}
+		return strconv.Atoi(out)
+	}
+	n, err := count(append(defaults, upstreams...)...)
+	if err != nil || n > 0 {
+		return Merge{Unmerged: n}, err
+	}
+	if len(defaults) > 0 {
+		if n, err := count(defaults...); err != nil || n == 0 {
+			return Merge{Into: base}, err
+		}
+	}
+	return Merge{Into: strings.TrimPrefix(upstream, "refs/remotes/")}, nil
+}
+
+// DeleteBranch deletes the local branch named branch of the repository at root. git refuses one not
+// merged into its upstream, or HEAD without one, unless force, which loses its commits.
+func DeleteBranch(root, branch string, force bool) error {
+	flag := "-d"
+	if force {
+		flag = "-D"
+	}
+	if out, err := exec.Command("git", "-C", root, "branch", flag, branch).CombinedOutput(); err != nil {
 		return fmt.Errorf("%s", strings.TrimSpace(string(out)))
 	}
 	return nil
