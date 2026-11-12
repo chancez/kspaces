@@ -213,7 +213,7 @@ func (m *sidebar) moveRow(delta int) tea.Cmd {
 // the order it moves to itself.
 func (m *sidebar) keepOrder() {
 	switch {
-	case m.menu != nil:
+	case m.press != nil || m.menu != nil:
 		if m.held == nil {
 			m.held = m.shown().held()
 		}

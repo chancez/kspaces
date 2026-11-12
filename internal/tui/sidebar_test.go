@@ -69,11 +69,12 @@ type sidebarEnv struct {
 	m *sidebar
 }
 
-// newSidebarEnv is a sidebar 30 cells wide and 40 high showing fixture, with the folded file in a
-// directory of the test's own.
+// newSidebarEnv is a sidebar 30 cells wide and 40 high showing fixture, with the state files and the
+// config in directories of the test's own, so moving a space never edits mine.
 func newSidebarEnv(t *testing.T) *sidebarEnv {
 	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	e := &sidebarEnv{t: t, m: newSidebar(0)}
 	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 40})
 	e.m.Update(fixture(time.Now()))
@@ -165,16 +166,19 @@ func (e *sidebarEnv) entry(window int) int {
 	return 0
 }
 
-// click presses button on zone id, then draws the screen.
+// click presses button on zone id and lets go of it, then draws the screen.
 func (e *sidebarEnv) click(id string, button tea.MouseButton) tea.Cmd {
 	e.t.Helper()
 	x, y := e.zone(id)
 	return e.clickAt(x, y, button)
 }
 
+// clickAt is the command of the press, or of the release when that runs one, as opening a row does.
 func (e *sidebarEnv) clickAt(x, y int, button tea.MouseButton) tea.Cmd {
 	_, cmd := e.m.Update(tea.MouseClickMsg{X: x, Y: y, Button: button})
-	e.m.Update(tea.MouseReleaseMsg{X: x, Y: y, Button: button})
+	if _, done := e.m.Update(tea.MouseReleaseMsg{X: x, Y: y, Button: button}); done != nil {
+		cmd = done
+	}
 	e.m.render()
 	return cmd
 }
@@ -818,7 +822,8 @@ func TestErrorOnLastLine(t *testing.T) {
 }
 
 // In pixel mouse mode, positions are turned into cells, and kitty's event for the mouse leaving the window,
-// which bubbletea reads as motion with the left button, into mouseLeftMsg.
+// which bubbletea reads as motion with the left button, into mouseLeftMsg; between a left press and its
+// release that motion is a drag.
 func TestPixelMouse(t *testing.T) {
 	p := &pixelMouse{on: true, cellW: 10, cellH: 20}
 	got := []tea.Msg{
@@ -827,6 +832,10 @@ func TestPixelMouse(t *testing.T) {
 		p.filter(nil, tea.MouseWheelMsg{X: 5, Y: 399, Button: tea.MouseWheelDown}),
 		p.filter(nil, tea.MouseMotionMsg{X: 3000, Y: 7, Button: tea.MouseLeft}),
 		p.filter(nil, tea.KeyPressMsg{Code: 'j', Text: "j"}),
+		p.filter(nil, tea.MouseClickMsg{X: 60, Y: 40, Button: tea.MouseLeft}),
+		p.filter(nil, tea.MouseMotionMsg{X: 61, Y: 100, Button: tea.MouseLeft}),
+		p.filter(nil, tea.MouseReleaseMsg{X: 61, Y: 120, Button: tea.MouseLeft}),
+		p.filter(nil, tea.MouseMotionMsg{X: 3000, Y: 7, Button: tea.MouseLeft}),
 	}
 	want := []tea.Msg{
 		tea.MouseMotionMsg{X: 5, Y: 2},
@@ -834,6 +843,10 @@ func TestPixelMouse(t *testing.T) {
 		tea.MouseWheelMsg{X: 0, Y: 19, Button: tea.MouseWheelDown},
 		mouseLeftMsg{},
 		tea.KeyPressMsg{Code: 'j', Text: "j"},
+		tea.MouseClickMsg{X: 6, Y: 2, Button: tea.MouseLeft},
+		tea.MouseMotionMsg{X: 6, Y: 5, Button: tea.MouseLeft},
+		tea.MouseReleaseMsg{X: 6, Y: 6, Button: tea.MouseLeft},
+		mouseLeftMsg{},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("filtered:\n%#v\nwant\n%#v", got, want)

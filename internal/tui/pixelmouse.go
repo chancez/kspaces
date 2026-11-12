@@ -24,6 +24,8 @@ type pixelMouse struct {
 	on    bool
 	cellW float64
 	cellH float64
+	// Whether the left button is down, between its press and its release.
+	down bool
 }
 
 // resize takes the size of a cell from the terminal, which kitty gives in pixels along with the rows and
@@ -49,8 +51,15 @@ func (p *pixelMouse) start() tea.Cmd {
 
 // filter turns the pixels of mouse events into cells while the mode is on, and the event kitty sends when the
 // mouse leaves into a mouseLeftMsg. That event is motion with bit 8 set, which bubbletea drops, leaving motion
-// with the left button down: what a drag would be, which the sidebar has no use for.
+// with the left button: what a drag is too. So it is a drag between a left press and its release, and the
+// mouse leaving otherwise.
 func (p *pixelMouse) filter(_ tea.Model, msg tea.Msg) tea.Msg {
+	switch msg := msg.(type) {
+	case tea.MouseClickMsg:
+		p.down = p.down || msg.Button == tea.MouseLeft
+	case tea.MouseReleaseMsg:
+		p.down = false
+	}
 	if !p.on {
 		return msg
 	}
@@ -60,7 +69,7 @@ func (p *pixelMouse) filter(_ tea.Model, msg tea.Msg) tea.Msg {
 	}
 	switch msg := msg.(type) {
 	case tea.MouseMotionMsg:
-		if msg.Button == tea.MouseLeft {
+		if msg.Button == tea.MouseLeft && !p.down {
 			return mouseLeftMsg{}
 		}
 		return tea.MouseMotionMsg(cell(tea.Mouse(msg)))

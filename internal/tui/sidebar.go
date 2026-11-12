@@ -71,6 +71,8 @@ type sidebar struct {
 	hover   int
 	hoverAt time.Time
 	mouse   *pixelMouse
+	// The left press on a spaces row until its release, nil for none: a click or a drag, see drag.go.
+	press *press
 	// Whether the mouse is on the add space button or the sort button, which lights it.
 	addHot, sortHot bool
 	// zones are where the last frame drew marked spans, by id, so a click maps back to what was drawn.
@@ -210,10 +212,25 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseClickMsg:
 		return m, m.click(msg)
 	case tea.MouseMotionMsg:
-		m.motion(msg)
+		switch {
+		case msg.Button == tea.MouseLeft:
+			m.dragTo(msg.Y)
+		case m.press != nil:
+			// Moving with no button down: the release went elsewhere, as outside the window.
+			m.cancelPress()
+			m.motion(msg)
+		default:
+			m.motion(msg)
+		}
+	case tea.MouseReleaseMsg:
+		return m, m.release(msg.X, msg.Y)
 	case mouseLeftMsg:
 		m.hover, m.addHot, m.sortHot = 0, false, false
 	case tea.KeyPressMsg:
+		if m.press != nil && m.press.drag != nil && msg.String() == "esc" {
+			m.cancelPress()
+			return m, nil
+		}
 		if !m.focused {
 			if !m.remote {
 				m.remote = true

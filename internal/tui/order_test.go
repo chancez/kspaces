@@ -299,3 +299,173 @@ func TestHoldWhileMenuOpen(t *testing.T) {
 		t.Errorf("refreshed with the menu closed:\n%q\nwant\n%q", got, want)
 	}
 }
+
+// pressOn presses the left button on session's row, moves with it down to each of ys, screen rows, and
+// draws the screen.
+func (e *sidebarEnv) pressOn(session string, ys ...int) {
+	e.t.Helper()
+	x, y := e.zone(fmt.Sprintf(entryZone, e.row(session)))
+	e.m.Update(tea.MouseClickMsg{X: x + 4, Y: y, Button: tea.MouseLeft})
+	for _, y := range ys {
+		e.m.Update(tea.MouseMotionMsg{X: x + 4, Y: y, Button: tea.MouseLeft})
+	}
+	e.m.render()
+}
+
+// letGo releases the left button at screen row y.
+func (e *sidebarEnv) letGo(y int) tea.Cmd {
+	_, cmd := e.m.Update(tea.MouseReleaseMsg{X: 4, Y: y, Button: tea.MouseLeft})
+	e.m.render()
+	return cmd
+}
+
+// Dragging a space moves it among the spaces, the rows showing where it goes as it goes with the dragged
+// row lit; letting go keeps it in config.toml with its comments. A row taller than the dragged one is
+// moved past only once the mouse is past where it would land.
+func TestDragSpace(t *testing.T) {
+	e := newOrderEnv(t)
+	cfg := newConfig(t, orderConfig)
+	gr := []string{"\u25bc " + repoIcon + "gr main", "  " + blocked + "dev pr/me/dev", "  " + branchIcon + "fix fix"}
+	kitty, docs, broken := "  "+repoIcon+"kitty master", "\u25b6 \uf110  docs main", "  \uf00d  broken"
+	screen := func(rows ...string) []string {
+		return append([]string{spacesTitle, "", "  " + termIcon + "default", ""}, rows...)
+	}
+	type state struct {
+		Screen, Lit []string
+		Config      string
+	}
+	now := func() state { return state{e.spacesScreen(), e.highlighted(), cfg()} }
+
+	// kitty, on screen row 8, onto docs on 10.
+	e.pressOn("kitty", 9, 10)
+	want := state{screen(gr[0], gr[1], gr[2], "", docs, "", kitty, "", broken), []string{kitty}, orderConfig}
+	if got := now(); !reflect.DeepEqual(got, want) {
+		t.Errorf("dragging kitty onto docs:\n%#v\nwant\n%#v", got, want)
+	}
+	e.letGo(10)
+	want = state{screen(gr[0], gr[1], gr[2], "", docs, "", kitty, "", broken), nil,
+		"# Mine.\nspaces = [\n  \"/src/gr\", # work\n  \"/src/docs\",\n  # the terminal\n  \"/src/kitty\",\n  \"/src/broken\",\n]\n"}
+	if got := now(); !reflect.DeepEqual(got, want) {
+		t.Errorf("dropped:\n%#v\nwant\n%#v", got, want)
+	}
+
+	// docs, on row 8, up over gr's worktrees: on fix it would land under the mouse with gr there again,
+	// so it waits for gr's own row.
+	e.pressOn("docs", 6)
+	if got := e.spacesScreen(); !reflect.DeepEqual(got, want.Screen) {
+		t.Errorf("docs on fix:\n%q\nwant\n%q", got, want.Screen)
+	}
+	e.m.Update(tea.MouseMotionMsg{X: 4, Y: 4, Button: tea.MouseLeft})
+	e.letGo(4)
+	want = state{screen(docs, "", gr[0], gr[1], gr[2], "", kitty, "", broken), nil,
+		"# Mine.\nspaces = [\n  \"/src/docs\",\n  \"/src/gr\", # work\n  # the terminal\n  \"/src/kitty\",\n  \"/src/broken\",\n]\n"}
+	if got := now(); !reflect.DeepEqual(got, want) {
+		t.Errorf("docs onto gr:\n%#v\nwant\n%#v", got, want)
+	}
+}
+
+// Dragging a linked worktree moves it among its space's, kept in the state directory; past the space's
+// last it stays its last. esc or a right click puts it back.
+func TestDragWorktree(t *testing.T) {
+	e := newOrderEnv(t)
+	cfg := newConfig(t, orderConfig)
+	head, dev, fix := "\u25bc "+repoIcon+"gr main", "  "+blocked+"dev pr/me/dev", "  "+branchIcon+"fix fix"
+	type state struct {
+		Rows, Lit     []string
+		Config, Order string
+	}
+	now := func() state { return state{e.spacesScreen()[4:7], e.highlighted(), cfg(), savedOrder(t)} }
+
+	for _, cancel := range []func(){
+		func() { e.press("esc") },
+		func() { e.m.Update(tea.MouseClickMsg{X: 4, Y: 6, Button: tea.MouseRight}) },
+	} {
+		e.pressOn("gr@dev", 6, 12)
+		if got, want := now(), (state{[]string{head, fix, dev}, []string{dev}, orderConfig, ""}); !reflect.DeepEqual(got, want) {
+			t.Errorf("dragging dev past the space:\n%#v\nwant\n%#v", got, want)
+		}
+		cancel()
+		e.letGo(12)
+		if got, want := now(), (state{[]string{head, dev, fix}, nil, orderConfig, ""}); !reflect.DeepEqual(got, want) {
+			t.Errorf("cancelled:\n%#v\nwant\n%#v", got, want)
+		}
+		if e.m.menu != nil {
+			t.Error("the right click opened a menu")
+		}
+	}
+
+	e.pressOn("gr@dev", 6)
+	e.letGo(6)
+	if got, want := now(), (state{[]string{head, fix, dev}, nil, orderConfig, "{\n  \"/src/gr\": [\n    \"fix\",\n    \"dev\"\n  ]\n}\n"}); !reflect.DeepEqual(got, want) {
+		t.Errorf("dropped:\n%#v\nwant\n%#v", got, want)
+	}
+	// Let go on the row it was pressed on, it is a click, which opens it.
+	e.pressOn("gr@fix")
+	if cmd := e.letGo(5); cmd == nil || !reflect.DeepEqual(now().Rows, []string{head, fix, dev}) {
+		t.Errorf("clicking fix: opened %v, rows %q", cmd != nil, now().Rows)
+	}
+}
+
+// Dragging in an automatic mode switches to manual, from the order shown: config.toml's spaces and every
+// space's worktrees as they were shown, then the move.
+func TestDragSwitchesToManual(t *testing.T) {
+	e := newOrderEnv(t)
+	cfg := newConfig(t, orderConfig)
+	e.click(sortZone, tea.MouseLeft)
+	if got := e.spacesScreen(); !reflect.DeepEqual(got, activityScreen) {
+		t.Fatalf("activity:\n%q\nwant\n%q", got, activityScreen)
+	}
+	// docs, on row 10, onto kitty on 8.
+	e.pressOn("docs", 8)
+	e.letGo(8)
+	want := []string{
+		spacesTitle, "", "  " + termIcon + "default", "",
+		"\u25bc " + repoIcon + "gr main", "  " + branchIcon + "fix fix", "  " + blocked + "dev pr/me/dev", "",
+		"\u25b6 \uf110  docs main", "", "  " + repoIcon + "kitty master", "", "  \uf00d  broken",
+	}
+	if got := e.spacesScreen(); !reflect.DeepEqual(got, want) {
+		t.Errorf("dropped:\n%q\nwant\n%q", got, want)
+	}
+	files := []string{cfg(), savedOrder(t), savedSort(t)}
+	wantFiles := []string{
+		"# Mine.\nspaces = [\n  \"/src/gr\", # work\n  \"/src/docs\",\n  # the terminal\n  \"/src/kitty\",\n  \"/src/broken\",\n]\n",
+		"{\n  \"/src/docs\": [\n    \"notes\"\n  ],\n  \"/src/gr\": [\n    \"fix\",\n    \"dev\"\n  ]\n}\n",
+		"manual\n",
+	}
+	if !reflect.DeepEqual(files, wantFiles) {
+		t.Errorf("saved %q\nwant %q", files, wantFiles)
+	}
+}
+
+// Through the pixel mouse filter, motion with the left button is a drag between a press on a row and its
+// release, and otherwise the mouse leaving, which closes the hover popup. While a row is pressed a
+// refresh does not move the rows.
+func TestDragOrLeave(t *testing.T) {
+	e := newOrderEnv(t)
+	e.m.mouse = &pixelMouse{on: true, cellW: 1, cellH: 1}
+	send := func(msg tea.Msg) {
+		e.m.Update(e.m.mouse.filter(e.m, msg))
+		e.m.render()
+	}
+	e.hover(fmt.Sprintf(entryZone, e.entry(20)))
+	send(tea.MouseMotionMsg{X: 4, Y: 30, Button: tea.MouseLeft})
+	if e.m.hovered() >= 0 {
+		t.Error("the popup stayed with the mouse out of the window")
+	}
+
+	e.press("s")
+	busy := orderFixture()
+	busy.Order.Focused["kitty"] = 100
+	send(tea.MouseClickMsg{X: 4, Y: 8, Button: tea.MouseLeft})
+	e.m.Update(busy)
+	send(tea.MouseMotionMsg{X: 4, Y: 10, Button: tea.MouseLeft})
+	want := []string{"\u25bc " + repoIcon + "gr main", "  " + branchIcon + "fix fix", "  " + blocked + "dev pr/me/dev", "", "\u25b6 \uf110  docs main", "", "  " + repoIcon + "kitty master"}
+	if got := e.spacesScreen()[4:11]; !reflect.DeepEqual(got, want) {
+		t.Errorf("dragging kitty onto docs:\n%q\nwant\n%q", got, want)
+	}
+	send(tea.MouseReleaseMsg{X: 4, Y: 10, Button: tea.MouseLeft})
+	send(tea.MouseMotionMsg{X: 4, Y: 10, Button: tea.MouseLeft})
+	if e.m.press != nil {
+		t.Error("motion after the release dragged")
+	}
+}

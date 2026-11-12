@@ -54,11 +54,19 @@ func (m *sidebar) wheel(msg tea.MouseWheelMsg) {
 	}
 }
 
-// click acts on what was drawn where the mouse was pressed. A left click moves the cursor to the entry and
-// opens it, or folds its space on the caret; a click on the hover popup is one on its entry rather than on
-// the one it covers. A left click on the add button does what a does, and on the sort button what s does.
-// A right click opens a spaces row's menu, or on the sort button the menu of sort modes.
+// click acts on what was drawn where the mouse was pressed. A left press on a spaces row moves the cursor
+// to it and holds it until the release, see drag.go; on its caret it folds its space. A left click on a
+// status entry opens it, and on the hover popup it is one on its entry rather than on the one it covers.
+// A left click on the add button does what a does, and on the sort button what s does. A right click
+// opens a spaces row's menu, or on the sort button the menu of sort modes; while a row is pressed it lets
+// go of it instead.
 func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
+	if m.press != nil {
+		m.cancelPress()
+		if msg.Button != tea.MouseLeft {
+			return nil
+		}
+	}
 	switch msg.Button {
 	case tea.MouseLeft:
 		if m.inZone(addZone, msg.X, msg.Y) {
@@ -88,7 +96,11 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 		if m.inZone(fmt.Sprintf(caretZone, i), msg.X, msg.Y) {
 			return runFirst(m, t, actFold, actUnfold)
 		}
-		return runFirst(m, t, actOpenWorktree, actOpenWindow)
+		if i < len(m.rows) {
+			m.press = &press{row: m.rows[i], key: rowKey(m.rows[i])}
+			return nil
+		}
+		return runFirst(m, t, actOpenWindow)
 	case tea.MouseRight:
 		if m.inZone(sortZone, msg.X, msg.Y) {
 			m.openSortMenu(msg.Y)

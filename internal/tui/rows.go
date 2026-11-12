@@ -112,7 +112,7 @@ func (m *sidebar) renderRow(i int) string {
 	// A highlighted row is drawn on a surface across its whole width, so it reads as one bar.
 	surface := look.Plain
 	switch {
-	case i == m.cursor && m.navigating():
+	case m.dragging(r), i == m.cursor && m.navigating():
 		surface = look.Cursor
 	case current:
 		surface = look.Current
