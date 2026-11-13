@@ -94,6 +94,38 @@ func (m *sidebar) clearFilter() {
 	m.remote = false
 }
 
+// toggleAttention narrows the spaces list to the sessions whose programs are not idle, see
+// spaces.AttentionRows, or shows all of it again, the cursor on the row it was on when that shows. It
+// applies along with the text filter, and unlike the folds it is this sidebar's alone and not saved.
+func (m *sidebar) toggleAttention() tea.Cmd {
+	m.attending = !m.attending
+	m.setRows()
+	m.scrollToCursor()
+	return nil
+}
+
+// narrowed is whether a filter hides rows, so the rows shown are not the whole order to move a row in.
+func (m *sidebar) narrowed() bool {
+	return m.filtering || m.attending
+}
+
+// spacesTitle is the spaces list's title, marked while the attention filter is on.
+func (m *sidebar) spacesTitle() string {
+	if m.attending {
+		return "SPACES !"
+	}
+	return "SPACES"
+}
+
+// emptyText is what the spaces list says when a filter leaves it no rows: that nothing needs me when only
+// the attention filter narrows it, else that the query matches nothing.
+func (m *sidebar) emptyText() string {
+	if m.attending && m.filter.Value() == "" {
+		return "Nothing needs you"
+	}
+	return "No matches"
+}
+
 // moveFiltered moves the cursor by delta over the rows the filter shows, not into the status list, which
 // the query does not narrow.
 func (m *sidebar) moveFiltered(delta int) {
@@ -128,9 +160,10 @@ func (m *sidebar) setRows() {
 	m.rebuildRows(m.cursorAt())
 }
 
-// rebuildRows builds the rows, all of them or the filter's, and puts the cursor back on the entry it was
-// on: the same row, or the folded space that holds it, or the same status entry. A row the filter hides
-// moves the cursor to the first row shown, or to none, -1, when none is; without the filter the cursor
+// rebuildRows builds the rows, all of them or the filters', and puts the cursor back on the entry it was
+// on: the same row, or the folded space that holds it, or the same status entry. A row a filter hides
+// moves the cursor to the first row shown; with none shown, to none, -1, under the text filter, which
+// keeps the cursor out of the status list, else to the status list's top. Without a filter the cursor
 // keeps its place, as it did before the rows changed.
 func (m *sidebar) rebuildRows(at cursorPos) {
 	key, entry := at.key, at.entry
@@ -138,6 +171,9 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 		m.rows = filterRows(spaces.BuildRows(m.others, m.spaces, nil, m.rowOrder()), m.filter.Value())
 	} else {
 		m.rows = spaces.BuildRows(m.others, m.spaces, m.folded, m.rowOrder())
+	}
+	if m.attending {
+		m.rows = spaces.AttentionRows(m.rows, m.kitty.Statuses)
 	}
 	if entry >= 0 {
 		m.cursor = min(len(m.rows)+entry, max(m.numEntries()-1, 0))
@@ -157,16 +193,19 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 			}
 		}
 	}
-	if !m.filtering {
+	if !m.narrowed() {
 		m.cursor = min(max(m.cursor, 0), max(m.numEntries()-1, 0))
 		return
 	}
-	m.cursor = -1
 	for i, r := range m.rows {
 		if r.Space != nil {
 			m.cursor = i
 			return
 		}
+	}
+	m.cursor = 0
+	if m.filtering {
+		m.cursor = -1
 	}
 }
 

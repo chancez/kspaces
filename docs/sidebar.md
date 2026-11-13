@@ -58,6 +58,13 @@ cursor stays on its row while it shows, and goes to the first row shown when the
 puts it back on its row, or on the folded space that holds it. The filter also goes when navigating ends:
 when the sidebar loses focus, or keys sent without focus stop.
 
+`f` shows only what is going on: the rows whose session has a status that is not idle, blocked, error,
+done or working, with their spaces' rows above them, and a folded space's row when any of its sessions
+has one. The SPACES title reads `SPACES !` while it is on, and with nothing to show the list says
+`Nothing needs you`. It applies along with `/`, so a query narrows what it shows. The cursor stays on
+its row while it shows, and goes to the first row shown when it does not. `f` again shows the whole
+list. It is each sidebar's own and is not saved, nor does it end with navigating as the query does.
+
 ## Order
 
 The button left of the plus on the SPACES title shows how the list is sorted, and a click on it goes on
@@ -84,8 +91,8 @@ The rows show where it goes as the mouse moves, the dragged row lit, and letting
 or a right click while dragging puts it back. A press let go of on the row it was on is a click, which is
 why a row opens when the mouse is let go rather than pressed. `K` and `J` move the cursor's row up and
 down the same way. A session in no space and a missing worktree do not move, and neither does anything
-while filtering. Moving a space rewrites the order of `spaces` in config.toml, as text, each entry with
-the comments on the lines right above it and after it on its line, through a symlinked config to its
+while a filter is on. Moving a space rewrites the order of `spaces` in config.toml, as text, each entry
+with the comments on the lines right above it and after it on its line, through a symlinked config to its
 target. Moving a worktree keeps its space's order, by the worktrees' directories, in
 `$XDG_STATE_HOME/kspaces/order`. Either moves the order of every sidebar.
 
@@ -308,6 +315,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `!` | focus the window that needs you most, wherever the cursor is |
 | `t` | reply to the cursor's status entry: write to its window without switching to it |
 | `/` | filter the spaces list; see [Spaces](#spaces) |
+| `f` | show only what is not idle, or everything again; see [Spaces](#spaces) |
 | `s` | sort the list the next way; see [Order](#order) |
 | `K` / `J` | move the cursor's space, or linked worktree within its space, up / down |
 | `r` | refresh, which also happens every two seconds |

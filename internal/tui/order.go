@@ -197,7 +197,7 @@ func (m *sidebar) keep(a arrangement, r spaces.Row) tea.Cmd {
 
 // moveRow moves the cursor's row by delta among its own, as dragging it does: K and J.
 func (m *sidebar) moveRow(delta int) tea.Cmd {
-	if m.filtering || m.cursor < 0 || m.cursor >= len(m.rows) || !movable(m.rows[m.cursor]) {
+	if m.narrowed() || m.cursor < 0 || m.cursor >= len(m.rows) || !movable(m.rows[m.cursor]) {
 		return nil
 	}
 	r, a := m.rows[m.cursor], m.shown()

@@ -38,7 +38,7 @@ func (m *sidebar) rowAtY(y int) int {
 // dragTo moves the row pressed on to where the mouse is, at screen row y, once it is off the row.
 func (m *sidebar) dragTo(y int) {
 	p := m.press
-	if p == nil || m.filtering || !movable(p.row) {
+	if p == nil || m.narrowed() || !movable(p.row) {
 		return
 	}
 	i := m.rowAtY(y)

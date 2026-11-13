@@ -332,6 +332,9 @@ var actAttend = paneAction("attend", func(m *sidebar) tea.Cmd {
 // actFilter opens the spaces list's filter.
 var actFilter = paneAction("filter", (*sidebar).openFilter)
 
+// actAttention toggles the attention filter, see toggleAttention.
+var actAttention = paneAction("attention filter", (*sidebar).toggleAttention)
+
 // actCycleSort goes on to the next sort mode, as a left click on the sort button does.
 var actCycleSort = paneAction("sort", func(m *sidebar) tea.Cmd { m.setSort(m.sortMode().Next()); return nil })
 
@@ -830,7 +833,7 @@ func init() {
 
 	paneKind = interact.NewKind(func(paneSubject) string { return "Sidebar" },
 		actDown, actUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit,
-		actAttend, actFilter, actCycleSort, actMoveUp, actMoveDown)
+		actAttend, actFilter, actAttention, actCycleSort, actMoveUp, actMoveDown)
 	paneKind.Bind(actDown, "j/k", "down/up", "j", "down")
 	paneKind.Bind(actUp, "", "", "k", "up")
 	paneKind.Bind(actTop, "g/G", "top/bottom", "g", "home")
@@ -842,6 +845,7 @@ func init() {
 	paneKind.Bind(actQuit, "ctrl+c", "quit", "ctrl+c")
 	paneKind.Bind(actAttend, "!", "go to what needs you", "!")
 	paneKind.Bind(actFilter, "/", "filter the spaces", "/")
+	paneKind.Bind(actAttention, "f", "show only what is not idle", "f")
 	paneKind.Bind(actCycleSort, "s", "change the sort mode", "s")
 	paneKind.Bind(actMoveUp, "K/J", "move the row up/down", "K")
 	paneKind.Bind(actMoveDown, "", "", "J")
