@@ -454,10 +454,36 @@ func SessionWindows(data []OSWindow, session string) []int {
 	return out
 }
 
+// FindWindow is the window id in data, if it is there.
+func FindWindow(data []OSWindow, id int) (Window, bool) {
+	for _, osw := range data {
+		for _, tab := range osw.Tabs {
+			for _, w := range tab.Windows {
+				if w.ID == id {
+					return w, true
+				}
+			}
+		}
+	}
+	return Window{}, false
+}
+
 // ScreenText is what window id has on its screen, its colors and styles as SGR sequences.
 func ScreenText(id int) (string, error) {
 	out, err := kitten("get-text", "--match", fmt.Sprintf("id:%d", id), "--ansi", "--extent", "screen")
 	return string(out), err
+}
+
+// SendText writes text to the program in window id, as typing it would, then a carriage return, which is
+// what Enter sends, with enter. kitten reads its text with bash's $'...' escapes, so a backslash is
+// doubled to go as one; -- keeps text that starts with a dash from being taken for an option.
+func SendText(id int, text string, enter bool) error {
+	text = strings.ReplaceAll(text, `\`, `\\`)
+	if enter {
+		text += `\r`
+	}
+	_, err := kitten("send-text", "--match", fmt.Sprintf("id:%d", id), "--", text)
+	return err
 }
 
 // Action runs a kitty action, such as goto_session PATH. In a panel it first leaves the panel, see
