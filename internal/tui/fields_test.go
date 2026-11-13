@@ -91,7 +91,7 @@ func TestNewWorktreeFormClickField(t *testing.T) {
 	clickInto(t, f, "branch", labelWidth+2)
 	typeInto(f, "Y")
 	branch := "fe" + long + "ixY"
-	if got, want := formScreen(f), screen("  branch     "+branch[len(branch)-54:], "  directory  here", "  Creates "+branch[:55]+"...", ""); !reflect.DeepEqual(got, want) {
+	if got, want := formScreen(f), screen("  branch     "+branch[len(branch)-54:], "  directory  here", "  Creates "+branch[:57]+"\u2026", ""); !reflect.DeepEqual(got, want) {
 		t.Errorf("long branch:\n%q\nwant\n%q", got, want)
 	}
 }

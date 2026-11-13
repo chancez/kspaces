@@ -133,15 +133,19 @@ func (t *Theme) Draw(s Surface, width int, spans ...Span) string {
 	return out
 }
 
-// DrawCut is Draw, but marks a cut with "..." in the last span's style.
+// DrawCut is Draw, but marks a cut with GlyphCut in the last span's style, bare where Cut would be.
 func (t *Theme) DrawCut(s Surface, width int, spans ...Span) string {
 	out := t.Render(s, spans...)
 	if ansi.StringWidth(out) > width {
-		tail := sp(elText, "...")
+		tail := sp(elText, t.Glyph(GlyphCut))
 		if n := len(spans); n > 0 && spans[n-1].styled == nil {
 			tail.el, tail.props = spans[n-1].el, spans[n-1].props
 		}
-		out = ansi.Truncate(out, width, t.Render(s, tail))
+		mark := ""
+		if width > ansi.StringWidth(tail.text) {
+			mark = t.Render(s, tail)
+		}
+		out = ansi.Truncate(out, width, mark)
 	}
 	return t.Draw(s, width, Styled(func(color.Color) string { return out }))
 }

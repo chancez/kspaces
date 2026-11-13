@@ -26,15 +26,51 @@ func TestEveryElementAndSurfaceIsNamed(t *testing.T) {
 	}
 }
 
-// Every glyphs' set draws every role, in one cell, so rows keep their columns whichever is used.
+// Every glyphs' set draws every role, in one cell, so rows keep their columns whichever is used. ASCII's
+// cut mark is the one exception: it ends a cut, so it moves no column after it.
 func TestGlyphSets(t *testing.T) {
 	th := New(true)
 	for _, g := range []Glyphs{GlyphsASCII, GlyphsUnicode, GlyphsNerd} {
 		th.SetGlyphs(g)
 		for role := GlyphNone + 1; role < numGlyphs; role++ {
-			if w := th.Width(glyph(elDefault, role, false)); w != 1 {
+			want := 1
+			if g == GlyphsASCII && role == GlyphCut {
+				want = 3
+			}
+			if w := th.Width(glyph(elDefault, role, false)); w != want {
 				t.Errorf("glyphs %d: role %d is %d cells wide", g, role, w)
 			}
+		}
+	}
+}
+
+// Cut keeps width less the mark, and cuts bare where there is no room for the mark and a cell of text.
+func TestCutMarksPerGlyphs(t *testing.T) {
+	th := New(true)
+	for _, tc := range []struct {
+		glyphs Glyphs
+		width  int
+		want   string
+	}{
+		{GlyphsASCII, 0, ""},
+		{GlyphsASCII, 1, "a"},
+		{GlyphsASCII, 3, "abc"},
+		{GlyphsASCII, 4, "a..."},
+		{GlyphsASCII, 7, "abcd..."},
+		{GlyphsASCII, 8, "abcdefgh"},
+		{GlyphsUnicode, 0, ""},
+		{GlyphsUnicode, 1, "a"},
+		{GlyphsUnicode, 2, "a\u2026"},
+		{GlyphsUnicode, 7, "abcdef\u2026"},
+		{GlyphsUnicode, 8, "abcdefgh"},
+		{GlyphsNerd, 1, "a"},
+		{GlyphsNerd, 2, "a\u2026"},
+		{GlyphsNerd, 4, "abc\u2026"},
+		{GlyphsNerd, 9, "abcdefgh"},
+	} {
+		th.SetGlyphs(tc.glyphs)
+		if got := th.TextOf(th.Cut(tc.width, Text("abcdefgh"))...); got != tc.want {
+			t.Errorf("glyphs %d, width %d: got %q, want %q", tc.glyphs, tc.width, got, tc.want)
 		}
 	}
 }
@@ -141,9 +177,10 @@ func TestCut(t *testing.T) {
 		want  string
 	}{
 		{12, "\ue725  release"},
-		{8, "\ue725  re..."},
-		{3, "\ue725  "},
-		{2, "\ue725 "},
+		{8, "\ue725  rele\u2026"},
+		{3, "\ue725 \u2026"},
+		{2, "\ue725\u2026"},
+		{1, "\ue725"},
 	} {
 		if got := th.TextOf(th.Cut(tc.width, append(RowIcon(RowWorktree, "", true, false), Worktree(wt))...)...); got != tc.want {
 			t.Errorf("cut to %d = %q, want %q", tc.width, got, tc.want)

@@ -41,7 +41,7 @@ func TestErrorPopup(t *testing.T) {
 	}
 	rule := strings.Repeat("\u2500", 29)
 	long := "To get started with GitHub CLI, please run:  gh auth login\nAlternatively, populate the GH_TOKEN environment variable."
-	cut := "To get started with GitHub..."
+	cut := "To get started with GitHub C\u2026"
 
 	show := func(msgs ...tea.Msg) {
 		for _, msg := range msgs {

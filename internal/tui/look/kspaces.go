@@ -18,16 +18,19 @@ func (t *Theme) Width(spans ...Span) int {
 	return ansi.StringWidth(t.TextOf(spans...))
 }
 
-// Cut cuts spans to width cells, marking the cut with "..." in the style of the span it falls in, so a
-// name and a branch each show where they were cut. A width of 3 or less has no room for the mark and is
-// cut bare. Glyphs are drawn as their text, so a cut can fall in one.
+// Cut cuts spans to width cells, marking the cut with GlyphCut in the style of the span it falls in, so
+// a name and a branch each show where they were cut. A width with no room for the mark and a cell of text
+// (3 or less in ASCII, 1 in the others) is cut bare. Glyphs are drawn as their text, so a cut can fall in
+// one.
 func (t *Theme) Cut(width int, spans ...Span) []Span {
 	if t.Width(spans...) <= width {
 		return spans
 	}
-	keep, mark := width, ""
-	if width > 3 {
-		keep, mark = width-3, "..."
+	keep, mark := width, t.Glyph(GlyphCut)
+	if mw := ansi.StringWidth(mark); width > mw {
+		keep = width - mw
+	} else {
+		mark = ""
 	}
 	var out []Span
 	for _, x := range spans {

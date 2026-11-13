@@ -431,9 +431,9 @@ func TestMenuNarrow(t *testing.T) {
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	rule := strings.Repeat("\u2500", 11)
 	want := []string{
-		"\u2500 Session \u2500", " Open", " Save as...", " Close s...",
-		"\u2500 Work... \u2500", " Remove ...",
-		"\u2500 Space \u2500\u2500\u2500", " New wor...", " Fold wo...", " Add space",
+		"\u2500 Session \u2500", " Open", " Save as l\u2026", " Close ses\u2026",
+		"\u2500 Worktr\u2026 \u2500", " Remove wo\u2026",
+		"\u2500 Space \u2500\u2500\u2500", " New workt\u2026", " Fold work\u2026", " Add space",
 		rule,
 	}
 	if got := e.screen()[y+1 : y+12]; !reflect.DeepEqual(got, want) {
@@ -792,7 +792,7 @@ func TestRowHoverPopup(t *testing.T) {
 			"pr       #98 merged",
 			"session  gr@fix",
 			"windows  none open",
-			"saved    no sessions direc...",
+			"saved    no sessions directo\u2026",
 			strings.Repeat("\u2500", 29),
 		}
 		if got := popup(); !reflect.DeepEqual(got, want) {
@@ -919,7 +919,7 @@ func TestErrorOnLastLine(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(spaces.Snapshot{Err: errors.New("config.toml: unknown keys: space")})
 	lines := e.screen()
-	if got := lines[len(lines)-1]; got != "config.toml: unknown keys:..." {
+	if got := lines[len(lines)-1]; got != "config.toml: unknown keys: s\u2026" {
 		t.Errorf("last line %q", got)
 	}
 	if !e.has("\u25bc " + repoIcon + "gr main") {

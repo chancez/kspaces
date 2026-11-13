@@ -44,7 +44,7 @@ func TestGitStateOnRows(t *testing.T) {
 		"  " + termIcon + "default",
 		"",
 		"\u25bc " + repoIcon + "gr main" + pad(15) + "\u25cf1",
-		"  " + blocked + "dev pr/m... \u25cf3 \u21912\u21931 #123",
+		"  " + blocked + "dev pr/me/\u2026 \u25cf3 \u21912\u21931 #123",
 		"  " + branchIcon + "fix fix" + pad(14) + "#98",
 		"",
 		"  " + repoIcon + "kitty master",
@@ -61,13 +61,13 @@ func TestGitStateOnRows(t *testing.T) {
 	want = []string{
 		"  " + termIcon + "default",
 		"",
-		"\u25bc " + repoIcon + "gr ma \u25cf1",
+		"\u25bc " + repoIcon + "gr m\u2026 \u25cf1",
 		"  " + blocked + "dev   \u25cf3",
 		"  " + branchIcon + "fix  #98",
 		"",
-		"  " + repoIcon + "kitty ma",
+		"  " + repoIcon + "kitty m\u2026",
 		"",
-		"\u25b6 \uf110  docs mai",
+		"\u25b6 \uf110  docs ma\u2026",
 		"",
 		"  \uf00d  broken",
 	}
@@ -90,8 +90,8 @@ func TestLongNameGivesWayToGitState(t *testing.T) {
 		want  string
 	}{
 		{44, "  " + branchIcon + "intent_sync_api_updates   \u25cf2 \u21914 #11243"},
-		{30, "  " + branchIcon + "intent_sync... \u25cf2 #11243"},
-		{16, "  " + branchIcon + "inte... \u25cf2"},
+		{30, "  " + branchIcon + "intent_sync_a\u2026 \u25cf2 #11243"},
+		{16, "  " + branchIcon + "intent\u2026 \u25cf2"},
 	} {
 		e.m.Update(tea.WindowSizeMsg{Width: tc.width, Height: 40})
 		if got := row(); got != tc.want {
@@ -125,7 +125,7 @@ func TestPRChecksAndReviewOnRows(t *testing.T) {
 			case checks[c] != "" && reviews[r] != "":
 				mid = "  " + branchIcon + "fix  #98" + checks[c]
 			case checks[c] == "" && reviews[r] == "":
-				mid = "  " + branchIcon + "fix fi #98"
+				mid = "  " + branchIcon + "fix f\u2026 #98"
 			}
 			want = append(want,
 				fmt.Sprintf("%s %s 30: %s", c, r, "  "+branchIcon+"fix fix"+pad(17-len([]rune(full)))+full),
@@ -156,10 +156,10 @@ func TestLongNameGivesWayToPRChecks(t *testing.T) {
 	}
 	want := []string{
 		"  " + branchIcon + "intent_sync_api_updates  \u25cf2 #11243 \u2717 \u00b1",
-		"  " + branchIcon + "intent_... \u25cf2 #11243 \u2717 \u00b1",
-		"  " + branchIcon + "int... \u25cf2 #11243 \u2717",
-		"  " + branchIcon + "int... \u25cf2 #11243",
-		"  " + branchIcon + "intent_sy... \u25cf2",
+		"  " + branchIcon + "intent_sy\u2026 \u25cf2 #11243 \u2717 \u00b1",
+		"  " + branchIcon + "inten\u2026 \u25cf2 #11243 \u2717",
+		"  " + branchIcon + "inten\u2026 \u25cf2 #11243",
+		"  " + branchIcon + "intent_sync\u2026 \u25cf2",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("rows:\n%q\nwant\n%q", got, want)
@@ -367,7 +367,7 @@ func TestActionErrorStays(t *testing.T) {
 	want := [][]string{
 		saying("no pull request found"),
 		saying("no pull request found"),
-		saying("config.toml: unknown keys:..."),
+		saying("config.toml: unknown keys: s\u2026"),
 		before,
 		before,
 	}

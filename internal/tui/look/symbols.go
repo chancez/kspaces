@@ -62,11 +62,14 @@ const (
 	GlyphFrameBottomRight
 	GlyphFrameHorizontal
 	GlyphFrameVertical
+	// GlyphCut marks where text was cut to fit.
+	GlyphCut
 	numGlyphs
 )
 
 // glyphSets are each glyphs' symbols, by role. Each is one cell wide, so a row's columns stay put
-// whichever is drawn. Nerd Font icons are Font Awesome's and Codicons', at the code points Nerd Fonts
+// whichever is drawn; only ASCII's cut mark is wider, as ASCII has no one-cell ellipsis. Nerd Font icons
+// are Font Awesome's and Codicons', at the code points Nerd Fonts
 // keeps them at.
 var glyphSets = map[Glyphs][numGlyphs]string{
 	GlyphsASCII: {
@@ -108,6 +111,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphFrameBottomRight: "+",
 		GlyphFrameHorizontal:  "-",
 		GlyphFrameVertical:    "|",
+		GlyphCut:              "...",
 	},
 	GlyphsUnicode: {
 		GlyphOpen:             "\u25bc", // black down-pointing triangle
@@ -148,6 +152,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphFrameBottomRight: "\u256f", // box drawings light arc up and left
 		GlyphFrameHorizontal:  "\u2500", // box drawings light horizontal
 		GlyphFrameVertical:    "\u2502", // box drawings light vertical
+		GlyphCut:              "\u2026", // horizontal ellipsis
 	},
 	GlyphsNerd: {
 		// The triangles, not Font Awesome's chevrons, which are drawn wider than their cell and thin.
@@ -194,5 +199,6 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphFrameBottomRight: "\u256f",
 		GlyphFrameHorizontal:  "\u2500",
 		GlyphFrameVertical:    "\u2502",
+		GlyphCut:              "\u2026",
 	},
 }
