@@ -48,8 +48,9 @@ type spaceFileWorktrees struct {
 }
 
 // globalOnly are the global config's keys a space file cannot have: they are about every space, or name
-// spaces, which a space's own file has no say in.
-var globalOnly = []string{"spaces", "launch", "sessions", "sidebar", "kitty", "space"}
+// spaces, which a space's own file has no say in. group is a space table's, there for a file that sets it
+// at its top, as it sets its layouts.
+var globalOnly = []string{"spaces", "launch", "sessions", "sidebar", "kitty", "space", "groups", "group"}
 
 // ParseSpaceFile reads a space file, its commands checked as the global config's are. Its layouts are
 // checked when merged, by Config.WithSpace, as they can run the global config's commands. A key it does
@@ -77,6 +78,8 @@ func ParseSpaceFile(data string) (SpaceFile, error) {
 	switch {
 	case slices.Contains(global, "space"):
 		return SpaceFile{}, fmt.Errorf("space tables are for the global config; a space's file sets its own layout and worktree_layout at the top")
+	case slices.Contains(global, "group"):
+		return SpaceFile{}, fmt.Errorf("a space's group is set in the global config, as group in its [space.NAME]")
 	case len(global) > 0:
 		return SpaceFile{}, fmt.Errorf("only the global config can have %s", strings.Join(global, ", "))
 	case len(unknown) > 0:
@@ -134,10 +137,12 @@ func (cfg Config) WithSpace(name string, f SpaceFile) (Config, error) {
 		if out.Space == nil {
 			out.Space = map[string]SpaceSettings{}
 		}
-		// The file's linked default falls back on its own main one before the space table's.
+		// The file's linked default falls back on its own main one before the space table's. The group is
+		// the table's alone.
 		out.Space[name] = SpaceSettings{
 			Layout:         cmp.Or(f.Layout, s.Layout),
 			WorktreeLayout: cmp.Or(f.WorktreeLayout, f.Layout, s.WorktreeLayout),
+			Group:          s.Group,
 		}
 	}
 	if f.Dir != nil {

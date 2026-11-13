@@ -160,6 +160,21 @@ func TestWithSpaceDefaults(t *testing.T) {
 	}
 }
 
+// A space file's defaults take the place of its table's, and its group, which only the table can say,
+// stays.
+func TestWithSpaceKeepsGroup(t *testing.T) {
+	global := spaceGlobal + "group = \"work\"\n"
+	got, err := withSpace(t, global, `layout = "plain"`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := mustParse(t, spaceGlobal+"group = \"work\"\n")
+	want.Space["gr"] = SpaceSettings{Layout: "plain", WorktreeLayout: "plain", Group: "work"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("merged:\n%#v\nwant\n%#v", got, want)
+	}
+}
+
 // A space file is checked as the global config is, with the global config's commands and layouts to
 // refer to, and has none of what only the global config says.
 func TestSpaceFileErrors(t *testing.T) {
@@ -167,6 +182,8 @@ func TestSpaceFileErrors(t *testing.T) {
 		{"nope = 1\n[worktrees]\ndirr = \"x\"", "unknown keys: nope, worktrees.dirr"},
 		{`spaces = ["/x"]` + "\n[sidebar]\nwidth = 30", "only the global config can have spaces, sidebar"},
 		{"[space.gr]\nlayout = \"agent\"", "space tables are for the global config; a space's file sets its own layout and worktree_layout at the top"},
+		{`group = "work"`, "a space's group is set in the global config, as group in its [space.NAME]"},
+		{`groups = ["work"]`, "only the global config can have groups"},
 		{"layout = \"nope\"", `layout is "nope", no layout has that name`},
 		{"worktree_layout = \"nope\"", `worktree_layout is "nope", no layout has that name`},
 		{"[[layouts]]\nname = \"a\"\ntabs = [{ panes = [{ command = \"nope\" }] }]", `layouts: a: tab 1 pane 1: command is "nope", no command has that name`},

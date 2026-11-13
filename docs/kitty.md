@@ -6,6 +6,21 @@ A space is a repository root listed in the config. Its worktrees come from `git 
 show up on their own. Each worktree is a kitty session: the main worktree's is named after the space
 (`gr`), a linked worktree's `SPACE@DIR` (`gr@dev`).
 
+Spaces can be put in groups, such as work and personal, which the [sidebar](sidebar.md#groups) lists each
+under a header of its own and can fold or hide:
+
+```toml
+groups = ["work", "personal"]  # the order of the groups; any other after them, by name
+
+[space.gr]                     # by the space's name
+group = "work"
+```
+
+A space with no `group` is in none, and is listed before the groups, under no header. Only config.toml
+says a space's group: a group is about how every space is shown, so a space's
+[own config](#per-space-config) setting `group` is an error. `groups` cannot name a group twice; a group
+it names that no space is in is left out.
+
 Opening a worktree:
 
 1. focuses its session's most recently focused window, if it has windows open;
@@ -238,7 +253,8 @@ tabs = [{ panes = [{ command = "test" }, { command = "claude", split = "right" }
 
 It can have `[[layouts]]`, `[[commands]]`, `layout`, `worktree_layout` and `[worktrees]`'s `dir` and
 `branch_prefix`, checked as config.toml's are; anything else is an error naming the key, `spaces`,
-`launch`, `sessions`, `[sidebar]`, `[kitty]` and `[space.NAME]` included, which only config.toml has. For
+`launch`, `sessions`, `groups`, `[sidebar]`, `[kitty]` and `[space.NAME]` included, which only config.toml
+has, and so is `group`, which is the space's `[space.NAME]`'s. For
 that space alone, in its forms, its rows' menus, opening its worktrees and `kspaces layout` and `kspaces
 run` in them, its layouts and commands are added to config.toml's, one called as one of config.toml's in
 that one's place, and a layout of either can run a command of either. Its `layout` and `worktree_layout`

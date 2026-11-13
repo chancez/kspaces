@@ -76,6 +76,9 @@ type SpaceSettings struct {
 	Layout string `toml:"layout"`
 	// The layout its linked worktrees open with afresh, Layout when empty.
 	WorktreeLayout string `toml:"worktree_layout"`
+	// The group the sidebar lists the space under, such as work; empty for none. Only the global config
+	// sets it: a group is about how every space is shown, which one space's own file has no say in.
+	Group string `toml:"group"`
 }
 
 // checkLayouts fills in the layouts' defaults and inputs and says what is wrong with the first that has a

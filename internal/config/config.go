@@ -13,6 +13,7 @@ import (
 // Config is what ~/.config/kspaces/config.toml says:
 //
 //	spaces = ["~/projects/gr", "~/projects/kitty"]
+//	groups = ["work", "personal"]
 //	launch = ["launch"]
 //	sessions = "~/.local/share/kitty/sessions"
 //
@@ -53,6 +54,9 @@ type Config struct {
 	DefaultLayout string `toml:"layout"`
 	// What each space, by name, says of itself.
 	Space map[string]SpaceSettings `toml:"space"`
+	// The order of the groups spaces are in, see SpaceSettings.Group. A group it does not list comes
+	// after those it does, by name.
+	Groups []string `toml:"groups"`
 }
 
 // Sidebar is how the sidebar's dock is laid out, and where its forms and the picker open. kitty sizes the
@@ -165,6 +169,9 @@ func Parse(data string) (Config, error) {
 	if err := checkCommands(cfg.Commands); err != nil {
 		return Config{}, err
 	}
+	if err := checkGroups(cfg.Groups); err != nil {
+		return Config{}, err
+	}
 	expand := func(p string) string {
 		if rest, ok := strings.CutPrefix(p, "~/"); ok {
 			return filepath.Join(home, rest)
@@ -179,6 +186,21 @@ func Parse(data string) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// checkGroups says what is wrong with the order of groups: a name empty, or listed twice.
+func checkGroups(groups []string) error {
+	seen := map[string]bool{}
+	for i, g := range groups {
+		if g == "" {
+			return fmt.Errorf("groups: group %d has no name", i+1)
+		}
+		if seen[g] {
+			return fmt.Errorf("groups: %s is listed twice", g)
+		}
+		seen[g] = true
+	}
+	return nil
 }
 
 // Tilde is path with the home directory written as ~/, the way the config can say it, or path as it is

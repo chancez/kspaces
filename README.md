@@ -92,6 +92,10 @@ Then list your spaces in `~/.config/kspaces/config.toml`:
 # Repositories, in the sidebar's manual order, which moving a space there rewrites. ~/ is expanded.
 spaces = ["~/projects/gr", "~/projects/kitty"]
 
+# The order of the groups the sidebar lists spaces under, each set in its [space.NAME] below; any group
+# not listed after them, by name, and spaces in none first.
+groups = ["work", "personal"]
+
 # Where kitty session files are kept, as SESSION.kitty-session, to reopen a worktree's session from.
 # Unset by default.
 sessions = "~/.local/share/kitty/sessions"
@@ -134,9 +138,11 @@ panes = [
 # Per space, by name: the layout its linked worktrees' sessions open with afresh, when there is no saved
 # session to restore, and the new worktree form's at first. `layout` is the main worktree's, and a
 # top-level `layout`, before any table, the default for every space. A layout needing an input with no
-# default, as claude's prompt, is opened afresh as one shell tab, and the sidebar says so.
+# default, as claude's prompt, is opened afresh as one shell tab, and the sidebar says so. `group` is the
+# group the sidebar lists it under.
 [space.gr]
 worktree_layout = "agent"
+group = "work"
 
 # The sidebar's width in columns, 12 to 120, and where its forms and the picker open: "overlay", over the
 # window they are for, or "panel", a centered OS window of a fixed size (macOS, Wayland with layer shell,
