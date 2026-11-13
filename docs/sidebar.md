@@ -80,7 +80,8 @@ end with navigating as the query does.
 
 A right click on the SPACES title or its buttons, or on an empty row of the list, opens the list's menu:
 the sort modes, see [Order](#order), in a Filter section `Only what is not idle`, ticked while the
-attention filter is on, which turns it on and off, and with [groups](#groups) configured a Groups section.
+attention filter is on, which turns it on and off, in a Rows section **Select**, see
+[Selecting](#selecting), and with [groups](#groups) configured a Groups section.
 
 ## Groups
 
@@ -140,9 +141,10 @@ The rows show where it goes as the mouse moves, the dragged row lit, and letting
 or a right click while dragging puts it back. A press let go of on the row it was on is a click, which is
 why a row opens when the mouse is let go rather than pressed. `K` and `J` move the cursor's row up and
 down the same way. A session in no space and a missing worktree do not move, and neither does anything
-while a filter is on. A space moves among the spaces of its group, or of none: `K` on the first of them
-or `J` on the last does nothing, and dragging it past them leaves it first or last; groups are not
-reordered by moving, only by `groups` in config.toml. Moving a space rewrites the order of `spaces` in
+while a filter is on, nor by dragging in the [select mode](#selecting), where a drag ticks rows. A space
+moves among the spaces of its group, or of none: `K` on the first of them or `J` on the last does nothing,
+and dragging it past them leaves it first or last; groups are not reordered by moving, only by `groups`
+in config.toml. Moving a space rewrites the order of `spaces` in
 config.toml, as text, each entry with the comments on the lines right above it and after it on its line,
 through a symlinked config to its target, each group's spaces together as the list shows them. Moving a
 worktree keeps its space's order, by the worktrees' directories, in `$XDG_STATE_HOME/kspaces/order`.
@@ -152,7 +154,53 @@ Moving in activity or status switches to manual, starting from the order shown: 
 config.toml as they were shown and every space's worktrees saved as they were shown, then the move is
 made.
 
+## Selecting
 
+A click opens a row and a drag moves it, so acting on several rows at once, as removing the worktrees a
+week of work left behind, has a mode of its own. `v`, **Select** in a row's menu, which ticks the row, or
+in the list's menu, or alt and a click on a row, which ticks it, turns it on. alt, as kitty keeps shift and
+a click or a drag for selecting text even in a program that takes the mouse.
+
+While it is on, every row that can be acted on has a box after its caret, ticked or not, `[ ]` and `[x]` in
+ASCII and a ballot box in Unicode: linked and missing worktrees, sessions in no space, and a space's own
+row, its main worktree. A click on a row ticks or unticks it rather than opening it, and a click on a caret
+still folds. Pressing on a row and dragging gives every row the mouse passes what the first one changed
+to, ticked or not, and moves nothing; alt and a drag outside the mode turns it on and does the same. A
+space's row stands for the rows under it: ticking it ticks its main worktree and its linked and missing
+worktrees, shown or folded, and unticking it unticks them, and while only some are ticked its box is partly
+ticked, `[-]`. A group's header does the same for its spaces' rows. Under a filter they stand for only the
+rows it shows, and hiding a group unticks its rows, so nothing out of sight is acted on. `space` ticks the
+cursor's row, `j` and `k` move as ever, `A` ticks every row shown, and `esc` leaves the mode, letting go of
+the ticks. No row gets the cursor's bar in the mode: a click changes only its row's box and leaves the
+cursor where it was, and the cursor is the box drawn lit, reversed, as that is what `space` ticks.
+
+A bar at the bottom of the spaces list, above the STATUS rule, is titled by a rule with how many rows are
+ticked set into it, `8 selected`, or the number alone in a narrow sidebar. Under it is a row for each
+action on the ticked rows, as a menu's items: **Remove** `x`, **Close** `c`, **Forget** `F`, with commands
+configured **Run** `R`, and last **Cancel** `esc`. Each row has the action's name on the left, then how
+many of the ticked rows it applies to and its key, each in a column of its own, so the rows line up; an
+action that applies to none of them is muted, with `-` for its count, and stays in its row. A click
+anywhere on a row runs it, and the row under the mouse is lit, but a muted one, which does nothing. The
+hint line under the rows says what the muted ones have nothing to do to, as `Nothing to close or forget`,
+and with the mouse on a row what it does, or why it is muted, as `None has windows open`; the key says
+the same on the sidebar's last line. A sidebar too narrow for the columns drops the counts first, then
+the keys, rather than wrap a row; the keys work whether shown or not.
+
+- **Remove** opens [Clean up worktrees](#the-menu), titled **Remove worktrees**, with every ticked row:
+  linked worktrees ticked unless they have changes, with its checks and **Also delete their branches**,
+  missing ones to close and forget, and a main worktree or a session in no space listed as refused, so it
+  says why it leaves them.
+- **Close** opens one form listing the ticked sessions with windows open, and closes them all.
+- **Forget** opens one form listing the saved files of the ticked sessions with no windows open, missing
+  worktrees and closed ones, and deletes them.
+- **Run** opens the Run form for the ticked worktrees, but missing ones, with the first one's first
+  command chosen, and runs it in each, a tab each as Run opens it, without switching sessions; one that
+  fails is said on the form, which stays, rather than on the sidebar's last line, as the form is a process
+  of its own.
+
+Each form confirms in a popup of its own, so the mode ends once the rows show the action done: a worktree
+gone from the list, a session with no windows, a saved file gone, or a session with a window more. A form
+cancelled changes nothing, and the ticks stay for another go.
 
 ## The menu
 
@@ -182,6 +230,7 @@ group, and Add space.
 | Space | Clean up worktrees | `p` | remove the space's linked worktrees that look done with, and its missing ones, on a space's row |
 | Space | Trust space config | | show what the space's own config adds, and trust it, in a form; while its `.kspaces.toml` is untrusted or changed |
 | Group | Fold / Unfold group | `space` | hide or show a group's spaces, on its header |
+| Space | Select | | turn on the [select mode](#selecting) with the row ticked, a group's header too |
 | Space | Add space | `a` | add a repository to the spaces, in a form; on every row |
 
 Each item that changes something opens a form in a popup, with buttons and keys to confirm or cancel: an
@@ -405,8 +454,11 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `f` | show only what is not idle, or everything again; see [Spaces](#spaces) |
 | `s` | sort the list the next way; see [Order](#order) |
 | `K` / `J` | move the cursor's space within its group, or linked worktree within its space, up / down |
+| `v` | select rows to act on; see [Selecting](#selecting) |
+| `space`, `A` | in the select mode, tick the cursor's row, every row shown |
+| `x`, `c`, `F`, `R` | in the select mode, remove, close, forget, run in what is ticked |
 | `r` | refresh, which also happens every two seconds |
-| `esc` / `q` | give focus back to the window it came from |
+| `esc` / `q` | give focus back to the window it came from; `esc` in the select mode leaves it |
 
 Each list scrolls on its own. A list with entries out of view says how many on its first or last row;
 clicking that row scrolls a page.

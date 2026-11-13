@@ -25,7 +25,7 @@ func (m *sidebar) startSelect() {
 
 // endSelect turns the select mode off, letting go of the ticks.
 func (m *sidebar) endSelect() {
-	m.selecting, m.ticked = false, nil
+	m.selecting, m.ticked, m.pending = false, nil, nil
 	m.scrollToCursor()
 }
 

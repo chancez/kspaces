@@ -402,8 +402,9 @@ var (
 // actSelect turns the select mode on, see select.go.
 var actSelect = paneAction("select", func(m *sidebar) tea.Cmd { m.startSelect(); return nil })
 
-// The select mode's: ticking rows, and leaving. Each applies throughout the mode, so a key that does
-// nothing here does not reach the cursor's row, where x would remove its one worktree.
+// The select mode's: ticking rows, acting on the ticked ones, and leaving. Each applies throughout the
+// mode, so a key that does nothing here, as x with nothing to remove ticked, says why rather than reaching
+// the cursor's row, where it would remove its one worktree.
 var (
 	actTick = &interact.Action[*sidebar, selectSubject]{
 		Title: "tick",
@@ -416,6 +417,23 @@ var (
 	actEndSelect = &interact.Action[*sidebar, selectSubject]{
 		Title: "Cancel",
 		Run:   do[*sidebar, selectSubject]((*sidebar).endSelect),
+	}
+	// The bar's, see selectbar.go, each opening its form with the ticked rows it applies to.
+	actSelRemove = &interact.Action[*sidebar, selectSubject]{
+		Title: "Remove",
+		Run:   cmd[*sidebar, selectSubject]((*sidebar).removeSelected),
+	}
+	actSelClose = &interact.Action[*sidebar, selectSubject]{
+		Title: "Close",
+		Run:   cmd[*sidebar, selectSubject]((*sidebar).closeSelected),
+	}
+	actSelForget = &interact.Action[*sidebar, selectSubject]{
+		Title: "Forget",
+		Run:   cmd[*sidebar, selectSubject]((*sidebar).forgetSelected),
+	}
+	actSelRun = &interact.Action[*sidebar, selectSubject]{
+		Title: "Run",
+		Run:   cmd[*sidebar, selectSubject]((*sidebar).runSelected),
 	}
 )
 
@@ -982,9 +1000,14 @@ func init() {
 	interact.Via(paneKind, func(paneSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	thePane = interact.List(paneKind)
 
-	selectKind = interact.NewKind(func(selectSubject) string { return "Select" }, actTick, actTickAll, actEndSelect)
+	selectKind = interact.NewKind(func(selectSubject) string { return "Select" },
+		actTick, actTickAll, actSelRemove, actSelClose, actSelForget, actSelRun, actEndSelect)
 	selectKind.Bind(actTick, "space", "tick the row", "space")
 	selectKind.Bind(actTickAll, "A", "tick every row", "A")
+	selectKind.Bind(actSelRemove, "x", "remove the ticked worktrees", "x")
+	selectKind.Bind(actSelClose, "c", "close the ticked sessions", "c")
+	selectKind.Bind(actSelForget, "F", "forget the ticked sessions' saved files", "F")
+	selectKind.Bind(actSelRun, "R", "run a command in the ticked worktrees", "R")
 	selectKind.Bind(actEndSelect, "esc", "leave the select mode", "esc")
 	theSelection = interact.List(selectKind)
 

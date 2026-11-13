@@ -102,9 +102,15 @@ type sidebar struct {
 	mouse      *pixelMouse
 	// The left press on a spaces row until its release, nil for none: a click or a drag, see drag.go.
 	press *press
-	// The select mode, see select.go: whether it is on, and the sessions ticked.
+	// The select mode, see select.go: whether it is on, the sessions ticked, and whether the action handed
+	// to a form shows done, which ends it. bar is the bar's rows as the last frame drew them, barHints what
+	// its hint line says of each, by action, and barHot the row under the mouse, see selectbar.go.
 	selecting bool
 	ticked    map[string]bool
+	pending   func(m *sidebar) bool
+	bar       controls[*sidebar]
+	barHints  map[string]string
+	barHot    string
 	// Whether the mouse is on the add space button, the sort button or the attention filter's button,
 	// which lights it.
 	addHot, sortHot, attentionHot bool
@@ -259,6 +265,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.order = msg.Order
 			m.git = msg.Git
 			m.rebuildRows(at)
+			m.settle()
 			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))
 		}
 	case tea.MouseWheelMsg:
@@ -280,7 +287,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.release(msg.X, msg.Y)
 	case mouseLeftMsg:
 		m.unhover()
-		m.addHot, m.sortHot, m.attentionHot = false, false, false
+		m.addHot, m.sortHot, m.attentionHot, m.barHot = false, false, false, ""
 	case tea.KeyPressMsg:
 		if m.press != nil && m.press.drag != nil && msg.String() == "esc" {
 			m.cancelPress()
@@ -314,11 +321,16 @@ type layout struct {
 	statusTop int
 }
 
+// layout is the height's split now: the select mode's bar takes the spaces list's last rows.
 func (m *sidebar) layout() layout {
 	avail := max(m.height-headerRows-1, 1)
 	spaces := max(int(float64(avail)*statusAt), 1)
 	status := max(avail-spaces-2, 1)
-	return layout{spaces: spaces, status: status, statusTop: headerRows + spaces + 2}
+	l := layout{spaces: spaces, status: status, statusTop: headerRows + spaces + 2}
+	if m.selecting {
+		l.spaces = max(spaces-m.barHeight(), 1)
+	}
+	return l
 }
 
 // contentWidth leaves the last column for the border against the window the sidebar is docked to.
@@ -398,6 +410,10 @@ func (m *sidebar) frame() string {
 	th, width, l := m.th, m.contentWidth(), m.layout()
 	lines := []string{m.titleLine(width), m.filterLine()}
 	lines = append(lines, m.spacesLines()...)
+	for len(lines) < headerRows+l.spaces {
+		lines = append(lines, "")
+	}
+	lines = append(lines, m.barLines(width)...)
 	for len(lines) < l.statusTop-2 {
 		lines = append(lines, "")
 	}
