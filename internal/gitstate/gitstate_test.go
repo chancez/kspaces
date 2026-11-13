@@ -1,6 +1,7 @@
 package gitstate
 
 import (
+	"encoding/json"
 	"errors"
 	"reflect"
 	"testing"
@@ -157,5 +158,32 @@ func TestKnownPR(t *testing.T) {
 	want := []known{{&gh.PR{Number: 7, State: "open"}, true}, {nil, true}, {}, {}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v\nwant %+v", got, want)
+	}
+}
+
+// A state goes through the poller file with its PR's checks and review, and one a sidebar wrote before
+// PRs had them reads as none of either.
+func TestStateFile(t *testing.T) {
+	at := time.Date(2026, 11, 13, 10, 0, 0, 0, time.UTC)
+	st := State{PR: &gh.PR{Number: 7, State: "open", Checks: gh.ChecksFailing, Review: gh.ReviewChangesRequested}, PRAt: at, PRBranch: "dev"}
+	data, err := json.Marshal(st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(data), `{"pr":{"number":7,"state":"open","checks":"failing","review":"changes_requested"},"pr_at":"2026-11-13T10:00:00Z","pr_branch":"dev"}`; got != want {
+		t.Errorf("written as %s\nwant %s", got, want)
+	}
+	for _, in := range []string{string(data), `{"pr":{"number":7,"state":"open"},"pr_at":"2026-11-13T10:00:00Z","pr_branch":"dev"}`} {
+		var got State
+		if err := json.Unmarshal([]byte(in), &got); err != nil {
+			t.Fatal(err)
+		}
+		want := st
+		if in != string(data) {
+			want.PR = &gh.PR{Number: 7, State: "open", Checks: gh.ChecksNone, Review: gh.ReviewNone}
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("%s read as %+v, want %+v", in, got, want)
+		}
 	}
 }

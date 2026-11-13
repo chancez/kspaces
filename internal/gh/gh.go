@@ -19,8 +19,32 @@ import (
 type PR struct {
 	Number int `json:"number"`
 	// State is open, draft, merged or closed.
-	State string `json:"state"`
+	State  string `json:"state"`
+	Checks Checks `json:"checks,omitempty"`
+	Review Review `json:"review,omitempty"`
 }
+
+// Checks is what a PR's CI checks come to, all of them together. The zero value is none, so a poller
+// file written before PRs had checks reads as none.
+type Checks string
+
+const (
+	ChecksNone    Checks = ""
+	ChecksPassing Checks = "passing"
+	ChecksFailing Checks = "failing"
+	ChecksPending Checks = "pending"
+)
+
+// Review is a PR's review decision, as GitHub works it out from the reviews and the branch's rules. The
+// zero value is none, as for Checks.
+type Review string
+
+const (
+	ReviewNone             Review = ""
+	ReviewApproved         Review = "approved"
+	ReviewChangesRequested Review = "changes_requested"
+	ReviewRequired         Review = "review_required"
+)
 
 // PRView is what ViewPR says of a PR, as much as checking it out needs.
 type PRView struct {
@@ -81,21 +105,26 @@ func BranchPR(root, branch string) (*PR, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), branchTimeout)
 	defer cancel()
 	out, err := run(ctx, root, "looking up a branch's PR", "pr", "list", "--state", "all", "--head", branch, "--limit", "10",
-		"--json", "number,state,isDraft,isCrossRepository")
+		"--json", listFields)
 	if err != nil {
 		return nil, err
 	}
 	return parsePRs(out)
 }
 
-// parsePRs reads `gh pr list --json number,state,isDraft,isCrossRepository`, newest first, and picks the
-// newest from the repository itself over one from a fork of the same name.
+// listFields are what BranchPR asks gh pr list for.
+const listFields = "number,state,isDraft,isCrossRepository,statusCheckRollup,reviewDecision"
+
+// parsePRs reads `gh pr list --json` of listFields, newest first, and picks the newest from the repository
+// itself over one from a fork of the same name.
 func parsePRs(data []byte) (*PR, error) {
 	var prs []struct {
-		Number            int    `json:"number"`
-		State             string `json:"state"`
-		IsDraft           bool   `json:"isDraft"`
-		IsCrossRepository bool   `json:"isCrossRepository"`
+		Number            int         `json:"number"`
+		State             string      `json:"state"`
+		IsDraft           bool        `json:"isDraft"`
+		IsCrossRepository bool        `json:"isCrossRepository"`
+		StatusCheckRollup []rollupRun `json:"statusCheckRollup"`
+		ReviewDecision    string      `json:"reviewDecision"`
 	}
 	if err := json.Unmarshal(data, &prs); err != nil {
 		return nil, fmt.Errorf("parsing gh pr list: %w", err)
@@ -118,7 +147,38 @@ func parsePRs(data []byte) (*PR, error) {
 	if state == "open" && pr.IsDraft {
 		state = "draft"
 	}
-	return &PR{Number: pr.Number, State: state}, nil
+	return &PR{Number: pr.Number, State: state, Checks: summarize(pr.StatusCheckRollup), Review: Review(strings.ToLower(pr.ReviewDecision))}, nil
+}
+
+// rollupRun is one check of a PR's statusCheckRollup, as gh gives it: a check run, with a status and,
+// once completed, a conclusion, or a commit status context, with a state.
+type rollupRun struct {
+	Status     string `json:"status"`
+	Conclusion string `json:"conclusion"`
+	State      string `json:"state"`
+}
+
+// summarize is what a PR's checks come to: failing when any failed, else pending when any has not
+// finished, else passing; none when it has none. Neutral, skipped and stale count as passing, as GitHub
+// does not hold a PR back on them.
+func summarize(runs []rollupRun) Checks {
+	if len(runs) == 0 {
+		return ChecksNone
+	}
+	sum := ChecksPassing
+	for _, r := range runs {
+		result := r.Conclusion + r.State
+		if r.Status != "" && r.Status != "COMPLETED" {
+			result = r.Status
+		}
+		switch result {
+		case "FAILURE", "ERROR", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE":
+			return ChecksFailing
+		case "PENDING", "QUEUED", "IN_PROGRESS", "EXPECTED", "WAITING", "REQUESTED":
+			sum = ChecksPending
+		}
+	}
+	return sum
 }
 
 // Browse opens PR number in the browser, with gh run in dir for the repository it is of. The error is
