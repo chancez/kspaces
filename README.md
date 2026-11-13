@@ -146,7 +146,8 @@ panes = [
 # linked worktrees' sessions open with afresh, when there is no saved session to restore, and the new
 # worktree form's at first. `layout` is the main worktree's, and a top-level `layout`, before any table,
 # the default for every space. A layout needing an input with no default, as claude's prompt, is opened
-# afresh as one shell tab, and the sidebar says so. `group` is the group the sidebar lists it under.
+# afresh as one shell tab, and the sidebar says so. `pr_layout`, here or top-level, is the new worktree
+# form's for a PR. `group` is the group the sidebar lists it under.
 [space.gr]
 worktree_layout = "agent"
 
@@ -170,7 +171,7 @@ setting in two files is an error. See [docs/kitty.md](docs/kitty.md#more-config-
 A repository's own layouts and commands can live with it, rather than in your dotfiles, in `.kspaces.toml`
 at the top of its main worktree, which its linked worktrees share. They are added to config.toml's for that
 space alone, a name it has taking config.toml's one's place, and it can set the space's `layout`,
-`worktree_layout` and `[worktrees]`:
+`worktree_layout`, `pr_layout` and `[worktrees]`:
 
 ```toml
 layout = "tests"

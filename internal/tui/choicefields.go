@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -88,11 +89,8 @@ func layoutDetail(l config.Layout) string {
 // choice, or the first when there is no such choice, and its inputs filled in from values, the rest with
 // their defaults. Each input is a textField when multiline says so, else a lineField.
 func newChoiceFields[T any](th *look.Theme, label string, choices []T, nameOf func(T) string, inputOf func(T) []config.Input, detailOf func(T) string, multiline bool, none *noChoice, name string, values map[string]string) choiceFields[T] {
-	c := choiceFields[T]{th: th, label: label, zone: label, choices: choices, nameOf: nameOf, inputOf: inputOf, detailOf: detailOf, none: none, sel: -1}
-	if none == nil && len(choices) > 0 {
-		c.sel = 0
-	}
-	for i, ch := range choices {
+	c := choiceFields[T]{th: th, label: label, zone: label, choices: choices, nameOf: nameOf, inputOf: inputOf, detailOf: detailOf, none: none}
+	for _, ch := range choices {
 		var ins []field
 		for _, in := range inputOf(ch) {
 			placeholder := ""
@@ -114,11 +112,9 @@ func newChoiceFields[T any](th *look.Theme, label string, choices []T, nameOf fu
 			box.fill(v)
 			ins = append(ins, box)
 		}
-		if nameOf(ch) == name {
-			c.sel = i
-		}
 		c.inputs = append(c.inputs, ins)
 	}
+	c.choose(name)
 	return c
 }
 
@@ -146,6 +142,15 @@ func (c *choiceFields[T]) cycle(delta int) {
 		return
 	}
 	c.sel = ((c.sel-first+delta)%n+n)%n + first
+}
+
+// choose chooses the one called name, or none when there is no such choice and none is one, else the
+// first, as newChoiceFields does.
+func (c *choiceFields[T]) choose(name string) {
+	c.sel = slices.IndexFunc(c.choices, func(ch T) bool { return c.nameOf(ch) == name })
+	if c.sel < 0 && c.none == nil && len(c.choices) > 0 {
+		c.sel = 0
+	}
 }
 
 // fields are the chosen one's text boxes, in order.

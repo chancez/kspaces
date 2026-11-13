@@ -580,6 +580,43 @@ func TestNewWorktreeFormLayout(t *testing.T) {
 	}
 }
 
+// While the branch field names a PR the new worktree form chooses the space's PR layout, and the
+// worktree layout again once it names a branch, until a layout is chosen in the form.
+func TestNewWorktreeFormPRLayout(t *testing.T) {
+	root := mainRepo(t)
+	cfg := testLayouts(t)
+	cfg.Spaces = []string{root}
+	cfg.Space = map[string]config.SpaceSettings{filepath.Base(root): {WorktreeLayout: "agent", PRLayout: "plain"}}
+	f := newForm(cfg, spaces.LoadSpace(root))
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	chosen := func() string {
+		l, ok := f.layouts.chosen()
+		if !ok {
+			return "shell"
+		}
+		return l.Name
+	}
+	backspace := tea.KeyPressMsg{Code: tea.KeyBackspace}
+	got := []string{chosen()}
+	typeInto(f, "#7")
+	got = append(got, chosen())
+	f.Update(backspace)
+	got = append(got, chosen())
+	typeInto(f, "7")
+	f.Update(keyMsg("tab"))
+	f.Update(keyMsg("tab"))
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	got = append(got, chosen())
+	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+	f.Update(backspace)
+	typeInto(f, "8")
+	got = append(got, chosen())
+	if want := []string{"agent", "plain", "agent", "agent", "agent"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 // Opening a worktree afresh opens its default layout; a default that needs an input it has no default for
 // opens the shell tab instead, and says so.
 func TestOpenWorktreeLayout(t *testing.T) {

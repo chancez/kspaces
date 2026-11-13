@@ -7,7 +7,7 @@ show up on their own. Each worktree is a kitty session: the main worktree's is n
 (`gr`), a linked worktree's `SPACE@DIR` (`gr@dev`).
 
 An entry of `spaces` is the root's path, or an inline table of its `path` and any of the keys a
-`[space.NAME]` table takes, `group`, `layout` and `worktree_layout`, meaning the same:
+`[space.NAME]` table takes, `group`, `layout`, `worktree_layout` and `pr_layout`, meaning the same:
 
 ```toml
 spaces = [
@@ -196,11 +196,18 @@ the main worktree the space's `layout`, else the top-level one; else the one tab
 
 ```toml
 layout = "agent"            # before any table
+pr_layout = "review"
 
 [space.gr]                  # by the space's name
 layout = "plain"
 worktree_layout = "agent"
+pr_layout = "review"
 ```
+
+The new worktree form starts on the linked worktree's default layout, and while its branch field names a
+PR, on the PR layout: the space's `pr_layout`, else the top-level `pr_layout`, else the linked worktree's
+default. A layout chosen in the form stays chosen. `pr_layout` is only the form's: reopening the worktree
+afresh later uses its default layout.
 
 A default layout with an input that is required and has no default is not opened without asking: the
 session opens with its one tab, and the sidebar's last line says why. The new worktree form, **Open layout**
@@ -301,6 +308,7 @@ yourself in `.git/info/exclude`.
 ```toml
 layout = "tests"            # the space's default layouts, in place of its [space.NAME]'s
 worktree_layout = "agent"
+pr_layout = "review"
 
 [worktrees]                 # in place of config.toml's
 branch_prefix = "pr/me"
@@ -314,15 +322,16 @@ name = "tests"
 tabs = [{ panes = [{ command = "test" }, { command = "claude", split = "right" }] }]
 ```
 
-It can have `[[layouts]]`, `[[commands]]`, `layout`, `worktree_layout` and `[worktrees]`'s `dir` and
-`branch_prefix`, checked as config.toml's are; anything else is an error naming the key, `spaces`,
-`launch`, `sessions`, `groups`, `[sidebar]`, `[kitty]` and `[space.NAME]` included, which only config.toml
-has, and so is `group`, which is the space's `[space.NAME]`'s. For
+It can have `[[layouts]]`, `[[commands]]`, `layout`, `worktree_layout`, `pr_layout` and `[worktrees]`'s
+`dir` and `branch_prefix`, checked as config.toml's are; anything else is an error naming the key,
+`spaces`, `launch`, `sessions`, `groups`, `[sidebar]`, `[kitty]` and `[space.NAME]` included, which only
+config.toml has, and so is `group`, which is the space's `[space.NAME]`'s. For
 that space alone, in its forms, its rows' menus, opening its worktrees and `kspaces layout` and `kspaces
 run` in them, its layouts and commands are added to config.toml's, one called as one of config.toml's in
 that one's place, and a layout of either can run a command of either. Its `layout` and `worktree_layout`
 come first, then the space's `[space.NAME]`'s, then the top-level `layout`; a linked worktree's falls back
-on the file's own `layout` before `[space.NAME]`'s. Its worktree settings are used in place of
+on the file's own `layout` before `[space.NAME]`'s. Its `pr_layout` comes before `[space.NAME]`'s, then
+the top-level `pr_layout`, then the linked worktree's default. Its worktree settings are used in place of
 config.toml's they name. Other spaces never see any of it.
 
 A file with an error is left out, and only for its space: the space's row says `config error`, and

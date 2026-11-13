@@ -19,6 +19,7 @@ const SpaceFileName = ".kspaces.toml"
 //
 //	layout = "agent"
 //	worktree_layout = "agent"
+//	pr_layout = "review"
 //
 //	[worktrees]
 //	branch_prefix = "pr/me"
@@ -36,6 +37,7 @@ type SpaceFile struct {
 	// The space's defaults, which take the place of its [space.NAME]'s.
 	Layout         string `toml:"layout"`
 	WorktreeLayout string `toml:"worktree_layout"`
+	PRLayout       string `toml:"pr_layout"`
 	// Nil for a setting the file leaves to the global config.
 	Dir          *string `toml:"-"`
 	BranchPrefix *string `toml:"-"`
@@ -77,7 +79,7 @@ func ParseSpaceFile(data string) (SpaceFile, error) {
 	}
 	switch {
 	case slices.Contains(global, "space"):
-		return SpaceFile{}, fmt.Errorf("space tables are for the global config; a space's file sets its own layout and worktree_layout at the top")
+		return SpaceFile{}, fmt.Errorf("space tables are for the global config; a space's file sets its own layout, worktree_layout and pr_layout at the top")
 	case slices.Contains(global, "group"):
 		return SpaceFile{}, fmt.Errorf("a space's group is set in the global config, as group in its [space.NAME]")
 	case len(global) > 0:
@@ -131,7 +133,7 @@ func (cfg Config) WithSpace(name string, f SpaceFile) (Config, error) {
 			out.Layouts = append(out.Layouts, l)
 		}
 	}
-	if f.Layout != "" || f.WorktreeLayout != "" {
+	if f.Layout != "" || f.WorktreeLayout != "" || f.PRLayout != "" {
 		s := cfg.Space[name]
 		out.Space = maps.Clone(cfg.Space)
 		if out.Space == nil {
@@ -142,6 +144,7 @@ func (cfg Config) WithSpace(name string, f SpaceFile) (Config, error) {
 		out.Space[name] = SpaceSettings{
 			Layout:         cmp.Or(f.Layout, s.Layout),
 			WorktreeLayout: cmp.Or(f.WorktreeLayout, f.Layout, s.WorktreeLayout),
+			PRLayout:       cmp.Or(f.PRLayout, s.PRLayout),
 			Group:          s.Group,
 		}
 	}
@@ -152,7 +155,7 @@ func (cfg Config) WithSpace(name string, f SpaceFile) (Config, error) {
 		out.Worktrees.BranchPrefix = *f.BranchPrefix
 	}
 	// The defaults before the layouts, which would blame the space table the file's take the place of.
-	for _, d := range []struct{ key, layout string }{{"layout", f.Layout}, {"worktree_layout", f.WorktreeLayout}} {
+	for _, d := range []struct{ key, layout string }{{"layout", f.Layout}, {"worktree_layout", f.WorktreeLayout}, {"pr_layout", f.PRLayout}} {
 		if d.layout != "" && !slices.ContainsFunc(out.Layouts, func(l Layout) bool { return l.Name == d.layout }) {
 			return Config{}, fmt.Errorf("%s is %q, no layout has that name", d.key, d.layout)
 		}

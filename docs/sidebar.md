@@ -296,8 +296,10 @@ has focus the keys row lists `shift+enter newline`. Every form with an input, be
 
 With [layouts](kitty.md#layouts) configured, a `layout` field comes before `command`, set at first to the
 space's layout for its linked worktrees, else `shell`, listed first as `shell  1 tab, a shell`, and below it
-a field for each of its inputs. With a layout chosen the session opens with its tabs rather than one shell
-tab; with a command too, the command then runs where its `open` says, by the pane the layout left focused.
+a field for each of its inputs. While the branch field names a PR it is set to the space's
+[`pr_layout`](kitty.md#layouts) instead, until a layout is chosen in the form. With a layout chosen the
+session opens with its tabs rather than one shell tab; with a command too, the command then runs where its
+`open` says, by the pane the layout left focused.
 
 **Run** chooses a command, with the same `command` field when there is more than one, and has a field for
 each input of the one chosen. It says where the command opens: as the session's first tab when the session

@@ -129,6 +129,8 @@ tabs = [{ panes = [{ command = "claude" }, { command = "other", split = "right" 
 		{`layout = "nope"`, `layout is "nope", no layout has that name`},
 		{one("[{}]") + "[space.gr]\nworktree_layout = \"nope\"", `space.gr.worktree_layout is "nope", no layout has that name`},
 		{one("[{}]") + "[space.gr]\nlayout = \"nope\"", `space.gr.layout is "nope", no layout has that name`},
+		{one("[{}]") + "[space.gr]\npr_layout = \"nope\"", `space.gr.pr_layout is "nope", no layout has that name`},
+		{`pr_layout = "nope"`, `pr_layout is "nope", no layout has that name`},
 		{one("[{}]") + "[space.vim]\nlayout = \"a\"", "space.vim: no space is named vim"},
 		{`space = ["~/x"]`, "space must be [space.NAME] tables; the list of spaces is spaces"},
 		{"space = 1", "space must be [space.NAME] tables; the list of spaces is spaces"},
@@ -167,6 +169,29 @@ func TestLayoutFor(t *testing.T) {
 	}
 	if got := (Config{}).LayoutFor("none", true); got != "" {
 		t.Errorf("with no default: %q", got)
+	}
+}
+
+// A worktree for a PR opens with its space's pr_layout, else the global one, else a linked worktree's.
+func TestPRLayoutFor(t *testing.T) {
+	spaces := map[string]SpaceSettings{
+		"pr":     {Layout: "main", WorktreeLayout: "linked", PRLayout: "review"},
+		"linked": {WorktreeLayout: "linked"},
+	}
+	got := map[string][]string{}
+	for _, space := range []string{"pr", "linked", "none"} {
+		got[space] = []string{
+			Config{DefaultLayout: "global", DefaultPRLayout: "global-pr", Space: spaces}.PRLayoutFor(space),
+			Config{DefaultLayout: "global", Space: spaces}.PRLayoutFor(space),
+		}
+	}
+	want := map[string][]string{
+		"pr":     {"review", "review"},
+		"linked": {"global-pr", "linked"},
+		"none":   {"global-pr", "global"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v\nwant %v", got, want)
 	}
 }
 

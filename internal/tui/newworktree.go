@@ -26,8 +26,10 @@ type newWorktreeForm struct {
 	// Empty for the default, which spaces.WorktreeDir derives from the branch and the placeholder shows.
 	dir lineField
 	// The layout the session opens with, none for a shell tab, and its inputs. Only with layouts
-	// configured, the space's worktree layout chosen at first.
-	layouts choiceFields[config.Layout]
+	// configured, the space's worktree layout chosen at first, and its PR layout while the branch field
+	// names a PR, until one is chosen here.
+	layouts      choiceFields[config.Layout]
+	layoutPicked bool
 	// The command to run, none for none, and its inputs: as the first tab without a layout, else after
 	// it, where the command opens. Only with commands configured.
 	cmds choiceFields[config.Command]
@@ -217,6 +219,9 @@ func (f *newWorktreeForm) onCommand() bool { return f.cmds.picks() && f.focus ==
 // cycleLayout and cycleCommand choose the next layout or command, or the one before, and focus the
 // choice, as the inputs below it change with it.
 func (f *newWorktreeForm) cycleLayout(delta int) tea.Cmd {
+	if delta != 0 {
+		f.layoutPicked = true
+	}
 	f.layouts.cycle(delta)
 	f.focus = f.layoutAt()
 	return moveFocus(f.fields(), &f.focus, 0)
@@ -252,6 +257,7 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case f.layouts.listOpen():
 			cmd, picked := f.layouts.updateList(msg, f.zones)
 			if picked {
+				f.layoutPicked = true
 				return f, tea.Batch(cmd, f.cycleLayout(0))
 			}
 			return f, cmd
@@ -340,6 +346,13 @@ func (f *newWorktreeForm) followBranch() tea.Cmd {
 		if isPR != f.isPR || ref != f.pr {
 			f.pr, f.isPR = ref, isPR
 			f.prSeq++
+			if !f.layoutPicked {
+				layout := f.cfg.LayoutFor(f.space.Name, true)
+				if isPR {
+					layout = f.cfg.PRLayoutFor(f.space.Name)
+				}
+				f.layouts.choose(layout)
+			}
 			if _, asked := f.lookups[ref.Arg]; isPR && !asked {
 				seq := f.prSeq
 				cmd = tea.Tick(prDebounce, func(time.Time) tea.Msg { return prDueMsg{seq, ref} })

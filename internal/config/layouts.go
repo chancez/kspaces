@@ -1,6 +1,7 @@
 package config
 
 import (
+	"cmp"
 	"fmt"
 	"maps"
 	"path/filepath"
@@ -76,6 +77,8 @@ type SpaceSettings struct {
 	Layout string `toml:"layout"`
 	// The layout its linked worktrees open with afresh, Layout when empty.
 	WorktreeLayout string `toml:"worktree_layout"`
+	// The layout the new worktree form opens a worktree for a PR with, see Config.PRLayoutFor.
+	PRLayout string `toml:"pr_layout"`
 	// The group the sidebar lists the space under, such as work; empty for none. Only the global config
 	// sets it: a group is about how every space is shown, which one space's own file has no say in.
 	Group string `toml:"group"`
@@ -107,6 +110,9 @@ func checkLayouts(cfg *Config) error {
 	if err := known("layout", cfg.DefaultLayout); err != nil {
 		return err
 	}
+	if err := known("pr_layout", cfg.DefaultPRLayout); err != nil {
+		return err
+	}
 	names := map[string]bool{}
 	for _, root := range cfg.Spaces {
 		names[filepath.Base(root)] = true
@@ -120,6 +126,9 @@ func checkLayouts(cfg *Config) error {
 			return err
 		}
 		if err := known("space."+name+".worktree_layout", s.WorktreeLayout); err != nil {
+			return err
+		}
+		if err := known("space."+name+".pr_layout", s.PRLayout); err != nil {
 			return err
 		}
 	}
@@ -254,6 +263,13 @@ func (cfg Config) LayoutFor(space string, linked bool) string {
 		return s.Layout
 	}
 	return cfg.DefaultLayout
+}
+
+// PRLayoutFor is the name of the layout the new worktree form opens a worktree of the space called space
+// with when it checks out a PR, or empty for a shell: the space's pr_layout, else the global pr_layout,
+// else a linked worktree's, see LayoutFor.
+func (cfg Config) PRLayoutFor(space string) string {
+	return cmp.Or(cfg.Space[space].PRLayout, cfg.DefaultPRLayout, cfg.LayoutFor(space, true))
 }
 
 // Values are the layout's inputs as given, by name, the default for any not given. An input it does not

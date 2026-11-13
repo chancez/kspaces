@@ -131,7 +131,7 @@ func (f *trustForm) adds(width int) []string {
 	}
 	var settings []string
 	for _, s := range []struct{ key, value string }{
-		{"layout", f.file.Layout}, {"worktree_layout", f.file.WorktreeLayout},
+		{"layout", f.file.Layout}, {"worktree_layout", f.file.WorktreeLayout}, {"pr_layout", f.file.PRLayout},
 	} {
 		if s.value != "" {
 			settings = append(settings, line(look.Text("  "+s.key+" = "+s.value)))
