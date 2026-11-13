@@ -230,6 +230,7 @@ group, and Add space.
 | Worktree | Remove worktree | `x` | close the session and remove a linked worktree |
 | Worktree | Forget | `x` | delete the saved session file of a missing worktree with no windows open |
 | Space | New worktree | `n` | create a worktree in the space, in a form |
+| Space | New worktree from PR | `N` | the same form on its Pull request tab, to check out one of the space's open PRs |
 | Space | Fold / Unfold worktrees | `space` | hide or show a space's linked worktrees |
 | Space | Clean up worktrees | `p` | remove the space's linked worktrees that look done with, and its missing ones, on a space's row |
 | Space | Trust space config | | show what the space's own config adds, and trust it, in a form; while its `.kspaces.toml` is untrusted or changed |
@@ -257,21 +258,35 @@ line, until the next key or click in the sidebar.
 background, so the sidebar does not wait for it; what it says when it fails shows on the sidebar's last
 line.
 
-**New worktree** has a branch field, which starts with `worktrees.branch_prefix/`, and a directory field,
+**New worktree** and **New worktree from PR** open one form with two tabs, `Branch` and `Pull request`,
+on a strip below its heading, the one shown on a chip. The strip is the form's first field: `left` and
+`right` while it has focus, or a click on a tab, switch tabs. Each tab keeps its own fields, so switching
+loses nothing typed. Create creates from the tab shown.
+
+The branch tab has a branch field, which starts with `worktrees.branch_prefix/`, and a directory field,
 empty for the default: `worktrees.dir` under the space's root, named after the branch. An existing branch is
 checked out; a new one is created from what the main worktree has checked out. Create switches to the new
-session.
+session. Typing `#` in the branch field, after the prefix or in place of it, goes to the PR tab, typing going
+on in its PR field; a PR's URL typed or pasted there goes to the PR tab with it in the PR field.
 
-The branch field also takes a GitHub PR: `#123`, the PR's URL, or a number that is no branch, after the
-prefix or in place of it. Once typing rests on it, the form looks it up with `gh pr view` in the space's root
-and shows the PR's title and the branch it checks out, which the directory follows. A PR from the repository
-itself is its branch, fetched and tracking the remote's. A PR from a fork is fetched from the remote's
-`pull/N/head` into a branch named after the fork's, or `pr-N-BRANCH` when the space has a branch of that name
-for something else, and pulls from `pull/N/head`, as `gh pr checkout` sets up a fork it has no remote for.
-The remote is the one for the repository the PR is to, else `origin`. A branch set up for the PR before is
-checked out as it is. When gh cannot say, because it is not installed, there is no such PR or the repository
-is not on GitHub, the form shows gh's error as it does git's. `kspaces new [SPACE] --pr N` opens the form
-on PR N, its number or URL, looked up at once.
+The PR tab's first field is the PR: its number, `#N`, its URL, or words of its title or its author's login,
+as `number, URL or title` says while it is empty. The first time the tab shows, the form lists the space's
+open PRs with `gh pr list` in its root. While the field has focus the open PRs it matches show below it, up
+to five, each with its author and whether it is a draft, the one of the number typed first: `up` and `down`
+go through them, and the one highlighted, the first at first, is the PR Create checks out, so an empty field
+is the newest. A click on one chooses it, fills the field in with its number and moves on to the directory,
+closing them. A number or URL no open PR has is looked up with `gh pr view` once typing rests on it. Without
+focus the field shows the PR chosen and its title.
+The form shows the PR's title and the branch it checks out, which the directory follows. A PR from the
+repository itself is its branch, fetched and tracking the remote's. A PR from a fork is fetched from the
+remote's `pull/N/head` into a branch named after the fork's, or `pr-N-BRANCH` when the space has a branch of
+that name for something else, and pulls from `pull/N/head`, as `gh pr checkout` sets up a fork it has no
+remote for. The remote is the one for the repository the PR is to, else `origin`. A branch set up for the
+PR before is checked out as it is. When gh cannot say, because it is not installed, there is no such PR or
+the repository is not on GitHub, the form shows gh's error as it does git's.
+
+`kspaces new [SPACE] --from-pr` opens the form on the PR tab, and `--pr N` on PR N, its number or URL,
+looked up at once.
 
 With [commands](kitty.md#running-commands) configured, the form has a `command` field below the directory,
 `none` at first, and below it a field for each input of the command chosen. `tab` and `shift+tab` go round
@@ -296,11 +311,10 @@ move down. `up` and `down` move between its lines, and leave it only from the fi
 has focus the keys row lists `shift+enter newline`. Every form with an input, below, has these.
 
 With [layouts](kitty.md#layouts) configured, a `layout` field comes before `command`, set at first to the
-space's layout for its linked worktrees, else `shell`, listed first as `shell  1 tab, a shell`, and below it
-a field for each of its inputs. While the branch field names a PR it is set to the space's
-[`pr_layout`](kitty.md#layouts) instead, until a layout is chosen in the form. With a layout chosen the
-session opens with its tabs rather than one shell tab; with a command too, the command then runs where its
-`open` says, by the pane the layout left focused.
+space's layout for its linked worktrees, on the PR tab to its [`pr_layout`](kitty.md#layouts), else
+`shell`, listed first as `shell  1 tab, a shell`, and below it a field for each of its inputs. With a layout
+chosen the session opens with its tabs rather than one shell tab; with a command too, the command then runs
+where its `open` says, by the pane the layout left focused.
 
 **Run** chooses a command, with the same `command` field when there is more than one, and has a field for
 each input of the one chosen. It says where the command opens: as the session's first tab when the session
@@ -449,7 +463,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `enter` / `l` | open |
 | `space` | fold or unfold the space's worktrees, or on a group's header the group's spaces |
 | `m` | menu |
-| `n`, `c`, `x` | new worktree, close session, remove worktree (forget, on a missing worktree) |
+| `n`, `N`, `c`, `x` | new worktree, new worktree from a PR, close session, remove worktree (forget, on a missing worktree) |
 | `p` | clean up the space's worktrees, on a space's row |
 | `R` | run a command in the worktree, with commands configured |
 | `L` | open a layout in the worktree's session, with layouts configured |

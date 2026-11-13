@@ -307,10 +307,12 @@ func TestNewWorktreeForm(t *testing.T) {
 		"",
 		"  New worktree in gr",
 		"",
+		"   Branch   Pull request",
+		"",
 		"  branch     pr/me/",
 		"  directory  .worktrees",
 		"",
-		"  Name the branch to create or check out, or a PR",
+		"  Name the branch to create or check out, or # for a PR",
 		"",
 		"   Create enter    Cancel esc   tab next field",
 		"",
@@ -320,7 +322,7 @@ func TestNewWorktreeForm(t *testing.T) {
 	}
 
 	typeInto(f, "fix/x")
-	want[3], want[4], want[6] = "  branch     pr/me/fix/x", "  directory  .worktrees/fix-x", "  Creates pr/me/fix/x from main"
+	want[5], want[6], want[8] = "  branch     pr/me/fix/x", "  directory  .worktrees/fix-x", "  Creates pr/me/fix/x from main"
 	if got := screen(); !reflect.DeepEqual(got, want) {
 		t.Errorf("after typing a branch:\n%q\nwant\n%q", got, want)
 	}
@@ -332,7 +334,7 @@ func TestNewWorktreeForm(t *testing.T) {
 	}
 
 	_, cmd := f.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
-	if cmd == nil || !f.busy || screen()[8] != "  Creating..." {
+	if cmd == nil || !f.busy || screen()[10] != "  Creating..." {
 		t.Fatalf("enter: busy %v:\n%s", f.busy, strings.Join(screen(), "\n"))
 	}
 	if _, again := f.Update(tea.KeyPressMsg{Code: tea.KeyEnter}); again != nil {

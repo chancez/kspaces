@@ -7,12 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/gh"
 	"github.com/chancez/kspaces/internal/git"
 )
 
-// PRRef is a PR the new worktree form's branch field names.
+// PRRef is a PR as typed: its number, or its URL.
 type PRRef struct {
 	// What gh pr view is given: the number, or the URL as typed.
 	Arg    string
@@ -23,28 +22,28 @@ type PRRef struct {
 // tab of it such as /files.
 var prURL = regexp.MustCompile(`^https?://[^/\s]+/[^/\s]+/[^/\s]+/pull/([0-9]+)(?:[/?#]\S*)?$`)
 
-// ParsePRRef says whether field, the branch field as typed, names a PR rather than a branch: #N, a PR's
-// URL, or a number that is no branch of the space. The configured prefix the field starts with is left
-// out, so a PR typed or pasted after it counts.
-func ParsePRRef(cfg config.Config, space Space, field string) (PRRef, bool) {
-	field = strings.TrimSpace(field)
-	rest := strings.TrimPrefix(field, BranchStart(cfg))
-	if m := prURL.FindStringSubmatch(rest); m != nil {
+// ParsePRRef says whether s names a PR: N, #N or a PR's URL.
+func ParsePRRef(s string) (PRRef, bool) {
+	s = strings.TrimSpace(s)
+	if m := prURL.FindStringSubmatch(s); m != nil {
 		if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
-			return PRRef{Arg: rest, Number: n}, true
+			return PRRef{Arg: s, Number: n}, true
 		}
 		return PRRef{}, false
 	}
-	digits, hash := strings.CutPrefix(rest, "#")
+	digits := strings.TrimPrefix(s, "#")
 	if digits == "" || strings.Trim(digits, "0123456789") != "" {
 		return PRRef{}, false
 	}
 	n, err := strconv.Atoi(digits)
-	if err != nil || n <= 0 || (!hash && space.HasBranch(field)) {
+	if err != nil || n <= 0 {
 		return PRRef{}, false
 	}
 	return PRRef{Arg: strconv.Itoa(n), Number: n}, true
 }
+
+// IsPRURL says whether s is a PR's page.
+func IsPRURL(s string) bool { return prURL.MatchString(strings.TrimSpace(s)) }
 
 // PR is a pull request to check out in a new worktree, and how.
 type PR struct {
@@ -62,22 +61,27 @@ type PR struct {
 	Exists bool
 }
 
-// ResolvePR looks ref up with gh, in the space's root, and works out how to check it out. A PR from the
-// repository itself is its branch, tracking the remote's. A PR from a fork is fetched into a local branch
-// named after the fork's, or pr-N-BRANCH when the space has a branch of that name that is not this PR's,
-// as a fork's main would clash with the space's own.
+// ResolvePR looks ref up with gh, in the space's root, and works out how to check it out, see CheckoutPR.
 func ResolvePR(space Space, ref PRRef) (PR, error) {
 	got, err := gh.ViewPR(space.Root, ref.Arg)
 	if err != nil {
 		return PR{}, err
 	}
+	return CheckoutPR(space, got)
+}
+
+// CheckoutPR works out how to check out view, a PR as gh says it, in the space. A PR from the repository
+// itself is its branch, tracking the remote's. A PR from a fork is fetched into a local branch named after
+// the fork's, or pr-N-BRANCH when the space has a branch of that name that is not this PR's, as a fork's
+// main would clash with the space's own.
+func CheckoutPR(space Space, view gh.PRView) (PR, error) {
 	pr := PR{
-		Number:  got.Number,
-		Title:   got.Title,
-		HeadRef: got.HeadRef,
-		Owner:   got.Owner,
-		Cross:   got.Cross,
-		Remote:  prRemote(git.Remotes(space.Root), got.URL),
+		Number:  view.Number,
+		Title:   view.Title,
+		HeadRef: view.HeadRef,
+		Owner:   view.Owner,
+		Cross:   view.Cross,
+		Remote:  prRemote(git.Remotes(space.Root), view.URL),
 	}
 	if !pr.Cross {
 		pr.Branch, pr.Exists = pr.HeadRef, space.HasBranch(pr.HeadRef)

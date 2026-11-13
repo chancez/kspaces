@@ -218,10 +218,14 @@ func Leave(st kitty.State) error {
 	return kitty.FocusWindow(st.Home)
 }
 
-// NewWorktree opens the form that creates a worktree in the space at root, in a popup for the sidebar's
-// tab, as cfg says: the dock is too narrow to type a name in and read back where it goes.
-func NewWorktree(cfg config.Config, st kitty.State, root string) error {
-	return launchForm(cfg, st, formPanel, "new", root)
+// NewWorktree opens the form that creates a worktree in the space at root, on its Pull request tab when
+// fromPR says so, in a popup for the sidebar's tab, as cfg says: the dock is too narrow to type a name in
+// and read back where it goes. A panel is a list form's size, for the list of open PRs.
+func NewWorktree(cfg config.Config, st kitty.State, root string, fromPR bool) error {
+	if fromPR {
+		return launchForm(cfg, st, listPanel, "new", "--from-pr", root)
+	}
+	return launchForm(cfg, st, listPanel, "new", root)
 }
 
 // AskRemoveWorktree opens the form that confirms removing the worktree at path, in a popup as

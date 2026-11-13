@@ -153,10 +153,10 @@ func TestLayoutKey(t *testing.T) {
 	want := []string{
 		menuRule("Session"), " Open", " Run", " Open layout", " Save as layout", " Close session",
 		menuRule("Worktree"), " Remove worktree",
-		menuRule("Space"), " New worktree", " Fold worktrees", " Select", " Add space",
+		menuRule("Space"), " New worktree", " New worktree from PR", " Fold worktrees", " Select", " Add space",
 		menuRule(""),
 	}
-	if got := e.screen()[y+1 : y+15]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[y+1 : y+16]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	e.press("esc")
@@ -509,7 +509,7 @@ func TestNewWorktreeFormLayout(t *testing.T) {
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	keys := "   Create enter    Cancel esc   tab next field"
 	screen := func(fields []string, keys string, says ...string) []string {
-		lines := append([]string{"", "  New worktree in " + space.Name, "", "  branch     fix", "  directory  .worktrees/fix"}, fields...)
+		lines := append([]string{"", "  New worktree in " + space.Name, "", "   Branch   Pull request", "", "  branch     fix", "  directory  .worktrees/fix"}, fields...)
 		lines = append(lines, "", "  Creates fix from main")
 		for _, s := range says {
 			lines = append(lines, "  "+s)
@@ -532,7 +532,7 @@ func TestNewWorktreeFormLayout(t *testing.T) {
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 12})
 	f.Update(keyMsg("tab"))
 	f.Update(keyMsg("space"))
-	if got, want := formScreen(f), []string{"", listRule(""), listRow(true, "none"), listRow(false, "claude  claude {prompt}"), listRow(false, "review  gr"), listRule(""),
+	if got, want := formScreen(f), []string{"", "  New worktree in " + space.Name, "", listRule(""), listRow(true, "none"), listRow(false, "claude  claude {prompt}"), listRow(false, "review  gr"), listRule(""),
 		"  command    < none >  left/right change  space list", "", "  Creates fix from main", "",
 		"  up/down move  type filter  enter choose  esc close", ""}; !reflect.DeepEqual(got, want) {
 		t.Errorf("above:\n%q\nwant\n%q", got, want)
@@ -543,7 +543,7 @@ func TestNewWorktreeFormLayout(t *testing.T) {
 	// A click opens the list, the shell first as it is a choice, and a click on one chooses it.
 	clickOn(t, f, "< shell >")
 	rule := "             " + strings.Repeat("\u2500", 55)
-	want := []string{"", "  New worktree in " + space.Name, "", "  branch     fix", "  directory  .worktrees/fix",
+	want := []string{"", "  New worktree in " + space.Name, "", "   Branch   Pull request", "", "  branch     fix", "  directory  .worktrees/fix",
 		"  layout     < shell >  left/right change  space list",
 		rule, "             \uf00c shell  1 tab, a shell", "               plain  1 tab, 1 pane", "               agent  1 tab, 3 panes", rule,
 		"  up/down move  type filter  enter choose  esc close", ""}
@@ -580,40 +580,40 @@ func TestNewWorktreeFormLayout(t *testing.T) {
 	}
 }
 
-// While the branch field names a PR the new worktree form chooses the space's PR layout, and the
-// worktree layout again once it names a branch, until a layout is chosen in the form.
+// The new worktree form's branch tab starts on the space's worktree layout and its PR tab on its PR
+// layout; a layout chosen on one stays chosen there, whichever tab is shown, and leaves the other's be.
 func TestNewWorktreeFormPRLayout(t *testing.T) {
 	root := mainRepo(t)
+	fakeGH(t, "[]", nil)
 	cfg := testLayouts(t)
 	cfg.Spaces = []string{root}
 	cfg.Space = map[string]config.SpaceSettings{filepath.Base(root): {WorktreeLayout: "agent", PRLayout: "plain"}}
 	f := newForm(cfg, spaces.LoadSpace(root))
-	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
-	chosen := func() string {
-		l, ok := f.layouts.chosen()
-		if !ok {
-			return "shell"
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 24})
+	chosen := func() [2]string {
+		var out [2]string
+		for i := range f.tabs {
+			out[i] = "shell"
+			if l, ok := f.tabs[i].layouts.chosen(); ok {
+				out[i] = l.Name
+			}
 		}
-		return l.Name
+		return out
 	}
-	backspace := tea.KeyPressMsg{Code: tea.KeyBackspace}
-	got := []string{chosen()}
-	typeInto(f, "#7")
-	got = append(got, chosen())
-	f.Update(backspace)
-	got = append(got, chosen())
-	typeInto(f, "7")
+	got := [][2]string{chosen()}
 	f.Update(keyMsg("tab"))
 	f.Update(keyMsg("tab"))
 	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	got = append(got, chosen())
-	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
-	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
-	f.Update(backspace)
-	typeInto(f, "8")
+	for range 3 {
+		f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+	}
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	tab := f.tab
+	f.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
 	got = append(got, chosen())
-	if want := []string{"agent", "plain", "agent", "agent", "agent"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("got %q, want %q", got, want)
+	if want := [][2]string{{"agent", "plain"}, {"shell", "plain"}, {"shell", "plain"}}; !reflect.DeepEqual(got, want) || tab != tabPR {
+		t.Errorf("got %q on tab %d, want %q", got, tab, want)
 	}
 }
 
@@ -738,11 +738,11 @@ func TestOpenWithoutLayoutMenu(t *testing.T) {
 	linked := func(session ...string) []string {
 		return slices.Concat([]string{menuRule("Session"), " Open"}, session, []string{" Open layout",
 			menuRule("Worktree"), " Remove worktree",
-			menuRule("Space"), " New worktree", " Fold worktrees", " Select", " Add space", menuRule("")})
+			menuRule("Space"), " New worktree", " New worktree from PR", " Fold worktrees", " Select", " Add space", menuRule("")})
 	}
 	main := func(session ...string) []string {
 		return slices.Concat([]string{menuRule("Session"), " Open"}, session, []string{" Open layout",
-			menuRule("Space"), " New worktree", " Select", " Add space", menuRule("")})
+			menuRule("Space"), " New worktree", " New worktree from PR", " Select", " Add space", menuRule("")})
 	}
 	type result struct {
 		Session string
@@ -765,7 +765,7 @@ func TestOpenWithoutLayoutMenu(t *testing.T) {
 		{"kitty", main(" Open without layout")},
 		// With windows open, there is no default layout to skip.
 		{"gr", []string{menuRule("Session"), " Open", " Open layout", " Save as layout", " Close session",
-			menuRule("Space"), " New worktree", " Fold worktrees", " Clean up worktrees", " Select", " Add space", menuRule("")}},
+			menuRule("Space"), " New worktree", " New worktree from PR", " Fold worktrees", " Clean up worktrees", " Select", " Add space", menuRule("")}},
 		{"default", []string{menuRule("Session"), " Open", " Close session", menuRule("Space"), " Select", " Add space", menuRule("")}},
 		{"gr@gone", []string{menuRule(""), " Fold worktrees", " Select", " Add space", menuRule("")}},
 	})

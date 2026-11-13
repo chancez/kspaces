@@ -49,10 +49,12 @@ func TestFormInPanel(t *testing.T) {
 		want := []string{
 			c.topLeft + c.h + " New worktree in gr " + strings.Repeat(c.h, 67) + c.topRight,
 			row(""),
+			row(" Branch   Pull request"),
+			row(""),
 			row("branch     pr/me/"),
 			row("directory  .worktrees"),
 			row(""),
-			row("Name the branch to create or check out, or a PR"),
+			row("Name the branch to create or check out, or # for a PR"),
 		}
 		for len(want) < 22 {
 			want = append(want, row(""))

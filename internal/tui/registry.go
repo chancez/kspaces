@@ -113,6 +113,11 @@ func foldable(m *sidebar, s entrySubject) bool {
 	return !m.filtering && !s.row.Other && s.row.Space.HasLinked()
 }
 
+// newWorktreeApplies is whether a worktree can be created in an entry's space: one configured and read.
+func newWorktreeApplies(_ *sidebar, s entrySubject) bool {
+	return !s.row.Other && !s.row.Missing && s.row.Space.Err == nil
+}
+
 // The context menu's sections. A menu draws them in the order their first actions come in the kinds'
 // lists: the session first, as opening it is what a row is mostly for; then what acts on the row's own
 // worktree; then what is the same from any row of the space, and the list's own last.
@@ -165,10 +170,19 @@ var (
 	actNewWorktree = &interact.Action[*sidebar, entrySubject]{
 		Title:   "New worktree",
 		Section: sectionSpace,
-		Applies: func(_ *sidebar, s entrySubject) bool { return !s.row.Other && !s.row.Missing && s.row.Space.Err == nil },
+		Applies: newWorktreeApplies,
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
-			return m.newWorktree(s.row.Space.Root)
+			return m.newWorktree(s.row.Space.Root, false)
+		},
+	}
+	actNewWorktreeFromPR = &interact.Action[*sidebar, entrySubject]{
+		Title:   "New worktree from PR",
+		Section: sectionSpace,
+		Applies: newWorktreeApplies,
+		Run: func(m *sidebar, s entrySubject) tea.Cmd {
+			m.remote = false
+			return m.newWorktree(s.row.Space.Root, true)
 		},
 	}
 	actRemoveWorktree = &interact.Action[*sidebar, entrySubject]{
@@ -586,21 +600,24 @@ var (
 		Title: "previous field",
 		Run:   cmd[*newWorktreeForm, formSubject]((*newWorktreeForm).prevField),
 	}
-	// On a choice, of layout or command, only, so left and right move the cursor in a text field.
+	// On a choice, the tab strip, layout or command, only, so left and right move the cursor in a text
+	// field.
 	actNextChoice = &interact.Action[*newWorktreeForm, formSubject]{
 		Title:   "next choice",
-		Applies: func(f *newWorktreeForm, _ formSubject) bool { return f.onLayout() || f.onCommand() },
+		Applies: func(f *newWorktreeForm, _ formSubject) bool { return f.onChoice() },
 		Run:     func(f *newWorktreeForm, _ formSubject) tea.Cmd { return f.cycleChoice(1) },
 	}
 	actPrevChoice = &interact.Action[*newWorktreeForm, formSubject]{
 		Title:   "previous choice",
-		Applies: func(f *newWorktreeForm, _ formSubject) bool { return f.onLayout() || f.onCommand() },
+		Applies: func(f *newWorktreeForm, _ formSubject) bool { return f.onChoice() },
 		Run:     func(f *newWorktreeForm, _ formSubject) tea.Cmd { return f.cycleChoice(-1) },
 	}
 	actFormList = &interact.Action[*newWorktreeForm, formSubject]{
-		Title:   "list",
-		Applies: func(f *newWorktreeForm, _ formSubject) bool { return !f.busy && (f.onLayout() || f.onCommand()) },
-		Run:     do[*newWorktreeForm, formSubject]((*newWorktreeForm).openList),
+		Title: "list",
+		Applies: func(f *newWorktreeForm, _ formSubject) bool {
+			return !f.busy && (f.onLayout() || f.onCommand())
+		},
+		Run: do[*newWorktreeForm, formSubject]((*newWorktreeForm).openList),
 	}
 	actCreate = &interact.Action[*newWorktreeForm, formSubject]{
 		Title:   "create",
@@ -950,10 +967,11 @@ func init() {
 	spacesKind.Bind(actAddSpace, "a", "add space", "a")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actOpenPlain, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actFold, actUnfold, actCleanup, actTrustConfig, actSelectRow)
+		actOpenWorktree, actOpenPlain, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actNewWorktreeFromPR, actFold, actUnfold, actCleanup, actTrustConfig, actSelectRow)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
+	entryKind.Bind(actNewWorktreeFromPR, "N", "new worktree from PR", "N")
 	entryKind.Bind(actRunCommand, "R", "run a command", "R")
 	entryKind.Bind(actOpenLayout, "L", "open a layout", "L")
 	entryKind.Bind(actOpenPlain, "o", "open without the default layout", "o")

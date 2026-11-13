@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/gittest"
 )
@@ -63,32 +62,28 @@ func prRepos(t *testing.T) (space *gittest.Repo, pullHead string) {
 	return space, pullHead
 }
 
-// The branch field names a PR as #N, a URL or a number that is no branch, after the prefix or not.
+// A PR is named by its number, #N or its URL.
 func TestParsePRRef(t *testing.T) {
-	r, _ := prRepos(t)
-	root := r.Dir
-	cfg := config.Config{Worktrees: config.Worktrees{BranchPrefix: "pr/me"}}
-	space := Space{Name: "space", Root: root}
 	type result struct {
 		Ref PRRef
 		OK  bool
 	}
 	var got []result
-	for _, field := range []string{
-		"#7", " pr/me/#7 ", "7", "pr/me/7", "007",
-		"https://github.com/o/r/pull/7", "pr/me/https://github.com/o/r/pull/7/files",
-		// A branch, or nothing to look up.
-		"123", "#123", "feat", "pr/me/", "#", "#x", "7a", "0", "-7", "https://github.com/o/r/issues/7",
+	for _, s := range []string{
+		"#7", " #7 ", "7", "007",
+		"https://github.com/o/r/pull/7", "https://github.com/o/r/pull/7/files",
+		// Nothing to look up.
+		"feat", "pr/me/#7", "", "#", "#x", "7a", "0", "-7", "https://github.com/o/r/issues/7",
 	} {
-		ref, ok := ParsePRRef(cfg, space, field)
+		ref, ok := ParsePRRef(s)
 		got = append(got, result{ref, ok})
 	}
 	seven := result{PRRef{Arg: "7", Number: 7}, true}
 	want := []result{
-		seven, seven, seven, seven, seven,
+		seven, seven, seven, seven,
 		{PRRef{Arg: "https://github.com/o/r/pull/7", Number: 7}, true},
 		{PRRef{Arg: "https://github.com/o/r/pull/7/files", Number: 7}, true},
-		{}, {PRRef{Arg: "123", Number: 123}, true}, {}, {}, {}, {}, {}, {}, {}, {},
+		{}, {}, {}, {}, {}, {}, {}, {}, {},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v\nwant %+v", got, want)
@@ -113,7 +108,7 @@ func TestPRWorktree(t *testing.T) {
 	if want := (PR{Number: 3, Title: "Add feat", HeadRef: "feat", Owner: "o", Remote: "origin", Branch: "feat"}); same != want {
 		t.Errorf("same repository: got %+v\nwant %+v", same, want)
 	}
-	if got, want := args(), []string{root, "pr", "view", "3", "--json", "number,headRefName,headRepositoryOwner,isCrossRepository,title,url"}; !reflect.DeepEqual(got, want) {
+	if got, want := args(), []string{root, "pr", "view", "3", "--json", "number,title,author,isDraft,headRefName,headRepositoryOwner,isCrossRepository,url"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("gh ran as %q\nwant %q", got, want)
 	}
 	fork, err := ResolvePR(space, PRRef{Arg: "https://github.com/o/r/pull/7", Number: 7})

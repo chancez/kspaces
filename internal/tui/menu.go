@@ -233,12 +233,13 @@ func (m *sidebar) toggleHidden(name string) {
 	m.scrollToCursor()
 }
 
-// newWorktree opens the form that creates a worktree in the space at root, in a popup for the sidebar's
-// tab: the dock is too narrow to type a name in and read back where it goes.
-func (m *sidebar) newWorktree(root string) tea.Cmd {
+// newWorktree opens the form that creates a worktree in the space at root, on its Pull request tab when
+// fromPR says so, in a popup for the sidebar's tab: the dock is too narrow to type a name in and read back
+// where it goes.
+func (m *sidebar) newWorktree(root string, fromPR bool) tea.Cmd {
 	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
-		if err := spaces.NewWorktree(cfg, st, root); err != nil {
+		if err := spaces.NewWorktree(cfg, st, root, fromPR); err != nil {
 			return failedMsg{err}
 		}
 		return nil

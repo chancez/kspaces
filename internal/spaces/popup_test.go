@@ -56,7 +56,8 @@ func TestPopups(t *testing.T) {
 		v              string
 		args           []string
 	}{
-		{func(cfg config.Config) error { return NewWorktree(cfg, st, "/src/gr") }, "90", "24", form, []string{"new", "/src/gr"}},
+		{func(cfg config.Config) error { return NewWorktree(cfg, st, "/src/gr", false) }, "100", "32", form, []string{"new", "/src/gr"}},
+		{func(cfg config.Config) error { return NewWorktree(cfg, st, "/src/gr", true) }, "100", "32", form, []string{"new", "--from-pr", "/src/gr"}},
 		{func(cfg config.Config) error { return AskRemoveWorktree(cfg, st, "/src/gr/dev") }, "90", "24", form, []string{"remove", "/src/gr/dev"}},
 		{func(cfg config.Config) error { return AskRunCommand(cfg, st, "claude", "/src/gr/dev") }, "90", "24", form, []string{"run", "claude", "/src/gr/dev"}},
 		{func(cfg config.Config) error { return AskRunCommand(cfg, st, "claude", "/src/gr/dev", "/src/gr/fix") }, "100", "32", form, []string{"run", "claude", "/src/gr/dev", "/src/gr/fix"}},

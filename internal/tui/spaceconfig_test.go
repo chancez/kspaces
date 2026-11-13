@@ -111,13 +111,13 @@ func TestTrustMenu(t *testing.T) {
 	e.m.cursor = e.row("gr@dev")
 	e.press("m")
 	_, y := e.zone(fmt.Sprintf(entryZone, e.m.cursor))
-	if got, want := e.screen()[y+1:y+15], []string{
+	if got, want := e.screen()[y+1:y+16], []string{
 		menuRule("Session"), " Open", " Save as layout", " Close session", menuRule("Worktree"), " Open PR #123", " Remove worktree",
-		menuRule("Space"), " New worktree", " Fold worktrees", " Trust space config", " Select", " Add space", menuRule(""),
+		menuRule("Space"), " New worktree", " New worktree from PR", " Fold worktrees", " Trust space config", " Select", " Add space", menuRule(""),
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("the menu:\n%q\nwant\n%q", got, want)
 	}
-	cmd := e.press("j", "j", "j", "j", "j", "j", "j", "enter")
+	cmd := e.press("j", "j", "j", "j", "j", "j", "j", "j", "enter")
 	if cmd == nil {
 		t.Fatal("Trust space config ran nothing")
 	}

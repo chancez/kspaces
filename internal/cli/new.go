@@ -10,6 +10,7 @@ import (
 
 func (a *app) newCommand() *cobra.Command {
 	var pr string
+	var fromPR bool
 	cmd := &cobra.Command{
 		Use:   "new [SPACE]",
 		Short: "Create a worktree and switch to it, in the space given by root or name, or the current one",
@@ -27,9 +28,10 @@ func (a *app) newCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return tui.RunNewWorktree(cmd.Context(), cfg, space, pr)
+			return tui.RunNewWorktree(cmd.Context(), cfg, space, fromPR, pr)
 		},
 	}
-	cmd.Flags().StringVar(&pr, "pr", "", "a PR to check out, its number or URL, looked up with gh")
+	cmd.Flags().BoolVar(&fromPR, "from-pr", false, "open on the Pull request tab, to choose one of the open PRs")
+	cmd.Flags().StringVar(&pr, "pr", "", "open on the Pull request tab on this PR, its number or URL")
 	return cmd
 }

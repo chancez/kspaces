@@ -96,9 +96,9 @@ and `"--pr={pr?}"` goes when there is no PR. `{{` and `}}` are a literal brace. 
 config loads.
 
 An input's default can use the built-ins, not other inputs. The forms show it filled in, and the new
-worktree form fills it in again as the branch field changes, until it is typed in: `{pr}` is the PR's
-number once the field names one, and `{branch}` its branch once looked up. `--yes` and opening a default
-layout afresh fill it in the same way. A default with a literal brace writes it `{{` or `}}`.
+worktree form fills it in again as its branch or PR changes, until it is typed in: `{pr}` is the PR's
+number once one is chosen, and `{branch}` its branch once looked up. `--yes` and opening a default layout
+afresh fill it in the same way. A default with a literal brace writes it `{{` or `}}`.
 
 The command also gets `KSPACES_SPACE`, `KSPACES_ROOT`, `KSPACES_WORKTREE`, `KSPACES_BRANCH`, `KSPACES_BASE`,
 `KSPACES_SESSION`, `KSPACES_PR` and `KSPACES_INPUT_NAME` for each input, then `env`, which can override them.
@@ -223,10 +223,9 @@ worktree_layout = "agent"
 pr_layout = "review"
 ```
 
-The new worktree form starts on the linked worktree's default layout, and while its branch field names a
-PR, on the PR layout: the space's `pr_layout`, else the top-level `pr_layout`, else the linked worktree's
-default. A layout chosen in the form stays chosen. `pr_layout` is only the form's: reopening the worktree
-afresh later uses its default layout.
+The new worktree form's branch tab starts on the linked worktree's default layout, and its Pull request tab
+on the PR layout: the space's `pr_layout`, else the top-level `pr_layout`, else the linked worktree's
+default. `pr_layout` is only the form's: reopening the worktree afresh later uses its default layout.
 
 A default layout with an input that is required and has no default is not opened without asking: the
 session opens with its one tab, and the sidebar's last line says why. The new worktree form, **Open layout**
