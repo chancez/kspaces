@@ -77,6 +77,12 @@ type filterSubject struct{}
 // list's empty rows, chooses the sort mode and turns the attention filter on and off.
 type sortSubject struct{}
 
+// errorSubject is the error on the sidebar's last line, as it read when the mouse came to it.
+type errorSubject struct{ text string }
+
+// showSubject is the show error form.
+type showSubject struct{}
+
 // do adapts a function that changes the model without a command.
 func do[M, S any](f func(m M)) func(M, S) tea.Cmd {
 	return func(m M, _ S) tea.Cmd { f(m); return nil }
@@ -277,6 +283,15 @@ var (
 		},
 	}
 )
+
+// The sidebar's last line, while it shows an error.
+var actShowError = &interact.Action[*sidebar, errorSubject]{
+	Title: "Show error",
+	Run: func(m *sidebar, s errorSubject) tea.Cmd {
+		m.remote = false
+		return m.showError(s.text)
+	},
+}
 
 // The spaces list's own, offered on every row and on the sidebar.
 var actAddSpace = &interact.Action[*sidebar, spacesSubject]{
@@ -767,6 +782,16 @@ var (
 	actReplyCancel = quit[*replyForm, replySubject]()
 )
 
+// The show error form's.
+var (
+	actShowDown     = &interact.Action[*errorForm, showSubject]{Title: "down", Run: do[*errorForm, showSubject](func(f *errorForm) { f.scroll(1) })}
+	actShowUp       = &interact.Action[*errorForm, showSubject]{Title: "up", Run: do[*errorForm, showSubject](func(f *errorForm) { f.scroll(-1) })}
+	actShowPageDown = &interact.Action[*errorForm, showSubject]{Title: "page down", Run: do[*errorForm, showSubject](func(f *errorForm) { f.scroll(f.shown()) })}
+	actShowPageUp   = &interact.Action[*errorForm, showSubject]{Title: "page up", Run: do[*errorForm, showSubject](func(f *errorForm) { f.scroll(-f.shown()) })}
+	actShowCopy     = &interact.Action[*errorForm, showSubject]{Title: "copy", Run: cmd[*errorForm, showSubject]((*errorForm).copyText)}
+	actShowClose    = quit[*errorForm, showSubject]()
+)
+
 var (
 	entryKind  *interact.Kind[*sidebar, entrySubject]
 	statusKind *interact.Kind[*sidebar, statusSubject]
@@ -785,6 +810,8 @@ var (
 	saveKind   *interact.Kind[*saveLayoutForm, saveSubject]
 	trustKind  *interact.Kind[*trustForm, trustSubject]
 	replyKind  *interact.Kind[*replyForm, replySubject]
+	errorKind  *interact.Kind[*sidebar, errorSubject]
+	showKind   *interact.Kind[*errorForm, showSubject]
 	filterKind *interact.Kind[*sidebar, filterSubject]
 	listKind   *interact.Kind[*choiceList, listSubject]
 	sortKind   *interact.Kind[*sidebar, sortSubject]
@@ -805,6 +832,8 @@ var (
 	theSaveForm   *interact.Place[*saveLayoutForm, saveSubject]
 	theTrustForm  *interact.Place[*trustForm, trustSubject]
 	theReplyForm  *interact.Place[*replyForm, replySubject]
+	theErrorLine  *interact.Place[*sidebar, errorSubject]
+	theShowForm   *interact.Place[*errorForm, showSubject]
 	theFilter     *interact.Place[*sidebar, filterSubject]
 	theSort       *interact.Place[*sidebar, sortSubject]
 	theChoiceList *interact.Place[*choiceList, listSubject]
@@ -939,6 +968,19 @@ func init() {
 	replyKind.Bind(actReplyCancel, "esc", "cancel", "esc", "ctrl+c")
 	theReplyForm = interact.List(replyKind)
 
+	errorKind = interact.NewKind(func(errorSubject) string { return "Error" }, actShowError)
+	theErrorLine = interact.List(errorKind)
+
+	showKind = interact.NewKind(func(showSubject) string { return "Error" },
+		actShowDown, actShowUp, actShowPageDown, actShowPageUp, actShowCopy, actShowClose)
+	showKind.Bind(actShowDown, "up/down", "scroll", "down", "j")
+	showKind.Bind(actShowUp, "", "", "up", "k")
+	showKind.Bind(actShowPageDown, "pgup/pgdown", "page", "pgdown", "space")
+	showKind.Bind(actShowPageUp, "", "", "pgup")
+	showKind.Bind(actShowCopy, "y", "copy", "y")
+	showKind.Bind(actShowClose, "esc/q/enter", "close", "esc", "q", "enter", "ctrl+c")
+	theShowForm = interact.List(showKind)
+
 	runKind = interact.NewKind(func(runSubject) string { return "Run" },
 		actRunNextField, actRunPrevField, actRunNextCommand, actRunPrevCommand, actRunList, actRun, actRunCancel)
 	runKind.Bind(actRunNextField, "tab", "next field", "tab", "down")
@@ -1007,6 +1049,15 @@ func init() {
 }
 
 // Targets: the subjects on screen, each in its place.
+
+// errorTarget is the error on the last line, if it shows one.
+func (m *sidebar) errorTarget() (interact.Target[*sidebar], bool) {
+	err := m.lastError()
+	if err == nil {
+		return interact.Target[*sidebar]{}, false
+	}
+	return theErrorLine.Target(errorSubject{text: err.Error()}), true
+}
 
 // entryTarget is entry i of the sidebar, a row of the spaces list or a status entry, if there is one
 // there: a blank row between groups is none.

@@ -189,8 +189,11 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	switch msg.(type) {
 	case tea.KeyPressMsg, tea.MouseClickMsg:
-		// The user has seen the error and moved on; what they do now may fail anew.
-		m.failed = nil
+		// The user has seen the error and moved on, unless to the error itself; what they do now may fail
+		// anew.
+		if !m.keepsError(msg) {
+			m.failed = nil
+		}
 	}
 	_, cmd := m.update(msg)
 	// The filter belongs to navigating: it goes when the keys stop coming, so no sidebar is left narrowed.

@@ -26,6 +26,8 @@ type contextMenu struct {
 	// chosen are the items marked as chosen now, by index, as the sort mode in its menu; nil for a menu
 	// of actions rather than choices, which has no column of marks.
 	chosen map[int]bool
+	// ofError is a menu of the last line's error, which acting in leaves the error there, see keepsError.
+	ofError bool
 }
 
 // height is how many rows the menu takes: its items, the rules above them and the one below.

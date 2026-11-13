@@ -1,6 +1,7 @@
 package spaces
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -266,6 +267,30 @@ func AskTrust(cfg config.Config, st kitty.State, root string) error {
 // shows the window's screen.
 func AskReply(cfg config.Config, st kitty.State, window int) error {
 	return launchForm(cfg, st, listPanel, "reply", strconv.Itoa(window))
+}
+
+// AskShowError opens the form that shows text, an error, in full, in a popup as NewWorktree's, of a list's
+// size, as the text can be long. The text goes in a temporary file the form reads and deletes, rather than
+// on its command line, as an error can be long and run over several lines. A form kitty launched but that
+// never started leaves the file to the temporary directory's cleaning.
+func AskShowError(cfg config.Config, st kitty.State, text string) error {
+	f, err := os.CreateTemp("", "kspaces-error-*.txt")
+	if err != nil {
+		return err
+	}
+	_, err = f.WriteString(text)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = launchForm(cfg, st, listPanel, "error", f.Name())
+	}
+	// A refused panel opened an overlay, whose form reads the file.
+	var refused *kitty.PanelRefused
+	if err != nil && !errors.As(err, &refused) {
+		os.Remove(f.Name())
+	}
+	return err
 }
 
 // ForgetSession deletes the saved file of session, so kitty does not restore it: for a missing worktree,

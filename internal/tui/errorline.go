@@ -3,6 +3,9 @@ package tui
 import (
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
+
+	"github.com/chancez/kspaces/internal/tui/interact"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
@@ -53,4 +56,44 @@ func (m *sidebar) errorPopup() ([]string, int) {
 	bottom := m.height - 1
 	top := max(bottom-len(popup), headerRows)
 	return popup[:max(bottom-top, 0)], top
+}
+
+// onError is whether x, y is on the last line's error, or on its popup.
+func (m *sidebar) onError(x, y int) bool {
+	return m.inZone(errorZone, x, y) || m.hoverError && m.inZone(popupZone, x, y)
+}
+
+// clickError acts on t, the last line's error, for a click on it or its popup: a left click shows it in
+// full, in a form, and a right click opens its menu above the line.
+func (m *sidebar) clickError(t interact.Target[*sidebar], msg tea.MouseClickMsg) tea.Cmd {
+	m.unhover()
+	switch msg.Button {
+	case tea.MouseLeft:
+		return runFirst(m, t, actShowError)
+	case tea.MouseRight:
+		m.openMenu(t, msg.Y)
+		if m.menu != nil {
+			m.menu.ofError = true
+		}
+	}
+	return nil
+}
+
+// keepsError is whether msg, a key or a click, acts on the action's error the last line shows rather than
+// moving on from it: a click on the error, or on its menu's items, and a key in its menu. Showing the
+// error in full leaves it there to come back to.
+func (m *sidebar) keepsError(msg tea.Msg) bool {
+	ofError := m.menu != nil && m.menu.ofError
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		return ofError
+	case tea.MouseClickMsg:
+		if ofError {
+			if _, ok := m.menuItemAt(msg.X, msg.Y); ok {
+				return true
+			}
+		}
+		return m.onError(msg.X, msg.Y)
+	}
+	return false
 }

@@ -3,6 +3,8 @@ package tui
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -83,5 +85,107 @@ func TestErrorPopup(t *testing.T) {
 		rule, "To get started with GitHub", "CLI, please run: gh auth", "login", cut,
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("in a short sidebar:\n%q\nwant\n%q", got, want)
+	}
+}
+
+// A click on the last line's error, or on its popup, or Show error in the menu a right click on it opens,
+// shows the error in full in a form, through a file the form reads, and the error stays on the line.
+func TestShowErrorLaunch(t *testing.T) {
+	e := newSidebarEnv(t)
+	launched := fakeKitten(t)
+	tmp := t.TempDir()
+	t.Setenv("TMPDIR", tmp)
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := "To get started with GitHub CLI, please run:  gh auth login\nAlternatively, populate the GH_TOKEN environment variable."
+	e.m.Update(failedMsg{errors.New(text)})
+	e.m.render()
+	before := e.screen()
+	// opened runs cmd, and is how kitty was asked to launch the form, with the directory of the form's file
+	// and what it says in place of its name. It deletes the file, as the form does.
+	opened := func(cmd tea.Cmd) []string {
+		t.Helper()
+		if cmd == nil {
+			t.Fatal("ran nothing")
+		}
+		if msg := cmd(); msg != nil {
+			t.Fatalf("said %v", msg)
+		}
+		args := launched()
+		path := args[len(args)-1]
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+		return append(args[:len(args)-1], filepath.Dir(path), string(data))
+	}
+
+	var got [][]string
+	got = append(got, opened(e.click(errorZone, tea.MouseLeft)))
+	e.hover(errorZone)
+	_, y := e.zone(errorZone)
+	got = append(got, opened(e.clickAt(3, y-2, tea.MouseLeft)))
+	e.click(errorZone, tea.MouseRight)
+	menu := e.screen()
+	got = append(got, opened(e.click(fmt.Sprintf(menuZone, 0), tea.MouseLeft)))
+	launch := []string{"@", "launch", "--type=overlay", "--var=kspaces_form=1", "--next-to", "id:11", exe, "error", tmp, text}
+	if want := [][]string{launch, launch, launch}; !reflect.DeepEqual(got, want) {
+		t.Errorf("launched:\n%q\nwant\n%q", got, want)
+	}
+	wantMenu := slices.Clone(before)
+	copy(wantMenu[len(wantMenu)-4:], []string{menuRule(""), " Show error", menuRule("")})
+	if !reflect.DeepEqual(menu, wantMenu) {
+		t.Errorf("menu:\n%s\nwant\n%s", strings.Join(menu, "\n"), strings.Join(wantMenu, "\n"))
+	}
+	if got := e.screen(); !reflect.DeepEqual(got, before) {
+		t.Errorf("after showing the error:\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(before, "\n"))
+	}
+}
+
+// The form shows the error wrapped, scrolls it when it is longer than the form fits, copies it on y, and
+// closes on esc, q or enter.
+func TestErrorForm(t *testing.T) {
+	text := "gh: could not resolve to a Repository with the name o/r, as no remote points to it\n" +
+		"line 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8"
+	f := newErrorForm(text)
+	f.Update(tea.WindowSizeMsg{Width: 40, Height: 10})
+	rows := []string{"gh: could not resolve to a", "Repository with the name o/r, as no", "remote points to it",
+		"line 2", "line 3", "line 4", "line 5", "line 6", "line 7", "line 8"}
+	// at is the form showing the 4 rows from the n-th, with what the footer says after its buttons.
+	at := func(n int, after string) []string {
+		out := []string{"", "  Error", ""}
+		for _, r := range rows[n-1 : n+3] {
+			out = append(out, "  "+r)
+		}
+		return append(out, "", fmt.Sprintf("   Copy y    Close esc   rows %d-%d of 10", n, n+3)+after, "")
+	}
+	keys := []tea.KeyPressMsg{
+		{Code: tea.KeyDown}, {Code: tea.KeyPgDown}, keyMsg("j"), keyMsg("space"),
+		keyMsg("k"), {Code: tea.KeyPgUp}, {Code: tea.KeyUp},
+	}
+	var got [][]string
+	got = append(got, formScreen(f))
+	for _, k := range keys {
+		f.Update(k)
+		got = append(got, formScreen(f))
+	}
+	_, cmd := f.Update(keyMsg("y"))
+	if cmd == nil || !reflect.DeepEqual(cmd(), tea.SetClipboard(text)()) {
+		t.Error("y did not copy the error")
+	}
+	got = append(got, formScreen(f))
+	want := [][]string{at(1, ""), at(2, ""), at(6, ""), at(7, ""), at(7, ""), at(6, ""), at(2, ""), at(1, ""), at(1, "  copied")}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("screens:\n%q\nwant\n%q", got, want)
+	}
+	for _, k := range []string{"esc", "q", "enter"} {
+		if _, cmd := f.Update(keyMsg(k)); cmd == nil || !reflect.DeepEqual(cmd(), tea.Quit()) {
+			t.Errorf("%s did not close the form", k)
+		}
 	}
 }

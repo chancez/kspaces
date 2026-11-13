@@ -144,7 +144,12 @@ its text puts the cursor there; in a one-line field too long for its box, which 
 An item that fails, or a key such as `space` folding a space, says why on the sidebar's last line until
 the next key or click. Loading's own errors, such as a broken config, show there when no such error does,
 until a load works. The line has the error on one line, cut to the sidebar's width; resting the mouse on
-a cut one shows all of it, wrapped, in a popup above the line, which ends as a status entry's does.
+a cut one shows all of it, wrapped, in a popup above the line, which ends as a status entry's does. A
+click on the error or its popup, or **Show error** in the menu a right click on it opens, shows it in full
+in a form in a popup, as the other forms are: wrapped, `up`/`down`, `j`/`k`, `pgup`/`pgdown`, `space`
+or the wheel scroll it, `y` copies it to the clipboard, and `esc`, `q` or `enter` closes it. The copy is
+an OSC 52 write, which kitty's default `clipboard_control` allows. Showing the error leaves it on the
+line, until the next key or click in the sidebar.
 
 **Open PR** is the PR the row shows, which needs gh signed in. gh runs in the worktree, in the
 background, so the sidebar does not wait for it; what it says when it fails shows on the sidebar's last

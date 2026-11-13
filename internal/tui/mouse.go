@@ -60,13 +60,16 @@ func (m *sidebar) wheel(msg tea.MouseWheelMsg) {
 // covers. A left click on the add button does what a does, on the sort button what s does, and on the
 // attention filter's button what f does. A right click opens a spaces row's menu; on the sort button, the
 // title or the list's empty rows the list's menu, its sort modes and its filter; while a row is pressed it
-// lets go of it instead.
+// lets go of it instead. The last line's error, and its popup, take their own clicks, see clickError.
 func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 	if m.press != nil {
 		m.cancelPress()
 		if msg.Button != tea.MouseLeft {
 			return nil
 		}
+	}
+	if t, ok := m.errorTarget(); ok && m.onError(msg.X, msg.Y) {
+		return m.clickError(t, msg)
 	}
 	switch msg.Button {
 	case tea.MouseLeft:
