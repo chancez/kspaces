@@ -65,6 +65,12 @@ tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/
 8. Resizing docks by dragging their inner border and with `resize_window`, or else not offering a drag
    that does nothing: issue kovidgoyal/kitty#10857. #2391 had said docks need no resizing, before they
    existed.
+9. `launch --type=tab --next-to` over remote control goes by the target tab, the active one by default,
+   so the tab lands in the focused OS window, while the docs say the matched window's; the `launch` action
+   honors it. It put a kspaces panel's new sessions in the panel until cm_launch.py passed `--self`
+   (dotfiles d164b2f) and kspaces left the panel before acting (22bddf5). Not filed yet; the draft, a docs
+   mismatch offering a docs line or letting `--next-to` choose the OS window, is
+   `drafts/issue-launch-next-to-rc.md`.
 
 When a kitty release has a fix, drop its workaround behind a check of kitty's version, as older kittys
 still need it. Going back to kitty's `save_as_session --match` for the saver: since c5e6bdf1f it fails
