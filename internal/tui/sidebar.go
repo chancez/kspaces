@@ -403,12 +403,9 @@ func (m *sidebar) frame() string {
 	}
 	m.drawMenu(lines)
 	status := ""
-	switch {
-	case m.failed != nil:
-		status = th.Render(look.Plain, th.Cut(width, look.Error(m.failed.Error()))...)
-	case m.err != nil:
-		status = th.Render(look.Plain, th.Cut(width, look.Error(m.err.Error()))...)
-	case m.notice != nil:
+	if err := m.lastError(); err != nil {
+		status = th.Render(look.Plain, th.Cut(width, look.Error(oneLine(err.Error())))...)
+	} else if m.notice != nil {
 		status = th.Render(look.Plain, th.Cut(width, *m.notice)...)
 	}
 	lines = append(lines, status)
