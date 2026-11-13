@@ -18,7 +18,8 @@
     shows the moved tab in every session. `kspaces_watcher.py` puts it back from the tab's windows.
 - `save_sessions.py` saves a session when one of its windows closes or takes focus, and removes its file
   with its last window, but nothing says a window's directory changed, so a `cd` is saved only at the next
-  focus change, close or quit.
+  focus change, close or quit. kitty after 0.50.0 has an `on_cwd_change` watcher event (65da47b61):
+  save on it once a release has it.
 - On macOS kitty keeps timers in a table of 128 (glfw/cocoa_init.m), and `add_timer` returns 0 when it is
   full, never calling back. kitty fills it itself: `call_watchers` takes a 0s timer for every window resize
   and focus change, listened to or not, and none fire until the code that caused them returns. Restoring 9
@@ -41,8 +42,11 @@ tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/
    `save_sessions.py` comes out once a release has it.
 2. `detach_tab` and window moves losing their session: #10851 closed, fixed by the maintainer in b261b08b7
    instead, more broadly. `repair_session` in `kspaces_watcher.py` comes out once a release has it.
-3. Watcher events (a close reason on `on_close`, an event for a window's directory changing): commented on
-   discussion #10828, offering PRs.
+3. Watcher events (a close reason on `on_close`, an event for a window's directory changing): asked on
+   discussion #10828; the maintainer added both in 65da47b61: `on_close` reports `reason` (window,
+   os_window, quit) and `cause`, and `on_cwd_change` reports `cwd` and `host`. Once a release has it,
+   `save_sessions.py` can tell teardown by `reason` rather than an OS window missing from
+   `boss.os_window_map`, and `cm_reap.py` can drop its `on_quit` flag.
 4. Watcher calls each taking a timer, and the macOS and Linux tables of 128: issue kovidgoyal/kitty#10853,
    fixed by the maintainer in cb66ed55c.
 5. A dock for the whole OS window, the fix for the first known issue: issue kovidgoyal/kitty#10854,
@@ -59,11 +63,14 @@ tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/
    new_tab, new_window, new_os_window and splits still start the plain shell. `action_alias launch`
    reaches actions but not the macOS menus, the tab bar's new tab button, `kitten @ launch` or session
    files, and redefining a built-in action is not documented; `shell` misses windows with a command and
-   is saved without its argv. Filed as an `on_launch` watcher event, called before every window's child
-   starts: issue kovidgoyal/kitty#10858. cm_launch.py's logic would move into a watcher once it lands.
-8. Resizing docks by dragging their inner border and with `resize_window`, or else not offering a drag
-   that does nothing: issue kovidgoyal/kitty#10857. #2391 had said docks need no resizing, before they
-   existed.
+   is saved without its argv. Filed as an `on_launch` watcher event: kovidgoyal/kitty#10858, closed by the
+   maintainer without a change, saying a watcher cannot read a running process's environment, only cwd
+   and host with caveats. I replied that the environment is not needed, only changing what is launched;
+   no answer yet.
+8. Resizing docks by dragging their inner border and with `resize_window`: kovidgoyal/kitty#10857,
+   implemented by the maintainer in 11cbfdce2. The new size is stored in the dock's spec and saved in
+   sessions. Once a release has it, kspaces' 2-second check of `[sidebar] width` must not undo a dragged
+   width: decide whether a drag or the config wins.
 9. `launch --type=tab --next-to` over remote control goes by the target tab, the active one by default,
    so the tab lands in the focused OS window, while the docs say the matched window's; the `launch` action
    honors it. It put a kspaces panel's new sessions in the panel until cm_launch.py passed `--self`
