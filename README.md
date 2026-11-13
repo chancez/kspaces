@@ -116,10 +116,11 @@ dir = ".worktrees"
 branch_prefix = "pr/me"
 
 # Commands to run in a worktree, from the new worktree form, a worktree's Run or kspaces run. run and
-# env are templates: {prompt} is the input, {worktree}, {branch}, {pr} and the like are built in.
+# env are templates: {prompt} is the input, {worktree}, {branch}, {pr} and the like are built in. With a
+# ?, {prompt?}, a word of run is left out when the value is empty.
 [[commands]]
 name = "claude"
-run = ["claude", "{prompt}"]
+run = ["claude", "{prompt?}"]
 inputs = [{ name = "prompt", label = "Prompt", required = false }] # Inputs can be marked required, and default to false.
 
 # Where it opens in a session with windows: tab, split, hsplit, vsplit, overlay or window.

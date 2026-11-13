@@ -18,7 +18,8 @@ import (
 //	inputs = [{ name = "prompt", label = "Prompt", required = true }]
 //
 // run and the values of env are templates: {NAME} is a built-in, see Builtins, or an input, substituted
-// as text within the argument, and {{ and }} are literal braces.
+// as text within the argument, and {{ and }} are literal braces. {NAME?} is substituted the same, but a
+// word of run with one whose value is empty is left out.
 type Command struct {
 	Name string `toml:"name"`
 	// The command line, its first word the program. Never run through a shell.
@@ -154,9 +155,11 @@ func checkRun(run []string, known map[string]bool) error {
 	return nil
 }
 
-// part is a piece of a template: literal text, or the placeholder name.
+// part is a piece of a template: literal text, or the placeholder name, optional when written {name?}.
 type part struct {
-	text, name string
+	text     string
+	name     string
+	optional bool
 }
 
 // parseTemplate splits tmpl into text and placeholders. {{ and }} are a literal brace; a brace that is not
@@ -174,7 +177,7 @@ func parseTemplate(tmpl string) ([]part, error) {
 			if end < 0 {
 				return nil, fmt.Errorf("%q has a { with no }; write {{ for a brace", tmpl)
 			}
-			name := tmpl[i+1 : i+end]
+			name, optional := strings.CutSuffix(tmpl[i+1:i+end], "?")
 			if name == "" {
 				return nil, fmt.Errorf("%q has an empty {}", tmpl)
 			}
@@ -182,7 +185,7 @@ func parseTemplate(tmpl string) ([]part, error) {
 				parts = append(parts, part{text: text.String()})
 				text.Reset()
 			}
-			parts = append(parts, part{name: name})
+			parts = append(parts, part{name: name, optional: optional})
 			i += end
 		case c == '}':
 			return nil, fmt.Errorf("%q has a } with no {; write }} for a brace", tmpl)
@@ -210,13 +213,24 @@ func expand(tmpl string, vars map[string]string) string {
 	return b.String()
 }
 
-// Argv is the command's run with vars, the built-ins and the inputs by name, substituted.
+// Argv is the command's run with vars, the built-ins and the inputs by name, substituted, leaving out a
+// word with an optional placeholder whose value is empty or only spaces.
 func (c Command) Argv(vars map[string]string) []string {
-	out := make([]string, len(c.Run))
-	for i, arg := range c.Run {
-		out[i] = expand(arg, vars)
+	var out []string
+	for _, arg := range c.Run {
+		if !omitted(arg, vars) {
+			out = append(out, expand(arg, vars))
+		}
 	}
 	return out
+}
+
+// omitted is whether tmpl has an optional placeholder whose value in vars is empty or only spaces.
+func omitted(tmpl string, vars map[string]string) bool {
+	parts, _ := parseTemplate(tmpl)
+	return slices.ContainsFunc(parts, func(p part) bool {
+		return p.optional && strings.TrimSpace(vars[p.name]) == ""
+	})
 }
 
 // Environ is the environment the command runs with, as NAME=VALUE: KSPACES_ and the built-in's name in

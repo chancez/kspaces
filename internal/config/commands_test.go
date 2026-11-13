@@ -93,6 +93,12 @@ name = "a"
 run = ["{}"]`, `commands: a: run[0]: "{}" has an empty {}`},
 		{`[[commands]]
 name = "a"
+run = ["{?}"]`, `commands: a: run[0]: "{?}" has an empty {}`},
+		{`[[commands]]
+name = "a"
+run = ["x", "{nope?}"]`, "commands: a: run[1]: {nope} is neither a built-in nor an input"},
+		{`[[commands]]
+name = "a"
 run = ["x"]
 [[commands.inputs]]
 name = "Prompt"`, `commands: a: input name "Prompt" must be lowercase letters, digits and _, starting with a letter`},
@@ -136,15 +142,19 @@ func errString(err error) string {
 }
 
 // Placeholders are substituted within each argument as text, never split or expanded, and doubled
-// braces are literal. The environment has the built-ins and inputs, then env, which can override them.
+// braces are literal. A word with an optional placeholder whose value is empty or only spaces is left out.
+// The environment has the built-ins and inputs, then env, which can override them, optional placeholders
+// substituted like any other.
 func TestCommandExpand(t *testing.T) {
 	cfg, err := Parse(`
 [[commands]]
 name = "claude"
-run = ["claude", "--name={space}-{branch}", "{prompt}", "{{literal}}", "{pr}"]
-env = { TASK_PR = "#{pr}", KSPACES_PR = "overridden" }
+run = ["claude", "--name={space}-{branch}", "{prompt}", "{{literal}}", "{pr}", "--pr={pr?}", "{prompt?}", "{model?}", "-m={model?}{pr}"]
+env = { TASK_PR = "#{pr?}", KSPACES_PR = "overridden" }
 [[commands.inputs]]
 name = "prompt"
+[[commands.inputs]]
+name = "model"
 `)
 	if err != nil {
 		t.Fatal(err)
@@ -155,16 +165,16 @@ name = "prompt"
 	}
 	vars := map[string]string{
 		"space": "gr", "root": "/src/gr", "worktree": "/src/gr/.worktrees/fix", "branch": "pr/me/fix", "base": "main",
-		"session": "gr@fix", "pr": "", "prompt": `fix "it" in $HOME; rm -rf {x}`,
+		"session": "gr@fix", "pr": "", "prompt": `fix "it" in $HOME; rm -rf {x}`, "model": " \n",
 	}
 	type result struct{ Argv, Env []string }
 	got := result{c.Argv(vars), c.Environ(vars)}
 	want := result{
-		Argv: []string{"claude", "--name=gr-pr/me/fix", `fix "it" in $HOME; rm -rf {x}`, "{literal}", ""},
+		Argv: []string{"claude", "--name=gr-pr/me/fix", `fix "it" in $HOME; rm -rf {x}`, "{literal}", "", `fix "it" in $HOME; rm -rf {x}`},
 		Env: []string{
 			"KSPACES_SPACE=gr", "KSPACES_ROOT=/src/gr", "KSPACES_WORKTREE=/src/gr/.worktrees/fix",
 			"KSPACES_BRANCH=pr/me/fix", "KSPACES_BASE=main", "KSPACES_SESSION=gr@fix", "KSPACES_PR=",
-			`KSPACES_INPUT_PROMPT=fix "it" in $HOME; rm -rf {x}`,
+			`KSPACES_INPUT_PROMPT=fix "it" in $HOME; rm -rf {x}`, "KSPACES_INPUT_MODEL= \n",
 			"KSPACES_PR=overridden", "TASK_PR=#",
 		},
 	}
