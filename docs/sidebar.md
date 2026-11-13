@@ -95,10 +95,11 @@ made.
 
 ## The menu
 
-Right-click a row, or press `m` on it. The menu lists what applies to the row, in sections, each named on
-the rule above it: what acts on the row's session, then on its worktree, then on the space as a whole, the
-same from any of its rows. A menu of one section names none. `j` / `k` and the mouse go over the items
-only. `esc`, a click outside it, or a click in another window closes it.
+Right-click a row or a status entry, or press `m` on it. The menu lists what applies to the row, in
+sections, each named on the rule above it: what acts on the row's session, then on its worktree, then on
+the space as a whole, the same from any of its rows. A status entry's has Open and Reply. A menu of one
+section names none. `j` / `k` and the mouse go over the items only. `esc`, a click outside it, or a click
+in another window closes it. On a hover popup, a right click is on the entry it shows.
 
 | Section | Item | Key | Does |
 |---|---|---|---|
@@ -108,6 +109,7 @@ only. `esc`, a click outside it, or a click in another window closes it.
 | Session | Open layout | `L` | add a configured layout's tabs, or one shell tab, to the worktree's session, in a form; with `[[layouts]]` configured |
 | Session | Save as layout | | save the session's tabs as a layout in config.toml, in a form; on a worktree's session with windows open |
 | Session | Close session | `c` | close every window of the session, on a session with windows open |
+| Session | Reply | `t` | write to the window of a status entry without switching to it, in a form; on a status entry |
 | Worktree | Open PR #N | `b` | open the branch's PR in the browser with `gh browse N`, on a worktree whose row shows a PR |
 | Worktree | Remove worktree | `x` | close the session and remove a linked worktree |
 | Worktree | Forget | `x` | delete the saved session file of a missing worktree with no windows open |
@@ -254,6 +256,15 @@ already in the spaces, is refused before you confirm. Add appends the root to `s
 text, so the file's comments and layout stay as they were, and writes through a symlinked config to its
 target. Every sidebar shows the new space at its next refresh.
 
+**Reply**, on a status entry, is for answering a program that waits, a blocked one above all, without
+switching to it. It shows the last lines of the entry's window's screen that fit, with their colors,
+fetched again every second, and under them a `reply` field, which takes several lines as an input does.
+`enter` sends what it holds and then Enter, or Enter alone when it is empty; `ctrl+s` sends it as it is,
+without Enter, as for a single key a choice menu takes. `shift+enter`, `alt+enter` or `ctrl+j` start a new
+line, which goes to the program as a line feed. The form then closes; it does not switch sessions.
+`kspaces reply WINDOW_ID [TEXT]` sends TEXT and Enter to the window, `--no-enter` TEXT alone, and with no
+TEXT opens the form. [docs/kitty.md](kitty.md#replying-to-a-window) says how the text gets there.
+
 ## Status
 
 The STATUS list shows every window whose program reports its state with OSC 7501, kitty's program status
@@ -295,6 +306,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `b` | open the worktree's PR in the browser, when its row shows one |
 | `a` | add a space, wherever the cursor is |
 | `!` | focus the window that needs you most, wherever the cursor is |
+| `t` | reply to the cursor's status entry: write to its window without switching to it |
 | `/` | filter the spaces list; see [Spaces](#spaces) |
 | `s` | sort the list the next way; see [Order](#order) |
 | `K` / `J` | move the cursor's space, or linked worktree within its space, up / down |
