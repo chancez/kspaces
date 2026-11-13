@@ -68,13 +68,20 @@ run = "go vet ./..."
 description = "Run the tests"
 run = "go test ./..."
 
+# The release job runs on ubuntu-latest, in UTC, and a test that only passed in local time failed v0.2.0's.
+# -count=1, as the cache key leaves TZ out and would replay test's run.
+[tasks.test-utc]
+description = "Run the tests in UTC, as the release job does"
+env = { TZ = "UTC" }
+run = "go test -count=1 ./..."
+
 [tasks.test-race]
 description = "Run the tests with the race detector"
 run = "go test -race ./..."
 
 [tasks.check]
-description = "Format, vet, and test"
-depends = ["fmt", "vet", "test"]
+description = "Format, vet, and test, in local time and in UTC"
+depends = ["fmt", "vet", "test", "test-utc"]
 
 [tasks.dist]
 description = "Build release archives for macOS and Linux into dist/"
