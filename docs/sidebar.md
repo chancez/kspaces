@@ -17,7 +17,9 @@ any is still to run (`v`, `x` and `~` in ASCII), and nothing for a PR without ch
 is its review: a green star approved, a red plus-minus with changes requested (`A` and `R` in ASCII), and
 nothing while a review is only required. They are faint with the row, as the number is. The branch is cut
 to make room for them, and a long worktree name for the changes and the PR, down to 6 cells; in a narrow
-sidebar ahead and behind go first, then the review, the checks, the PR, and the changes last. Only the
+sidebar ahead and behind go first, then the review, the checks, the PR, and the changes last. Anything
+cut ends in a one-cell ellipsis, `...` in ASCII, unless there is no room for it and a cell of text (2
+cells, 4 in ASCII), when it is cut bare. Only the
 leading sidebar asks: `git status` every 10 seconds, and `gh pr list --head BRANCH` every 3 minutes, its
 checks and review decision in the same call, which needs gh signed in to GitHub. Without gh, a GitHub
 remote or a network there is no PR, and none is looked up for the repository's default branch. `r` asks
