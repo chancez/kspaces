@@ -20,6 +20,8 @@ import (
 // The remove form offers deleting the branch, off at first, but not a detached HEAD, the default branch or
 // a branch another worktree has checked out. It says whether deleting loses commits; d or a click ticks
 // it, and y deletes the branch after the worktree, forcing git only for the commits it said are lost.
+// worktrees.delete_branch, the global one or the space file's, ticks it at first for a branch that loses
+// nothing, merged or by its PR, and leaves one that would lose commits off.
 func TestRemoveFormDeleteBranch(t *testing.T) {
 	r := gittest.New(t)
 	r.Commit("first")
@@ -38,10 +40,10 @@ func TestRemoveFormDeleteBranch(t *testing.T) {
 	r.Worktree("twice", wt("twice"))
 	r.Git("worktree", "add", "-q", "-f", wt("twice2"), "twice")
 	space := spaces.LoadSpace(r.Dir)
-	form := func(name string, pr *gh.PR) *removeWorktreeForm {
+	formWith := func(cfg config.Config, space spaces.Space, name string, pr *gh.PR) *removeWorktreeForm {
 		for _, w := range space.Worktrees {
 			if w.Path == wt(name) {
-				f, err := newRemoveForm(config.Config{}, space, w, kitty.State{}, pr, false)
+				f, err := newRemoveForm(cfg, space, w, kitty.State{}, pr, false)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -52,6 +54,7 @@ func TestRemoveFormDeleteBranch(t *testing.T) {
 		t.Fatalf("no worktree %s", name)
 		return nil
 	}
+	form := func(name string, pr *gh.PR) *removeWorktreeForm { return formWith(config.Config{}, space, name, pr) }
 	screen := func(f *removeWorktreeForm) []string {
 		var out []string
 		for _, l := range strings.Split(ansi.Strip(f.render()), "\n") {
@@ -111,6 +114,33 @@ func TestRemoveFormDeleteBranch(t *testing.T) {
 	squashed.Update(keyMsg("d"))
 	got = append(got, check{"squashed, on", screen(squashed)})
 	want = append(want, check{"squashed, on", with("squashed", "squashed deleted", "  \u2611 Delete branch squashed d  merged by PR #12, nothing lost")})
+
+	on := config.Config{Worktrees: config.Worktrees{DeleteBranch: true}}
+	for _, tc := range []struct{ name, branch string }{
+		{"detached", "none, HEAD is detached kept"},
+		{"main", "main kept"},
+		{"twice", "twice kept"},
+	} {
+		got = append(got, check{tc.name + ", option on", screen(formWith(on, space, tc.name, nil))})
+		want = append(want, check{tc.name + ", option on", without(tc.name, tc.branch)})
+	}
+	byOption := formWith(on, space, "merged", nil)
+	got = append(got, check{"merged, option on", screen(byOption)})
+	want = append(want, check{"merged, option on", with("merged", "merged deleted", "  \u2611 Delete branch merged d  merged into main, nothing lost")})
+	byOption.Update(keyMsg("d"))
+	got = append(got, check{"merged, option on, d", screen(byOption)})
+	want = append(want, check{"merged, option on, d", with("merged", "merged kept", "  \u2610 Delete branch merged d  merged into main, nothing lost")})
+	got = append(got, check{"squashed, option on", screen(formWith(on, space, "squashed", &gh.PR{Number: 12, State: "merged"}))})
+	want = append(want, check{"squashed, option on", with("squashed", "squashed deleted", "  \u2611 Delete branch squashed d  merged by PR #12, nothing lost")})
+	got = append(got, check{"unmerged, option on", screen(formWith(on, space, "unmerged", nil))})
+	want = append(want, check{"unmerged, option on", with("unmerged", "unmerged kept", "  \u2610 Delete branch unmerged d  2 commits not merged, lost")})
+	// The space's file says so in place of the global config, either way.
+	ownOn, ownOff := space, space
+	ownOn.Config, ownOff.Config = &on, &config.Config{}
+	got = append(got, check{"merged, space file on", screen(formWith(config.Config{}, ownOn, "merged", nil))})
+	want = append(want, check{"merged, space file on", with("merged", "merged deleted", "  \u2611 Delete branch merged d  merged into main, nothing lost")})
+	got = append(got, check{"merged, space file off", screen(formWith(on, ownOff, "merged", nil))})
+	want = append(want, check{"merged, space file off", with("merged", "merged kept", "  \u2610 Delete branch merged d  merged into main, nothing lost")})
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got\n%q\nwant\n%q", got, want)
 	}

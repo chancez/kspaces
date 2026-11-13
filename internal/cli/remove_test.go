@@ -33,7 +33,9 @@ func TestRemoveOptions(t *testing.T) {
 
 // remove --yes --delete-branch deletes a merged branch with git branch -d once its worktree is removed,
 // refuses an unmerged one, keeping its worktree and saying so in kitty, unless --force-branch, which
-// deletes it with -D; --delete-branch-path and --force-branch-path do the same for one path each.
+// deletes it with -D; --delete-branch-path and --force-branch-path do the same for one path each. --yes
+// follows its flags alone: worktrees.delete_branch, on here, is for the forms, so kept, merged but not
+// asked for, stays, as the forms' own background removal of an unticked branch has it.
 func TestRemoveDeleteBranch(t *testing.T) {
 	r := gittest.New(t)
 	r.Commit("first")
@@ -46,6 +48,14 @@ func TestRemoveDeleteBranch(t *testing.T) {
 	}
 	r.Git("merge", "-q", "--no-edit", "merged", "merged2")
 	calls, _ := fakeRemoval(t, r.Dir)
+	cfgFile := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "kspaces", "config.toml")
+	cfgText, err := os.ReadFile(cfgFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cfgFile, append(cfgText, "\n[worktrees]\ndelete_branch = true\n"...), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	type result struct {
 		Err      string

@@ -185,15 +185,18 @@ func plural(n int, what string) string {
 }
 
 // newRemoveForm is the form for removing wt from space, with what kitty and git say about it now. pr is
-// the branch's PR, nil for none or not known. deleteBranch ticks deleting the branch, if it is offered.
+// the branch's PR, nil for none or not known. Deleting the branch, if it is offered, starts ticked with
+// deleteBranch, or with the space's worktrees.delete_branch when deleting loses nothing, so the option
+// never drops commits unasked.
 func newRemoveForm(cfg config.Config, space spaces.Space, wt spaces.Worktree, st kitty.State, pr *gh.PR, deleteBranch bool) (*removeWorktreeForm, error) {
 	changes, err := git.Changes(wt.Path)
 	if err != nil {
 		return nil, fmt.Errorf("checking %s for changes: %w", wt.Path, err)
 	}
 	branch := spaces.BranchOf(space, git.DefaultBranch(space.Root), wt, pr)
+	tick := deleteBranch || space.ConfigOf(cfg).Worktrees.DeleteBranch && branch.Lost() == 0
 	return &removeWorktreeForm{th: look.New(true), cfg: cfg, space: space, wt: wt, changes: changes, windows: st.Windows[wt.Session],
-		branch: branch, deleteBranch: deleteBranch && branch.Offered()}, nil
+		branch: branch, deleteBranch: tick && branch.Offered()}, nil
 }
 
 // RunRemoveWorktree runs the remove worktree form for the worktree at path, meant for a kitty popup,

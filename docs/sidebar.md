@@ -374,6 +374,12 @@ otherwise how many commits only the branch has, which are lost. The branch goes 
 never deleted. If git refuses after the worktree is gone, as `-d` does a branch its upstream lacks, kitty
 shows why and the worktree stays removed.
 
+With `delete_branch = true` under `[worktrees]`, in config.toml or the space's `.kspaces.toml`, the box
+starts ticked when deleting loses nothing, merged or by its PR, and unticked, saying the commits are lost,
+when it would lose some, so the option never drops work unasked. It only sets where the forms start, this
+one opened from the sidebar or by `kspaces remove PATH`, Clean up worktrees and the select mode's Remove:
+`kspaces remove --yes` follows its flags alone and deletes a branch only with `--delete-branch`.
+
 **Clean up worktrees** lists the space's linked worktrees whose branch's PR is merged, whose upstream is
 gone, or whose branch is merged into the main worktree's, each with why and the files it has not
 committed. A branch merged into the main worktree's counts only once it has moved since it was made, so a
