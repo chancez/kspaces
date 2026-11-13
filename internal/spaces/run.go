@@ -19,6 +19,9 @@ type Run struct {
 	Open string
 	// The worktree's PR, 0 when not known.
 	PR int
+	// Stay leaves the focus where it is, on the form that runs it in several worktrees, rather than
+	// switching to each session in turn: no goto_session, and the launch is --keep-focus.
+	Stay bool
 }
 
 // NewRun is cmd to run with inputs, the defaults filled in, where it is configured to open. A required
@@ -97,15 +100,24 @@ func commandVars(space Space, wt Worktree, r Run) map[string]string {
 // window that goto_session focuses: kitty's action runs on that window, which launch acts next to, through
 // a kitten as well as plain launch, and --next-to names it for a split or an overlay. --hold has kitty
 // start the shell once the command exits, so the window stays usable; not for an overlay, which closes
-// back to the window it was over.
+// back to the window it was over. With r.Stay there is no switch, and --keep-focus, after
+// --add-to-session, keeps kitty from focusing what launch opens.
 func runActions(cfg config.Config, st kitty.State, space Space, wt Worktree, r Run) [][]string {
 	vars := commandVars(space, wt, r)
 	env, argv := commandWords(r.Command, vars)
 	goTo := []string{"goto_session", SessionFile(cfg, wt.Session)}
+	var stay []string
+	if r.Stay {
+		stay = []string{"--keep-focus"}
+	}
 	id, open := st.Sessions[wt.Session]
 	if !open {
-		launch := append(firstTab(cfg, wt.Path, wt.Session), env...)
-		return [][]string{append(append(launch, "--hold"), argv...), goTo}
+		launch := append(append(firstTab(cfg, wt.Path, wt.Session), stay...), env...)
+		launch = append(append(launch, "--hold"), argv...)
+		if r.Stay {
+			return [][]string{launch}
+		}
+		return [][]string{launch, goTo}
 	}
 	next := fmt.Sprintf("--next-to=id:%d", id)
 	launch := append([]string{fmt.Sprintf("--match=id:%d", id)}, cfg.Launch...)
@@ -119,10 +131,13 @@ func runActions(cfg config.Config, st kitty.State, space Space, wt Worktree, r R
 	default:
 		launch = append(launch, "--type=tab")
 	}
-	launch = append(launch, "--cwd="+wt.Path, "--add-to-session="+wt.Session)
+	launch = append(append(launch, "--cwd="+wt.Path, "--add-to-session="+wt.Session), stay...)
 	launch = append(launch, env...)
 	if r.Open != "overlay" {
 		launch = append(launch, "--hold")
+	}
+	if r.Stay {
+		return [][]string{append(launch, argv...)}
 	}
 	return [][]string{goTo, append(launch, argv...)}
 }

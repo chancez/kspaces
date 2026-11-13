@@ -174,7 +174,7 @@ group, and Add space.
 | Worktree | Forget | `x` | delete the saved session file of a missing worktree with no windows open |
 | Space | New worktree | `n` | create a worktree in the space, in a form |
 | Space | Fold / Unfold worktrees | `space` | hide or show a space's linked worktrees |
-| Space | Clean up worktrees | `p` | remove the space's linked worktrees that look done with, on a space's row |
+| Space | Clean up worktrees | `p` | remove the space's linked worktrees that look done with, and its missing ones, on a space's row |
 | Space | Trust space config | | show what the space's own config adds, and trust it, in a form; while its `.kspaces.toml` is untrusted or changed |
 | Group | Fold / Unfold group | `space` | hide or show a group's spaces, on its header |
 | Space | Add space | `a` | add a repository to the spaces, in a form; on every row |
@@ -244,7 +244,12 @@ tab; with a command too, the command then runs where its `open` says, by the pan
 **Run** chooses a command, with the same `command` field when there is more than one, and has a field for
 each input of the one chosen. It says where the command opens: as the session's first tab when the session
 has no windows, else where the command's `open` says, beside the window switching to the session focuses.
-Run switches to the session and opens it there.
+Run switches to the session and opens it there. `kspaces run NAME PATH...` with several worktrees opens
+**Run in N worktrees**, listing their sessions and offering the commands every worktree's space has, by
+name, in the first's order, NAME chosen, or else the first of them; none in common is an error. Run opens
+the command in each, as its own space configures it and with the inputs it has, without switching
+sessions: launch keeps the focus, so the form stays in view. One failing does not stop the rest, and the
+form stays, a line for each that failed saying why. `--yes` runs in each without the form.
 
 **Open layout** chooses a layout, the worktree's default at first, else the first configured, or `shell`,
 listed first as in the new worktree form, for one tab in the worktree that is a shell, with a `layout`
@@ -274,8 +279,10 @@ in, its name filled in, with `--tab` for this tab at first: the one kspaces runs
 session's.
 
 **Close session** closes every window the way closing them by hand does, so whatever kitty.conf runs when a
-window closes still runs. It, Remove worktree, Clean up worktrees, Forget and Trust space config confirm
-with `y` or `enter`, and cancel with `n` or `esc`.
+window closes still runs. `kspaces close SESSION...` with several sessions lists each with its windows and
+closes them all; one with no windows is an error, and `--yes` closes them without asking. It, Remove
+worktree, Clean up worktrees, Forget and Trust space config confirm with `y` or `enter`, and cancel with `n`
+or `esc`.
 
 **Remove worktree** shows the directory, the session's windows and the files that are not committed, which
 are lost. It closes the session, waits for its windows to go, deletes the session's saved file and runs
@@ -300,14 +307,26 @@ removes the ticked ones one after another, each as Remove worktree does, in one 
 git is forced only for those the form said have changes. The PR is the one the sidebar shows, or looked
 up with gh as the form opens when the sidebar has none yet.
 
+After them come the space's missing worktrees, each saying its directory is gone: ticked at first when only
+its saved file is left, not when its session has windows open, which ticking it says are closed. Removing
+one closes its session, waiting for its windows to go, and deletes its saved file, in the same background
+process, after the linked ones (`kspaces remove --yes --forget-session SESSION`), and the form's note says
+so when one is ticked.
+
+`kspaces cleanup --session SESSION...` opens the same form, titled **Remove worktrees**, for exactly the
+sessions given, in their order, each named by its session when they span spaces: a linked worktree with
+its reasons, if any, and the same checks, a missing one as above, and, refused, a main worktree, which
+cannot be removed, or a session in no space.
+
 **Also delete their branches**, off at first, `d` or a click, deletes each removed worktree's branch by
 Remove worktree's rules, and gives each worktree a line saying what deleting its branch loses, or why it is
 kept. A branch whose commits are not merged is deleted with `-D`, its line saying the commits are lost once
 its worktree is ticked; one whose PR is merged, as after a squash, says so and loses nothing.
 
 **Forget** shows the saved session file of a missing worktree with no windows open, and Delete deletes it,
-so kitty does not restore the session. `kspaces forget SESSION` does the same for any session with no
-windows open; `--yes` without asking.
+so kitty does not restore the session. `kspaces forget SESSION...` does the same for any sessions with no
+windows open, several in one form that lists each one's file and says the directory is gone only of a
+missing worktree's; one with windows open is refused, and `--yes` deletes without asking.
 
 **Trust space config** shows the space's `.kspaces.toml` and what it would add, as
 [Per-space config](kitty.md#per-space-config) says: each command and the line it runs, each layout and

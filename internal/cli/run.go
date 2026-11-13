@@ -17,26 +17,26 @@ func (a *app) runCommand() *cobra.Command {
 		inputs []string
 	)
 	cmd := &cobra.Command{
-		Use:   "run NAME [PATH]",
-		Short: "Run the configured command NAME in the worktree at PATH, the current directory's by default, after filling in its inputs in a form",
-		Args:  cobra.RangeArgs(1, 2),
+		Use:   "run NAME [PATH...]",
+		Short: "Run the configured command NAME in the worktrees at PATH, the current directory's by default, after filling in its inputs in a form",
+		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.Load()
 			if err != nil {
 				return err
 			}
-			dir := "."
-			if len(args) > 1 {
-				dir = args[1]
+			dirs := args[1:]
+			if len(dirs) == 0 {
+				dirs = []string{"."}
 			}
 			values, err := parseInputs(inputs)
 			if err != nil {
 				return err
 			}
 			if yes {
-				return tui.RunCommandNow(cfg, dir, args[0], values, open)
+				return tui.RunCommandNow(cfg, dirs, args[0], values, open)
 			}
-			return tui.RunCommandForm(cmd.Context(), cfg, dir, args[0], values, open)
+			return tui.RunCommandForm(cmd.Context(), cfg, dirs, args[0], values, open)
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "run without the form; a required input not given is an error")

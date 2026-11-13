@@ -22,7 +22,7 @@ var (
 // A click on a run form's field, its label or its box, focuses it as tab would, and one in its text puts
 // the cursor on the character clicked.
 func TestRunFormClickField(t *testing.T) {
-	f := newRunForm(testCommands(t), clickSpace, clickWt, clickOpen, "claude", map[string]string{"prompt": "fix it"}, "")
+	f := newRunForm([]runTarget{{testCommands(t), clickSpace, clickWt}}, clickOpen, "claude", map[string]string{"prompt": "fix it"}, "")
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	screen := func(command, prompt, keys string) []string {
 		return []string{"", "  Run in gr@fix", "", command, prompt, "", "  Runs claude", "  Opens in a new tab in gr@fix", "", keys, ""}
@@ -147,7 +147,7 @@ func TestRunFormLines(t *testing.T) {
 	calls := fakeKittenLs(t, lsWith("gr@fix"))
 	cfg := testCommands(t)
 	cfg.Launch = []string{"launch"}
-	f := newRunForm(cfg, clickSpace, clickWt, clickOpen, "claude", nil, "")
+	f := newRunForm([]runTarget{{cfg, clickSpace, clickWt}}, clickOpen, "claude", nil, "")
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	f.Update(keyMsg("tab"))
 	typeInto(f, "fix")

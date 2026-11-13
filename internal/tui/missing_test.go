@@ -167,7 +167,7 @@ func TestForgetSessionForm(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	f := &forgetSessionForm{th: look.New(true), cfg: config.Config{SessionsDir: dir}, session: "gr@saved"}
+	f := &forgetSessionForm{th: look.New(true), cfg: config.Config{SessionsDir: dir}, sessions: []string{"gr@saved"}, gone: []bool{true}}
 	f.Update(tea.WindowSizeMsg{Width: 300, Height: 20})
 	var screen []string
 	for _, l := range strings.Split(ansi.Strip(f.render()), "\n") {
@@ -213,6 +213,64 @@ func TestForgetSessionForm(t *testing.T) {
 	f.Update(f.forget()())
 	if f.err == nil || f.busy {
 		t.Errorf("forgetting a forgotten session: err %v, busy %v", f.err, f.busy)
+	}
+}
+
+// The forget form for several sessions lists each one's saved file, saying the directory is gone only of a
+// missing worktree's, and deletes each, saying which could not be; for one closed session it does not say
+// its directory is gone.
+func TestForgetSessionsForm(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"gr", "gr@dev", "gr@saved"} {
+		if err := os.WriteFile(filepath.Join(dir, name+".kitty-session"), []byte("launch\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cfg := config.Config{SessionsDir: dir}
+	screen := func(f *forgetSessionForm) []string {
+		f.Update(tea.WindowSizeMsg{Width: 300, Height: 20})
+		var out []string
+		for _, l := range strings.Split(ansi.Strip(f.render()), "\n") {
+			out = append(out, strings.TrimRight(l, " "))
+		}
+		return out
+	}
+	file := func(name string) string { return config.Tilde(filepath.Join(dir, name+".kitty-session")) }
+	one := &forgetSessionForm{th: look.New(true), cfg: cfg, sessions: []string{"gr@dev"}, gone: []bool{false}}
+	if got, want := screen(one)[3], "  Deletes its saved file, so kitty does not restore it."; got != want {
+		t.Errorf("closed session: %q, want %q", got, want)
+	}
+	f := &forgetSessionForm{th: look.New(true), cfg: cfg, sessions: []string{"gr@dev", "gr@saved", "gr@none"}, gone: []bool{false, true, true}}
+	want := []string{
+		"",
+		"  Forget 3 sessions",
+		"",
+		"  Deletes their saved files, so kitty does not restore them.",
+		"",
+		"  gr@dev    " + file("gr@dev"),
+		"  gr@saved  " + file("gr@saved") + "; worktree directory gone",
+		"  gr@none   " + file("gr@none") + "; worktree directory gone",
+		"",
+		"   Delete y    Cancel n",
+		"",
+	}
+	if got := screen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("form:\n%q\nwant\n%q", got, want)
+	}
+	_, cmd := f.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	if _, quit := f.Update(cmd()); quit != nil {
+		t.Error("the form left though gr@none had no file")
+	}
+	want = append(want[:9:9], fmt.Sprintf("  gr@none: remove %s: no such file or directory", filepath.Join(dir, "gr@none.kitty-session")), "", "   Delete y    Cancel n", "")
+	if got := screen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("after deleting:\n%q\nwant\n%q", got, want)
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "gr.kitty-session" {
+		t.Errorf("left %v", entries)
 	}
 }
 

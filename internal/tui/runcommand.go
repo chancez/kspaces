@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -16,17 +17,25 @@ import (
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
-// runForm chooses a configured command, fills in its inputs and runs it in a worktree's session, saying
-// where it opens. It is meant for a kitty popup, like the new worktree form.
-type runForm struct {
-	th    *look.Theme
+// runTarget is a worktree to run a command in, its space, and the config as the space sees it, where the
+// command is looked up.
+type runTarget struct {
 	cfg   config.Config
 	space spaces.Space
 	wt    spaces.Worktree
-	cmds  choiceFields[config.Command]
+}
+
+// runForm chooses a configured command, fills in its inputs and runs it in a worktree's session, saying
+// where it opens, or in each of several worktrees' sessions. It is meant for a kitty popup, like the new
+// worktree form.
+type runForm struct {
+	th      *look.Theme
+	targets []runTarget
+	cmds    choiceFields[config.Command]
 	// open overrides where the command opens, empty for where it is configured to.
 	open string
-	// windows says whether the session has windows, without which the command is its first tab.
+	// windows says whether the one worktree's session has windows, without which the command is its first
+	// tab.
 	windows bool
 	// focus is the index in fields of the field that has focus.
 	focus  int
@@ -41,16 +50,28 @@ type runForm struct {
 
 type ranMsg struct{ err error }
 
-// newRunForm is the form for running the command called name in wt, a worktree of space, its inputs
-// filled in from inputs, opening where open says, or where configured when empty. st says whether the
-// session has windows.
-func newRunForm(cfg config.Config, space spaces.Space, wt spaces.Worktree, st kitty.State, name string, inputs map[string]string, open string) *runForm {
+// newRunForm is the form for running the command called name in targets, its inputs filled in from
+// inputs, opening where open says, or where configured when empty. It offers the commands every target's
+// config has, in the first's order. st says whether the session has windows.
+func newRunForm(targets []runTarget, st kitty.State, name string, inputs map[string]string, open string) *runForm {
 	th := look.New(true)
-	_, windows := st.Sessions[wt.Session]
-	f := &runForm{th: th, cfg: cfg, space: space, wt: wt, open: open, windows: windows,
-		cmds: newCommandFields(th, cfg.Commands, false, name, inputs)}
+	_, windows := st.Sessions[targets[0].wt.Session]
+	f := &runForm{th: th, targets: targets, open: open, windows: windows,
+		cmds: newCommandFields(th, commonCommands(targets), false, name, inputs)}
 	moveFocus(f.fields(), &f.focus, 0)
 	return f
+}
+
+// commonCommands are the commands of the first target's config that every target's config has one of by
+// name.
+func commonCommands(targets []runTarget) []config.Command {
+	var out []config.Command
+	for _, c := range targets[0].cfg.Commands {
+		if !slices.ContainsFunc(targets[1:], func(t runTarget) bool { _, ok := t.cfg.Command(c.Name); return !ok }) {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 func (f *runForm) Init() tea.Cmd { return textinput.Blink }
@@ -96,13 +117,21 @@ func (f *runForm) opens() string {
 	return cmd.Open
 }
 
-// opensWhere says where the chosen command opens.
+// opensWhere says where the chosen command opens: in the one worktree's session, or in each.
 func (f *runForm) opensWhere() string {
-	s := f.wt.Session
+	if len(f.targets) > 1 {
+		return opensBeside(f.opens(), "each session") + ", or as the first tab of one with no windows"
+	}
+	s := f.targets[0].wt.Session
 	if !f.windows {
 		return "Opens as the first tab of " + s + ", which has no windows"
 	}
-	switch f.opens() {
+	return opensBeside(f.opens(), s)
+}
+
+// opensBeside says where a command opening at open opens in a session with windows, s naming it.
+func opensBeside(open, s string) string {
+	switch open {
 	case "split":
 		return "Opens in a split beside " + s + "'s window"
 	case "hsplit":
@@ -117,27 +146,63 @@ func (f *runForm) opensWhere() string {
 	return "Opens in a new tab in " + s
 }
 
-// run runs the chosen command and leaves, or says why it cannot.
+// run runs the chosen command and leaves, or says why it cannot: its inputs are checked as the first
+// target's command has them before running anything.
 func (f *runForm) run() tea.Cmd {
 	cmd, _ := f.cmds.chosen()
-	r, err := spaces.NewRun(cmd, f.cmds.values())
-	if err != nil {
+	values := f.cmds.values()
+	if _, err := spaces.NewRun(cmd, values); err != nil {
 		f.err = err
 		return nil
 	}
-	if f.open != "" {
-		r.Open = f.open
-	}
 	f.busy, f.err = true, nil
-	cfg, space, wt := f.cfg, f.space, f.wt
-	return func() tea.Msg {
-		// Read again: the session may have gained or lost windows since the form opened.
-		st, err := kitty.LoadState(kitty.SelfWindowID())
-		if err != nil {
-			return ranMsg{err}
-		}
-		return ranMsg{spaces.RunCommand(cfg, st, space, wt, r)}
+	targets, open := f.targets, f.open
+	return func() tea.Msg { return ranMsg{runIn(targets, cmd.Name, values, open)} }
+}
+
+// runIn runs the command called name in each of targets, as its own config has it, with the inputs of
+// values it has, opening where open says, or where configured when empty. In several it stays in this
+// window rather than switching to each session, see spaces.Run.Stay; one failing does not stop the rest,
+// and the error says which failed and why, one line each.
+func runIn(targets []runTarget, name string, values map[string]string, open string) error {
+	// Read now: the sessions may have gained or lost windows since a form opened.
+	st, err := kitty.LoadState(kitty.SelfWindowID())
+	if err != nil {
+		return err
 	}
+	if len(targets) == 1 {
+		return targets[0].run(st, name, values, open, false)
+	}
+	var errs []error
+	for _, t := range targets {
+		if err := t.run(st, name, values, open, true); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", t.wt.Session, err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// run runs t's command called name with the inputs of values it has, see runIn.
+func (t runTarget) run(st kitty.State, name string, values map[string]string, open string, stay bool) error {
+	cmd, ok := t.cfg.Command(name)
+	if !ok {
+		return fmt.Errorf("no command %s in the config", name)
+	}
+	inputs := map[string]string{}
+	for _, in := range cmd.Inputs {
+		if v, ok := values[in.Name]; ok {
+			inputs[in.Name] = v
+		}
+	}
+	r, err := spaces.NewRun(cmd, inputs)
+	if err != nil {
+		return err
+	}
+	if open != "" {
+		r.Open = open
+	}
+	r.Stay = stay
+	return spaces.RunCommand(t.cfg, st, t.space, t.wt, r)
 }
 
 func (f *runForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -200,7 +265,16 @@ func (f *runForm) render() string {
 	th, width := f.th, max(f.width-4, 20)
 	line := func(spans ...look.Span) string { return th.Render(look.Plain, spans...) }
 	muted := func(s string) string { return line(th.Cut(width, look.Muted(s))...) }
-	lines := []string{line(look.Heading("Run in " + f.wt.Session)), ""}
+	var lines []string
+	if len(f.targets) == 1 {
+		lines = []string{line(look.Heading("Run in " + f.targets[0].wt.Session)), ""}
+	} else {
+		lines = []string{line(look.Heading(fmt.Sprintf("Run in %d worktrees", len(f.targets)))), ""}
+		for _, t := range f.targets {
+			lines = append(lines, line(th.Cut(width, look.Text(t.wt.Session))...))
+		}
+		lines = append(lines, "")
+	}
 	at := len(lines)
 	if fields := f.cmds.lines(f.onCommand(), width); len(fields) > 0 {
 		lines = append(append(lines, fields...), "")
@@ -211,8 +285,10 @@ func (f *runForm) render() string {
 	case f.busy:
 		lines = append(lines, line(look.Busy("Running...")), "")
 	case f.err != nil:
-		for _, row := range look.Error(f.err.Error()).Wrapped(width) {
-			lines = append(lines, line(row))
+		for _, l := range strings.Split(f.err.Error(), "\n") {
+			for _, row := range look.Error(l).Wrapped(width) {
+				lines = append(lines, line(row))
+			}
 		}
 		lines = append(lines, "")
 	}
@@ -233,39 +309,53 @@ func (f *runForm) render() string {
 	return boxed(append(lines, line(spans...)))
 }
 
-// findRun is the worktree the directory dir is in, its space, the config as the space sees it, and its
-// command called name, with inputs it has, opening where open says, one of config.Opens, or where
-// configured when empty.
-func findRun(global config.Config, dir, name string, inputs map[string]string, open string) (config.Config, spaces.Space, spaces.Worktree, config.Command, error) {
+// findRun is the worktree each directory of dirs is in, its space and the config as the space sees it,
+// and the command called name to run in them, with inputs it has, opening where open says, one of
+// config.Opens, or where configured when empty. In several worktrees the command is one they all have;
+// with pick, the first they all have stands in for name when not every one has it, as the sidebar asks
+// for the first worktree's first command.
+func findRun(global config.Config, dirs []string, name string, inputs map[string]string, open string, pick bool) ([]runTarget, config.Command, error) {
 	if open != "" && !slices.Contains(config.Opens, open) {
-		return config.Config{}, spaces.Space{}, spaces.Worktree{}, config.Command{}, fmt.Errorf("--open is %q, it must be one of %s", open, strings.Join(config.Opens, ", "))
+		return nil, config.Command{}, fmt.Errorf("--open is %q, it must be one of %s", open, strings.Join(config.Opens, ", "))
 	}
-	top, err := git.TopLevel(dir)
-	if err != nil {
-		return config.Config{}, spaces.Space{}, spaces.Worktree{}, config.Command{}, err
+	var targets []runTarget
+	for _, dir := range dirs {
+		top, err := git.TopLevel(dir)
+		if err != nil {
+			return nil, config.Command{}, err
+		}
+		space, wt, err := spaces.FindWorktree(global, top)
+		if err != nil {
+			return nil, config.Command{}, err
+		}
+		targets = append(targets, runTarget{cfg: space.ConfigOf(global), space: space, wt: wt})
 	}
-	space, wt, err := spaces.FindWorktree(global, top)
-	if err != nil {
-		return config.Config{}, spaces.Space{}, spaces.Worktree{}, config.Command{}, err
+	cmds := commonCommands(targets)
+	i := slices.IndexFunc(cmds, func(c config.Command) bool { return c.Name == name })
+	switch {
+	case i < 0 && len(targets) == 1:
+		return nil, config.Command{}, fmt.Errorf("no command %s in the config", name)
+	case len(cmds) == 0:
+		return nil, config.Command{}, fmt.Errorf("the worktrees have no command in common")
+	case i < 0 && !pick:
+		return nil, config.Command{}, fmt.Errorf("not every worktree has command %s", name)
+	case i < 0:
+		i = 0
 	}
-	cfg := space.ConfigOf(global)
-	cmd, ok := cfg.Command(name)
-	if !ok {
-		return config.Config{}, spaces.Space{}, spaces.Worktree{}, config.Command{}, fmt.Errorf("no command %s in the config", name)
-	}
+	cmd := cmds[i]
 	for k := range inputs {
 		if !slices.ContainsFunc(cmd.Inputs, func(in config.Input) bool { return in.Name == k }) {
-			return config.Config{}, spaces.Space{}, spaces.Worktree{}, config.Command{}, fmt.Errorf("%s has no input %s", name, k)
+			return nil, config.Command{}, fmt.Errorf("%s has no input %s", cmd.Name, k)
 		}
 	}
-	return cfg, space, wt, cmd, nil
+	return targets, cmd, nil
 }
 
-// RunCommandForm runs the run form for the command called name in the worktree dir is in, its inputs
+// RunCommandForm runs the run form for the command called name in the worktrees dirs are in, its inputs
 // filled in from inputs, meant for a kitty popup, until the command runs or the form is left. open
 // overrides where it opens when not empty.
-func RunCommandForm(ctx context.Context, global config.Config, dir, name string, inputs map[string]string, open string) error {
-	cfg, space, wt, _, err := findRun(global, dir, name, inputs, open)
+func RunCommandForm(ctx context.Context, global config.Config, dirs []string, name string, inputs map[string]string, open string) error {
+	targets, cmd, err := findRun(global, dirs, name, inputs, open, true)
 	if err != nil {
 		return err
 	}
@@ -273,29 +363,21 @@ func RunCommandForm(ctx context.Context, global config.Config, dir, name string,
 	if err != nil {
 		return err
 	}
-	if err := runPopup(ctx, newRunForm(cfg, space, wt, st, name, inputs, open)); err != nil {
+	if err := runPopup(ctx, newRunForm(targets, st, cmd.Name, inputs, open)); err != nil {
 		return fmt.Errorf("running the run form: %w", err)
 	}
 	return nil
 }
 
-// RunCommandNow runs the command called name in the worktree dir is in, with inputs, without asking. A
+// RunCommandNow runs the command called name in the worktrees dirs are in, with inputs, without asking. A
 // required input that is not given, and has no default, is an error.
-func RunCommandNow(global config.Config, dir, name string, inputs map[string]string, open string) error {
-	cfg, space, wt, cmd, err := findRun(global, dir, name, inputs, open)
+func RunCommandNow(global config.Config, dirs []string, name string, inputs map[string]string, open string) error {
+	targets, cmd, err := findRun(global, dirs, name, inputs, open, false)
 	if err != nil {
 		return err
 	}
-	r, err := spaces.NewRun(cmd, inputs)
-	if err != nil {
+	if _, err := spaces.NewRun(cmd, inputs); err != nil {
 		return err
 	}
-	if open != "" {
-		r.Open = open
-	}
-	st, err := kitty.LoadState(kitty.SelfWindowID())
-	if err != nil {
-		return err
-	}
-	return spaces.RunCommand(cfg, st, space, wt, r)
+	return runIn(targets, name, inputs, open)
 }

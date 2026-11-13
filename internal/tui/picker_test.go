@@ -423,7 +423,7 @@ func TestRemoveLockedWorktree(t *testing.T) {
 
 // The close session form says how many windows close, y closes and n leaves.
 func TestCloseSessionForm(t *testing.T) {
-	f := &closeSessionForm{th: look.New(true), session: "gr@dev", windows: 3}
+	f := &closeSessionForm{th: look.New(true), sessions: []string{"gr@dev"}, windows: []int{3}}
 	f.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	var got []string
 	for _, l := range strings.Split(ansi.Strip(f.render()), "\n") {
@@ -447,6 +447,42 @@ func TestCloseSessionForm(t *testing.T) {
 	// The command closes kitty windows, so it is not run here.
 	if _, cmd := f.Update(tea.KeyPressMsg{Code: 'y', Text: "y"}); cmd == nil || !f.busy {
 		t.Errorf("y: cmd %v, busy %v", cmd != nil, f.busy)
+	}
+}
+
+// The close session form for several sessions lists each with its windows, and y closes each.
+func TestCloseSessionsForm(t *testing.T) {
+	calls := fakeKittenLs(t, lsWith("gr@dev"))
+	f := &closeSessionForm{th: look.New(true), sessions: []string{"gr@dev", "kspaces@fix"}, windows: []int{3, 1}}
+	f.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	var got []string
+	for _, l := range strings.Split(ansi.Strip(f.render()), "\n") {
+		got = append(got, strings.TrimRight(l, " "))
+	}
+	want := []string{
+		"",
+		"  Close 2 sessions",
+		"",
+		"  gr@dev       3 windows",
+		"  kspaces@fix  1 window",
+		"",
+		"  Closes their windows, and what runs in them.",
+		"",
+		"   Close y    Cancel n",
+		"",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("form:\n%q\nwant\n%q", got, want)
+	}
+	_, cmd := f.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+	if _, quit := f.Update(cmd()); quit == nil || f.err != nil {
+		t.Fatalf("the form stayed: %v", f.err)
+	}
+	if got, want := calls(), []string{
+		"@", "close-window", "--ignore-no-match", "--match", "session:^gr@dev$", "--",
+		"@", "close-window", "--ignore-no-match", "--match", `session:^kspaces@fix$`, "--",
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
 	}
 }
 
@@ -519,7 +555,7 @@ func TestFormButtons(t *testing.T) {
 		t.Errorf("Create: %+v, want %+v", got, want)
 	}
 
-	c := &closeSessionForm{th: look.New(true), session: "gr@dev", windows: 1}
+	c := &closeSessionForm{th: look.New(true), sessions: []string{"gr@dev"}, windows: []int{1}}
 	c.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	cmd = clickOn(t, c, "Close y")
 	if got, want := (result{cmd != nil, c.busy}), (result{true, true}); got != want {

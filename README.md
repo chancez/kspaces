@@ -201,20 +201,21 @@ kspaces next, prev       switch to the next or previous session with windows ope
   --attention            or to the next or previous window that is blocked, failed or done
 kspaces recent           switch to the session used before this one, as alt-tab does: twice goes back
 kspaces new [SPACE]      create a worktree, in a form
-kspaces run NAME [PATH]  run a configured command in the worktree at PATH or the current directory,
+kspaces run NAME [PATH...]  run a configured command in the worktrees at PATH or the current directory,
   --input K=V, --yes     in a form, with inputs filled in; --yes without asking
 kspaces layout NAME [PATH]  open a configured layout's tabs in the worktree's session, in a form, as run
 kspaces layout save [NAME] [PATH]  save the session's tabs as a layout, choosing what each pane runs in a
   --tab                  form; --tab saves only this tab
-kspaces close [SESSION]  close every window of a session, after confirming
-kspaces forget SESSION   delete the saved file of a session with no windows, after confirming
+kspaces close [SESSION...]  close every window of the sessions, after confirming
+kspaces forget SESSION...   delete the saved files of sessions with no windows, after confirming
 kspaces trust [PATH]     trust the .kspaces.toml of the space PATH is in, after seeing what it adds in a
   --yes, --revoke        form; --yes without asking, --revoke to forget it
 kspaces reply WINDOW_ID [TEXT]  type TEXT and Enter into a window without switching to it; no TEXT: a form
   --no-enter             showing its screen; --no-enter sends TEXT alone, as for a single key
 kspaces remove PATH      close a linked worktree's session and remove the worktree, after confirming
   --delete-branch        and then its branch, if merged; --force-branch even if not, losing its commits
-kspaces cleanup SPACE    remove the worktrees whose PR is merged, upstream gone or branch merged, in a form
+kspaces cleanup SPACE    remove the worktrees whose PR is merged, upstream gone or branch merged, and the
+  --session SESSION      missing ones, in a form; --session, repeated, lists those sessions in place of SPACE
 kspaces add [PATH]       add the repository at PATH to the spaces, in a form; --yes without asking
 kspaces kitty install    install the files kitty needs; kspaces kitty check says if they are current
 ```

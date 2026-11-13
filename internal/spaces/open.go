@@ -229,10 +229,10 @@ func AskRemoveWorktree(cfg config.Config, st kitty.State, path string) error {
 	return launchForm(cfg, st, formPanel, "remove", path)
 }
 
-// AskRunCommand opens the form that runs the command called name in the worktree at path, in a popup as
-// NewWorktree's.
-func AskRunCommand(cfg config.Config, st kitty.State, name, path string) error {
-	return launchForm(cfg, st, formPanel, "run", name, path)
+// AskRunCommand opens the form that runs the command called name in the worktrees at paths, in a popup
+// sized as AskCloseSession's. For several it offers the commands they all have, name or else the first.
+func AskRunCommand(cfg config.Config, st kitty.State, name string, paths ...string) error {
+	return launchForm(cfg, st, panelFor(len(paths)), append([]string{"run", name}, paths...)...)
 }
 
 // AskOpenLayout opens the form that opens the layout called name in the worktree at path, in a popup as
@@ -248,14 +248,23 @@ func AskSaveLayout(cfg config.Config, st kitty.State, path string) error {
 	return launchForm(cfg, st, listPanel, "layout", "save", "", path)
 }
 
-// AskCloseSession opens the form that confirms closing session, in a popup as NewWorktree's.
-func AskCloseSession(cfg config.Config, st kitty.State, session string) error {
-	return launchForm(cfg, st, formPanel, "close", session)
+// AskCloseSession opens the form that confirms closing sessions, in a popup as NewWorktree's, or as
+// AskCleanup's for several, which the form lists.
+func AskCloseSession(cfg config.Config, st kitty.State, sessions ...string) error {
+	return launchForm(cfg, st, panelFor(len(sessions)), append([]string{"close"}, sessions...)...)
 }
 
-// AskForgetSession opens the form that confirms forgetting session, in a popup as NewWorktree's.
-func AskForgetSession(cfg config.Config, st kitty.State, session string) error {
-	return launchForm(cfg, st, formPanel, "forget", session)
+// panelFor is the size of the popup of a form for n worktrees or sessions: a list's for more than one.
+func panelFor(n int) panelSize {
+	if n > 1 {
+		return listPanel
+	}
+	return formPanel
+}
+
+// AskForgetSession opens the form that confirms forgetting sessions, in a popup sized as AskCloseSession's.
+func AskForgetSession(cfg config.Config, st kitty.State, sessions ...string) error {
+	return launchForm(cfg, st, panelFor(len(sessions)), append([]string{"forget"}, sessions...)...)
 }
 
 // AskTrust opens the form that trusts the own config of the space at root, in a popup as NewWorktree's.

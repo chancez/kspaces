@@ -63,6 +63,22 @@ func TestRunActions(t *testing.T) {
 			t.Errorf("%s:\ngot  %q\nwant %q", launcher[0], got, want)
 		}
 	}
+
+	// Staying, there is no switch, and the launch keeps the focus.
+	r := Run{Command: cmd, Inputs: map[string]string{"prompt": "fix it's $HOME"}, Open: "split", PR: 12, Stay: true}
+	cfg := config.Config{Launch: []string{"launch"}}
+	got := result{
+		Open:   runActions(cfg, kitty.State{Sessions: map[string]int{"gr@fix": 7}}, space, wt, r),
+		Closed: runActions(cfg, kitty.State{}, space, wt, r),
+	}
+	at = append(at, "--keep-focus")
+	want := result{
+		Open:   [][]string{launch([]string{"--match=id:7", "launch"}, true, "--type=window", "--location=split", "--next-to=id:7")},
+		Closed: [][]string{launch([]string{"launch"}, true, "--type=tab")},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("staying:\ngot  %q\nwant %q", got, want)
+	}
 }
 
 // A worktree's PR is known from a branch that pulls from a PR's head, as one from a fork is set up.

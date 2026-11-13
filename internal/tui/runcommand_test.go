@@ -1,10 +1,12 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -143,7 +145,7 @@ func TestRunForm(t *testing.T) {
 		f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 		return f
 	}
-	f := sized(newRunForm(cfg, space, wt, open, "gr", nil, ""))
+	f := sized(newRunForm([]runTarget{{cfg, space, wt}}, open, "gr", nil, ""))
 	want := screen([]string{"  command    < gr >  left/right change  space list"}, "Runs gr", "Opens in a split beside gr@fix's window", "",
 		" Run enter    Cancel esc   left/right command  space list", "")
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
@@ -169,17 +171,17 @@ func TestRunForm(t *testing.T) {
 	}
 
 	// Prefilled, for one run in an overlay, and with the session closed.
-	if got, want := formScreen(sized(newRunForm(cfg, space, wt, open, "claude", map[string]string{"prompt": "hi"}, "overlay")))[3:8],
+	if got, want := formScreen(sized(newRunForm([]runTarget{{cfg, space, wt}}, open, "claude", map[string]string{"prompt": "hi"}, "overlay")))[3:8],
 		[]string{"  command    < claude >  left/right change  space list", "  Prompt     hi", "", "  Runs claude", "  Opens over gr@fix's window, closing back to it"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("prefilled:\n%q\nwant\n%q", got, want)
 	}
-	if got, want := formScreen(sized(newRunForm(cfg, space, wt, kitty.State{}, "gr", nil, "")))[6], "  Opens as the first tab of gr@fix, which has no windows"; got != want {
+	if got, want := formScreen(sized(newRunForm([]runTarget{{cfg, space, wt}}, kitty.State{}, "gr", nil, "")))[6], "  Opens as the first tab of gr@fix, which has no windows"; got != want {
 		t.Errorf("closed: %q, want %q", got, want)
 	}
 	// With one command there is nothing to choose.
 	one := cfg
 	one.Commands = cfg.Commands[1:]
-	if got, want := formScreen(sized(newRunForm(one, space, wt, open, "gr", nil, "")))[1:6], []string{"  Run in gr@fix", "", "  Runs gr", "  Opens in a split beside gr@fix's window", ""}; !reflect.DeepEqual(got, want) {
+	if got, want := formScreen(sized(newRunForm([]runTarget{{one, space, wt}}, open, "gr", nil, "")))[1:6], []string{"  Run in gr@fix", "", "  Runs gr", "  Opens in a split beside gr@fix's window", ""}; !reflect.DeepEqual(got, want) {
 		t.Errorf("one command:\n%q\nwant\n%q", got, want)
 	}
 
@@ -232,7 +234,7 @@ func TestRunCommandNow(t *testing.T) {
 		{"nope", nil, ""},
 		{"gr", nil, "overlay"},
 	} {
-		got = append(got, errString(RunCommandNow(cfg, sub, c.name, c.inputs, c.open)))
+		got = append(got, errString(RunCommandNow(cfg, []string{sub}, c.name, c.inputs, c.open)))
 	}
 	want := []string{
 		"claude needs Prompt",
@@ -260,4 +262,68 @@ func errString(err error) string {
 		return "<nil>"
 	}
 	return err.Error()
+}
+
+// In several worktrees the run form lists their sessions and offers the commands they all have, the
+// first standing in for one they do not; run opens the command in each without switching sessions, by
+// its window in one with windows and as the first tab of one without, and the form stays to say which
+// failed. kspaces run --yes runs in each the same.
+func TestRunSeveral(t *testing.T) {
+	root := mainRepo(t)
+	cfg := testCommands(t)
+	cfg.Spaces = []string{root}
+	space := spaces.LoadSpace(root)
+	var wts []spaces.Worktree
+	for _, name := range []string{"fix", "dev"} {
+		wt, err := spaces.CreateWorktree(space, name, filepath.Join(root, ".worktrees", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		wts = append(wts, wt)
+	}
+	calls := fakeKittenLs(t, lsWith(wts[0].Session))
+	targets, cmd, err := findRun(cfg, []string{wts[0].Path, wts[1].Path}, "nope", nil, "", true)
+	if err != nil || cmd.Name != "claude" {
+		t.Fatalf("findRun: %v, %s", err, cmd.Name)
+	}
+	if _, _, err := findRun(cfg, []string{wts[0].Path, wts[1].Path}, "nope", nil, "", false); errString(err) != "not every worktree has command nope" {
+		t.Errorf("--yes with nope: %v", err)
+	}
+	f := newRunForm(targets, kitty.State{}, "gr", nil, "")
+	f.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	want := []string{"", "  Run in 2 worktrees", "", "  " + wts[0].Session, "  " + wts[1].Session, "",
+		"  command    < gr >  left/right change  space list", "",
+		"  Runs gr", "  Opens in a split beside each session's window, or as the first tab of one with no windows", "",
+		"   Run enter    Cancel esc   left/right command  space list", ""}
+	if got := formScreen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("form:\n%q\nwant\n%q", got, want)
+	}
+	_, run := f.Update(keyMsg("enter"))
+	if _, quit := f.Update(run()); quit == nil || f.err != nil {
+		t.Fatalf("the form stayed: %v", f.err)
+	}
+	env := func(wt spaces.Worktree) []string {
+		return []string{"--env=KSPACES_SPACE=" + filepath.Base(root), "--env=KSPACES_ROOT=" + root, "--env=KSPACES_WORKTREE=" + wt.Path,
+			"--env=KSPACES_BRANCH=" + wt.Branch, "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=" + wt.Session, "--env=KSPACES_PR="}
+	}
+	ran := slices.Concat(
+		[]string{"@", "action", "--match=id:7", "launch", "--type=window", "--location=split", "--next-to=id:7",
+			"--cwd=" + wts[0].Path, "--add-to-session=" + wts[0].Session, "--keep-focus"}, env(wts[0]), []string{"--hold", "gr", "--"},
+		[]string{"@", "action", "launch", "--type=tab", "--cwd=" + wts[1].Path, "--add-to-session=" + wts[1].Session, "--keep-focus"},
+		env(wts[1]), []string{"--hold", "gr", "--"})
+	if got := calls(); !reflect.DeepEqual(got, ran) {
+		t.Errorf("kitten ran as\n%q\nwant\n%q", got, ran)
+	}
+	if err := RunCommandNow(cfg, []string{wts[0].Path, wts[1].Path}, "gr", nil, ""); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := calls(), slices.Concat(ran, ran); !reflect.DeepEqual(got, want) {
+		t.Errorf("--yes: kitten ran as\n%q\nwant\n%q", got, want)
+	}
+
+	// Failures are said one line each, and the form stays.
+	f.Update(ranMsg{errors.Join(errors.New(wts[1].Session+": kitty said no"), errors.New(wts[0].Session+": so did git"))})
+	if got, want := formScreen(f)[11:14], []string{"  " + wts[1].Session + ": kitty said no", "  " + wts[0].Session + ": so did git", ""}; !reflect.DeepEqual(got, want) {
+		t.Errorf("failures %q, want %q", got, want)
+	}
 }

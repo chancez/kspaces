@@ -70,15 +70,10 @@ func removeOptions(paths []string, force, deleteBranch, forceBranch bool, forceP
 func (a *app) closeCommand() *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
-		Use:   "close [SESSION]",
-		Short: "Close every window of a session, the current one by default, after confirming in a form",
-		Args:  cobra.MaximumNArgs(1),
+		Use:   "close [SESSION...]",
+		Short: "Close every window of the sessions, the current one by default, after confirming in a form",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			session := ""
-			if len(args) > 0 {
-				session = args[0]
-			}
-			return tui.RunCloseSession(cmd.Context(), session, yes)
+			return tui.RunCloseSession(cmd.Context(), args, yes)
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "close without asking")
@@ -88,15 +83,15 @@ func (a *app) closeCommand() *cobra.Command {
 func (a *app) forgetCommand() *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
-		Use:   "forget SESSION",
-		Short: "Delete the saved file of a session with no windows open, such as a missing worktree's, after confirming in a form",
-		Args:  cobra.ExactArgs(1),
+		Use:   "forget SESSION...",
+		Short: "Delete the saved files of sessions with no windows open, such as missing worktrees', after confirming in a form",
+		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := config.Load()
 			if err != nil {
 				return err
 			}
-			return tui.RunForgetSession(cmd.Context(), cfg, args[0], yes)
+			return tui.RunForgetSession(cmd.Context(), cfg, args, yes)
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "delete without asking")
