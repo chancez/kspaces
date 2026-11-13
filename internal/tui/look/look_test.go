@@ -128,6 +128,27 @@ func TestThemeDraw(t *testing.T) {
 			got:  th.Render(Plain, Text("a\x1b[5m")),
 			want: "a^[[5m",
 		},
+		"a button is a chip: its label bold in the text's color, its key quiet": {
+			got: th.Render(Plain, Button("Remove", "y")...),
+			want: lipgloss.NewStyle().Background(charcoal).Render(" ") + lipgloss.NewStyle().Background(charcoal).Bold(true).Render("Remove") +
+				lipgloss.NewStyle().Background(charcoal).Render(" ") + lipgloss.NewStyle().Background(charcoal).Foreground(ash).Render("y") +
+				lipgloss.NewStyle().Background(charcoal).Render(" "),
+		},
+		"a greyed button keeps its chip": {
+			got: th.Render(Plain, DisabledButton("Close")...),
+			want: lipgloss.NewStyle().Background(charcoal).Render(" ") + lipgloss.NewStyle().Background(charcoal).Foreground(ash).Render("Close") +
+				lipgloss.NewStyle().Background(charcoal).Render(" "),
+		},
+		"on a light background the chip is light": {
+			got: New(false).Render(Plain, Button("Cancel", "n")...),
+			want: lipgloss.NewStyle().Background(paleGray).Render(" ") + lipgloss.NewStyle().Background(paleGray).Bold(true).Render("Cancel") +
+				lipgloss.NewStyle().Background(paleGray).Render(" ") + lipgloss.NewStyle().Background(paleGray).Foreground(slate).Render("n") +
+				lipgloss.NewStyle().Background(paleGray).Render(" "),
+		},
+		"a button for what loses work is solid in danger's color": {
+			got:  th.Render(Plain, DangerButton("Remove", "y")...),
+			want: lipgloss.NewStyle().Background(p.danger).Foreground(p.onSolid).Bold(true).Render(" Remove y "),
+		},
 	} {
 		if !reflect.DeepEqual(cells.Parse(tc.got), cells.Parse(tc.want)) {
 			t.Errorf("%s:\ngot  %q\nwant %q", name, tc.got, tc.want)

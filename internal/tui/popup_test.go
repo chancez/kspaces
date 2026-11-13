@@ -11,6 +11,7 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/tui/look"
 )
 
 // stubForm is a popup's form that works while busy and fails with err.
@@ -32,6 +33,9 @@ func (f *stubForm) Update(tea.Msg) (tea.Model, tea.Cmd) {
 func (f *stubForm) View() tea.View { return tea.NewView("form") }
 func (f *stubForm) working() bool  { return f.busy }
 func (f *stubForm) failed() bool   { return f.err }
+func (f *stubForm) theme() *look.Theme {
+	return look.New(true)
+}
 
 // quits says whether cmd quits the program.
 func quits(cmd tea.Cmd) bool {

@@ -303,15 +303,15 @@ func chip(spans ...Span) []Span {
 func Button(label, key string) []Span {
 	out := []Span{sp(elDefault, " "), sp(elButton, label)}
 	if key != "" {
-		out = append(out, sp(elDefault, " "), sp(elMuted, key))
+		out = append(out, sp(elDefault, " "), sp(elButtonKey, key))
 	}
 	return chip(append(out, sp(elDefault, " "))...)
 }
 
-// DisabledButton is a Button greyed, for one there is nothing to click on. It has no chip: the chip is
-// reversed, which would draw it as bright as one that works.
+// DisabledButton is a Button that cannot be clicked now: its chip kept, so it stays in place and visibly a
+// button, its label greyed and no key.
 func DisabledButton(label string) []Span {
-	return []Span{sp(elDefault, " "), sp(elMuted, label).With(Dim), sp(elDefault, " ")}
+	return chip(sp(elDefault, " "), sp(elButtonKey, label), sp(elDefault, " "))
 }
 
 // DangerButton is a Button for what loses work, such as closing what runs or removing a worktree, drawn

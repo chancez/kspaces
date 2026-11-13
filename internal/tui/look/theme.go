@@ -16,7 +16,8 @@ import (
 // changes what danger looks like changes it everywhere.
 //
 // kspaces' colors are terminal palette indexes rather than fixed colors, so the sidebar follows the kitty
-// theme; gr's palette, in palette.go, is not used for them.
+// theme. A control's chip is the exception: no palette index is a quiet step off the terminal's
+// background, so it takes gr's, from palette.go, for a light or a dark one.
 type roles struct {
 	muted  color.Color
 	accent color.Color
@@ -30,9 +31,14 @@ type roles struct {
 	merged color.Color
 	// onSolid is text on a solid background, such as the current session's bar.
 	onSolid color.Color
+	// controlBg is a control's chip, and onControl what is quiet on it, a key or a greyed label, which
+	// the palette's muted would all but hide on a grey chip.
+	controlBg color.Color
+	onControl color.Color
 }
 
-func newRoles() roles {
+func newRoles(isDark bool) roles {
+	ld := lipgloss.LightDark(isDark)
 	return roles{
 		muted:     lipgloss.Color("8"),
 		accent:    lipgloss.Color("4"),
@@ -42,6 +48,8 @@ func newRoles() roles {
 		attention: lipgloss.Color("3"),
 		merged:    lipgloss.Color("5"),
 		onSolid:   lipgloss.Color("15"),
+		controlBg: ld(paleGray, charcoal),
+		onControl: ld(slate, ash),
 	}
 }
 
@@ -92,8 +100,9 @@ const (
 	elError
 	elBorder
 	elBorderActive
-	// elButton is a control's label.
+	// elButton is a control's label, elButtonKey its key and the label of one greyed.
 	elButton
+	elButtonKey
 	// elButtonOn is a toggle's label while it is on.
 	elButtonOn
 	// elChanges is how many files a worktree has not committed.
@@ -144,6 +153,7 @@ var elementNames = [numElements]string{
 	elBorder:                 "border",
 	elBorderActive:           "border.active",
 	elButton:                 "button",
+	elButtonKey:              "button.key",
 	elButtonOn:               "button.on",
 	elChanges:                "git.changes",
 	elPROpen:                 "pr.open",
@@ -209,10 +219,10 @@ type Theme struct {
 	glyphs   Glyphs
 }
 
-// New is kspaces' theme, drawing in Nerd Font icons. Its colors are the terminal's palette, which suits a
-// light or dark background alike; isDark only picks a foreign renderer's defaults.
+// New is kspaces' theme, drawing in Nerd Font icons, for a dark background or a light one. Its colors are
+// the terminal's palette, which suits either alike, but for the controls' chips, see roles.
 func New(isDark bool) *Theme {
-	p := newRoles()
+	p := newRoles(isDark)
 	fg := func(c color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(c) }
 	bold := func(c color.Color) lipgloss.Style { return fg(c).Bold(true) }
 	t := &Theme{isDark: isDark, roles: p, glyphs: GlyphsNerd}
@@ -249,6 +259,7 @@ func New(isDark bool) *Theme {
 		elBorder:                 fg(p.muted),
 		elBorderActive:           fg(p.accent),
 		elButton:                 lipgloss.NewStyle().Bold(true),
+		elButtonKey:              fg(p.onControl),
 		elButtonOn:               bold(p.attention),
 		elChanges:                fg(p.attention),
 		elPROpen:                 fg(p.success),
@@ -265,12 +276,22 @@ func New(isDark bool) *Theme {
 		Plain:   {},
 		Cursor:  {solid: true, reverse: true},
 		Current: {bg: p.muted, solid: true, fg: p.onSolid, bold: true},
-		Control: {solid: true, reverse: true},
+		// A chip, as gr's and GitHub's buttons: a quiet shade the label stays bold on, in the text's own
+		// color, rather than reversed, which reads as a selected row.
+		Control: {bg: p.controlBg},
 		// kspaces' only solid controls confirm closing and removing, which lose what runs or is not
 		// committed, so they are drawn in danger's color.
 		ControlSolid: {bg: p.danger, solid: true, fg: p.onSolid, bold: true},
 	}
 	return t
+}
+
+// SetDark makes the theme the one for a dark background or a light one, as the terminal says it has once
+// it answers, keeping its glyphs.
+func (t *Theme) SetDark(isDark bool) {
+	g := t.glyphs
+	*t = *New(isDark)
+	t.glyphs = g
 }
 
 // style is how el with props draws on surface s.

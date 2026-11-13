@@ -159,8 +159,9 @@ func tick() tea.Cmd {
 	return tea.Tick(refreshEvery, func(time.Time) tea.Msg { return tickMsg{} })
 }
 
+// Init asks the terminal for its background too, which picks the controls' shade, see look.roles.
 func (m *sidebar) Init() tea.Cmd {
-	return tea.Batch(m.poll(), tick(), checkGlue)
+	return tea.Batch(m.poll(), tick(), checkGlue, tea.RequestBackgroundColor)
 }
 
 // The cursor runs over the spaces rows first, then the status entries: index i is m.rows[i] below
@@ -229,6 +230,8 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cursorToCurrent()
 	case tea.BlurMsg:
 		m.focused = false
+	case tea.BackgroundColorMsg:
+		m.th.SetDark(msg.IsDark())
 	case tickMsg:
 		if m.remote && time.Since(m.remoteAt) > remoteIdle {
 			m.remote = false

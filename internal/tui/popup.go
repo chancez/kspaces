@@ -19,7 +19,23 @@ type popupModel interface {
 	working() bool
 	// failed is whether what it last did failed, which it stays open to show.
 	failed() bool
+	// theme is what it draws with, which the terminal's background makes a light or a dark one.
+	theme() *look.Theme
 }
+
+func (f *addSpaceForm) theme() *look.Theme       { return f.th }
+func (f *cleanupForm) theme() *look.Theme        { return f.th }
+func (f *closeSessionForm) theme() *look.Theme   { return f.th }
+func (f *forgetSessionForm) theme() *look.Theme  { return f.th }
+func (f *newWorktreeForm) theme() *look.Theme    { return f.th }
+func (f *layoutForm) theme() *look.Theme         { return f.th }
+func (f *removeWorktreeForm) theme() *look.Theme { return f.th }
+func (f *runForm) theme() *look.Theme            { return f.th }
+func (f *saveLayoutForm) theme() *look.Theme     { return f.th }
+func (f *trustForm) theme() *look.Theme          { return f.th }
+func (f *errorForm) theme() *look.Theme          { return f.th }
+func (f *replyForm) theme() *look.Theme          { return f.th }
+func (m *picker) theme() *look.Theme             { return m.th }
 
 func (f *addSpaceForm) working() bool       { return f.busy }
 func (f *cleanupForm) working() bool        { return f.busy }
@@ -83,9 +99,15 @@ func newPopup(inner popupModel, from int) *popup {
 	}
 }
 
-func (p *popup) Init() tea.Cmd { return p.inner.Init() }
+// Init asks the terminal for its background too, which picks the controls' shade, see look.roles.
+func (p *popup) Init() tea.Cmd { return tea.Batch(p.inner.Init(), tea.RequestBackgroundColor) }
 
 func (p *popup) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if bg, ok := msg.(tea.BackgroundColorMsg); ok {
+		p.th.SetDark(bg.IsDark())
+		p.inner.theme().SetDark(bg.IsDark())
+		return p, nil
+	}
 	if p.from != 0 {
 		switch msg.(type) {
 		case tea.FocusMsg:
