@@ -331,7 +331,7 @@ map cmd+alt+. kspaces_attention_next
 
 `kspaces_recent` switches to the session focused most recently other than the focused window's, as alt-tab
 does, so pressing it twice goes back; sessions in no space count, and docks never count as focusing one.
-With no other session open it fails, saying so, as the other actions do.
+With no other session open it fails, saying so in kitty's output, as the other actions do.
 
 The watcher and the actions find `kspaces` the way kitty's `launch` does: kitty's `exe_search_path`, its
 own PATH, `~/.local/bin`, then the PATH of kitty.conf's `env` and your login shell. kitty started from the
