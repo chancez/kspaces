@@ -316,6 +316,18 @@ func SortButton(mode spaces.SortMode, hot bool) Span {
 	return glyph(elMuted, g, false)
 }
 
+// AttentionButton is the icon button that turns the attention filter on and off, drawn as AddButton is
+// but lit in the attention color while the filter is on, so it says so with the mouse elsewhere.
+func AttentionButton(on, hot bool) Span {
+	switch {
+	case on:
+		return glyph(elButtonOn, GlyphFilter, false)
+	case hot:
+		return glyph(elButton, GlyphFilter, false)
+	}
+	return glyph(elMuted, GlyphFilter, false)
+}
+
 // Chosen marks the item chosen now in a list of choices, as the sort mode in its menu, and is a blank as
 // wide for the others.
 func Chosen(chosen bool) Span {

@@ -37,6 +37,8 @@ const (
 	GlyphSortManual
 	GlyphSortActivity
 	GlyphSortStatus
+	// GlyphFilter is the attention filter's button.
+	GlyphFilter
 	// GlyphChosen marks the menu item chosen now, as the sort mode.
 	GlyphChosen
 	// GlyphChanges marks how many files a worktree has not committed, GlyphAhead and GlyphBehind how many
@@ -82,6 +84,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphSortManual:       "=",
 		GlyphSortActivity:     "@",
 		GlyphSortStatus:       "!",
+		GlyphFilter:           "Y",
 		GlyphChosen:           "*",
 		GlyphChanges:          "*",
 		GlyphAhead:            "+",
@@ -116,6 +119,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphSortManual:       "\u2261", // identical to
 		GlyphSortActivity:     "\u25f7", // white circle with upper right quadrant, a clock face
 		GlyphSortStatus:       "!",
+		GlyphFilter:           "\u25bd", // white down-pointing triangle, a funnel
 		GlyphChosen:           "\u2713", // check mark
 		GlyphChanges:          "\u25cf", // black circle
 		GlyphAhead:            "\u2191", // upwards arrow
@@ -153,6 +157,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphSortManual:   "\uf0c9", // bars
 		GlyphSortActivity: "\uf017", // clock
 		GlyphSortStatus:   "\uf071", // warning
+		GlyphFilter:       "\uf0b0", // filter
 		GlyphChosen:       "\uf00c", // check
 		// Unicode rather than Nerd Font icons: they are followed by a number, not a space.
 		GlyphChanges: "\u25cf",

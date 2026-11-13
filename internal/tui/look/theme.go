@@ -90,6 +90,8 @@ const (
 	elBorderActive
 	// elButton is a control's label.
 	elButton
+	// elButtonOn is a toggle's label while it is on.
+	elButtonOn
 	// elChanges is how many files a worktree has not committed.
 	elChanges
 	// elPR* are a pull request's number, by its state.
@@ -130,6 +132,7 @@ var elementNames = [numElements]string{
 	elBorder:       "border",
 	elBorderActive: "border.active",
 	elButton:       "button",
+	elButtonOn:     "button.on",
 	elChanges:      "git.changes",
 	elPROpen:       "pr.open",
 	elPRDraft:      "pr.draft",
@@ -226,6 +229,7 @@ func New(isDark bool) *Theme {
 		elBorder:       fg(p.muted),
 		elBorderActive: fg(p.accent),
 		elButton:       lipgloss.NewStyle().Bold(true),
+		elButtonOn:     bold(p.attention),
 		elChanges:      fg(p.attention),
 		elPROpen:       fg(p.success),
 		elPRDraft:      fg(p.muted),
