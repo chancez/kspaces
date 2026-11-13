@@ -149,6 +149,7 @@ Moving in activity or status switches to manual, starting from the order shown: 
 config.toml as they were shown and every space's worktrees saved as they were shown, then the move is
 made.
 
+
 ## The menu
 
 Right-click a row or a status entry, or press `m` on it. The menu lists what applies to the row, in

@@ -173,6 +173,9 @@ type Prop uint8
 const (
 	// Dim is for entries with nothing open: a worktree without a session, or an empty list's note.
 	Dim Prop = 1 << iota
+	// Lit marks a mark as where keys act, reversed, as the select mode's box that space ticks: the
+	// cursor's mark rather than a bar across the row.
+	Lit
 )
 
 // Surface is where a line sits. It owns the background.
@@ -298,7 +301,7 @@ func (t *Theme) SetDark(isDark bool) {
 func (t *Theme) style(el element, p Prop, s Surface) lipgloss.Style {
 	ss := t.surfaces[s]
 	if ss.solid {
-		st := lipgloss.NewStyle().Bold(ss.bold).Reverse(ss.reverse)
+		st := lipgloss.NewStyle().Bold(ss.bold).Reverse(ss.reverse != (p&Lit != 0))
 		if ss.fg != nil {
 			st = st.Foreground(ss.fg)
 		}
@@ -310,6 +313,9 @@ func (t *Theme) style(el element, p Prop, s Surface) lipgloss.Style {
 	st := t.elements[el]
 	if p&Dim != 0 {
 		st = st.Faint(true)
+	}
+	if p&Lit != 0 {
+		st = st.Reverse(true)
 	}
 	if ss.bg != nil {
 		st = st.Background(ss.bg)

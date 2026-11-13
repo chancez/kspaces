@@ -152,15 +152,21 @@ func (m *sidebar) paintTo(y int) {
 }
 
 // box is row i's box in the select mode, after its caret, or a blank as wide on a row with nothing to
-// tick; nothing outside the mode.
+// tick; nothing outside the mode. The cursor's box is lit, as that is what space ticks: the mode draws no
+// cursor bar, which a row clicked would get and would read as the current session's.
 func (m *sidebar) box(i int) []look.Span {
 	if !m.selecting {
 		return nil
 	}
-	if t, ok := m.tick(i); ok {
-		return look.Box(t, false)
+	t, ok := m.tick(i)
+	if !ok {
+		return []look.Span{look.Default(strings.Repeat(" ", m.th.Width(look.Box(look.Unticked, false)...)))}
 	}
-	return []look.Span{look.Default(strings.Repeat(" ", m.th.Width(look.Box(look.Unticked, false)...)))}
+	box := look.Box(t, false)
+	if i == m.cursor && m.navigating() {
+		box[0] = box[0].With(look.Lit)
+	}
+	return box
 }
 
 // allRows are every row of the list, as though nothing were folded or filtered: the hidden groups' are

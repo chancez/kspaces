@@ -147,7 +147,7 @@ func (m *sidebar) renderRow(i int) string {
 	// whose popup shows, heading it.
 	surface := look.Plain
 	switch {
-	case m.dragging(r), i == m.cursor && m.navigating(), m.hoverShown && rowKey(r) == m.hoverRow:
+	case m.dragging(r), i == m.cursor && m.navigating() && !m.selecting, m.hoverShown && rowKey(r) == m.hoverRow:
 		surface = look.Cursor
 	case current:
 		surface = look.Current
@@ -178,7 +178,7 @@ func (m *sidebar) renderHeader(i int) string {
 
 	surface := look.Plain
 	switch {
-	case i == m.cursor && m.navigating():
+	case i == m.cursor && m.navigating() && !m.selecting:
 		surface = look.Cursor
 	case rowHolds(r, m.kitty.Current):
 		surface = look.Current

@@ -101,7 +101,12 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 			m.unhover()
 			return nil
 		}
-		m.cursor = i
+		// A press that ticks, with alt or in the select mode, leaves the cursor where it is: only the box
+		// changes, see box. alt rather than shift, which kitty keeps for its own selection.
+		ticking := i < len(m.rows) && (m.selecting || msg.Mod.Contains(tea.ModAlt))
+		if !ticking {
+			m.cursor = i
+		}
 		t, _ := m.entryTarget(i)
 		if m.inZone(fmt.Sprintf(caretZone, i), msg.X, msg.Y) {
 			m.unhover()
@@ -111,11 +116,8 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 			// A row's popup stays until the release, which finds the row by it as the press did.
 			m.hover = 0
 			m.press = &press{row: m.rows[i], key: rowKey(m.rows[i])}
-			// alt rather than shift, which kitty keeps for its own selection.
-			if msg.Mod.Contains(tea.ModAlt) {
+			if ticking {
 				m.startSelect()
-			}
-			if m.selecting {
 				m.pressTick(i)
 			}
 			return nil

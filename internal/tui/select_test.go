@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/chancez/kspaces/internal/tui/cells"
+	"github.com/chancez/kspaces/internal/tui/look"
 )
 
 // A row's box in the select mode, with the space after it.
@@ -200,6 +203,35 @@ func TestSelectKeys(t *testing.T) {
 	e.press("esc")
 	if got := e.spacesScreen(); e.m.selecting || e.m.ticked != nil || !reflect.DeepEqual(got, plainScreen()) {
 		t.Errorf("esc, selecting %v, ticked %v:\n%q\nwant\n%q", e.m.selecting, e.m.ticked, got, plainScreen())
+	}
+}
+
+// In the select mode no row gets the cursor's bar: a click ticks its row's box and leaves the cursor where
+// it was, and the cursor, which space ticks, is the one box lit, reversed.
+func TestSelectCursor(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(tea.FocusMsg{})
+	e.m.cursor = e.row("gr@fix")
+	e.press("v")
+	e.clickRow(e.row("kitty"))
+	if e.m.cursor != e.row("gr@fix") || !e.m.ticked["kitty"] {
+		t.Errorf("clicking kitty moved the cursor to %d, ticked %q", e.m.cursor, e.tickedSessions())
+	}
+	frame := cells.Parse(e.m.render())
+	lit := cells.Parse(e.m.th.Render(look.Plain, look.Box(look.Unticked, false)[0].With(look.Lit)))[0][0]
+	bar := cells.Parse(e.m.th.Render(look.Cursor, look.Text("x")))[0][0].Style
+	for _, session := range []string{"gr@fix", "kitty"} {
+		row := frame[e.rowY(session)]
+		for x, c := range row {
+			switch {
+			case session == "gr@fix" && x == 2:
+				if c != lit {
+					t.Errorf("fix's box drawn %v, want %v", c, lit)
+				}
+			case c.Style == lit.Style || c.Style == bar:
+				t.Errorf("%s's cell %d %q drawn as the cursor: %v", session, x, c.R, c.Style)
+			}
+		}
 	}
 }
 
