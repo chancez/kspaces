@@ -125,9 +125,12 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 }
 
 // clickedEntry is the entry a click at x, y is on: on a hover popup the entry it shows, a spaces row or a
-// status entry, rather than the one it covers; else the one drawn there.
+// status entry, rather than the one it covers, and none on the error's; else the one drawn there.
 func (m *sidebar) clickedEntry(x, y int) (int, bool) {
 	if m.inZone(popupZone, x, y) {
+		if m.hoverError {
+			return 0, false
+		}
 		if i := m.hoveredRow(); i >= 0 {
 			return i, true
 		}
@@ -140,7 +143,7 @@ func (m *sidebar) clickedEntry(x, y int) (int, bool) {
 
 // unhover closes the hover popup, or stops the delay before a row's.
 func (m *sidebar) unhover() {
-	m.hover, m.hoverRow, m.hoverShown = 0, "", false
+	m.hover, m.hoverRow, m.hoverShown, m.hoverError = 0, "", false, false
 }
 
 // hoveredRow is the index of the spaces row whose popup shows, or -1. Kept by rowKey, as a refresh can
@@ -158,17 +161,21 @@ func (m *sidebar) hoveredRow() int {
 }
 
 // motion lights the button under the mouse, and shows what the mouse rests on in a popup: a status entry
-// in full at once, when that says more than the entry does, and a spaces row's worktree once the mouse
-// has rested on it rowHoverDelay. Moving within a popup keeps it, rather than switching to what it
-// covers; moving anywhere else clears it.
+// in full at once, when that says more than the entry does, the last line's error in full at once, when
+// the line cuts it, and a spaces row's worktree once the mouse has rested on it rowHoverDelay. Moving
+// within a popup keeps it, rather than switching to what it covers; moving anywhere else clears it.
 func (m *sidebar) motion(msg tea.MouseMotionMsg) tea.Cmd {
 	m.addHot, m.sortHot = m.inZone(addZone, msg.X, msg.Y), m.inZone(sortZone, msg.X, msg.Y)
 	m.attentionHot = m.inZone(attentionZone, msg.X, msg.Y)
-	if (m.hovered() >= 0 || m.hoveredRow() >= 0) && m.inZone(popupZone, msg.X, msg.Y) {
+	if (m.hovered() >= 0 || m.hoveredRow() >= 0 || m.hoverError) && m.inZone(popupZone, msg.X, msg.Y) {
 		m.hoverAt = time.Now()
 		return nil
 	}
 	m.hover = 0
+	if m.hoverError = m.inZone(errorZone, msg.X, msg.Y) && m.errorCut(); m.hoverError {
+		m.hoverRow, m.hoverShown, m.hoverAt = "", false, time.Now()
+		return nil
+	}
 	i, ok := m.entryAt(msg.X, msg.Y)
 	if ok && i < len(m.rows) && m.rows[i].Worktree != nil {
 		m.hoverAt = time.Now()

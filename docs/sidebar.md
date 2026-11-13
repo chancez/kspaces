@@ -143,7 +143,8 @@ its text puts the cursor there; in a one-line field too long for its box, which 
 
 An item that fails, or a key such as `space` folding a space, says why on the sidebar's last line until
 the next key or click. Loading's own errors, such as a broken config, show there when no such error does,
-until a load works.
+until a load works. The line has the error on one line, cut to the sidebar's width; resting the mouse on
+a cut one shows all of it, wrapped, in a popup above the line, which ends as a status entry's does.
 
 **Open PR** is the PR the row shows, which needs gh signed in. gh runs in the worktree, in the
 background, so the sidebar does not wait for it; what it says when it fails shows on the sidebar's last

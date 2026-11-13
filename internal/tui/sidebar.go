@@ -92,6 +92,9 @@ type sidebar struct {
 	hoverRow   string
 	hoverShown bool
 	hoverGen   int
+	// Whether the mouse rests on the last line while it cuts an error, which then shows in full as a
+	// popup, ending as a status entry's does.
+	hoverError bool
 	mouse      *pixelMouse
 	// The left press on a spaces row until its release, nil for none: a click or a drag, see drag.go.
 	press *press
@@ -220,7 +223,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.remote && time.Since(m.remoteAt) > remoteIdle {
 			m.remote = false
 		}
-		if (m.hover != 0 || m.hoverRow != "") && time.Since(m.hoverAt) > hoverIdle {
+		if (m.hover != 0 || m.hoverRow != "" || m.hoverError) && time.Since(m.hoverAt) > hoverIdle {
 			m.unhover()
 		}
 		return m, tea.Batch(m.poll(), tick())
@@ -401,10 +404,13 @@ func (m *sidebar) frame() string {
 	if popup, top := m.rowPopup(); popup != nil && top < len(lines) {
 		copy(lines[top:], popup)
 	}
+	if popup, top := m.errorPopup(); popup != nil && top < len(lines) {
+		copy(lines[top:], popup)
+	}
 	m.drawMenu(lines)
 	status := ""
 	if err := m.lastError(); err != nil {
-		status = th.Render(look.Plain, th.Cut(width, look.Error(oneLine(err.Error())))...)
+		status = m.errorLine(err)
 	} else if m.notice != nil {
 		status = th.Render(look.Plain, th.Cut(width, *m.notice)...)
 	}
