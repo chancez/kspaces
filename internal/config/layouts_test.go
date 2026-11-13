@@ -126,6 +126,11 @@ inputs = [{ name = "prompt" }]
 [[layouts]]
 name = "a"
 tabs = [{ panes = [{ command = "claude" }, { command = "other", split = "right" }] }]`, "layouts: a: input prompt is defined differently by claude and other"},
+		{one(`[{ command = "claude", inputs = { promt = "x" } }]`), "layouts: a: tab 1 pane 1: inputs has promt, which claude has no input called"},
+		{one(`[{ command = "claude", inputs = { prompt = "{model}" } }]`), "layouts: a: tab 1 pane 1: inputs.prompt: {model} is not a built-in, the only placeholders a default can have"},
+		{one(`[{ run = ["x"], inputs = { prompt = "x" } }]`), "layouts: a: tab 1 pane 1: inputs are for a configured command's inputs, and it runs none"},
+		{one(`[{ command = "claude", inputs = { prompt = "a" } }, { command = "claude", split = "right" }]`), "layouts: a: input prompt has different defaults in tab 1 pane 1 and tab 1 pane 2, both claude"},
+		{one(`[{ command = "claude", inputs = { prompt = "a" } }, { command = "codex", split = "right" }]`), "layouts: a: input prompt is defined differently by claude and codex"},
 		{`layout = "nope"`, `layout is "nope", no layout has that name`},
 		{one("[{}]") + "[space.gr]\nworktree_layout = \"nope\"", `space.gr.worktree_layout is "nope", no layout has that name`},
 		{one("[{}]") + "[space.gr]\nlayout = \"nope\"", `space.gr.layout is "nope", no layout has that name`},
@@ -192,6 +197,42 @@ func TestPRLayoutFor(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
+	}
+}
+
+// A pane's inputs are its command's defaults in the layout, filled in with the built-ins as a command's
+// own are; panes that set one input alike share it.
+func TestPaneInputs(t *testing.T) {
+	cfg, err := Parse(layoutCommands + `
+[[layouts]]
+name = "review"
+[[layouts.tabs]]
+panes = [
+  { command = "claude", inputs = { prompt = "Review PR #{pr}" } },
+  { command = "codex", split = "right", inputs = { prompt = "Review PR #{pr}", model = "o4" } },
+]
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	l, _ := cfg.Layout("review")
+	v, err := l.Values(nil, map[string]string{"pr": "3"})
+	type result struct {
+		Inputs []Input
+		Values map[string]string
+		Err    string
+	}
+	got := result{l.Inputs, v, errString(err)}
+	want := result{
+		Inputs: []Input{
+			{Name: "prompt", Type: "string", Label: "Prompt", Default: "Review PR #{pr}", Required: true},
+			{Name: "model", Type: "string", Label: "model", Default: "o4"},
+		},
+		Values: map[string]string{"prompt": "Review PR #3", "model": "o4"},
+		Err:    "<nil>",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v\nwant %#v", got, want)
 	}
 }
 

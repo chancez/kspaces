@@ -177,6 +177,19 @@ A layout's inputs are those of its panes' commands, in order, one input for a na
 long as they define it the same. `run`, `cwd` and `title` can use them, and the built-ins. A tab's title is
 one line, so a newline in a value there is a space.
 
+A pane running a command can set defaults for its inputs, in place of the command's own, as templates of
+the built-ins as theirs are. A layout for reviewing a PR, as the space's `pr_layout`, can ask with the
+prompt filled in, to edit or keep:
+
+```toml
+[[layouts]]
+name = "review"
+tabs = [{ panes = [{ command = "claude", inputs = { prompt = "Review PR #{pr}" } }, { command = "gr", split = "right" }] }]
+```
+
+A name `inputs` has must be one of the command's inputs, and only a pane with `command` has them. Two panes
+sharing an input set it alike, or both leave it to the command.
+
 Each tab is, for the agent layout:
 
 ```

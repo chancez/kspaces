@@ -142,14 +142,21 @@ panes = [
   { split = "below", of = 1, size = 30 },
 ]
 
+# A pane's inputs are defaults for its command's inputs, templates as a command's are: here a prompt the
+# new worktree form fills in with the PR's number, to edit before creating.
+[[layouts]]
+name = "review"
+tabs = [{ panes = [{ command = "claude", inputs = { prompt = "Review PR #{pr}" } }] }]
+
 # Per space, by name, its directory's, as well as or instead of in its spaces entry: the layout its
 # linked worktrees' sessions open with afresh, when there is no saved session to restore, and the new
 # worktree form's at first. `layout` is the main worktree's, and a top-level `layout`, before any table,
 # the default for every space. A layout needing an input with no default, as claude's prompt, is opened
 # afresh as one shell tab, and the sidebar says so. `pr_layout`, here or top-level, is the new worktree
-# form's for a PR. `group` is the group the sidebar lists it under.
+# form's while its branch field names a PR. `group` is the group the sidebar lists it under.
 [space.gr]
 worktree_layout = "agent"
+pr_layout = "review"
 
 # The sidebar's width in columns, 12 to 120, and where its forms and the picker open: "overlay", over the
 # window they are for, or "panel", a centered OS window of a fixed size (macOS, Wayland with layer shell,

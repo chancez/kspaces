@@ -45,6 +45,9 @@ type LayoutTab struct {
 type Pane struct {
 	// The name of a configured command, which brings its env and inputs.
 	Command string `toml:"command"`
+	// Defaults for the command's inputs, by name, in place of its own: templates of the built-ins, as an
+	// input's default is.
+	Inputs map[string]string `toml:"inputs"`
 	// A command line, a template as a command's.
 	Run []string `toml:"run"`
 	// The pane's working directory, a template; the worktree's, {worktree}, when empty.
@@ -141,21 +144,29 @@ func (cfg *Config) checkLayout(l *Layout) error {
 	}
 	// The inputs first, as any template may use them.
 	l.Inputs = nil
-	from := map[string]string{}
-	for _, tab := range l.Tabs {
-		for _, p := range tab.Panes {
+	type source struct{ cmd, pane string }
+	from := map[string]source{}
+	for t, tab := range l.Tabs {
+		for i, p := range tab.Panes {
 			cmd, ok := cfg.Command(p.Command)
 			if !ok {
 				continue
 			}
+			here := source{cmd.Name, fmt.Sprintf("tab %d pane %d", t+1, i+1)}
 			for _, in := range cmd.Inputs {
+				if v, ok := p.Inputs[in.Name]; ok {
+					in.Default = v
+				}
 				j := slices.IndexFunc(l.Inputs, func(x Input) bool { return x.Name == in.Name })
 				switch {
 				case j < 0:
 					l.Inputs = append(l.Inputs, in)
-					from[in.Name] = cmd.Name
-				case !reflect.DeepEqual(l.Inputs[j], in):
-					return fmt.Errorf("input %s is defined differently by %s and %s", in.Name, from[in.Name], cmd.Name)
+					from[in.Name] = here
+				case reflect.DeepEqual(l.Inputs[j], in):
+				case from[in.Name].cmd == cmd.Name:
+					return fmt.Errorf("input %s has different defaults in %s and %s, both %s", in.Name, from[in.Name].pane, here.pane, cmd.Name)
+				default:
+					return fmt.Errorf("input %s is defined differently by %s and %s", in.Name, from[in.Name].cmd, cmd.Name)
 				}
 			}
 		}
@@ -201,9 +212,20 @@ func checkPane(p *Pane, i int, layout string, known map[string]bool, cfg *Config
 	case p.Command != "" && p.Run != nil:
 		return fmt.Errorf("it has both command and run, it can have one")
 	case p.Command != "":
-		if _, ok := cfg.Command(p.Command); !ok {
+		cmd, ok := cfg.Command(p.Command)
+		if !ok {
 			return fmt.Errorf("command is %q, no command has that name", p.Command)
 		}
+		for _, k := range slices.Sorted(maps.Keys(p.Inputs)) {
+			if !slices.ContainsFunc(cmd.Inputs, func(in Input) bool { return in.Name == k }) {
+				return fmt.Errorf("inputs has %s, which %s has no input called", k, cmd.Name)
+			}
+			if err := checkDefault("inputs."+k, p.Inputs[k]); err != nil {
+				return err
+			}
+		}
+	case p.Inputs != nil:
+		return fmt.Errorf("inputs are for a configured command's inputs, and it runs none")
 	case p.Run != nil:
 		if len(p.Run) == 0 {
 			return fmt.Errorf("run cannot be empty")
