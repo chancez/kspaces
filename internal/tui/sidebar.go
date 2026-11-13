@@ -31,7 +31,16 @@ const remoteIdle = 10 * time.Second
 // hoverIdle is how long the hover popup stays after the mouse last moved.
 const hoverIdle = 15 * time.Second
 
+// rowHoverDelay is how long the mouse rests on a spaces row before its popup shows, so passing over rows
+// shows nothing.
+const rowHoverDelay = 2 * time.Second
+
 type tickMsg struct{}
+
+// rowHoverMsg is rowHoverDelay passing since the mouse came to rest on a row, the gen-th time it did.
+type rowHoverMsg struct {
+	gen int
+}
 
 type sidebar struct {
 	th     *look.Theme
@@ -70,7 +79,13 @@ type sidebar struct {
 	// move.
 	hover   int
 	hoverAt time.Time
-	mouse   *pixelMouse
+	// The spaces row the mouse rests on, by rowKey, or "". Its details show as a popup, hoverShown, once
+	// rowHoverDelay passes with the mouse still on it, and end as a status entry's do. hoverGen tells the
+	// delay of the row the mouse is on from one it has left.
+	hoverRow   string
+	hoverShown bool
+	hoverGen   int
+	mouse      *pixelMouse
 	// The left press on a spaces row until its release, nil for none: a click or a drag, see drag.go.
 	press *press
 	// Whether the mouse is on the add space button or the sort button, which lights it.
@@ -190,10 +205,14 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.remote && time.Since(m.remoteAt) > remoteIdle {
 			m.remote = false
 		}
-		if m.hover != 0 && time.Since(m.hoverAt) > hoverIdle {
-			m.hover = 0
+		if (m.hover != 0 || m.hoverRow != "") && time.Since(m.hoverAt) > hoverIdle {
+			m.unhover()
 		}
 		return m, tea.Batch(m.poll(), tick())
+	case rowHoverMsg:
+		if msg.gen == m.hoverGen && m.hoverRow != "" {
+			m.hoverShown = true
+		}
 	case glueMsg:
 		m.notice = &msg.notice
 	case spaces.Snapshot:
@@ -218,14 +237,15 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case m.press != nil:
 			// Moving with no button down: the release went elsewhere, as outside the window.
 			m.cancelPress()
-			m.motion(msg)
+			return m, m.motion(msg)
 		default:
-			m.motion(msg)
+			return m, m.motion(msg)
 		}
 	case tea.MouseReleaseMsg:
 		return m, m.release(msg.X, msg.Y)
 	case mouseLeftMsg:
-		m.hover, m.addHot, m.sortHot = 0, false, false
+		m.unhover()
+		m.addHot, m.sortHot = false, false
 	case tea.KeyPressMsg:
 		if m.press != nil && m.press.drag != nil && msg.String() == "esc" {
 			m.cancelPress()
@@ -313,7 +333,7 @@ func (m *sidebar) isOpen(wt *spaces.Worktree) bool {
 func (m *sidebar) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
-	// All motion, not just drags, so resting the mouse on a status entry can show it in full.
+	// All motion, not just drags, so resting the mouse on a status entry or a row can show it in full.
 	v.MouseMode = tea.MouseModeAllMotion
 	v.ReportFocus = true
 	return v
@@ -358,6 +378,9 @@ func (m *sidebar) frame() string {
 		if popup, top := m.hoverPopup(j); top < len(lines) {
 			copy(lines[top:], popup)
 		}
+	}
+	if popup, top := m.rowPopup(); popup != nil && top < len(lines) {
+		copy(lines[top:], popup)
 	}
 	m.drawMenu(lines)
 	status := ""

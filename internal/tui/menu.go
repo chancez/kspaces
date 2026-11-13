@@ -62,7 +62,8 @@ func (m *sidebar) openMenu(t interact.Target[*sidebar], y int) {
 	if menu.top+menu.height() > m.height-1 {
 		menu.top = max(y-menu.height(), 0)
 	}
-	m.menu, m.hover = menu, 0
+	m.menu = menu
+	m.unhover()
 }
 
 // menuAtCursor opens the menu of the spaces row under the cursor, when it is on screen.

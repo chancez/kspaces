@@ -41,6 +41,11 @@ Clicking a row, or `enter` on it, switches to its session, creating it the first
 space's triangle, or `space` on its row, folds its linked worktrees into the space's row. Folded spaces are
 kept in `$XDG_STATE_HOME/kspaces/folded`, so every tab's sidebar agrees.
 
+Resting the mouse on a row for 2 seconds shows its worktree in detail in a popup under it, as the
+picker's preview does: its space, path, branch, changes, upstream, PR and its state, session, windows,
+saved file and status entries, each cut to the sidebar's width. Passing over rows shows nothing. The popup
+closes as a status entry's does, and a click on it is one on its row.
+
 `/` filters the list. The query goes on the row under the SPACES title, so the list keeps all its rows and
 the query stays put as the list narrows. A space shows when its name, its branch, or a linked worktree's
 directory or branch has the query in it, ignoring case, with only the linked worktrees that match under it;

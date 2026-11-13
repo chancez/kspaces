@@ -129,15 +129,40 @@ func (m *sidebar) renderRow(i int) string {
 		pad := look.Default(strings.Repeat(" ", max(width-th.Width(spans...)-th.Width(git...), 1)))
 		spans = append(append(spans, pad), git...)
 	}
-	// A highlighted row is drawn on a surface across its whole width, so it reads as one bar.
+	// A highlighted row is drawn on a surface across its whole width, so it reads as one bar. So is the row
+	// whose popup shows, heading it.
 	surface := look.Plain
 	switch {
-	case m.dragging(r), i == m.cursor && m.navigating():
+	case m.dragging(r), i == m.cursor && m.navigating(), m.hoverShown && rowKey(r) == m.hoverRow:
 		surface = look.Cursor
 	case current:
 		surface = look.Current
 	}
 	return th.DrawZone(fmt.Sprintf(entryZone, i), surface, width, spans...)
+}
+
+// rowPopup is the hovered row's worktree in detail, as the picker's preview says it, and the screen row
+// it starts at: under the row, over what is below it, with a rule closing it off, and moved up over the
+// rows above when it would run off the bottom. Nil when no row's popup shows or the row is out of view.
+// All of it is marked, so the mouse on it is on the popup rather than on what it covers.
+func (m *sidebar) rowPopup() ([]string, int) {
+	i := m.hoveredRow()
+	y := i - m.offset
+	h := m.layout().spaces
+	above, below := m.spacesMore(m.offset)
+	if i < 0 || y < 0 || y >= h || above && y == 0 || below && y == h-1 {
+		return nil, 0
+	}
+	th, width := m.th, m.contentWidth()
+	snap := spaces.Snapshot{Config: &m.cfg, Git: m.git, Kitty: m.kitty, Saved: m.saved}
+	var popup []string
+	for _, l := range worktreeFields(th, snap, m.rows[i], width) {
+		popup = append(popup, th.DrawZone(popupZone, look.Plain, width, th.Cut(width, l...)...))
+	}
+	popup = append(popup, th.DrawZone(popupZone, look.Plain, width, look.Rule(width, true)))
+	bottom := m.height - 1
+	top := max(min(headerRows+y+1, bottom-len(popup)), headerRows)
+	return popup[:max(min(len(popup), bottom-top), 0)], top
 }
 
 // configSpans mark a space whose own config is not in use, untrusted or broken, in at most width cells:

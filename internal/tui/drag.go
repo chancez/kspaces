@@ -47,7 +47,8 @@ func (m *sidebar) dragTo(y int) {
 			return
 		}
 		a := m.shown()
-		p.drag, m.hover = &a, 0
+		p.drag = &a
+		m.unhover()
 	}
 	to, on, ok := m.dropAt(i)
 	if from, _ := p.drag.place(p.row); !ok || from == to {
@@ -132,7 +133,8 @@ func (m *sidebar) release(x, y int) tea.Cmd {
 	case p.drag != nil:
 		return m.keep(*p.drag, p.row)
 	}
-	i, ok := m.entryAt(x, y)
+	i, ok := m.clickedEntry(x, y)
+	m.unhover()
 	if !ok || i >= len(m.rows) || rowKey(m.rows[i]) != p.key {
 		return nil
 	}

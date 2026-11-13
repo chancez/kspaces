@@ -739,6 +739,95 @@ func TestHoverPopup(t *testing.T) {
 	})
 }
 
+// Resting the mouse on a spaces row for 2 seconds shows its worktree in detail under it, the row as a bar
+// heading it; passing over rows shows nothing, and moving within the row does not start the wait again.
+// Moving within the popup keeps it, a click on it is one on its row, and moving off the rows closes it.
+func TestRowHoverPopup(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		e := newSidebarEnv(t)
+		e.m.Update(gitFixture())
+		e.m.render()
+		// rest moves the mouse onto session's row, and is when the wait it starts runs out, if it starts one.
+		rest := func(session string) func() {
+			x, y := e.zone(fmt.Sprintf(entryZone, e.row(session)))
+			_, cmd := e.m.Update(tea.MouseMotionMsg{X: x, Y: y})
+			e.m.render()
+			if cmd == nil {
+				return nil
+			}
+			return func() {
+				e.m.Update(cmd())
+				e.m.render()
+			}
+		}
+		popup := func() []string {
+			if len(e.m.zones[popupZone]) == 0 {
+				return nil
+			}
+			_, top := e.zone(popupZone)
+			return e.screen()[top-1 : top-1+len(e.m.zones[popupZone])+1]
+		}
+
+		start := time.Now()
+		passed, shown := rest("gr@dev"), rest("gr@fix")
+		if again := rest("gr@fix"); again != nil {
+			t.Error("moving within a row started the wait again")
+		}
+		passed()
+		if got := popup(); got != nil {
+			t.Fatalf("a popup for a row the mouse passed over:\n%q", got)
+		}
+		// The wait starts as the mouse comes to the row.
+		shown()
+		if waited := time.Since(start); waited != 2*time.Second {
+			t.Errorf("the popup showed after %v", waited)
+		}
+		want := []string{
+			"  " + branchIcon + "fix fix" + strings.Repeat(" ", 14) + "#98",
+			"space    gr",
+			"path     .worktrees/fix",
+			"branch   fix",
+			"changes  none",
+			"upstream origin/fix, gone",
+			"pr       #98 merged",
+			"session  gr@fix",
+			"windows  none open",
+			"saved    no sessions direc...",
+			strings.Repeat("\u2500", 29),
+		}
+		if got := popup(); !reflect.DeepEqual(got, want) {
+			t.Errorf("popup:\n%q\nwant\n%q", got, want)
+		}
+		if got := e.highlighted(); !reflect.DeepEqual(got, want[:1]) {
+			t.Errorf("highlighted %q", got)
+		}
+
+		// Moving within the popup keeps it; a click on it presses its row, not the one it covers.
+		_, top := e.zone(popupZone)
+		e.m.Update(tea.MouseMotionMsg{X: 4, Y: top + 3})
+		e.m.render()
+		if e.m.hoveredRow() != e.row("gr@fix") {
+			t.Fatal("moving within the popup closed it")
+		}
+		if cmd := e.clickAt(4, top+3, tea.MouseLeft); cmd == nil || e.m.cursor != e.row("gr@fix") || popup() != nil {
+			t.Errorf("click on the popup: opened %v, cursor %d, popup %q", cmd != nil, e.m.cursor, popup())
+		}
+
+		// Moving onto a status entry closes it, and so does the mouse leaving the window.
+		rest("gr@fix")()
+		e.hover(fmt.Sprintf(entryZone, e.entry(21)))
+		if got := popup(); got != nil {
+			t.Errorf("the popup stayed with the mouse on a status entry:\n%q", got)
+		}
+		rest("gr@fix")()
+		e.m.Update(mouseLeftMsg{})
+		e.m.render()
+		if got := popup(); got != nil {
+			t.Errorf("the popup stayed with the mouse out of the window:\n%q", got)
+		}
+	})
+}
+
 // The cursor on a status entry opens it up, as the popup does, with the title and message cut short.
 func TestCursorExpandsStatusEntry(t *testing.T) {
 	e := newSidebarEnv(t)
