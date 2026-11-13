@@ -74,6 +74,18 @@ func Caret(folded bool) []Span {
 // NoCaret is as wide as a caret, for a row without one, and indents linked worktrees under their space.
 func NoCaret() Span { return sp(elCaret, "  ") }
 
+// CurrentEdge marks the sidebar's own session's row in its first cell, where a caret goes, as wide as one
+// with the space after it.
+func CurrentEdge() []Span { return []Span{glyph(elCurrent, GlyphCurrentEdge, false), sp(elCaret, " ")} }
+
+// CurrentCaret is Caret on the sidebar's own session's row, in the accent as CurrentEdge, which the caret
+// is in the place of.
+func CurrentCaret(folded bool) []Span {
+	c := Caret(folded)
+	c[0].el = elCurrent
+	return c
+}
+
 // Tick is how far a row of the spaces list is ticked in the select mode: a space's row and a group's
 // header stand for several rows, and are partly ticked when only some of them are.
 type Tick int

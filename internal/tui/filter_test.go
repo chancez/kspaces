@@ -37,7 +37,7 @@ func TestFilter(t *testing.T) {
 		"  " + termIcon + "default",
 		"",
 		"  " + repoIcon + "gr main",
-		"  " + blocked + "dev pr/me/dev",
+		here + blocked + "dev pr/me/dev",
 		"  " + branchIcon + "fix fix",
 		"",
 		"  " + repoIcon + "kitty master",
@@ -58,12 +58,12 @@ func TestFilter(t *testing.T) {
 		"  " + termIcon + "default",
 		"",
 		"  " + repoIcon + "gr main",
-		"  " + blocked + "dev pr/me/dev",
+		here + blocked + "dev pr/me/dev",
 	}
 	if got := e.spacesScreen(); !reflect.DeepEqual(got, want) {
 		t.Errorf("filtered by de:\n%q\nwant\n%q", got, want)
 	}
-	if got, want := e.highlighted(), []string{filterPrompt + "de", "  " + blocked + "dev pr/me/dev"}; !reflect.DeepEqual(got, want) {
+	if got, want := e.highlighted(), []string{filterPrompt + "de", here + blocked + "dev pr/me/dev"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("highlighted %q, want the filter and the cursor on dev", got)
 	}
 

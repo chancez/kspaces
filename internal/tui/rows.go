@@ -71,11 +71,6 @@ func (m *sidebar) renderRow(i int) string {
 	case r.Space == nil:
 		return th.Draw(look.Plain, width)
 	}
-	caret := []look.Span{look.NoCaret()}
-	// Not while filtering, which ignores folds, so a caret would fold what the list does not show.
-	if r.Main && !r.Other && r.Space.HasLinked() && !m.filtering {
-		caret = look.Mark(fmt.Sprintf(caretZone, i), look.Caret(r.Folded)...)
-	}
 	kind, label := look.RowSpace, look.Space(*r.Space)
 	switch {
 	case r.Missing:
@@ -100,6 +95,22 @@ func (m *sidebar) renderRow(i int) string {
 		icon = look.DimIf(!open, look.GoneMarker(open)...)
 	case state == "" && r.Worktree != nil:
 		icon = look.DimIf(!open, icon...)
+	}
+	// The sidebar's own session's row is marked at its edge, its caret in the accent when it has one, and
+	// its name bold, rather than drawn as a bar, which would read as the cursor's. No caret while
+	// filtering, which ignores folds, so it would fold what the list does not show.
+	caret := []look.Span{look.NoCaret()}
+	folds := r.Main && !r.Other && r.Space.HasLinked() && !m.filtering
+	switch {
+	case folds && current:
+		caret = look.Mark(fmt.Sprintf(caretZone, i), look.CurrentCaret(r.Folded)...)
+	case folds:
+		caret = look.Mark(fmt.Sprintf(caretZone, i), look.Caret(r.Folded)...)
+	case current:
+		caret = look.CurrentEdge()
+	}
+	if current {
+		label = label.With(look.Strong)
 	}
 	faint := !open
 	head := append(append(caret, m.box(i)...), icon...)
@@ -146,11 +157,8 @@ func (m *sidebar) renderRow(i int) string {
 	// A highlighted row is drawn on a surface across its whole width, so it reads as one bar. So is the row
 	// whose popup shows, heading it.
 	surface := look.Plain
-	switch {
-	case m.dragging(r), i == m.cursor && m.navigating() && !m.selecting, m.hoverShown && rowKey(r) == m.hoverRow:
+	if m.dragging(r) || i == m.cursor && m.navigating() && !m.selecting || m.hoverShown && rowKey(r) == m.hoverRow {
 		surface = look.Cursor
-	case current:
-		surface = look.Current
 	}
 	return th.DrawZone(fmt.Sprintf(entryZone, i), surface, width, spans...)
 }
@@ -159,29 +167,31 @@ func (m *sidebar) renderRow(i int) string {
 // mode, a rule in the caret column, the group's name, its fold icon, but while filtering, which ignores
 // folds, and the rule on to the right edge. A narrow sidebar loses the rule after the icon first, then the
 // name's end, so the icon stays. A folded group stands for its spaces' sessions, so it is current when one
-// of them is.
+// of them is, and marked so as a row is: its edge in place of the rule's start, and its name bold.
 func (m *sidebar) renderHeader(i int) string {
 	r, width, th := m.rows[i], m.contentWidth(), m.th
-	lead := append(m.box(i), th.GroupRule(th.Width(look.NoCaret())), look.Muted(" "))
+	current := rowHolds(r, m.kitty.Current)
+	start := []look.Span{th.GroupRule(th.Width(look.NoCaret()))}
+	name := look.GroupHeader(r.Group.Name)
+	if current {
+		start, name = look.CurrentEdge(), name.With(look.Strong)
+	}
+	lead := append(append(m.box(i), start...), look.Muted(" "))
 	var fold []look.Span
 	if !m.filtering {
 		fold = append([]look.Span{look.Muted(" ")}, look.Mark(fmt.Sprintf(caretZone, i), look.GroupFold(r.Folded)...)...)
 	}
 	room := max(width-th.Width(lead...)-th.Width(fold...), 0)
-	spans := append(append(lead, th.Cut(room, look.GroupHeader(r.Group.Name))...), fold...)
+	spans := append(append(lead, th.Cut(room, name)...), fold...)
 	if rest := width - th.Width(spans...); rest > 0 {
 		if len(fold) == 0 {
 			spans, rest = append(spans, look.Muted(" ")), rest-1
 		}
 		spans = append(spans, th.GroupRule(rest))
 	}
-
 	surface := look.Plain
-	switch {
-	case i == m.cursor && m.navigating() && !m.selecting:
+	if i == m.cursor && m.navigating() && !m.selecting {
 		surface = look.Cursor
-	case rowHolds(r, m.kitty.Current):
-		surface = look.Current
 	}
 	return th.DrawZone(fmt.Sprintf(entryZone, i), surface, width, spans...)
 }

@@ -224,6 +224,9 @@ const (
 	termIcon   = "\uf120  "
 )
 
+// here is the edge of the sidebar's own session's row, in its caret's place, as wide.
+const here = "\u258e "
+
 // spacesTitle is the SPACES title with the attention filter's button, the sort button, manual, and the
 // add button in the last of the 29 columns before the border.
 const spacesTitle = "SPACES" + "                  " + "\uf0b0 \uf0c9 \uf067"
@@ -239,7 +242,7 @@ func TestSpacesList(t *testing.T) {
 		"  " + termIcon + "default",
 		"",
 		"\u25bc " + repoIcon + "gr main",
-		"  " + blocked + "dev pr/me/dev",
+		here + blocked + "dev pr/me/dev",
 		"  " + branchIcon + "fix fix",
 		"",
 		"  " + repoIcon + "kitty master",
@@ -312,7 +315,7 @@ func TestFoldCaretClick(t *testing.T) {
 		t.Error("the caret opened the space as well as folding it")
 	}
 	// gr@dev is the current session, so the folded row stands for it: its state and its bar.
-	if !e.has("\u25b6 "+blocked+"gr main") || e.has("  "+blocked+"dev pr/me/dev") {
+	if !e.has("\u25b6 "+blocked+"gr main") || e.has(here+blocked+"dev pr/me/dev") {
 		t.Errorf("gr is not folded:\n%s", strings.Join(e.screen(), "\n"))
 	}
 	if got, want := e.folded(), "/src/docs\n/src/gr\n"; got != want && got != "/src/gr\n/src/docs\n" {
@@ -447,7 +450,7 @@ func TestMenuKeys(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.FocusMsg{})
 	e.press("m", "j", "j", "j", "j", "j", "j", "k")
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Fold worktrees"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev", " Fold worktrees"}) {
 		t.Errorf("highlighted %q", got)
 	}
 	e.press("G", "esc")
@@ -466,11 +469,11 @@ func TestMenuSkipsSections(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.FocusMsg{})
 	e.press("m", "j", "j", "j")
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev", " Remove worktree"}) {
 		t.Errorf("j past Session's last item: highlighted %q", got)
 	}
 	e.press("j", "k")
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev", " Remove worktree"}) {
 		t.Errorf("k from Space's first item: highlighted %q", got)
 	}
 	_, y := e.zone(fmt.Sprintf(menuZone, 3))
@@ -480,7 +483,7 @@ func TestMenuSkipsSections(t *testing.T) {
 	}
 	e.m.Update(tea.MouseMotionMsg{X: 3, Y: head})
 	e.m.render()
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev", " Remove worktree"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev", " Remove worktree"}) {
 		t.Errorf("mouse on Worktree's name: highlighted %q", got)
 	}
 	if cmd := e.clickAt(3, head, tea.MouseLeft); cmd != nil || e.m.menu == nil || e.m.menu.sel != 3 {
@@ -663,7 +666,7 @@ func TestFocusFindsTheCurrentSession(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.cursor = 0
 	e.m.Update(tea.FocusMsg{})
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev"}) {
 		t.Errorf("cursor on %q", got)
 	}
 	snap := fixture(time.Now())
@@ -873,7 +876,7 @@ func TestMoreIndicators(t *testing.T) {
 		"  " + termIcon + "default",
 		"",
 		"\u25bc " + repoIcon + "gr main",
-		"  " + blocked + "dev pr/me/dev",
+		here + blocked + "dev pr/me/dev",
 		"  " + branchIcon + "fix fix",
 		"",
 		"\u25be 3 more",

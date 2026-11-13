@@ -5,8 +5,10 @@
 Each row starts with a fold triangle for a space with linked worktrees, then an icon: a repository for a
 space, a branch for a linked worktree, a terminal for a session in no space, or a cross for a space whose
 worktrees could not be listed. The most urgent status of the row's sessions replaces the icon. The icon is
-green when the session has windows open; the row is faint when it has none. The sidebar's own session is
-drawn as a bar.
+green when the session has windows open; the row is faint when it has none. The sidebar's own session's
+row is marked at its left edge, where a caret goes, by a thin bar in the accent (`|` in ASCII), or by its
+caret in the accent on a space's row, and its name is bold: a bar across the row would read as the
+cursor's.
 
 At the right end of a worktree's row, a space's own row included, is what git and GitHub say of it: a dot
 and 3 for three files not committed, an up arrow and 2 and a down arrow and 1 for two commits ahead of its
@@ -96,8 +98,9 @@ Clicking anywhere on a header, its rule, its name or its icon, or `space` on it,
 into it, as a
 space folds its worktrees; its menu has **Fold group** and **Unfold group**. Folded groups are kept with
 the folded spaces, in `$XDG_STATE_HOME/kspaces/folded`, as `group:NAME`, which no space's root is. A
-folded group's header stands for its spaces' sessions, as a folded space does for its worktrees: it is a
-bar while the sidebar's own session is in it, and the attention filter shows it when any of them is not
+folded group's header stands for its spaces' sessions, as a folded space does for its worktrees: it is
+marked as the sidebar's own session's row while that session is in it, and the attention filter shows it
+when any of them is not
 idle.
 
 The list's menu has a Groups section, each group ticked while it shows; choosing one hides it, header and
@@ -148,6 +151,7 @@ Either moves the order of every sidebar.
 Moving in activity or status switches to manual, starting from the order shown: the spaces are written to
 config.toml as they were shown and every space's worktrees saved as they were shown, then the move is
 made.
+
 
 
 ## The menu

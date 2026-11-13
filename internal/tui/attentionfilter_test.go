@@ -19,7 +19,7 @@ var attentionScreen = []string{
 	spacesTitle,
 	"",
 	"\u25bc " + repoIcon + "gr main",
-	"  " + blocked + "dev pr/me/dev",
+	here + blocked + "dev pr/me/dev",
 	"",
 	"\u25b6 \uf110  docs main",
 }
@@ -46,7 +46,7 @@ func TestAttentionFilter(t *testing.T) {
 	if got := e.titleRow(); !strings.Contains(got, on) {
 		t.Errorf("button not lit with the filter on: %q", got)
 	}
-	if got, want := e.highlighted(), []string{"  " + blocked + "dev pr/me/dev"}; !reflect.DeepEqual(got, want) {
+	if got, want := e.highlighted(), []string{here + blocked + "dev pr/me/dev"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("highlighted %q, want the cursor still on dev", got)
 	}
 	// Rows do not move while some are hidden, as with the text filter: dev would go below fix.
@@ -58,7 +58,7 @@ func TestAttentionFilter(t *testing.T) {
 	if got := e.spacesScreen(); !reflect.DeepEqual(got, unfiltered) {
 		t.Errorf("attention filter off:\n%q\nwant\n%q", got, unfiltered)
 	}
-	if got, want := e.highlighted(), []string{"  " + blocked + "dev pr/me/dev"}; !reflect.DeepEqual(got, want) {
+	if got, want := e.highlighted(), []string{here + blocked + "dev pr/me/dev"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("highlighted %q after f again", got)
 	}
 

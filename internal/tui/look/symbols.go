@@ -21,6 +21,8 @@ const (
 	// GlyphCurrent marks the session of the sidebar's own tab, GlyphSession a session with windows open.
 	GlyphCurrent
 	GlyphSession
+	// GlyphCurrentEdge marks the sidebar's own session's row at its left edge, where a caret would go.
+	GlyphCurrentEdge
 	// GlyphBroken marks a space whose worktrees could not be listed.
 	GlyphBroken
 	// GlyphGone marks a missing worktree: a session whose worktree directory is gone.
@@ -95,6 +97,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphIdle:             "o",
 		GlyphCurrent:          ">",
 		GlyphSession:          "*",
+		GlyphCurrentEdge:      "|",
 		GlyphBroken:           "x",
 		GlyphGone:             "x",
 		GlyphSpace:            "#",
@@ -142,6 +145,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphIdle:             "\u25cb", // white circle
 		GlyphCurrent:          "\u203a", // single right angle quote
 		GlyphSession:          "\u2022", // bullet
+		GlyphCurrentEdge:      "\u258e", // left one quarter block
 		GlyphBroken:           "\u2717",
 		GlyphGone:             "\u2715", // multiplication x
 		GlyphSpace:            "\u25a0", // black square
@@ -184,19 +188,21 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphGroupOpen:   "\uf07c", // folder-open
 		GlyphGroupFolded: "\uf07b", // folder
 		// The ones kitty uses for tab.program_status.
-		GlyphBlocked:  "\uf071", // warning
-		GlyphError:    "\ue654", // error
-		GlyphDone:     "\uf00c", // check
-		GlyphWorking:  "\uf110", // spinner
-		GlyphIdle:     "\uf10c", // circle outline
-		GlyphCurrent:  "\uf054", // chevron-right
-		GlyphSession:  "\uf444", // dot-fill
-		GlyphBroken:   "\uf00d", // times
-		GlyphGone:     "\uf127", // chain-broken
-		GlyphSpace:    "\uf401", // repo
-		GlyphWorktree: "\ue725", // git-branch
-		GlyphOther:    "\uf120", // terminal
-		GlyphSearch:   "\uf002", // search
+		GlyphBlocked: "\uf071", // warning
+		GlyphError:   "\ue654", // error
+		GlyphDone:    "\uf00c", // check
+		GlyphWorking: "\uf110", // spinner
+		GlyphIdle:    "\uf10c", // circle outline
+		GlyphCurrent: "\uf054", // chevron-right
+		GlyphSession: "\uf444", // dot-fill
+		// A block, not an icon: kitty draws it itself, the full height of the row.
+		GlyphCurrentEdge: "\u258e",
+		GlyphBroken:      "\uf00d", // times
+		GlyphGone:        "\uf127", // chain-broken
+		GlyphSpace:       "\uf401", // repo
+		GlyphWorktree:    "\ue725", // git-branch
+		GlyphOther:       "\uf120", // terminal
+		GlyphSearch:      "\uf002", // search
 		// The small triangles, for the same reason as the fold triangles.
 		GlyphMoreAbove:    "\u25b4",
 		GlyphMoreBelow:    "\u25be",

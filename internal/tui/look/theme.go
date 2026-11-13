@@ -29,7 +29,7 @@ type roles struct {
 	attention color.Color
 	// merged is for a merged pull request, as GitHub draws one.
 	merged color.Color
-	// onSolid is text on a solid background, such as the current session's bar.
+	// onSolid is text on a solid background, such as a button that confirms losing work.
 	onSolid color.Color
 	// controlBg is a control's chip, and onControl what is quiet on it, a key or a greyed label, which
 	// the palette's muted would all but hide on a grey chip.
@@ -68,6 +68,8 @@ const (
 	elGroup
 	// elHeading heads a screen, as the new worktree form's.
 	elHeading
+	// elCurrent marks the sidebar's own session's row: its edge, or its caret.
+	elCurrent
 	elSpace
 	elOther
 	elWorktree
@@ -127,6 +129,7 @@ var elementNames = [numElements]string{
 	elText:                   "text",
 	elMuted:                  "muted",
 	elTitle:                  "title",
+	elCurrent:                "current",
 	elGroup:                  "group",
 	elHeading:                "heading",
 	elSpace:                  "space",
@@ -176,6 +179,8 @@ const (
 	// Lit marks a mark as where keys act, reversed, as the select mode's box that space ticks: the
 	// cursor's mark rather than a bar across the row.
 	Lit
+	// Strong is bold, as the name on the sidebar's own session's row.
+	Strong
 )
 
 // Surface is where a line sits. It owns the background.
@@ -185,8 +190,6 @@ const (
 	Plain Surface = iota
 	// Cursor is the entry keys act on, while keys are moving it.
 	Cursor
-	// Current is the session of the sidebar's own tab.
-	Current
 	// Control is a control's own background, a chip on whatever it sits on.
 	Control
 	// ControlSolid is a one-cell control that has to stand out on any line.
@@ -197,7 +200,6 @@ const (
 var surfaceNames = [numSurfaces]string{
 	Plain:        "surface.plain",
 	Cursor:       "surface.cursor",
-	Current:      "surface.current",
 	Control:      "surface.control",
 	ControlSolid: "surface.control-solid",
 }
@@ -236,8 +238,11 @@ func New(isDark bool) *Theme {
 		// The terminal's own foreground, not muted, which read as disabled.
 		elTitle: lipgloss.NewStyle().Bold(true),
 		// Muted, and not bold, so it heads its spaces without competing with SPACES above them.
-		elGroup:                  fg(p.muted),
-		elHeading:                bold(p.accent),
+		elGroup:   fg(p.muted),
+		elHeading: bold(p.accent),
+		// In the accent, the full height of the row, rather than a bar across it, which would read as the
+		// cursor's, or a chip's grey.
+		elCurrent:                fg(p.accent),
 		elSpace:                  bold(p.accent),
 		elOther:                  bold(p.other),
 		elWorktree:               lipgloss.NewStyle(),
@@ -276,9 +281,8 @@ func New(isDark bool) *Theme {
 		elReviewChangesRequested: fg(p.danger),
 	}
 	t.surfaces = [numSurfaces]surfaceStyle{
-		Plain:   {},
-		Cursor:  {solid: true, reverse: true},
-		Current: {bg: p.muted, solid: true, fg: p.onSolid, bold: true},
+		Plain:  {},
+		Cursor: {solid: true, reverse: true},
 		// A chip, as gr's and GitHub's buttons: a quiet shade the label stays bold on, in the text's own
 		// color, rather than reversed, which reads as a selected row.
 		Control: {bg: p.controlBg},
@@ -313,6 +317,9 @@ func (t *Theme) style(el element, p Prop, s Surface) lipgloss.Style {
 	st := t.elements[el]
 	if p&Dim != 0 {
 		st = st.Faint(true)
+	}
+	if p&Strong != 0 {
+		st = st.Bold(true)
 	}
 	if p&Lit != 0 {
 		st = st.Reverse(true)

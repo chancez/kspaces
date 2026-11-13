@@ -53,13 +53,13 @@ func stateFile(t *testing.T, name string) string {
 
 // The rows of groupsFixture, by what they show.
 var (
-	groupGr     = []string{"\u25bc " + repoIcon + "gr main", "  " + blocked + "dev pr/me/dev", "  " + branchIcon + "fix fix"}
+	groupGr     = []string{"\u25bc " + repoIcon + "gr main", here + blocked + "dev pr/me/dev", "  " + branchIcon + "fix fix"}
 	groupDocs   = "\u25b6 \uf110  docs main"
 	groupKitty  = "  " + repoIcon + "kitty master"
 	groupBroken = "  \uf00d  broken"
 	workHeader  = headerLine(false, "WORK", 29)
 	homeHeader  = headerLine(false, "PERSONAL", 29)
-	workFolded  = headerLine(true, "WORK", 29)
+	workFolded  = heldHeaderLine(true, "WORK", 29)
 )
 
 // headerLine is a group's header in a list width cells wide: a rule in the caret column, its name, its
@@ -72,6 +72,12 @@ func headerLine(folded bool, name string, width int) string {
 	return "\u2500\u2500 " + name + " " + icon + "  " + strings.Repeat("\u2500", width-3-len(name)-4)
 }
 
+// heldHeaderLine is headerLine for a folded group holding the sidebar's own session, gr@dev: the edge of
+// the session's row in place of the rule's start.
+func heldHeaderLine(folded bool, name string, width int) string {
+	return here + strings.TrimPrefix(headerLine(folded, name, width), "\u2500\u2500")
+}
+
 // A header is a divider: a rule, its name, its fold icon and the rule to the edge, at the default width
 // and at the narrowest, where the rule after the icon goes first and then the name is cut, the icon kept,
 // folded or not.
@@ -82,16 +88,16 @@ func TestGroupHeaderWidths(t *testing.T) {
 	narrow := func(rows ...string) []string {
 		return append([]string{"SPACES\uf0b0 \uf0c9 \uf067", "", "  " + termIcon + "defau\u2026", "", groupBroken, ""}, rows...)
 	}
-	grNarrow := []string{"\u25bc " + repoIcon + "gr ma\u2026", "  " + blocked + "dev p\u2026", "  " + branchIcon + "fix f\u2026", "", "\u25b6 \uf110  docs"}
+	grNarrow := []string{"\u25bc " + repoIcon + "gr ma\u2026", here + blocked + "dev p\u2026", "  " + branchIcon + "fix f\u2026", "", "\u25b6 \uf110  docs"}
 	for _, c := range []struct {
 		width  int
 		folded bool
 		want   []string
 	}{
 		{config.DefaultSidebarWidth, false, wide(headerLine(false, "WORK", 27), groupGr[0], groupGr[1], groupGr[2], "", groupDocs, "", headerLine(false, "PERSONAL", 27), groupKitty)},
-		{config.DefaultSidebarWidth, true, wide(headerLine(true, "WORK", 27), "", headerLine(true, "PERSONAL", 27))},
+		{config.DefaultSidebarWidth, true, wide(heldHeaderLine(true, "WORK", 27), "", headerLine(true, "PERSONAL", 27))},
 		{config.MinSidebarWidth, false, narrow(append(append([]string{"\u2500\u2500 WORK \uf07c"}, grNarrow...), "", "\u2500\u2500 PER\u2026 \uf07c", "  "+repoIcon+"kitty")...)},
-		{config.MinSidebarWidth, true, narrow("\u2500\u2500 WORK \uf07b", "", "\u2500\u2500 PER\u2026 \uf07b")},
+		{config.MinSidebarWidth, true, narrow(here+" WORK \uf07b", "", "\u2500\u2500 PER\u2026 \uf07b")},
 	} {
 		e := newGroupsEnv(t)
 		e.m.Update(tea.WindowSizeMsg{Width: c.width, Height: 40})

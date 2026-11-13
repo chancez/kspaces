@@ -187,7 +187,7 @@ func TestStatusRightClick(t *testing.T) {
 		e := newSidebarEnv(t)
 		rule := strings.Repeat("\u2500", 29)
 		top := []string{
-			spacesTitle, "", "  \uf120  default", "", "\u25bc \uf401  gr main", "  \uf071  dev pr/me/dev", "  \ue725  fix fix", "",
+			spacesTitle, "", "  \uf120  default", "", "\u25bc \uf401  gr main", here + "\uf071  dev pr/me/dev", "  \ue725  fix fix", "",
 			"  \uf401  kitty master", "", "\u25b6 \uf110  docs main", "", "  \uf00d  broken", "", "", "", "", "", "", "", "", "",
 			rule, "STATUS", "Blocked 1", "\uf071  dev                  +1 5m", "   claude \u00b7 approve", "", "Failed 1", "\ue654  scratch",
 		}

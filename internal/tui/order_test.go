@@ -54,7 +54,7 @@ var (
 		"  " + termIcon + "default",
 		"",
 		"\u25bc " + repoIcon + "gr main",
-		"  " + blocked + "dev pr/me/dev",
+		here + blocked + "dev pr/me/dev",
 		"  " + branchIcon + "fix fix",
 		"",
 		"  " + repoIcon + "kitty master",
@@ -71,7 +71,7 @@ var (
 		"",
 		"\u25bc " + repoIcon + "gr main",
 		"  " + branchIcon + "fix fix",
-		"  " + blocked + "dev pr/me/dev",
+		here + blocked + "dev pr/me/dev",
 		"",
 		"  " + repoIcon + "kitty master",
 		"",
@@ -86,7 +86,7 @@ var (
 		"  " + termIcon + "default",
 		"",
 		"\u25bc " + repoIcon + "gr main",
-		"  " + blocked + "dev pr/me/dev",
+		here + blocked + "dev pr/me/dev",
 		"  " + branchIcon + "fix fix",
 		"",
 		"\u25b6 \uf110  docs main",
@@ -132,7 +132,7 @@ func TestSortButton(t *testing.T) {
 		if got := savedSort(t); got != step.saved {
 			t.Errorf("after a %s saved %q, want %q", step.name, got, step.saved)
 		}
-		if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev"}) {
+		if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev"}) {
 			t.Errorf("after a %s the cursor is on %q", step.name, got)
 		}
 	}
@@ -143,7 +143,7 @@ func TestSortButton(t *testing.T) {
 	if got := e.spacesScreen(); !reflect.DeepEqual(got[4:7], activityScreen[4:7]) {
 		t.Errorf("refreshed:\n%q", got)
 	}
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + blocked + "dev pr/me/dev"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev"}) {
 		t.Errorf("refreshed, the cursor is on %q", got)
 	}
 }
@@ -230,7 +230,7 @@ func TestMoveKeys(t *testing.T) {
 	now := func() state {
 		return state{e.spacesScreen(), e.highlighted(), cfg(), savedOrder(t), savedSort(t)}
 	}
-	gr := []string{"\u25bc " + repoIcon + "gr main", "  " + blocked + "dev pr/me/dev", "  " + branchIcon + "fix fix"}
+	gr := []string{"\u25bc " + repoIcon + "gr main", here + blocked + "dev pr/me/dev", "  " + branchIcon + "fix fix"}
 	dev, fix := gr[1], gr[2]
 	kitty, docs, broken := "  "+repoIcon+"kitty master", "\u25b6 \uf110  docs main", "  \uf00d  broken"
 	screen := func(title string, rows ...string) []string {
@@ -302,7 +302,7 @@ func TestHoldWhileMenuOpen(t *testing.T) {
 	}
 	e.press("esc")
 	e.m.Update(busy)
-	want := []string{"\u25b6 \uf110  docs main", "", "\u25bc " + repoIcon + "gr main", "  " + branchIcon + "fix fix", "  " + blocked + "dev pr/me/dev", "", "  " + repoIcon + "kitty master", "", "  \uf00d  broken"}
+	want := []string{"\u25b6 \uf110  docs main", "", "\u25bc " + repoIcon + "gr main", "  " + branchIcon + "fix fix", here + blocked + "dev pr/me/dev", "", "  " + repoIcon + "kitty master", "", "  \uf00d  broken"}
 	if got := e.spacesScreen()[4:13]; !reflect.DeepEqual(got, want) {
 		t.Errorf("refreshed with the menu closed:\n%q\nwant\n%q", got, want)
 	}
@@ -333,7 +333,7 @@ func (e *sidebarEnv) letGo(y int) tea.Cmd {
 func TestDragSpace(t *testing.T) {
 	e := newOrderEnv(t)
 	cfg := newConfig(t, orderConfig)
-	gr := []string{"\u25bc " + repoIcon + "gr main", "  " + blocked + "dev pr/me/dev", "  " + branchIcon + "fix fix"}
+	gr := []string{"\u25bc " + repoIcon + "gr main", here + blocked + "dev pr/me/dev", "  " + branchIcon + "fix fix"}
 	kitty, docs, broken := "  "+repoIcon+"kitty master", "\u25b6 \uf110  docs main", "  \uf00d  broken"
 	screen := func(rows ...string) []string {
 		return append([]string{spacesTitle, "", "  " + termIcon + "default", ""}, rows...)
@@ -377,7 +377,7 @@ func TestDragSpace(t *testing.T) {
 func TestDragWorktree(t *testing.T) {
 	e := newOrderEnv(t)
 	cfg := newConfig(t, orderConfig)
-	head, dev, fix := "\u25bc "+repoIcon+"gr main", "  "+blocked+"dev pr/me/dev", "  "+branchIcon+"fix fix"
+	head, dev, fix := "\u25bc "+repoIcon+"gr main", here+blocked+"dev pr/me/dev", "  "+branchIcon+"fix fix"
 	type state struct {
 		Rows, Lit     []string
 		Config, Order string
@@ -428,7 +428,7 @@ func TestDragSwitchesToManual(t *testing.T) {
 	e.letGo(8)
 	want := []string{
 		spacesTitle, "", "  " + termIcon + "default", "",
-		"\u25bc " + repoIcon + "gr main", "  " + branchIcon + "fix fix", "  " + blocked + "dev pr/me/dev", "",
+		"\u25bc " + repoIcon + "gr main", "  " + branchIcon + "fix fix", here + blocked + "dev pr/me/dev", "",
 		"\u25b6 \uf110  docs main", "", "  " + repoIcon + "kitty master", "", "  \uf00d  broken",
 	}
 	if got := e.spacesScreen(); !reflect.DeepEqual(got, want) {
@@ -467,7 +467,7 @@ func TestDragOrLeave(t *testing.T) {
 	send(tea.MouseClickMsg{X: 4, Y: 8, Button: tea.MouseLeft})
 	e.m.Update(busy)
 	send(tea.MouseMotionMsg{X: 4, Y: 10, Button: tea.MouseLeft})
-	want := []string{"\u25bc " + repoIcon + "gr main", "  " + branchIcon + "fix fix", "  " + blocked + "dev pr/me/dev", "", "\u25b6 \uf110  docs main", "", "  " + repoIcon + "kitty master"}
+	want := []string{"\u25bc " + repoIcon + "gr main", "  " + branchIcon + "fix fix", here + blocked + "dev pr/me/dev", "", "\u25b6 \uf110  docs main", "", "  " + repoIcon + "kitty master"}
 	if got := e.spacesScreen()[4:11]; !reflect.DeepEqual(got, want) {
 		t.Errorf("dragging kitty onto docs:\n%q\nwant\n%q", got, want)
 	}

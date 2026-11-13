@@ -116,9 +116,14 @@ func TestThemeDraw(t *testing.T) {
 			got:  th.Draw(Cursor, 6, Space(spaces.Space{Name: "gr"}), Branch(spaces.Worktree{Branch: " x"})),
 			want: lipgloss.NewStyle().Reverse(true).Render("gr x  "),
 		},
-		"the current session is a solid bar": {
-			got:  th.Render(Current, Space(spaces.Space{Name: "gr"})),
-			want: lipgloss.NewStyle().Background(p.muted).Foreground(p.onSolid).Bold(true).Render("gr"),
+		"the current session is marked at its edge in the accent, its name bold": {
+			got: th.Render(Plain, append(CurrentEdge(), Worktree(spaces.Worktree{Path: "/src/gr/dev"}).With(Strong))...),
+			want: lipgloss.NewStyle().Foreground(p.accent).Render("\u258e") + lipgloss.NewStyle().Foreground(p.muted).Render(" ") +
+				lipgloss.NewStyle().Bold(true).Render("dev"),
+		},
+		"a current space's caret is in the accent": {
+			got:  th.Render(Plain, CurrentCaret(false)...),
+			want: lipgloss.NewStyle().Foreground(p.accent).Render("\u25bc") + " ",
 		},
 		"dim is faint and keeps the element's look": {
 			got:  th.Render(Plain, Space(spaces.Space{Name: "gr"}).With(Dim)),

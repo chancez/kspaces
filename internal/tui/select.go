@@ -153,7 +153,7 @@ func (m *sidebar) paintTo(y int) {
 
 // box is row i's box in the select mode, after its caret, or a blank as wide on a row with nothing to
 // tick; nothing outside the mode. The cursor's box is lit, as that is what space ticks: the mode draws no
-// cursor bar, which a row clicked would get and would read as the current session's.
+// cursor bar, which every row clicked would get.
 func (m *sidebar) box(i int) []look.Span {
 	if !m.selecting {
 		return nil
