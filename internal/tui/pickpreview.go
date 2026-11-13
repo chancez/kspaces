@@ -9,6 +9,7 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/gitstate"
+	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/status"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
@@ -90,16 +91,18 @@ func (m *picker) details(it pickItem, width int) [][]look.Span {
 		lines := [][]look.Span{statusHeader(m.th, *s, width, time.Now())}
 		return append(lines, statusDetails(*s, max(width-m.th.Width(look.NoMarker()), 1), 0, 0)...)
 	}
-	return m.worktreePreview(it, width)
+	lines := [][]look.Span{{look.Heading(it.text[:it.nameLen])}, {}}
+	return append(lines, worktreeFields(m.th, m.snap, it.row, width)...)
 }
 
-func (m *picker) worktreePreview(it pickItem, width int) [][]look.Span {
-	r, snap := it.row, m.snap
+// worktreeFields are what the picker's preview and the sidebar's row popup say of a worktree's row, width
+// cells wide at most: its space, path, branch, git state, session, windows, saved file and statuses.
+func worktreeFields(th *look.Theme, snap spaces.Snapshot, r spaces.Row, width int) [][]look.Span {
 	wt := r.Worktree
 	field := func(label string, value look.Span) []look.Span {
 		return []look.Span{look.Label(fmt.Sprintf("%-*s", previewLabelWidth, label)), value}
 	}
-	lines := [][]look.Span{{look.Heading(it.text[:it.nameLen])}, {}}
+	var lines [][]look.Span
 	switch {
 	case r.Other:
 		lines = append(lines, field("space", look.Muted("none")))
@@ -137,14 +140,13 @@ func (m *picker) worktreePreview(it pickItem, width int) [][]look.Span {
 		if first {
 			lines, first = append(lines, []look.Span{}), false
 		}
-		lines = append(lines, m.statusSummary(s, width))
+		lines = append(lines, statusSummary(th, s, width))
 	}
 	return lines
 }
 
 // statusSummary is one row for a window's status: its marker, what the program is up to and its age.
-func (m *picker) statusSummary(s status.Status, width int) []look.Span {
-	th := m.th
+func statusSummary(th *look.Theme, s status.Status, width int) []look.Span {
 	mark, right := look.StateMarker(s.State), look.StatusAge(s, time.Now())
 	inner := max(width-th.Width(mark...)-th.Width(right), 0)
 	sum := look.Summary(s.Record, inner)
