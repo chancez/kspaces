@@ -80,6 +80,26 @@ func Space(s spaces.Space) Span { return sp(elSpace, s.Name) }
 // OtherSession is a session that belongs to no space, by its name.
 func OtherSession(s spaces.Space) Span { return sp(elOther, s.Name) }
 
+// GroupHeader names a group of spaces on its header, in capitals as the list's title is.
+func GroupHeader(name string) Span { return sp(elGroup, strings.ToUpper(name)) }
+
+// GroupFold follows a group's name on its header: an open folder while its spaces are shown, a closed one
+// when folded. kitty draws a Nerd Font icon over the cell after it when that is a space, so it has two
+// after it, as a marker does.
+func GroupFold(folded bool) []Span {
+	g := GlyphGroupOpen
+	if folded {
+		g = GlyphGroupFolded
+	}
+	return []Span{glyph(elGroup, g, false), sp(elGroup, "  ")}
+}
+
+// GroupRule runs a group's header to the right edge, width cells, so it reads as a divider between
+// groups rather than as one more row.
+func (t *Theme) GroupRule(width int) Span {
+	return sp(elGroup, strings.Repeat(t.Glyph(GlyphFrameHorizontal), max(width, 0)))
+}
+
 // RowKind is what a row of the spaces list is, for its icon.
 type RowKind int
 

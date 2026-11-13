@@ -56,6 +56,8 @@ const (
 	elMuted
 	// elTitle heads a list, as SPACES and STATUS.
 	elTitle
+	// elGroup heads a group of spaces in the spaces list.
+	elGroup
 	// elHeading heads a screen, as the new worktree form's.
 	elHeading
 	elSpace
@@ -114,6 +116,7 @@ var elementNames = [numElements]string{
 	elText:                   "text",
 	elMuted:                  "muted",
 	elTitle:                  "title",
+	elGroup:                  "group",
 	elHeading:                "heading",
 	elSpace:                  "space",
 	elOther:                  "other-session",
@@ -215,7 +218,9 @@ func New(isDark bool) *Theme {
 		elText:    lipgloss.NewStyle(),
 		elMuted:   fg(p.muted),
 		// The terminal's own foreground, not muted, which read as disabled.
-		elTitle:                  lipgloss.NewStyle().Bold(true),
+		elTitle: lipgloss.NewStyle().Bold(true),
+		// Muted, and not bold, so it heads its spaces without competing with SPACES above them.
+		elGroup:                  fg(p.muted),
 		elHeading:                bold(p.accent),
 		elSpace:                  bold(p.accent),
 		elOther:                  bold(p.other),

@@ -8,6 +8,10 @@ const (
 	// GlyphOpen and GlyphFolded head a space whose linked worktrees are shown or hidden.
 	GlyphOpen
 	GlyphFolded
+	// GlyphGroupOpen and GlyphGroupFolded follow a group's name on its header while its spaces are shown
+	// or folded, as an open or a closed folder, or an expander's minus and plus.
+	GlyphGroupOpen
+	GlyphGroupFolded
 	// The program status states, as kitty draws them for tab.program_status.
 	GlyphBlocked
 	GlyphError
@@ -75,6 +79,8 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 	GlyphsASCII: {
 		GlyphOpen:             "v",
 		GlyphFolded:           ">",
+		GlyphGroupOpen:        "-",
+		GlyphGroupFolded:      "+",
 		GlyphBlocked:          "!",
 		GlyphError:            "x",
 		GlyphDone:             "+",
@@ -116,6 +122,8 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 	GlyphsUnicode: {
 		GlyphOpen:             "\u25bc", // black down-pointing triangle
 		GlyphFolded:           "\u25b6", // black right-pointing triangle
+		GlyphGroupOpen:        "\u2212", // minus sign
+		GlyphGroupFolded:      "+",
 		GlyphBlocked:          "!",
 		GlyphError:            "\u2717", // ballot x
 		GlyphDone:             "\u2713", // check mark
@@ -156,8 +164,10 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 	},
 	GlyphsNerd: {
 		// The triangles, not Font Awesome's chevrons, which are drawn wider than their cell and thin.
-		GlyphOpen:   "\u25bc",
-		GlyphFolded: "\u25b6",
+		GlyphOpen:        "\u25bc",
+		GlyphFolded:      "\u25b6",
+		GlyphGroupOpen:   "\uf07c", // folder-open
+		GlyphGroupFolded: "\uf07b", // folder
 		// The ones kitty uses for tab.program_status.
 		GlyphBlocked:  "\uf071", // warning
 		GlyphError:    "\ue654", // error

@@ -75,6 +75,31 @@ func TestCutMarksPerGlyphs(t *testing.T) {
 	}
 }
 
+// A group's header draws its rule and its fold icon in each glyphs' own symbols, all muted.
+func TestGroupHeaderGlyphs(t *testing.T) {
+	th := New(true)
+	var got []string
+	for _, g := range []Glyphs{GlyphsASCII, GlyphsUnicode, GlyphsNerd} {
+		th.SetGlyphs(g)
+		for _, folded := range []bool{false, true} {
+			spans := append([]Span{th.GroupRule(2), Muted(" "), GroupHeader("work"), Muted(" ")}, GroupFold(folded)...)
+			got = append(got, th.TextOf(append(spans, th.GroupRule(3))...))
+		}
+	}
+	want := []string{
+		"-- WORK -  ---", "-- WORK +  ---",
+		"\u2500\u2500 WORK \u2212  \u2500\u2500\u2500", "\u2500\u2500 WORK +  \u2500\u2500\u2500",
+		"\u2500\u2500 WORK \uf07c  \u2500\u2500\u2500", "\u2500\u2500 WORK \uf07b  \u2500\u2500\u2500",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+	muted := lipgloss.NewStyle().Foreground(th.roles.muted)
+	if got, want := th.Render(Plain, GroupFold(false)...), muted.Render("\uf07c")+muted.Render("  "); got != want {
+		t.Errorf("fold icon %q, want %q", got, want)
+	}
+}
+
 func TestThemeDraw(t *testing.T) {
 	th := New(true)
 	p := th.roles
