@@ -13,6 +13,8 @@ import (
 
 	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/tui/cells"
+	"github.com/chancez/kspaces/internal/tui/look"
 )
 
 // cleanupFixture is gr with three linked worktrees that look done with: dev's PR merged, fix's upstream
@@ -50,9 +52,9 @@ func TestCleanupForm(t *testing.T) {
 		"",
 		"  Clean up worktrees of gr",
 		"",
-		"  [x] dev  PR #12 merged",
-		"  [ ] fix  upstream gone; 2 files not committed",
-		"  [-] old  merged into main; locked",
+		"  \u2611 dev  PR #12 merged",
+		"  \u2610 fix  upstream gone; 2 files not committed",
+		"  \u2610 old  merged into main; locked",
 		"",
 		"  Each closes its session and is removed; its branch is kept.",
 		"",
@@ -68,7 +70,7 @@ func TestCleanupForm(t *testing.T) {
 		}
 	}
 	press("j", "space", "j", "space")
-	want[4] = "  [x] fix  upstream gone; 2 files not committed, lost"
+	want[4] = "  \u2611 fix  upstream gone; 2 files not committed, lost"
 	want[9] = "   Remove 2 worktrees y    Cancel n"
 	if got := cleanupScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("after ticking fix and old:\n%q\nwant\n%q", got, want)
@@ -115,13 +117,13 @@ func TestCleanupFormBranches(t *testing.T) {
 		"",
 		"  Clean up worktrees of gr",
 		"",
-		"  [x] dev    PR #12 merged",
-		"  [ ] fix    upstream gone; 2 files not committed",
-		"  [-] old    merged into main; locked",
-		"  [x] done   merged into main",
-		"  [x] trunk  upstream gone",
+		"  \u2611 dev    PR #12 merged",
+		"  \u2610 fix    upstream gone; 2 files not committed",
+		"  \u2610 old    merged into main; locked",
+		"  \u2611 done   merged into main",
+		"  \u2611 trunk  upstream gone",
 		"",
-		"  [ ] Also delete their branches d",
+		"  \u2610 Also delete their branches d",
 		"  Each closes its session and is removed; its branch is kept.",
 		"",
 		"   Remove 3 worktrees y    Cancel n",
@@ -135,17 +137,17 @@ func TestCleanupFormBranches(t *testing.T) {
 		"",
 		"  Clean up worktrees of gr",
 		"",
-		"  [x] dev    PR #12 merged",
-		"      branch: merged by PR #12, nothing lost",
-		"  [ ] fix    upstream gone; 2 files not committed",
-		"      branch: 2 commits not merged",
-		"  [-] old    merged into main; locked",
-		"  [x] done   merged into main",
-		"      branch: merged into main, nothing lost",
-		"  [x] trunk  upstream gone",
-		"      branch: kept, as it is the default branch",
+		"  \u2611 dev    PR #12 merged",
+		"    branch: merged by PR #12, nothing lost",
+		"  \u2610 fix    upstream gone; 2 files not committed",
+		"    branch: 2 commits not merged",
+		"  \u2610 old    merged into main; locked",
+		"  \u2611 done   merged into main",
+		"    branch: merged into main, nothing lost",
+		"  \u2611 trunk  upstream gone",
+		"    branch: kept, as it is the default branch",
 		"",
-		"  [x] Also delete their branches d",
+		"  \u2611 Also delete their branches d",
 		"  Each closes its session and is removed, and its branch deleted.",
 		"",
 		"   Remove 3 worktrees y    Cancel n",
@@ -157,8 +159,8 @@ func TestCleanupFormBranches(t *testing.T) {
 	// A click on fix's branch line ticks fix, as one on its row does.
 	f.View()
 	clickOn(t, f, "2 commits not merged")
-	want[5] = "  [x] fix    upstream gone; 2 files not committed, lost"
-	want[6] = "      branch: 2 commits not merged, lost"
+	want[5] = "  \u2611 fix    upstream gone; 2 files not committed, lost"
+	want[6] = "    branch: 2 commits not merged, lost"
 	want[16] = "   Remove 4 worktrees y    Cancel n"
 	if got := cleanupScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("fix ticked:\n%q\nwant\n%q", got, want)
@@ -227,6 +229,58 @@ func TestCleanupFormEmpty(t *testing.T) {
 	}
 }
 
+// The form's boxes take what the sidebar's select mode takes: a press ticks or unticks a row, and dragging
+// gives every row passed what it changed to, a locked one left as it is; A ticks every row that can be.
+func TestCleanupFormPaint(t *testing.T) {
+	space, items := cleanupFixture()
+	items = append(items, spaces.Cleanup{Space: "gr", Worktree: spaces.Worktree{Path: "/src/gr/.worktrees/done", Branch: "done", Session: "gr@done"}, Reasons: []string{"merged into main"}})
+	f := newCleanupForm(space, items)
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	f.View()
+	row := func(i int) int { return f.zones[fmt.Sprintf(cleanupZone, i)][0].Y }
+	drag := func(from, to int) {
+		f.Update(tea.MouseClickMsg{X: 4, Y: row(from), Button: tea.MouseLeft})
+		f.Update(tea.MouseMotionMsg{X: 4, Y: row(to), Button: tea.MouseLeft})
+		f.Update(tea.MouseReleaseMsg{X: 4, Y: row(to), Button: tea.MouseLeft})
+		f.View()
+	}
+	lines := func(dev, fix, done string) []string {
+		return []string{
+			"",
+			"  Clean up worktrees of gr",
+			"",
+			"  " + dev + "dev   PR #12 merged",
+			"  " + fix + "fix   upstream gone; 2 files not committed" + map[bool]string{true: ", lost"}[fix == ticked],
+			"  " + unticked + "old   merged into main; locked",
+			"  " + done + "done  merged into main",
+		}
+	}
+	if got, want := cleanupScreen(f)[:7], lines(ticked, unticked, ticked); !reflect.DeepEqual(got, want) {
+		t.Errorf("at first:\n%q\nwant\n%q", got, want)
+	}
+	drag(0, 3)
+	if got, want := cleanupScreen(f)[:7], lines(unticked, unticked, unticked); !reflect.DeepEqual(got, want) {
+		t.Errorf("dragged from dev, ticked, to done:\n%q\nwant\n%q", got, want)
+	}
+	drag(3, 1)
+	if got, want := cleanupScreen(f)[:7], lines(unticked, ticked, ticked); !reflect.DeepEqual(got, want) {
+		t.Errorf("dragged up from done, unticked, to fix:\n%q\nwant\n%q", got, want)
+	}
+	f.Update(keyMsg("A"))
+	if got, want := cleanupScreen(f)[:7], lines(ticked, ticked, ticked); !reflect.DeepEqual(got, want) {
+		t.Errorf("A:\n%q\nwant\n%q", got, want)
+	}
+	// The boxes are the sidebar's select mode's, drawn the same: dev's ticked in the accent, old's greyed.
+	out, _ := look.Scan(f.render())
+	frame := cells.Parse(out)
+	for i, want := range map[int]look.Tick{0: look.Ticked, 2: look.Unticked} {
+		box := cells.Parse(f.th.Render(look.Plain, look.Box(want, items[i].Refused != nil)...))[0]
+		if got := frame[row(i)][2:4]; !reflect.DeepEqual(got, box) {
+			t.Errorf("row %d's box drawn %v, want %v", i, got, box)
+		}
+	}
+}
+
 // p on a space's row, and its menu, open the clean up form for the space; a row of no space or a space
 // without linked worktrees has neither.
 func TestCleanupKey(t *testing.T) {
@@ -282,9 +336,9 @@ func TestCleanupFormMissing(t *testing.T) {
 		"",
 		"  Clean up worktrees of gr",
 		"",
-		"  [x] dev   PR #12 merged",
-		"  [x] gone  directory gone",
-		"  [ ] open  directory gone; 2 windows open",
+		"  \u2611 dev   PR #12 merged",
+		"  \u2611 gone  directory gone",
+		"  \u2610 open  directory gone; 2 windows open",
 		"",
 		"  Each closes its session and is removed; its branch is kept.",
 		"  A missing one has its windows closed and its saved file deleted.",
@@ -298,7 +352,7 @@ func TestCleanupFormMissing(t *testing.T) {
 	f.Update(keyMsg("j"))
 	f.Update(keyMsg("j"))
 	f.Update(keyMsg("space"))
-	want[5] = "  [x] open  directory gone; 2 windows closed"
+	want[5] = "  \u2611 open  directory gone; 2 windows closed"
 	want[10] = "   Remove 3 worktrees y    Cancel n"
 	if got := cleanupScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("open ticked:\n%q\nwant\n%q", got, want)
@@ -347,15 +401,15 @@ func TestCleanupFormSessions(t *testing.T) {
 		"",
 		"  Remove worktrees",
 		"",
-		"  [x] gr@dev",
-		"      branch: 1 commit not merged, lost",
-		"  [ ] kspaces@fix   upstream gone; 1 file not committed",
-		"      branch: merged into main, nothing lost",
-		"  [x] kspaces@gone  directory gone",
-		"  [-] gr            /src/gr is the main worktree of gr, which cannot be removed",
-		"  [-] kitty         in no space, not a worktree",
+		"  \u2611 gr@dev",
+		"    branch: 1 commit not merged, lost",
+		"  \u2610 kspaces@fix   upstream gone; 1 file not committed",
+		"    branch: merged into main, nothing lost",
+		"  \u2611 kspaces@gone  directory gone",
+		"  \u2610 gr            /src/gr is the main worktree of gr, which cannot be removed",
+		"  \u2610 kitty         in no space, not a worktree",
 		"",
-		"  [x] Also delete their branches d",
+		"  \u2611 Also delete their branches d",
 		"  Each closes its session and is removed, and its branch deleted.",
 		"  A missing one has its windows closed and its saved file deleted.",
 		"",

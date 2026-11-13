@@ -340,7 +340,7 @@ func TestSaveLayoutToSpaceFile(t *testing.T) {
 		"  name       watch",
 		"  save       < this tab >",
 		"  save to    < " + name + "'s .kspaces.toml >",
-		"             [x] keep out of git (adds it to .git/info/exclude)",
+		"             \u2611 keep out of git (adds it to .git/info/exclude)",
 		"  tab 1, pane 1: make watch {x}",
 		"  runs       < run >",
 		"  run        make watch {{x}}",
@@ -356,7 +356,7 @@ func TestSaveLayoutToSpaceFile(t *testing.T) {
 	}
 	f.Update(keyMsg("space"))
 	cleared := slices.Clone(want)
-	cleared[6] = "             [ ] keep out of git (adds it to .git/info/exclude)"
+	cleared[6] = "             \u2610 keep out of git (adds it to .git/info/exclude)"
 	cleared[13] = "   Save enter    Cancel esc   tab next field  space tick"
 	if got := formScreen(f); !reflect.DeepEqual(got, cleared) {
 		t.Errorf("cleared:\n%q\nwant\n%q", got, cleared)

@@ -134,7 +134,7 @@ func (f *removeWorktreeForm) render() string {
 		"",
 	}
 	if f.branch.Offered() {
-		spans := []look.Span{look.Checkbox(f.deleteBranch, f.busy), look.Text(" Delete branch " + f.branch.Name)}
+		spans := append(look.BoxOf(f.deleteBranch, f.busy), look.Text("Delete branch "+f.branch.Name))
 		if _, key, ok := offered(f, target, interact.Keys(f, target), actRemoveDeleteBranch); ok && key != "" {
 			spans = append(spans, look.Default(" "), look.Muted(key))
 		}

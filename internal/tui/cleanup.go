@@ -39,6 +39,8 @@ type cleanupForm struct {
 	// zones and buttons are where the last frame drew its rows and buttons, and what each button runs.
 	zones   map[string][]look.Zone
 	buttons controls[*cleanupForm]
+	// paint is a press on a row's box until its release, as in the sidebar's select mode, nil for none.
+	paint *paint
 }
 
 // cleanupZone is row i of the form's list, and cleanupBranchesZone the box that deletes their branches.
@@ -72,11 +74,40 @@ func (f *cleanupForm) name(c spaces.Cleanup) string {
 
 func (f *cleanupForm) Init() tea.Cmd { return nil }
 
-// toggle ticks or clears item i, unless git would refuse to remove it.
-func (f *cleanupForm) toggle(i int) {
-	if i >= 0 && i < len(f.items) && f.items[i].Refused == nil {
-		f.checked[i] = !f.checked[i]
+// toggle ticks or clears item i, unless git would refuse to remove it, and says which it is now and
+// whether it could be.
+func (f *cleanupForm) toggle(i int) (bool, bool) {
+	if i < 0 || i >= len(f.items) || f.items[i].Refused != nil {
+		return false, false
 	}
+	f.checked[i] = !f.checked[i]
+	return f.checked[i], true
+}
+
+// tick ticks or clears item i, unless git would refuse to remove it.
+func (f *cleanupForm) tick(i int, on bool) {
+	if f.items[i].Refused == nil {
+		f.checked[i] = on
+	}
+}
+
+// tickAll ticks every item git would remove.
+func (f *cleanupForm) tickAll() {
+	for i := range f.items {
+		f.tick(i, true)
+	}
+}
+
+// itemAt is the item drawn on screen row y, its branch's line too.
+func (f *cleanupForm) itemAt(y int) (int, bool) {
+	for i := range f.items {
+		for _, z := range f.zones[fmt.Sprintf(cleanupZone, i)] {
+			if z.Y == y {
+				return i, true
+			}
+		}
+	}
+	return 0, false
 }
 
 // branches reports whether any item has a branch that can go with it, for the box that deletes them.
@@ -134,6 +165,7 @@ func (f *cleanupForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return f, cmd
 		}
 	case tea.MouseClickMsg:
+		f.paint = nil
 		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
 			return f, cmd
 		}
@@ -141,7 +173,7 @@ func (f *cleanupForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			for _, z := range f.zones[fmt.Sprintf(cleanupZone, i)] {
 				if msg.Button == tea.MouseLeft && z.Contains(msg.X, msg.Y) && !f.busy {
 					f.cursor = i
-					f.toggle(i)
+					f.paint = startPaint(i, f.toggle)
 				}
 			}
 		}
@@ -150,6 +182,13 @@ func (f *cleanupForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				f.deleteBranches = !f.deleteBranches
 			}
 		}
+	case tea.MouseMotionMsg:
+		// Dragging from a box ticks every row passed as the first went, as in the select mode.
+		if i, ok := f.itemAt(msg.Y); ok && f.paint != nil && msg.Button == tea.MouseLeft && !f.busy {
+			f.paint.to(i, f.tick)
+		}
+	case tea.MouseReleaseMsg:
+		f.paint = nil
 	}
 	return f, nil
 }
@@ -189,8 +228,8 @@ func (f *cleanupForm) render() string {
 	missing := false
 	for i, c := range f.items {
 		missing = missing || c.Missing && f.checked[i]
-		spans := []look.Span{look.Checkbox(f.checked[i], c.Refused != nil), look.Text(" "),
-			look.WorktreeName(f.name(c)), look.Default(strings.Repeat(" ", names-len(f.name(c))+2))}
+		spans := append(look.BoxOf(f.checked[i], c.Refused != nil),
+			look.WorktreeName(f.name(c)), look.Default(strings.Repeat(" ", names-len(f.name(c))+2)))
 		// Each detail after the first follows a semicolon; a linked worktree given may have no reason.
 		detail := func(s look.Span) {
 			if len(spans) > 4 {
@@ -225,7 +264,9 @@ func (f *cleanupForm) render() string {
 			if c.Branch.Offered() {
 				fate = branchFate(c.Branch, f.checked[i])
 			}
-			lines = append(lines, th.DrawZone(zone, surface, width, th.Cut(width, look.Default("    "), look.Muted("branch: "), fate)...))
+			// Under the name, past the box, which ASCII draws wider.
+			indent := look.Default(strings.Repeat(" ", th.Width(look.Box(look.Unticked, false)...)))
+			lines = append(lines, th.DrawZone(zone, surface, width, th.Cut(width, indent, look.Muted("branch: "), fate)...))
 		}
 	}
 	if len(f.items) > 0 {
@@ -233,7 +274,7 @@ func (f *cleanupForm) render() string {
 		note := "Each closes its session and is removed; its branch is kept."
 		if f.branches() {
 			target := theCleanup.Target(cleanupSubject{})
-			spans := []look.Span{look.Checkbox(f.deleteBranches, f.busy), look.Text(" Also delete their branches")}
+			spans := append(look.BoxOf(f.deleteBranches, f.busy), look.Text("Also delete their branches"))
 			if _, key, ok := offered(f, target, interact.Keys(f, target), actCleanupBranches); ok && key != "" {
 				spans = append(spans, look.Default(" "), look.Muted(key))
 			}

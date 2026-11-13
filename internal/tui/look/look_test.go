@@ -35,7 +35,7 @@ func TestGlyphSets(t *testing.T) {
 		th.SetGlyphs(g)
 		for role := GlyphNone + 1; role < numGlyphs; role++ {
 			want := 1
-			if g == GlyphsASCII && (role == GlyphCut || role == GlyphUnticked || role == GlyphTicked || role == GlyphPartlyTicked) {
+			if g == GlyphsASCII && (role == GlyphCut || role >= GlyphUnticked && role <= GlyphUntickable) {
 				want = 3
 			}
 			if w := th.Width(glyph(elDefault, role, false)); w != want {

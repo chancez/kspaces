@@ -128,34 +128,27 @@ func (m *sidebar) tickRow(key string) {
 	}
 }
 
-// pressTick starts painting with the press on row i: the row is ticked or unticked, and each row the mouse
-// then passes gets the same, see paintTo. A row with nothing to tick starts nothing.
+// pressTick starts painting with the press on row i, see paint. A row with nothing to tick starts
+// nothing.
 func (m *sidebar) pressTick(i int) {
-	if _, ok := m.tick(i); ok {
-		m.press.painting, m.press.paint, m.press.last = true, m.toggleTick(i), i
-	}
+	m.press.paint = startPaint(i, func(i int) (bool, bool) {
+		if _, ok := m.tick(i); !ok {
+			return false, false
+		}
+		return m.toggleTick(i), true
+	})
 }
 
-// paintTo gives the rows from the one painted last to the one at screen row y what the press gave its
-// own, every row between too, as the mouse can pass several between two reports. It goes no further than
-// the rows in view.
+// paintTo paints up to the row at screen row y, no further than the rows in view.
 func (m *sidebar) paintTo(y int) {
-	p := m.press
+	p := m.press.paint
 	if len(m.rows) == 0 {
 		return
 	}
 	// A refresh can have taken rows away since.
 	p.last = min(p.last, len(m.rows)-1)
 	h := m.layout().spaces
-	i := min(max(m.rowAtY(y), m.offset), min(m.offset+h, len(m.rows))-1)
-	for i != p.last {
-		if i > p.last {
-			p.last++
-		} else {
-			p.last--
-		}
-		m.setTicks(p.last, p.paint)
-	}
+	p.to(min(max(m.rowAtY(y), m.offset), min(m.offset+h, len(m.rows))-1), m.setTicks)
 }
 
 // box is row i's box in the select mode, after its caret, or a blank as wide on a row with nothing to
@@ -165,9 +158,9 @@ func (m *sidebar) box(i int) []look.Span {
 		return nil
 	}
 	if t, ok := m.tick(i); ok {
-		return look.RowBox(t)
+		return look.Box(t, false)
 	}
-	return []look.Span{look.Default(strings.Repeat(" ", m.th.Width(look.RowBox(look.Unticked)...)))}
+	return []look.Span{look.Default(strings.Repeat(" ", m.th.Width(look.Box(look.Unticked, false)...)))}
 }
 
 // allRows are every row of the list, as though nothing were folded or filtered: the hidden groups' are

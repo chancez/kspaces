@@ -84,16 +84,27 @@ const (
 	Ticked
 )
 
-// RowBox is a row's box in the select mode, after its caret: muted while unticked, so the names stay what
-// the eye goes to, and in the accent once ticked.
-func RowBox(t Tick) []Span {
-	switch t {
-	case Ticked:
+// Box is a box to tick, the select mode's on a row of the spaces list and a form's alike: muted while
+// unticked, so the names stay what the eye goes to, and in the accent once ticked. One that cannot be
+// ticked now, off, is greyed whatever it says.
+func Box(t Tick, off bool) []Span {
+	switch {
+	case off:
+		return []Span{glyph(elMuted, GlyphUntickable, false).With(Dim), sp(elMuted, " ")}
+	case t == Ticked:
 		return []Span{glyph(elTick, GlyphTicked, false), sp(elTick, " ")}
-	case PartlyTicked:
+	case t == PartlyTicked:
 		return []Span{glyph(elTick, GlyphPartlyTicked, false), sp(elTick, " ")}
 	}
 	return []Span{glyph(elMuted, GlyphUnticked, false), sp(elMuted, " ")}
+}
+
+// BoxOf is Box for a box that is ticked or not.
+func BoxOf(ticked, off bool) []Span {
+	if ticked {
+		return Box(Ticked, off)
+	}
+	return Box(Unticked, off)
 }
 
 // Space is a space's name, on its own row.
@@ -489,15 +500,4 @@ func PRReviewWords(pr gh.PR) Span {
 		return sp(r.el, r.words)
 	}
 	return Muted("none")
-}
-
-// Checkbox is a box, ticked when checked, or greyed for one that cannot be.
-func Checkbox(checked, off bool) Span {
-	switch {
-	case off:
-		return sp(elMuted, "[-]")
-	case checked:
-		return sp(elText, "[x]")
-	}
-	return sp(elText, "[ ]")
 }

@@ -400,7 +400,7 @@ func (f *saveLayoutForm) render() string {
 		}
 	}
 	if f.creates() {
-		spans := []look.Span{indent, look.Checkbox(f.exclude, false), look.Text(" keep out of git (adds it to .git/info/exclude)")}
+		spans := append(append([]look.Span{indent}, look.BoxOf(f.exclude, false)...), look.Text("keep out of git (adds it to .git/info/exclude)"))
 		lines = append(lines, th.DrawZone(excludeZone, look.Plain, width, th.Cut(width, spans...)...))
 	}
 	saved := f.saved()

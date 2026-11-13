@@ -302,8 +302,11 @@ shows why and the worktree stays removed.
 gone, or whose branch is merged into the main worktree's, each with why and the files it has not
 committed. A branch merged into the main worktree's counts only once it has moved since it was made, so a
 new worktree not worked on yet is not offered. Each has a box: ticked at first unless it has changes,
-which ticking it says are lost, and a locked one cannot be ticked. `space` ticks the cursor's, and `y`
-removes the ticked ones one after another, each as Remove worktree does, in one kitty background process.
+which ticking it says are lost, and a locked one cannot be ticked, its box greyed. The boxes are the
+[select mode](#selecting)'s and take what it takes: a click ticks or unticks one, pressing and dragging
+gives every row passed what the first changed to, a locked one left as it is, `space` ticks the cursor's
+and `A` every one that can be. `y` removes the ticked ones one after another, each as Remove worktree
+does, in one kitty background process.
 git is forced only for those the form said have changes. The PR is the one the sidebar shows, or looked
 up with gh as the form opens when the sidebar has none yet.
 

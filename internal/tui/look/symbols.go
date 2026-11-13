@@ -59,11 +59,13 @@ const (
 	GlyphChangesRequested
 	// GlyphUntrusted marks a space whose own config is not trusted, so not in use.
 	GlyphUntrusted
-	// GlyphUnticked, GlyphTicked and GlyphPartlyTicked are a row's box in the select mode: a space's row or
-	// a group's header is partly ticked when only some of the rows it stands for are.
+	// GlyphUnticked, GlyphTicked and GlyphPartlyTicked are a box to tick, a row's in the select mode or a
+	// form's: a space's row or a group's header is partly ticked when only some of the rows it stands for
+	// are. GlyphUntickable is a box that cannot be ticked, as a locked worktree's in a form.
 	GlyphUnticked
 	GlyphTicked
 	GlyphPartlyTicked
+	GlyphUntickable
 	// The corners and sides of the border a popup in a panel is drawn in.
 	GlyphFrameTopLeft
 	GlyphFrameTopRight
@@ -119,6 +121,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphUnticked:         "[ ]",
 		GlyphTicked:           "[x]",
 		GlyphPartlyTicked:     "[-]",
+		GlyphUntickable:       "[-]",
 		GlyphFrameTopLeft:     "+",
 		GlyphFrameTopRight:    "+",
 		GlyphFrameBottomLeft:  "+",
@@ -165,6 +168,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphUnticked:         "\u2610", // ballot box
 		GlyphTicked:           "\u2611", // ballot box with check
 		GlyphPartlyTicked:     "\u229f", // squared minus
+		GlyphUntickable:       "\u2610",
 		GlyphFrameTopLeft:     "\u256d", // box drawings light arc down and right
 		GlyphFrameTopRight:    "\u256e", // box drawings light arc down and left
 		GlyphFrameBottomLeft:  "\u2570", // box drawings light arc up and right
@@ -218,6 +222,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphUnticked:     "\u2610",
 		GlyphTicked:       "\u2611",
 		GlyphPartlyTicked: "\u229f",
+		GlyphUntickable:   "\u2610",
 		// Box drawings, as Unicode's: kitty draws them itself, joined.
 		GlyphFrameTopLeft:     "\u256d",
 		GlyphFrameTopRight:    "\u256e",

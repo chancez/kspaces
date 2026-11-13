@@ -95,22 +95,22 @@ func TestRemoveFormDeleteBranch(t *testing.T) {
 
 	merged := form("merged", nil)
 	got = append(got, check{"merged, off", screen(merged)})
-	want = append(want, check{"merged, off", with("merged", "merged kept", "  [ ] Delete branch merged d  merged into main, nothing lost")})
+	want = append(want, check{"merged, off", with("merged", "merged kept", "  \u2610 Delete branch merged d  merged into main, nothing lost")})
 	merged.Update(keyMsg("d"))
 	got = append(got, check{"merged, on", screen(merged)})
-	want = append(want, check{"merged, on", with("merged", "merged deleted", "  [x] Delete branch merged d  merged into main, nothing lost")})
+	want = append(want, check{"merged, on", with("merged", "merged deleted", "  \u2611 Delete branch merged d  merged into main, nothing lost")})
 
 	lost := form("unmerged", nil)
 	got = append(got, check{"unmerged, off", screen(lost)})
-	want = append(want, check{"unmerged, off", with("unmerged", "unmerged kept", "  [ ] Delete branch unmerged d  2 commits not merged, lost")})
+	want = append(want, check{"unmerged, off", with("unmerged", "unmerged kept", "  \u2610 Delete branch unmerged d  2 commits not merged, lost")})
 	clickOn(t, lost, "Delete branch")
 	got = append(got, check{"unmerged, clicked", screen(lost)})
-	want = append(want, check{"unmerged, clicked", with("unmerged", "unmerged deleted", "  [x] Delete branch unmerged d  2 commits not merged, lost")})
+	want = append(want, check{"unmerged, clicked", with("unmerged", "unmerged deleted", "  \u2611 Delete branch unmerged d  2 commits not merged, lost")})
 
 	squashed := form("squashed", &gh.PR{Number: 12, State: "merged"})
 	squashed.Update(keyMsg("d"))
 	got = append(got, check{"squashed, on", screen(squashed)})
-	want = append(want, check{"squashed, on", with("squashed", "squashed deleted", "  [x] Delete branch squashed d  merged by PR #12, nothing lost")})
+	want = append(want, check{"squashed, on", with("squashed", "squashed deleted", "  \u2611 Delete branch squashed d  merged by PR #12, nothing lost")})
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got\n%q\nwant\n%q", got, want)
 	}

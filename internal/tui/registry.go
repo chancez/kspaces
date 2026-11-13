@@ -665,6 +665,11 @@ var (
 		Applies: func(f *cleanupForm, _ cleanupSubject) bool { return !f.busy && len(f.items) > 0 },
 		Run:     do[*cleanupForm, cleanupSubject](func(f *cleanupForm) { f.toggle(f.cursor) }),
 	}
+	actCleanupTickAll = &interact.Action[*cleanupForm, cleanupSubject]{
+		Title:   "tick all",
+		Applies: func(f *cleanupForm, _ cleanupSubject) bool { return !f.busy && len(f.items) > 0 },
+		Run:     do[*cleanupForm, cleanupSubject]((*cleanupForm).tickAll),
+	}
 	actCleanupBranches = &interact.Action[*cleanupForm, cleanupSubject]{
 		Title:   "delete branches",
 		Applies: func(f *cleanupForm, _ cleanupSubject) bool { return !f.busy && f.branches() },
@@ -1022,10 +1027,11 @@ func init() {
 	theRemoveForm = interact.List(removeKind)
 
 	cleanKind = interact.NewKind(func(cleanupSubject) string { return "Clean up worktrees" },
-		actCleanupDown, actCleanupUp, actCleanupToggle, actCleanupBranches, actCleanupRemove, actCleanupCancel, actCleanupQuit)
+		actCleanupDown, actCleanupUp, actCleanupToggle, actCleanupTickAll, actCleanupBranches, actCleanupRemove, actCleanupCancel, actCleanupQuit)
 	cleanKind.Bind(actCleanupDown, "j/k", "down/up", "j", "down")
 	cleanKind.Bind(actCleanupUp, "", "", "k", "up")
 	cleanKind.Bind(actCleanupToggle, "space", "tick", "space")
+	cleanKind.Bind(actCleanupTickAll, "A", "tick all", "A")
 	cleanKind.Bind(actCleanupBranches, "d", "delete branches", "d")
 	cleanKind.Bind(actCleanupRemove, "y/enter", "remove", "y", "enter")
 	cleanKind.Bind(actCleanupCancel, "n/esc", "cancel", "n", "esc")
