@@ -154,6 +154,10 @@ func RowIcon(kind RowKind, state string, open, broken bool) []Span {
 // Worktree is a linked worktree, by its directory.
 func Worktree(wt spaces.Worktree) Span { return sp(elWorktree, filepath.Base(wt.Path)) }
 
+// WorktreeName is a worktree by a name of the caller's, such as its session where its directory would not
+// tell it apart.
+func WorktreeName(name string) Span { return sp(elWorktree, name) }
+
 // Branch is the branch a worktree has checked out.
 func Branch(wt spaces.Worktree) Span { return sp(elBranch, wt.Branch) }
 

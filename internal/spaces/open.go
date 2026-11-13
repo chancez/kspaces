@@ -325,6 +325,22 @@ func CloseSession(session string) error {
 	}
 }
 
+// EndSession closes every window of session, waiting as CloseSession does, and deletes its saved file, so
+// it is not restored: all there is of a missing worktree, and what removing a worktree ends first. A
+// session with no saved file is fine.
+func EndSession(cfg config.Config, session string) error {
+	if err := CloseSession(session); err != nil {
+		return err
+	}
+	if cfg.SessionsDir == "" {
+		return nil
+	}
+	if err := os.Remove(SessionFile(cfg, session)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 // CanRemove says why git would refuse to remove wt, a worktree of space, or nil when it would not. Changes
 // are not a reason: RemoveWorktree can force past them.
 func CanRemove(space Space, wt Worktree) error {
@@ -353,13 +369,8 @@ func RemoveWorktree(cfg config.Config, space Space, wt Worktree, opts RemoveOpti
 			return err
 		}
 	}
-	if err := CloseSession(wt.Session); err != nil {
+	if err := EndSession(cfg, wt.Session); err != nil {
 		return err
-	}
-	if cfg.SessionsDir != "" {
-		if err := os.Remove(SessionFile(cfg, wt.Session)); err != nil && !os.IsNotExist(err) {
-			return err
-		}
 	}
 	if err := git.RemoveWorktree(space.Root, wt.Path, opts.Force); err != nil {
 		return err

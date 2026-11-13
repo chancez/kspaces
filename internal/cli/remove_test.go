@@ -45,7 +45,7 @@ func TestRemoveDeleteBranch(t *testing.T) {
 		}
 	}
 	r.Git("merge", "-q", "--no-edit", "merged", "merged2")
-	calls := fakeRemoval(t, r.Dir)
+	calls, _ := fakeRemoval(t, r.Dir)
 
 	type result struct {
 		Err      string
@@ -87,16 +87,73 @@ func TestRemoveDeleteBranch(t *testing.T) {
 	}
 }
 
-// fakeRemoval configures root as the only space, with sessions saved in the test's directory, and puts on
-// PATH a kitten that answers `kitten @ ls` with no windows and a git that runs the real one. It returns the
-// branch deletions git was asked for and the errors kitty was asked to show since it was last called.
-func fakeRemoval(t *testing.T, root string) func() []string {
+// remove --yes --forget-session ends a missing worktree's session, deleting its saved file, with no PATH
+// or after the worktrees; one with no saved file is fine, and one that cannot be deleted is shown in kitty.
+func TestRemoveForgetSession(t *testing.T) {
+	r := gittest.New(t)
+	r.Commit("first")
+	dev := filepath.Join(r.Dir, ".worktrees", "dev")
+	r.Worktree("dev", dev)
+	calls, sessions := fakeRemoval(t, r.Dir)
+	name := filepath.Base(r.Dir)
+	for _, s := range []string{"@gone", "@dev", "@kept"} {
+		if err := os.WriteFile(filepath.Join(sessions, name+s+".kitty-session"), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A directory with something in it is a saved file os.Remove cannot delete.
+	stuck := filepath.Join(sessions, name+"@stuck.kitty-session")
+	if err := os.MkdirAll(filepath.Join(stuck, "x"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run := func(args ...string) []string {
+		var out bytes.Buffer
+		a := &app{stdout: &out, stderr: &out}
+		cmd := a.rootCommand()
+		cmd.SetArgs(append([]string{"remove"}, args...))
+		res := []string{"<nil>"}
+		if err := cmd.Execute(); err != nil {
+			res[0] = err.Error()
+		}
+		res = append(res, calls()...)
+		entries, err := os.ReadDir(sessions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range entries {
+			res = append(res, strings.TrimPrefix(e.Name(), name))
+		}
+		return res
+	}
+	got := [][]string{
+		run("--forget-session", name+"@gone"),
+		run("--yes"),
+		run("--yes", "--forget-session", name+"@gone", "--forget-session", name+"@none", dev),
+		run("--yes", "--forget-session", name+"@stuck"),
+	}
+	all := []string{"@dev.kitty-session", "@gone.kitty-session", "@kept.kitty-session", "@stuck.kitty-session"}
+	want := [][]string{
+		append([]string{"--forget-session needs --yes"}, all...),
+		append([]string{"give the PATH of a worktree to remove"}, all...),
+		{"<nil>", "@kept.kitty-session", "@stuck.kitty-session"},
+		{fmt.Sprintf("%s@stuck: remove %s: directory not empty", name, stuck), "kitten show_error Could not remove the worktree", "@kept.kitty-session", "@stuck.kitty-session"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got\n%q\nwant\n%q", got, want)
+	}
+}
+
+// fakeRemoval configures root as the only space, with sessions saved in the directory it returns, and puts
+// on PATH a kitten that answers `kitten @ ls` with no windows and a git that runs the real one. Its func
+// returns the branch deletions git was asked for and the errors kitty was asked to show since it was last
+// called.
+func fakeRemoval(t *testing.T, root string) (func() []string, string) {
 	t.Helper()
 	real, err := exec.LookPath("git")
 	if err != nil {
 		t.Fatal(err)
 	}
-	dir, config := t.TempDir(), t.TempDir()
+	dir, config, sessions := t.TempDir(), t.TempDir(), t.TempDir()
 	log := filepath.Join(dir, "calls")
 	scripts := map[string]string{
 		"kitten": "#!/bin/sh\n[ \"$2\" = ls ] && echo '[]'\n" +
@@ -109,7 +166,7 @@ func fakeRemoval(t *testing.T, root string) func() []string {
 			t.Fatal(err)
 		}
 	}
-	toml := fmt.Sprintf("spaces = [%q]\nsessions = %q\n", root, t.TempDir())
+	toml := fmt.Sprintf("spaces = [%q]\nsessions = %q\n", root, sessions)
 	if err := os.MkdirAll(filepath.Join(config, "kspaces"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -126,5 +183,5 @@ func fakeRemoval(t *testing.T, root string) func() []string {
 		}
 		os.Remove(log)
 		return strings.Split(strings.TrimSpace(string(data)), "\n")
-	}
+	}, sessions
 }

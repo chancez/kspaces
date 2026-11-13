@@ -17,17 +17,17 @@ import (
 
 // cleanupFixture is gr with three linked worktrees that look done with: dev's PR merged, fix's upstream
 // gone with two files not committed, and old merged but locked.
-func cleanupFixture() (spaces.Space, []spaces.Cleanup) {
-	space := spaces.Space{Name: "gr", Root: "/src/gr", Worktrees: []spaces.Worktree{
+func cleanupFixture() (*spaces.Space, []spaces.Cleanup) {
+	space := &spaces.Space{Name: "gr", Root: "/src/gr", Worktrees: []spaces.Worktree{
 		{Path: "/src/gr", Branch: "main", Session: "gr"},
 		{Path: "/src/gr/.worktrees/dev", Branch: "pr/me/dev", Session: "gr@dev"},
 		{Path: "/src/gr/.worktrees/fix", Branch: "fix", Session: "gr@fix"},
 		{Path: "/src/gr/.worktrees/old", Branch: "old", Session: "gr@old", Locked: true},
 	}}
 	return space, []spaces.Cleanup{
-		{Worktree: space.Worktrees[1], Reasons: []string{"PR #12 merged"}},
-		{Worktree: space.Worktrees[2], Reasons: []string{"upstream gone"}, Changes: 2},
-		{Worktree: space.Worktrees[3], Reasons: []string{"merged into main"}, Refused: errors.New("locked")},
+		{Space: "gr", Worktree: space.Worktrees[1], Reasons: []string{"PR #12 merged"}},
+		{Space: "gr", Worktree: space.Worktrees[2], Reasons: []string{"upstream gone"}, Changes: 2},
+		{Space: "gr", Worktree: space.Worktrees[3], Reasons: []string{"merged into main"}, Refused: errors.New("locked")},
 	}
 }
 
@@ -107,8 +107,8 @@ func TestCleanupFormBranches(t *testing.T) {
 	done := spaces.Worktree{Path: "/src/gr/.worktrees/done", Branch: "done", Session: "gr@done"}
 	trunk := spaces.Worktree{Path: "/src/gr/.worktrees/trunk", Branch: "trunk", Session: "gr@trunk"}
 	items = append(items,
-		spaces.Cleanup{Worktree: done, Reasons: []string{"merged into main"}, Branch: spaces.Branch{Name: "done", Merge: git.Merge{Into: "main"}}},
-		spaces.Cleanup{Worktree: trunk, Reasons: []string{"upstream gone"}, Branch: spaces.Branch{Name: "trunk", Kept: "it is the default branch"}})
+		spaces.Cleanup{Space: "gr", Worktree: done, Reasons: []string{"merged into main"}, Branch: spaces.Branch{Name: "done", Merge: git.Merge{Into: "main"}}},
+		spaces.Cleanup{Space: "gr", Worktree: trunk, Reasons: []string{"upstream gone"}, Branch: spaces.Branch{Name: "trunk", Kept: "it is the default branch"}})
 	f := newCleanupForm(space, items)
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	want := []string{
@@ -264,5 +264,119 @@ func TestCleanupKey(t *testing.T) {
 		if cmd := e.press("p"); cmd != nil {
 			t.Errorf("p on %s ran something", session)
 		}
+	}
+}
+
+// Missing worktrees follow the linked ones: one with only a saved file ticked, one with windows open not,
+// ticking it saying they are closed. y ends their sessions in the same background process, after the
+// worktrees.
+func TestCleanupFormMissing(t *testing.T) {
+	launched := fakeKitten(t)
+	space, items := cleanupFixture()
+	items = append(items[:1],
+		spaces.Cleanup{Space: "gr", Worktree: spaces.Worktree{Session: "gr@gone"}, Reasons: []string{"directory gone"}, Missing: true},
+		spaces.Cleanup{Space: "gr", Worktree: spaces.Worktree{Session: "gr@open"}, Reasons: []string{"directory gone"}, Missing: true, Windows: 2})
+	f := newCleanupForm(space, items)
+	f.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	want := []string{
+		"",
+		"  Clean up worktrees of gr",
+		"",
+		"  [x] dev   PR #12 merged",
+		"  [x] gone  directory gone",
+		"  [ ] open  directory gone; 2 windows open",
+		"",
+		"  Each closes its session and is removed; its branch is kept.",
+		"  A missing one has its windows closed and its saved file deleted.",
+		"",
+		"   Remove 2 worktrees y    Cancel n",
+		"",
+	}
+	if got := cleanupScreen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("form:\n%q\nwant\n%q", got, want)
+	}
+	f.Update(keyMsg("j"))
+	f.Update(keyMsg("j"))
+	f.Update(keyMsg("space"))
+	want[5] = "  [x] open  directory gone; 2 windows closed"
+	want[10] = "   Remove 3 worktrees y    Cancel n"
+	if got := cleanupScreen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("open ticked:\n%q\nwant\n%q", got, want)
+	}
+	_, cmd := f.Update(keyMsg("y"))
+	if msg := cmd(); msg != (cleanedMsg{}) {
+		t.Errorf("removing said %v", msg)
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantArgs := []string{"@", "launch", "--type=background", "--allow-remote-control", exe, "remove", "--yes",
+		"--forget-session", "gr@gone", "--forget-session", "gr@open", "--", "/src/gr/.worktrees/dev"}
+	if got := launched(); !reflect.DeepEqual(got, wantArgs) {
+		t.Errorf("launched\n%q\nwant\n%q", got, wantArgs)
+	}
+
+	// With only the missing one with no windows ticked, the note says what goes of it.
+	f = newCleanupForm(space, items[1:2])
+	f.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
+	if got, want := cleanupScreen(f)[5:7], []string{"  Each closes its session and is removed; its branch is kept.", "  A missing one has its windows closed and its saved file deleted."}; !reflect.DeepEqual(got, want) {
+		t.Errorf("notes %q, want %q", got, want)
+	}
+}
+
+// Sessions given are listed by their sessions when they span spaces: a linked worktree that does not look
+// done with has no reason, and a main worktree and a session in no space are refused. Remove worktrees
+// offers deleting the branches as Clean up does.
+func TestCleanupFormSessions(t *testing.T) {
+	launched := fakeKitten(t)
+	items := []spaces.Cleanup{
+		{Space: "gr", Worktree: spaces.Worktree{Path: "/src/gr/.worktrees/dev", Branch: "dev", Session: "gr@dev"},
+			Branch: spaces.Branch{Name: "dev", Merge: git.Merge{Unmerged: 1}}},
+		{Space: "kspaces", Worktree: spaces.Worktree{Path: "/src/kspaces/.worktrees/fix", Branch: "fix", Session: "kspaces@fix"},
+			Reasons: []string{"upstream gone"}, Changes: 1, Branch: spaces.Branch{Name: "fix", Merge: git.Merge{Into: "main"}}},
+		{Space: "kspaces", Worktree: spaces.Worktree{Session: "kspaces@gone"}, Reasons: []string{"directory gone"}, Missing: true},
+		{Space: "gr", Worktree: spaces.Worktree{Path: "/src/gr", Branch: "main", Session: "gr"},
+			Refused: errors.New("/src/gr is the main worktree of gr, which cannot be removed")},
+		{Worktree: spaces.Worktree{Session: "kitty"}, Refused: errors.New("in no space, not a worktree")},
+	}
+	f := newCleanupForm(nil, items)
+	f.Update(tea.WindowSizeMsg{Width: 90, Height: 20})
+	f.Update(keyMsg("d"))
+	want := []string{
+		"",
+		"  Remove worktrees",
+		"",
+		"  [x] gr@dev",
+		"      branch: 1 commit not merged, lost",
+		"  [ ] kspaces@fix   upstream gone; 1 file not committed",
+		"      branch: merged into main, nothing lost",
+		"  [x] kspaces@gone  directory gone",
+		"  [-] gr            /src/gr is the main worktree of gr, which cannot be removed",
+		"  [-] kitty         in no space, not a worktree",
+		"",
+		"  [x] Also delete their branches d",
+		"  Each closes its session and is removed, and its branch deleted.",
+		"  A missing one has its windows closed and its saved file deleted.",
+		"",
+		"   Remove 2 worktrees y    Cancel n",
+		"",
+	}
+	if got := cleanupScreen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("form:\n%q\nwant\n%q", got, want)
+	}
+	_, cmd := f.Update(keyMsg("y"))
+	if msg := cmd(); msg != (cleanedMsg{}) {
+		t.Errorf("removing said %v", msg)
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantArgs := []string{"@", "launch", "--type=background", "--allow-remote-control", exe, "remove", "--yes",
+		"--forget-session", "kspaces@gone", "--delete-branch-path", "/src/gr/.worktrees/dev", "--force-branch-path", "/src/gr/.worktrees/dev",
+		"--", "/src/gr/.worktrees/dev"}
+	if got := launched(); !reflect.DeepEqual(got, wantArgs) {
+		t.Errorf("launched\n%q\nwant\n%q", got, wantArgs)
 	}
 }

@@ -10,19 +10,24 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/gh"
+	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui/interact"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
-// cleanupForm lists the linked worktrees of a space that look done with, each with a box to tick, and
-// removes the ticked ones when confirmed, as the remove worktree form does one. It is meant for a kitty
-// overlay, like the new worktree form.
+// cleanupForm lists worktrees to remove, each with a box to tick, and removes the ticked ones when
+// confirmed, as the remove worktree form does one: the linked worktrees of a space that look done with and
+// its missing ones, or the sessions given. It is meant for a kitty overlay, like the new worktree form.
 type cleanupForm struct {
-	th    *look.Theme
-	space spaces.Space
+	th *look.Theme
+	// space is the space cleaned up, nil for sessions given.
+	space *spaces.Space
 	items []spaces.Cleanup
-	// checked are the items to remove: at first all but those with changes and those git would refuse.
+	// bySession names the items by their sessions, as they span spaces.
+	bySession bool
+	// checked are the items to remove: at first all but those with changes, missing ones with windows
+	// open and those git would refuse.
 	checked []bool
 	// deleteBranches deletes the branches of the items removed, those that can go.
 	deleteBranches bool
@@ -44,12 +49,25 @@ const (
 
 type cleanedMsg struct{ err error }
 
-func newCleanupForm(space spaces.Space, items []spaces.Cleanup) *cleanupForm {
+func newCleanupForm(space *spaces.Space, items []spaces.Cleanup) *cleanupForm {
 	f := &cleanupForm{th: look.New(true), space: space, items: items, checked: make([]bool, len(items))}
 	for i, c := range items {
-		f.checked[i] = c.Refused == nil && c.Changes == 0
+		f.checked[i] = c.Refused == nil && c.Changes == 0 && c.Windows == 0
+		f.bySession = f.bySession || c.Space != items[0].Space
 	}
 	return f
+}
+
+// name is what the form calls c: its directory, or its session when the items span spaces or it has no
+// directory, being in no space.
+func (f *cleanupForm) name(c spaces.Cleanup) string {
+	switch {
+	case f.bySession || c.Space == "":
+		return c.Worktree.Session
+	case c.Missing:
+		return strings.TrimPrefix(c.Worktree.Session, c.Space+"@")
+	}
+	return filepath.Base(c.Worktree.Path)
 }
 
 func (f *cleanupForm) Init() tea.Cmd { return nil }
@@ -83,18 +101,23 @@ func (f *cleanupForm) chosen() []spaces.Cleanup {
 }
 
 // remove hands the ticked worktrees to one background process, which removes them one after another, and
-// leaves, as the remove worktree form does. git is forced for those with changes, which the form said are
-// lost, and for the branches with commits not merged, which it said are lost or merged by their PR.
+// ends the missing ones' sessions, and leaves, as the remove worktree form does. git is forced for those
+// with changes, which the form said are lost, and for the branches with commits not merged, which it said
+// are lost or merged by their PR.
 func (f *cleanupForm) remove() tea.Cmd {
 	f.busy, f.err = true, nil
-	var paths []string
+	var paths, sessions []string
 	opts := map[string]spaces.RemoveOptions{}
 	for _, c := range f.chosen() {
+		if c.Missing {
+			sessions = append(sessions, c.Worktree.Session)
+			continue
+		}
 		paths = append(paths, c.Worktree.Path)
 		branch := f.deleteBranches && c.Branch.Offered()
 		opts[c.Worktree.Path] = spaces.RemoveOptions{Force: c.Changes > 0, DeleteBranch: branch, ForceBranch: branch && c.Branch.Unmerged > 0}
 	}
-	return func() tea.Msg { return cleanedMsg{spaces.RemoveAllInBackground(paths, opts)} }
+	return func() tea.Msg { return cleanedMsg{spaces.RemoveAllInBackground(paths, opts, sessions)} }
 }
 
 func (f *cleanupForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -143,8 +166,12 @@ func (f *cleanupForm) View() tea.View {
 func (f *cleanupForm) render() string {
 	th, width := f.th, max(f.width-4, 20)
 	line := func(spans ...look.Span) string { return th.Render(look.Plain, spans...) }
-	lines := []string{line(look.Heading("Clean up worktrees of " + f.space.Name)), ""}
-	if len(f.items) == 0 {
+	title := "Remove worktrees"
+	if f.space != nil {
+		title = "Clean up worktrees of " + f.space.Name
+	}
+	lines := []string{line(look.Heading(title)), ""}
+	if len(f.items) == 0 && f.space != nil {
 		base := "the main worktree's branch"
 		if len(f.space.Worktrees) > 0 && f.space.Worktrees[0].Branch != "" {
 			base = f.space.Worktrees[0].Branch
@@ -157,19 +184,34 @@ func (f *cleanupForm) render() string {
 	}
 	names := 0
 	for _, c := range f.items {
-		names = max(names, len(filepath.Base(c.Worktree.Path)))
+		names = max(names, len(f.name(c)))
 	}
+	missing := false
 	for i, c := range f.items {
+		missing = missing || c.Missing && f.checked[i]
 		spans := []look.Span{look.Checkbox(f.checked[i], c.Refused != nil), look.Text(" "),
-			look.Worktree(c.Worktree), look.Default(strings.Repeat(" ", names-len(filepath.Base(c.Worktree.Path))+2)),
-			look.Muted(strings.Join(c.Reasons, ", "))}
+			look.WorktreeName(f.name(c)), look.Default(strings.Repeat(" ", names-len(f.name(c))+2))}
+		// Each detail after the first follows a semicolon; a linked worktree given may have no reason.
+		detail := func(s look.Span) {
+			if len(spans) > 4 {
+				spans = append(spans, look.Muted("; "))
+			}
+			spans = append(spans, s)
+		}
+		if len(c.Reasons) > 0 {
+			detail(look.Muted(strings.Join(c.Reasons, ", ")))
+		}
 		switch {
 		case c.Refused != nil:
-			spans = append(spans, look.Muted("; "), look.Error(c.Refused.Error()))
+			detail(look.Error(c.Refused.Error()))
 		case c.Changes > 0 && f.checked[i]:
-			spans = append(spans, look.Muted("; "), look.Error(plural(c.Changes, "file")+" not committed, lost"))
+			detail(look.Error(plural(c.Changes, "file") + " not committed, lost"))
 		case c.Changes > 0:
-			spans = append(spans, look.Muted("; "), look.Text(plural(c.Changes, "file")+" not committed"))
+			detail(look.Text(plural(c.Changes, "file") + " not committed"))
+		case c.Windows > 0 && f.checked[i]:
+			detail(look.Error(plural(c.Windows, "window") + " closed"))
+		case c.Windows > 0:
+			detail(look.Text(plural(c.Windows, "window") + " open"))
 		}
 		surface := look.Plain
 		if i == f.cursor {
@@ -200,7 +242,11 @@ func (f *cleanupForm) render() string {
 				note = "Each closes its session and is removed, and its branch deleted."
 			}
 		}
-		lines = append(lines, line(th.Cut(width, look.Muted(note))...), "")
+		lines = append(lines, line(th.Cut(width, look.Muted(note))...))
+		if missing {
+			lines = append(lines, line(th.Cut(width, look.Muted("A missing one has its windows closed and its saved file deleted."))...))
+		}
+		lines = append(lines, "")
 	}
 	switch {
 	case f.busy:
@@ -219,26 +265,42 @@ func (f *cleanupForm) render() string {
 	return boxed(lines)
 }
 
-// RunCleanup runs the clean up form for the space at root, or named root, meant for a kitty popup. A
-// worktree's PR is what the sidebars' leader last saw, or else asked of gh now.
-func RunCleanup(ctx context.Context, cfg config.Config, root string) error {
-	space, err := spaces.Find(cfg, root)
-	if err != nil {
-		return err
+// RunCleanup runs the clean up form, meant for a kitty popup: for the space at root, or named root, or,
+// when sessions are given, for those. A worktree's PR is what the sidebars' leader last saw, or else
+// asked of gh now. The missing worktrees and their windows are as the sidebars see them.
+func RunCleanup(ctx context.Context, cfg config.Config, root string, sessions []string) error {
+	snap := spaces.LoadShared().View(kitty.SelfWindowID())
+	if snap.Err != nil {
+		return snap.Err
 	}
 	known := spaces.NewPoller().Git()
 	pr := func(wt spaces.Worktree) *gh.PR {
 		if p, ok := known[wt.Path].KnownPR(wt.Branch); ok {
 			return p
 		}
-		p, _ := gh.BranchPR(space.Root, wt.Branch)
+		p, _ := gh.BranchPR(wt.Path, wt.Branch)
 		return p
 	}
-	items, err := spaces.Cleanups(space, pr)
-	if err != nil {
-		return err
+	var f *cleanupForm
+	if len(sessions) > 0 {
+		f = newCleanupForm(nil, spaces.SessionCleanups(snap, sessions, pr))
+	} else {
+		space, err := spaces.Find(cfg, root)
+		if err != nil {
+			return err
+		}
+		for _, s := range snap.Spaces {
+			if s.Root == space.Root {
+				space.Missing = s.Missing
+			}
+		}
+		items, err := spaces.Cleanups(space, snap.Kitty.Windows, pr)
+		if err != nil {
+			return err
+		}
+		f = newCleanupForm(&space, items)
 	}
-	if err := runPopup(ctx, newCleanupForm(space, items)); err != nil {
+	if err := runPopup(ctx, f); err != nil {
 		return fmt.Errorf("running the clean up form: %w", err)
 	}
 	return nil

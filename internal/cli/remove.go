@@ -12,18 +12,23 @@ import (
 
 func (a *app) removeCommand() *cobra.Command {
 	var yes, force, deleteBranch, forceBranch bool
-	var forcePaths, deletePaths, forceBranchPaths []string
+	var forcePaths, deletePaths, forceBranchPaths, forgetSessions []string
 	cmd := &cobra.Command{
-		Use:   "remove PATH...",
+		Use:   "remove [PATH...]",
 		Short: "Close the session of the linked worktree at PATH and remove the worktree, after confirming in a form",
-		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			switch {
+			case len(forgetSessions) > 0 && !yes:
+				return fmt.Errorf("--forget-session needs --yes")
+			case len(args) == 0 && len(forgetSessions) == 0:
+				return fmt.Errorf("give the PATH of a worktree to remove")
+			}
 			cfg, err := config.Load()
 			if err != nil {
 				return err
 			}
 			if yes {
-				return tui.RemoveWorktrees(cfg, args, removeOptions(args, force, deleteBranch, forceBranch, forcePaths, deletePaths, forceBranchPaths))
+				return tui.RemoveWorktrees(cfg, args, removeOptions(args, force, deleteBranch, forceBranch, forcePaths, deletePaths, forceBranchPaths), forgetSessions)
 			}
 			if len(args) > 1 {
 				return fmt.Errorf("the form removes one worktree; give --yes to remove several")
@@ -31,6 +36,7 @@ func (a *app) removeCommand() *cobra.Command {
 			return tui.RunRemoveWorktree(cmd.Context(), cfg, args[0], deleteBranch)
 		},
 	}
+	cmd.Flags().StringArrayVar(&forgetSessions, "forget-session", nil, "with --yes, after the worktrees, close this session's windows, wait for kitty to have, and delete its saved file, as for a missing worktree; repeatable")
 	cmd.Flags().BoolVar(&yes, "yes", false, "remove without asking, as the form does once confirmed, one after another; errors are also shown in kitty")
 	cmd.Flags().BoolVar(&force, "force", false, "with --yes, remove the worktrees even with changes that are not committed, losing them")
 	cmd.Flags().StringArrayVar(&forcePaths, "force-path", nil, "with --yes, remove the worktree at this path even with changes that are not committed; repeatable")
