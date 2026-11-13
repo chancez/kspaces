@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui/cells"
@@ -46,7 +47,8 @@ func cleanupScreen(f *cleanupForm) []string {
 // with changes.
 func TestCleanupForm(t *testing.T) {
 	launched := fakeKitten(t)
-	f := newCleanupForm(cleanupFixture())
+	space, items := cleanupFixture()
+	f := newCleanupForm(space, items, false)
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	want := []string{
 		"",
@@ -98,20 +100,26 @@ func TestCleanupForm(t *testing.T) {
 	}
 }
 
-// Also delete their branches, off at first, puts each worktree's branch on a line of its own: merged, its PR
-// merged, kept, or its commits not merged, said lost once the worktree is ticked. y deletes those that can
-// go, forcing git for the commits not merged, which the form said are lost or merged by the PR.
-func TestCleanupFormBranches(t *testing.T) {
-	launched := fakeKitten(t)
+// cleanupBranchesFixture is cleanupFixture with branches: dev's PR merged after a squash, fix's commits not
+// merged, and two more worktrees, done merged and trunk on the default branch.
+func cleanupBranchesFixture() (*spaces.Space, []spaces.Cleanup) {
 	space, items := cleanupFixture()
 	items[0].Branch = spaces.Branch{Name: "pr/me/dev", Merge: git.Merge{Unmerged: 3}, PR: 12}
 	items[1].Branch = spaces.Branch{Name: "fix", Merge: git.Merge{Unmerged: 2}}
 	done := spaces.Worktree{Path: "/src/gr/.worktrees/done", Branch: "done", Session: "gr@done"}
 	trunk := spaces.Worktree{Path: "/src/gr/.worktrees/trunk", Branch: "trunk", Session: "gr@trunk"}
-	items = append(items,
+	return space, append(items,
 		spaces.Cleanup{Space: "gr", Worktree: done, Reasons: []string{"merged into main"}, Branch: spaces.Branch{Name: "done", Merge: git.Merge{Into: "main"}}},
 		spaces.Cleanup{Space: "gr", Worktree: trunk, Reasons: []string{"upstream gone"}, Branch: spaces.Branch{Name: "trunk", Kept: "it is the default branch"}})
-	f := newCleanupForm(space, items)
+}
+
+// Also delete their branches, off at first, puts each worktree's branch on a line of its own: merged, its PR
+// merged, kept, or its commits not merged, said lost once the worktree is ticked. y deletes those that can
+// go, forcing git for the commits not merged, which the form said are lost or merged by the PR.
+func TestCleanupFormBranches(t *testing.T) {
+	launched := fakeKitten(t)
+	space, items := cleanupBranchesFixture()
+	f := newCleanupForm(space, items, false)
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	want := []string{
 		"",
@@ -184,7 +192,7 @@ func TestCleanupFormBranches(t *testing.T) {
 	}
 
 	// Off again, nothing but the worktrees goes.
-	f = newCleanupForm(space, items)
+	f = newCleanupForm(space, items, false)
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	f.Update(keyMsg("d"))
 	f.View()
@@ -199,10 +207,102 @@ func TestCleanupFormBranches(t *testing.T) {
 	}
 }
 
+// Started with Also delete their branches ticked, as worktrees.delete_branch has it, the form leaves
+// unticked a worktree whose branch would lose commits, wip here, so only the branches that lose nothing go
+// unless one is ticked; d unticks the box as before.
+func TestCleanupFormDeleteBranchesFirst(t *testing.T) {
+	launched := fakeKitten(t)
+	space, items := cleanupBranchesFixture()
+	wip := spaces.Worktree{Path: "/src/gr/.worktrees/wip", Branch: "wip", Session: "gr@wip"}
+	items = append(items, spaces.Cleanup{Space: "gr", Worktree: wip, Reasons: []string{"upstream gone"}, Branch: spaces.Branch{Name: "wip", Merge: git.Merge{Unmerged: 1}}})
+	f := newCleanupForm(space, items, true)
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	want := []string{
+		"",
+		"  Clean up worktrees of gr",
+		"",
+		"  \u2611 dev    PR #12 merged",
+		"    branch: merged by PR #12, nothing lost",
+		"  \u2610 fix    upstream gone; 2 files not committed",
+		"    branch: 2 commits not merged",
+		"  \u2610 old    merged into main; locked",
+		"  \u2611 done   merged into main",
+		"    branch: merged into main, nothing lost",
+		"  \u2611 trunk  upstream gone",
+		"    branch: kept, as it is the default branch",
+		"  \u2610 wip    upstream gone",
+		"    branch: 1 commit not merged",
+		"",
+		"  \u2611 Also delete their branches d",
+		"  Each closes its session and is removed, and its branch deleted.",
+		"",
+		"   Remove 3 worktrees y    Cancel n",
+		"",
+	}
+	if got := cleanupScreen(f); !reflect.DeepEqual(got, want) {
+		t.Errorf("at first:\n%q\nwant\n%q", got, want)
+	}
+	_, cmd := f.Update(keyMsg("y"))
+	if msg := cmd(); msg != (cleanedMsg{}) {
+		t.Errorf("removing said %v", msg)
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantArgs := []string{"@", "launch", "--type=background", "--allow-remote-control", exe, "remove", "--yes",
+		"--delete-branch-path", "/src/gr/.worktrees/dev", "--force-branch-path", "/src/gr/.worktrees/dev",
+		"--delete-branch-path", "/src/gr/.worktrees/done",
+		"--", "/src/gr/.worktrees/dev", "/src/gr/.worktrees/done", "/src/gr/.worktrees/trunk"}
+	if got := launched(); !reflect.DeepEqual(got, wantArgs) {
+		t.Errorf("launched\n%q\nwant\n%q", got, wantArgs)
+	}
+
+	f = newCleanupForm(space, items, true)
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	f.Update(keyMsg("d"))
+	if got := cleanupScreen(f)[9:12]; !reflect.DeepEqual(got, []string{"", "  \u2610 Also delete their branches d", "  Each closes its session and is removed; its branch is kept."}) {
+		t.Errorf("d: %q", got)
+	}
+}
+
+// The form starts with deleting branches ticked when every space with a branch that can go says
+// worktrees.delete_branch, its own file in place of the global config.
+func TestDeleteBranchesFirst(t *testing.T) {
+	on, off := config.Config{Worktrees: config.Worktrees{DeleteBranch: true}}, config.Config{}
+	gr, kitty := spaces.Space{Name: "gr"}, spaces.Space{Name: "kitty"}
+	grOff, kittyOn := gr, kitty
+	grOff.Config, kittyOn.Config = &off, &on
+	branch := func(space string) spaces.Cleanup {
+		return spaces.Cleanup{Space: space, Branch: spaces.Branch{Name: "dev"}}
+	}
+	kept := spaces.Cleanup{Space: "gr", Branch: spaces.Branch{Name: "main", Kept: "it is the default branch"}}
+	for _, c := range []struct {
+		name   string
+		cfg    config.Config
+		spaces []spaces.Space
+		items  []spaces.Cleanup
+		want   bool
+	}{
+		{"global on", on, []spaces.Space{gr}, []spaces.Cleanup{branch("gr"), kept}, true},
+		{"global off", off, []spaces.Space{gr}, []spaces.Cleanup{branch("gr")}, false},
+		{"space file off", on, []spaces.Space{grOff}, []spaces.Cleanup{branch("gr")}, false},
+		{"space file on", off, []spaces.Space{kittyOn}, []spaces.Cleanup{branch("kitty")}, true},
+		{"one space of two off", off, []spaces.Space{gr, kittyOn}, []spaces.Cleanup{branch("kitty"), branch("gr")}, false},
+		{"the other space has no branch to delete", off, []spaces.Space{gr, kittyOn}, []spaces.Cleanup{branch("kitty"), kept}, true},
+		{"no branch to delete", on, []spaces.Space{gr}, []spaces.Cleanup{kept}, false},
+		{"in no space", on, []spaces.Space{gr}, []spaces.Cleanup{branch("")}, false},
+	} {
+		if got := deleteBranchesFirst(c.cfg, c.spaces, c.items); got != c.want {
+			t.Errorf("%s: %v, want %v", c.name, got, c.want)
+		}
+	}
+}
+
 // With nothing ticked there is nothing to remove, and with nothing that looks done with the form says so.
 func TestCleanupFormEmpty(t *testing.T) {
 	space, items := cleanupFixture()
-	f := newCleanupForm(space, items[:1])
+	f := newCleanupForm(space, items[:1], false)
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	f.Update(keyMsg("space"))
 	if _, cmd := f.Update(keyMsg("y")); cmd != nil || f.busy {
@@ -212,7 +312,7 @@ func TestCleanupFormEmpty(t *testing.T) {
 		t.Errorf("buttons %q", got)
 	}
 
-	f = newCleanupForm(space, nil)
+	f = newCleanupForm(space, nil, false)
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	want := []string{
 		"",
@@ -234,7 +334,7 @@ func TestCleanupFormEmpty(t *testing.T) {
 func TestCleanupFormPaint(t *testing.T) {
 	space, items := cleanupFixture()
 	items = append(items, spaces.Cleanup{Space: "gr", Worktree: spaces.Worktree{Path: "/src/gr/.worktrees/done", Branch: "done", Session: "gr@done"}, Reasons: []string{"merged into main"}})
-	f := newCleanupForm(space, items)
+	f := newCleanupForm(space, items, false)
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	f.View()
 	row := func(i int) int { return f.zones[fmt.Sprintf(cleanupZone, i)][0].Y }
@@ -330,7 +430,7 @@ func TestCleanupFormMissing(t *testing.T) {
 	items = append(items[:1],
 		spaces.Cleanup{Space: "gr", Worktree: spaces.Worktree{Session: "gr@gone"}, Reasons: []string{"directory gone"}, Missing: true},
 		spaces.Cleanup{Space: "gr", Worktree: spaces.Worktree{Session: "gr@open"}, Reasons: []string{"directory gone"}, Missing: true, Windows: 2})
-	f := newCleanupForm(space, items)
+	f := newCleanupForm(space, items, false)
 	f.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	want := []string{
 		"",
@@ -372,7 +472,7 @@ func TestCleanupFormMissing(t *testing.T) {
 	}
 
 	// With only the missing one with no windows ticked, the note says what goes of it.
-	f = newCleanupForm(space, items[1:2])
+	f = newCleanupForm(space, items[1:2], false)
 	f.Update(tea.WindowSizeMsg{Width: 80, Height: 20})
 	if got, want := cleanupScreen(f)[5:7], []string{"  Each closes its session and is removed; its branch is kept.", "  A missing one has its windows closed and its saved file deleted."}; !reflect.DeepEqual(got, want) {
 		t.Errorf("notes %q, want %q", got, want)
@@ -394,7 +494,7 @@ func TestCleanupFormSessions(t *testing.T) {
 			Refused: errors.New("/src/gr is the main worktree of gr, which cannot be removed")},
 		{Worktree: spaces.Worktree{Session: "kitty"}, Refused: errors.New("in no space, not a worktree")},
 	}
-	f := newCleanupForm(nil, items)
+	f := newCleanupForm(nil, items, false)
 	f.Update(tea.WindowSizeMsg{Width: 90, Height: 20})
 	f.Update(keyMsg("d"))
 	want := []string{

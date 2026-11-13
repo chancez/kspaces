@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -27,7 +28,8 @@ type cleanupForm struct {
 	// bySession names the items by their sessions, as they span spaces.
 	bySession bool
 	// checked are the items to remove: at first all but those with changes, missing ones with windows
-	// open and those git would refuse.
+	// open, those git would refuse and, when deleteBranches starts ticked, those whose branch would lose
+	// commits, which the box alone would delete.
 	checked []bool
 	// deleteBranches deletes the branches of the items removed, those that can go.
 	deleteBranches bool
@@ -51,13 +53,33 @@ const (
 
 type cleanedMsg struct{ err error }
 
-func newCleanupForm(space *spaces.Space, items []spaces.Cleanup) *cleanupForm {
-	f := &cleanupForm{th: look.New(true), space: space, items: items, checked: make([]bool, len(items))}
+// newCleanupForm is the form for items, of space or nil for sessions given, with deleting their branches
+// ticked at first with deleteBranches.
+func newCleanupForm(space *spaces.Space, items []spaces.Cleanup, deleteBranches bool) *cleanupForm {
+	f := &cleanupForm{th: look.New(true), space: space, items: items, checked: make([]bool, len(items)), deleteBranches: deleteBranches}
 	for i, c := range items {
-		f.checked[i] = c.Refused == nil && c.Changes == 0 && c.Windows == 0
+		lost := deleteBranches && c.Branch.Offered() && c.Branch.Lost() > 0
+		f.checked[i] = c.Refused == nil && c.Changes == 0 && c.Windows == 0 && !lost
 		f.bySession = f.bySession || c.Space != items[0].Space
 	}
 	return f
+}
+
+// deleteBranchesFirst reports whether the clean up form starts with deleting branches ticked: when every
+// space of items with a branch that can go says worktrees.delete_branch, in its file or cfg.
+func deleteBranchesFirst(cfg config.Config, of []spaces.Space, items []spaces.Cleanup) bool {
+	on := false
+	for _, c := range items {
+		if !c.Branch.Offered() {
+			continue
+		}
+		i := slices.IndexFunc(of, func(s spaces.Space) bool { return s.Name == c.Space })
+		if i < 0 || !of[i].ConfigOf(cfg).Worktrees.DeleteBranch {
+			return false
+		}
+		on = true
+	}
+	return on
 }
 
 // name is what the form calls c: its directory, or its session when the items span spaces or it has no
@@ -324,7 +346,8 @@ func RunCleanup(ctx context.Context, cfg config.Config, root string, sessions []
 	}
 	var f *cleanupForm
 	if len(sessions) > 0 {
-		f = newCleanupForm(nil, spaces.SessionCleanups(snap, sessions, pr))
+		items := spaces.SessionCleanups(snap, sessions, pr)
+		f = newCleanupForm(nil, items, deleteBranchesFirst(cfg, snap.Spaces, items))
 	} else {
 		space, err := spaces.Find(cfg, root)
 		if err != nil {
@@ -339,7 +362,7 @@ func RunCleanup(ctx context.Context, cfg config.Config, root string, sessions []
 		if err != nil {
 			return err
 		}
-		f = newCleanupForm(&space, items)
+		f = newCleanupForm(&space, items, deleteBranchesFirst(cfg, []spaces.Space{space}, items))
 	}
 	if err := runPopup(ctx, f); err != nil {
 		return fmt.Errorf("running the clean up form: %w", err)

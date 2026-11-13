@@ -406,7 +406,10 @@ cannot be removed, or a session in no space.
 **Also delete their branches**, off at first, `d` or a click, deletes each removed worktree's branch by
 Remove worktree's rules, and gives each worktree a line saying what deleting its branch loses, or why it is
 kept. A branch whose commits are not merged is deleted with `-D`, its line saying the commits are lost once
-its worktree is ticked; one whose PR is merged, as after a squash, says so and loses nothing.
+its worktree is ticked; one whose PR is merged, as after a squash, says so and loses nothing. With
+`worktrees.delete_branch` on, for every space listed with a branch that can go, the box starts ticked, and a
+worktree whose branch would lose commits starts unticked, so only branches that lose nothing go unless you
+tick it.
 
 **Forget** shows the saved session file of a missing worktree with no windows open, and Delete deletes it,
 so kitty does not restore the session. `kspaces forget SESSION...` does the same for any sessions with no
