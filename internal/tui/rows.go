@@ -95,16 +95,16 @@ func (m *sidebar) renderRow(i int) string {
 	// The git state takes the right end, after a space, and the branch what is left between. A space whose
 	// own config is not in use says so there instead, on its own row.
 	gitRow := r.Worktree != nil && !r.Folded && !r.Other && !r.Missing
-	var pieces [3][]look.Span
+	var pieces gitRowPieces
 	if gitRow {
 		pieces = gitPieces(m.git[r.Worktree.Path])
 	}
-	// The name gives way to the changes and the PR, down to labelFloor cells, so a long name does not hide
-	// them. Ahead and behind get only what the name leaves.
+	// The name gives way to the changes and the PR, its checks and review included, down to labelFloor
+	// cells, so a long name does not hide them. Ahead and behind get only what the name leaves.
 	nameRoom := room
 	if gitRow {
 		kept := pieces
-		kept[1] = nil
+		kept[pieceAheadBehind] = nil
 		if w := th.Width(m.fitGit(kept, room-min(th.Width(label), labelFloor)-1)...); w > 0 {
 			nameRoom = room - w - 1
 		}
@@ -185,25 +185,45 @@ func (m *sidebar) configSpans(s spaces.Space, width int) []look.Span {
 // labelFloor is the fewest cells a row's name gives way to its git state down to.
 const labelFloor = 6
 
+// The pieces of a worktree's git state on its row, in the order they are drawn.
+const (
+	pieceChanges = iota
+	pieceAheadBehind
+	piecePR
+	pieceChecks
+	pieceReview
+	numPieces
+)
+
+// gitRowPieces are a worktree's git state, apart, by piece.
+type gitRowPieces [numPieces][]look.Span
+
+// pieceDrops are the pieces fitGit leaves out, in turn, until the rest fit: ahead and behind first and the
+// changes last, as they are what removing the worktree loses, and the PR's review and checks before its
+// number.
+var pieceDrops = [numPieces]int{pieceAheadBehind, pieceReview, pieceChecks, piecePR, pieceChanges}
+
 // gitPieces are a worktree's git state, apart: the files it has not committed, how far it is ahead of
-// and behind its upstream, and its pull request.
-func gitPieces(st gitstate.State) [3][]look.Span {
-	var pieces [3][]look.Span
+// and behind its upstream, and its pull request, with what its checks come to and its review decision.
+func gitPieces(st gitstate.State) gitRowPieces {
+	var pieces gitRowPieces
 	if s := st.Status; s != nil {
 		if s.Changes > 0 {
-			pieces[0] = look.Changes(s.Changes)
+			pieces[pieceChanges] = look.Changes(s.Changes)
 		}
-		pieces[1] = look.AheadBehind(s.Ahead, s.Behind)
+		pieces[pieceAheadBehind] = look.AheadBehind(s.Ahead, s.Behind)
 	}
 	if st.PR != nil {
-		pieces[2] = []look.Span{look.PRNumber(*st.PR)}
+		pieces[piecePR] = []look.Span{look.PRNumber(*st.PR)}
+		pieces[pieceChecks] = look.PRChecks(*st.PR)
+		pieces[pieceReview] = look.PRReview(*st.PR)
 	}
 	return pieces
 }
 
-// fitGit is gitPieces in at most width cells, a space apart. What does not fit is left out, ahead and
-// behind first and the changes last, as they are what removing the worktree loses.
-func (m *sidebar) fitGit(pieces [3][]look.Span, width int) []look.Span {
+// fitGit is gitPieces in at most width cells, a space apart. What does not fit is left out, in the order
+// of pieceDrops.
+func (m *sidebar) fitGit(pieces gitRowPieces, width int) []look.Span {
 	join := func() []look.Span {
 		var out []look.Span
 		for _, p := range pieces {
@@ -217,7 +237,7 @@ func (m *sidebar) fitGit(pieces [3][]look.Span, width int) []look.Span {
 		}
 		return out
 	}
-	for _, drop := range []int{1, 2, 0} {
+	for _, drop := range pieceDrops {
 		if out := join(); m.th.Width(out...) <= width {
 			return out
 		}

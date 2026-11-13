@@ -1,12 +1,14 @@
 package look
 
 import (
+	"image/color"
 	"reflect"
 	"strings"
 	"testing"
 
 	"charm.land/lipgloss/v2"
 
+	"github.com/chancez/kspaces/internal/gh"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui/cells"
 )
@@ -87,6 +89,47 @@ func TestGoneMarker(t *testing.T) {
 		if got := th.Render(Plain, GoneMarker(c.open)...); !reflect.DeepEqual(cells.Parse(got), cells.Parse(c.want)) {
 			t.Errorf("open %v:\ngot  %q\nwant %q", c.open, got, c.want)
 		}
+	}
+}
+
+// A PR's checks are drawn green passing, red failing and yellow pending, its review green approved and
+// red with changes requested, and faint on a row with nothing open, as its number is. A review required
+// and no checks draw nothing.
+func TestPRChecksAndReview(t *testing.T) {
+	th := New(true)
+	th.SetGlyphs(GlyphsASCII)
+	p := th.roles
+	fg := func(c color.Color, s string) string { return lipgloss.NewStyle().Foreground(c).Render(s) }
+	faint := func(c color.Color, s string) string { return lipgloss.NewStyle().Faint(true).Foreground(c).Render(s) }
+	pr := func(c gh.Checks, r gh.Review) gh.PR { return gh.PR{Number: 7, State: "open", Checks: c, Review: r} }
+	for name, tc := range map[string]struct {
+		got  []Span
+		want string
+	}{
+		"passing":           {PRChecks(pr(gh.ChecksPassing, gh.ReviewNone)), fg(p.success, "v")},
+		"failing":           {PRChecks(pr(gh.ChecksFailing, gh.ReviewNone)), fg(p.danger, "x")},
+		"pending":           {PRChecks(pr(gh.ChecksPending, gh.ReviewNone)), fg(p.attention, "~")},
+		"no checks":         {PRChecks(pr(gh.ChecksNone, gh.ReviewApproved)), ""},
+		"approved":          {PRReview(pr(gh.ChecksNone, gh.ReviewApproved)), fg(p.success, "A")},
+		"changes requested": {PRReview(pr(gh.ChecksNone, gh.ReviewChangesRequested)), fg(p.danger, "R")},
+		"review required":   {PRReview(pr(gh.ChecksPassing, gh.ReviewRequired)), ""},
+		"no review":         {PRReview(pr(gh.ChecksPassing, gh.ReviewNone)), ""},
+		"dim": {
+			DimIf(true, PRNumber(pr(gh.ChecksFailing, gh.ReviewApproved)), PRChecks(pr(gh.ChecksFailing, gh.ReviewApproved))[0], PRReview(pr(gh.ChecksFailing, gh.ReviewApproved))[0]),
+			faint(p.success, "#7") + faint(p.danger, "x") + faint(p.success, "A"),
+		},
+	} {
+		if got := th.Render(Plain, tc.got...); !reflect.DeepEqual(cells.Parse(got), cells.Parse(tc.want)) {
+			t.Errorf("%s:\ngot  %q\nwant %q", name, got, tc.want)
+		}
+	}
+	words := func(c gh.Checks, r gh.Review) []string {
+		return []string{th.TextOf(PRChecksWords(pr(c, r))), th.TextOf(PRReviewWords(pr(c, r)))}
+	}
+	got := [][]string{words(gh.ChecksPassing, gh.ReviewApproved), words(gh.ChecksFailing, gh.ReviewChangesRequested), words(gh.ChecksPending, gh.ReviewRequired)}
+	want := [][]string{{"passing", "approved"}, {"failing", "changes requested"}, {"pending", "review required"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("words %q, want %q", got, want)
 	}
 }
 

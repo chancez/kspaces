@@ -46,6 +46,13 @@ const (
 	GlyphChanges
 	GlyphAhead
 	GlyphBehind
+	// GlyphChecksPassing, GlyphChecksFailing and GlyphChecksPending are what a PR's CI checks come to,
+	// after its number; GlyphApproved and GlyphChangesRequested its review decision.
+	GlyphChecksPassing
+	GlyphChecksFailing
+	GlyphChecksPending
+	GlyphApproved
+	GlyphChangesRequested
 	// GlyphUntrusted marks a space whose own config is not trusted, so not in use.
 	GlyphUntrusted
 	// The corners and sides of the border a popup in a panel is drawn in.
@@ -89,6 +96,11 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphChanges:          "*",
 		GlyphAhead:            "+",
 		GlyphBehind:           "-",
+		GlyphChecksPassing:    "v",
+		GlyphChecksFailing:    "x",
+		GlyphChecksPending:    "~",
+		GlyphApproved:         "A",
+		GlyphChangesRequested: "R",
 		GlyphUntrusted:        "?",
 		GlyphFrameTopLeft:     "+",
 		GlyphFrameTopRight:    "+",
@@ -124,6 +136,11 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphChanges:          "\u25cf", // black circle
 		GlyphAhead:            "\u2191", // upwards arrow
 		GlyphBehind:           "\u2193", // downwards arrow
+		GlyphChecksPassing:    "\u2713", // check mark
+		GlyphChecksFailing:    "\u2717", // ballot x
+		GlyphChecksPending:    "\u25cb", // white circle
+		GlyphApproved:         "\u2605", // black star
+		GlyphChangesRequested: "\u00b1", // plus-minus sign, changes
 		GlyphUntrusted:        "?",
 		GlyphFrameTopLeft:     "\u256d", // box drawings light arc down and right
 		GlyphFrameTopRight:    "\u256e", // box drawings light arc down and left
@@ -159,10 +176,15 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphSortStatus:   "\uf071", // warning
 		GlyphFilter:       "\uf0b0", // filter
 		GlyphChosen:       "\uf00c", // check
-		// Unicode rather than Nerd Font icons: they are followed by a number, not a space.
-		GlyphChanges: "\u25cf",
-		GlyphAhead:   "\u2191",
-		GlyphBehind:  "\u2193",
+		// Unicode rather than Nerd Font icons: they are followed by a number, not a space, or end the row.
+		GlyphChanges:          "\u25cf",
+		GlyphAhead:            "\u2191",
+		GlyphBehind:           "\u2193",
+		GlyphChecksPassing:    "\u2713",
+		GlyphChecksFailing:    "\u2717",
+		GlyphChecksPending:    "\u25cb",
+		GlyphApproved:         "\u2605",
+		GlyphChangesRequested: "\u00b1",
 		// Followed by two spaces, as a marker is, since kitty draws it over the first.
 		GlyphUntrusted: "\uf023", // lock
 		// Box drawings, as Unicode's: kitty draws them itself, joined.

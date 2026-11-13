@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/gh"
 	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/status"
@@ -172,7 +173,8 @@ func worktreePath(root, path string) string {
 }
 
 // gitFields are what git and gh say of a worktree, as preview fields: its changes, its upstream and how
-// far it is from it, and its PR. What is not known yet is left out.
+// far it is from it, and its PR, with its checks and review when it has them. What is not known yet is
+// left out.
 func gitFields(st gitstate.State) [][]look.Span {
 	field := func(label string, values ...look.Span) []look.Span {
 		return append([]look.Span{look.Label(fmt.Sprintf("%-*s", previewLabelWidth, label))}, values...)
@@ -198,6 +200,12 @@ func gitFields(st gitstate.State) [][]look.Span {
 	switch {
 	case st.PR != nil:
 		lines = append(lines, field("pr", look.PRNumber(*st.PR), look.Muted(" "), look.PRState(*st.PR)))
+		if st.PR.Checks != gh.ChecksNone {
+			lines = append(lines, field("checks", look.PRChecksWords(*st.PR)))
+		}
+		if st.PR.Review != gh.ReviewNone {
+			lines = append(lines, field("review", look.PRReviewWords(*st.PR)))
+		}
 	case !st.PRAt.IsZero():
 		lines = append(lines, field("pr", look.Muted("none")))
 	}

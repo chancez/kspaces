@@ -388,6 +388,63 @@ func PRNumber(pr gh.PR) Span { return sp(prStates[pr.State], fmt.Sprintf("#%d", 
 // PRState is a pull request's state, in its color.
 func PRState(pr gh.PR) Span { return sp(prStates[pr.State], pr.State) }
 
+// prChecks are the element, glyph and words of what a PR's checks come to.
+var prChecks = map[gh.Checks]struct {
+	el    element
+	g     Glyph
+	words string
+}{
+	gh.ChecksPassing: {elChecksPassing, GlyphChecksPassing, "passing"},
+	gh.ChecksFailing: {elChecksFailing, GlyphChecksFailing, "failing"},
+	gh.ChecksPending: {elChecksPending, GlyphChecksPending, "pending"},
+}
+
+// PRChecks marks what a PR's checks come to, to follow its number; nil when it has none.
+func PRChecks(pr gh.PR) []Span {
+	c, ok := prChecks[pr.Checks]
+	if !ok {
+		return nil
+	}
+	return []Span{glyph(c.el, c.g, false)}
+}
+
+// PRChecksWords is what a PR's checks come to, in words.
+func PRChecksWords(pr gh.PR) Span {
+	if c, ok := prChecks[pr.Checks]; ok {
+		return sp(c.el, c.words)
+	}
+	return Muted("none")
+}
+
+// prReviews are the element, glyph and words of a PR's review decisions. A review required has no glyph:
+// it is what every PR waits on before its first review, so a row would carry it for nothing.
+var prReviews = map[gh.Review]struct {
+	el    element
+	g     Glyph
+	words string
+}{
+	gh.ReviewApproved:         {elReviewApproved, GlyphApproved, "approved"},
+	gh.ReviewChangesRequested: {elReviewChangesRequested, GlyphChangesRequested, "changes requested"},
+	gh.ReviewRequired:         {elText, GlyphNone, "review required"},
+}
+
+// PRReview marks a PR approved or with changes requested; nil for any other review decision.
+func PRReview(pr gh.PR) []Span {
+	r, ok := prReviews[pr.Review]
+	if !ok || r.g == GlyphNone {
+		return nil
+	}
+	return []Span{glyph(r.el, r.g, false)}
+}
+
+// PRReviewWords is a PR's review decision, in words.
+func PRReviewWords(pr gh.PR) Span {
+	if r, ok := prReviews[pr.Review]; ok {
+		return sp(r.el, r.words)
+	}
+	return Muted("none")
+}
+
 // Checkbox is a box, ticked when checked, or greyed for one that cannot be.
 func Checkbox(checked, off bool) Span {
 	switch {

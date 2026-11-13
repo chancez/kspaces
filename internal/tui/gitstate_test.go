@@ -100,12 +100,81 @@ func TestLongNameGivesWayToGitState(t *testing.T) {
 	}
 }
 
-// The picker's preview of a worktree says what git and gh say of it, once they have.
+// A PR's checks follow its number a space after, and its review a space after that, approved or with
+// changes requested only. In a narrow sidebar the review gives way first, then the checks, before the
+// number does.
+func TestPRChecksAndReviewOnRows(t *testing.T) {
+	e := newSidebarEnv(t)
+	pad := func(n int) string { return strings.Repeat(" ", n) }
+	checks := map[gh.Checks]string{gh.ChecksNone: "", gh.ChecksPassing: " \u2713", gh.ChecksFailing: " \u2717", gh.ChecksPending: " \u25cb"}
+	reviews := map[gh.Review]string{gh.ReviewNone: "", gh.ReviewApproved: " \u2605", gh.ReviewChangesRequested: " \u00b1", gh.ReviewRequired: ""}
+	var got, want []string
+	for _, c := range []gh.Checks{gh.ChecksNone, gh.ChecksPassing, gh.ChecksFailing, gh.ChecksPending} {
+		for _, r := range []gh.Review{gh.ReviewNone, gh.ReviewApproved, gh.ReviewChangesRequested, gh.ReviewRequired} {
+			snap := gitFixture()
+			snap.Git["/src/gr/.worktrees/fix"] = gitstate.State{Status: &gitstate.Status{Upstream: "origin/fix"}, PR: &gh.PR{Number: 98, State: "open", Checks: c, Review: r}}
+			e.m.Update(snap)
+			for _, width := range []int{30, 16, 14, 13} {
+				e.m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
+				got = append(got, fmt.Sprintf("%s %s %d: %s", c, r, width, e.screen()[6]))
+			}
+			// At 16 the git state has 6 cells, which a PR with both its checks and its review overruns, and
+			// the branch gets what a PR's number alone leaves.
+			full, mid := "#98"+checks[c]+reviews[r], "  "+branchIcon+"fix  #98"+checks[c]+reviews[r]
+			switch {
+			case checks[c] != "" && reviews[r] != "":
+				mid = "  " + branchIcon + "fix  #98" + checks[c]
+			case checks[c] == "" && reviews[r] == "":
+				mid = "  " + branchIcon + "fix fi #98"
+			}
+			want = append(want,
+				fmt.Sprintf("%s %s 30: %s", c, r, "  "+branchIcon+"fix fix"+pad(17-len([]rune(full)))+full),
+				fmt.Sprintf("%s %s 16: %s", c, r, mid),
+				fmt.Sprintf("%s %s 14: %s", c, r, "  "+branchIcon+"fix  #98"),
+				fmt.Sprintf("%s %s 13: %s", c, r, "  "+branchIcon+"fix #98"),
+			)
+		}
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("rows:\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+// A long name gives way to a PR's checks and review as to its number, down to a few cells, and they give
+// way before the number and the changes. Ahead and behind get only what the name leaves.
+func TestLongNameGivesWayToPRChecks(t *testing.T) {
+	e := newSidebarEnv(t)
+	snap := gitFixture()
+	long := "/src/gr/.worktrees/intent_sync_api_updates"
+	snap.Spaces[0].Worktrees = append(snap.Spaces[0].Worktrees, spaces.Worktree{Path: long, Branch: "intent_sync_api_updates", Session: "gr@intent_sync_api_updates"})
+	snap.Git[long] = gitstate.State{Status: &gitstate.Status{Changes: 2, Ahead: 4}, PR: &gh.PR{Number: 11243, State: "open", Checks: gh.ChecksFailing, Review: gh.ReviewChangesRequested}}
+	e.m.Update(snap)
+	var got []string
+	for _, width := range []int{44, 30, 24, 22, 21} {
+		e.m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
+		got = append(got, e.screen()[7])
+	}
+	want := []string{
+		"  " + branchIcon + "intent_sync_api_updates  \u25cf2 #11243 \u2717 \u00b1",
+		"  " + branchIcon + "intent_... \u25cf2 #11243 \u2717 \u00b1",
+		"  " + branchIcon + "int... \u25cf2 #11243 \u2717",
+		"  " + branchIcon + "int... \u25cf2 #11243",
+		"  " + branchIcon + "intent_sy... \u25cf2",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("rows:\n%q\nwant\n%q", got, want)
+	}
+}
+
+// The picker's preview of a worktree says what git and gh say of it, once they have: a PR's checks and
+// review in words, when it has them.
 func TestPickerPreviewGitState(t *testing.T) {
 	m := newPicker(0)
 	m.Update(tea.WindowSizeMsg{Width: 40, Height: 26})
 	snap := gitFixture()
 	snap.Git["/src/kitty"] = gitstate.State{Status: &gitstate.Status{Upstream: "origin/master"}, PRAt: time.Now()}
+	snap.Git["/src/gr/.worktrees/dev"].PR.Checks, snap.Git["/src/gr/.worktrees/dev"].PR.Review = gh.ChecksFailing, gh.ReviewChangesRequested
+	snap.Git["/src/gr/.worktrees/fix"].PR.Checks, snap.Git["/src/gr/.worktrees/fix"].PR.Review = gh.ChecksPending, gh.ReviewRequired
 	m.Update(snap)
 	text := func() []string {
 		var out []string
@@ -128,6 +197,8 @@ func TestPickerPreviewGitState(t *testing.T) {
 			"changes  \u25cf3 not committed",
 			"upstream origin/pr/me/dev \u21912\u21931",
 			"pr       #123 open",
+			"checks   failing",
+			"review   changes requested",
 			"session  gr@dev",
 			"windows  2 open",
 			"saved    no sessions directory",
@@ -142,6 +213,8 @@ func TestPickerPreviewGitState(t *testing.T) {
 			"changes  none",
 			"upstream origin/fix, gone",
 			"pr       #98 merged",
+			"checks   pending",
+			"review   review required",
 			"session  gr@fix",
 			"windows  none open",
 			"saved    no sessions directory",
