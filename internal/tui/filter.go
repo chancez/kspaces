@@ -186,8 +186,7 @@ func rowKey(r spaces.Row) string {
 // its name, a linked worktree by its directory or branch, and a space by its name or its main worktree's
 // branch, or when any of its linked worktrees matches, so a match shows under its space. A substring
 // rather than the picker's fuzzy match: the sidebar keeps its order rather than ranking, so a row that
-// matches a scatter of letters would stay among the real matches. Blank rows go between groups as
-// spaces.BuildRows puts them.
+// matches a scatter of letters would stay among the real matches.
 func filterRows(rows []spaces.Row, query string) []spaces.Row {
 	q := strings.ToLower(query)
 	matches := func(texts ...string) bool {
@@ -198,30 +197,11 @@ func filterRows(rows []spaces.Row, query string) []spaces.Row {
 		}
 		return false
 	}
-	var out []spaces.Row
-	for i := 0; i < len(rows); i++ {
-		head := rows[i]
-		if head.Space == nil {
-			continue
-		}
-		var linked []spaces.Row
-		for i+1 < len(rows) && rows[i+1].Space == head.Space && !rows[i+1].Main {
-			i++
-			if wt := rows[i].Worktree; matches(rows[i].Dir(), wt.Branch) {
-				linked = append(linked, rows[i])
-			}
-		}
+	return spaces.Narrow(rows, func(head spaces.Row) bool {
 		own := []string{head.Space.Name}
 		if head.Worktree != nil {
 			own = append(own, head.Worktree.Branch)
 		}
-		if len(linked) == 0 && !matches(own...) {
-			continue
-		}
-		if !head.Other && len(out) > 0 {
-			out = append(out, spaces.Row{})
-		}
-		out = append(append(out, head), linked...)
-	}
-	return out
+		return matches(own...)
+	}, func(r spaces.Row) bool { return matches(r.Dir(), r.Worktree.Branch) })
 }
