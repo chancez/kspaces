@@ -39,10 +39,16 @@ type Input struct {
 	// InputString, the only type so far, and the default: text, which can take several lines.
 	Type string `toml:"type"`
 	// What the form calls it, the name by default.
-	Label   string `toml:"label"`
+	Label string `toml:"label"`
+	// What it is when not given, a template of the built-ins, see DefaultWith.
 	Default string `toml:"default"`
 	// Required refuses to run the command with the input empty.
 	Required bool `toml:"required"`
+}
+
+// DefaultWith is the input's default with vars, the built-ins, substituted.
+func (in Input) DefaultWith(vars map[string]string) string {
+	return expand(in.Default, vars)
 }
 
 // InputString is an input of text, which can take several lines.
@@ -116,6 +122,9 @@ func (c *Command) check() error {
 		if in.Label == "" {
 			in.Label = in.Name
 		}
+		if err := checkDefault("input "+in.Name+" default", in.Default); err != nil {
+			return err
+		}
 	}
 	if err := checkRun(c.Run, known); err != nil {
 		return err
@@ -140,6 +149,21 @@ func checkTemplate(where, tmpl string, known map[string]bool) error {
 	for _, p := range parts {
 		if p.name != "" && !known[p.name] {
 			return fmt.Errorf("%s: {%s} is neither a built-in nor an input", where, p.name)
+		}
+	}
+	return nil
+}
+
+// checkDefault says what is wrong with tmpl, an input's default found at where, which can only use the
+// built-ins: an input's value is not known before the inputs are filled in.
+func checkDefault(where, tmpl string) error {
+	parts, err := parseTemplate(tmpl)
+	if err != nil {
+		return fmt.Errorf("%s: %w", where, err)
+	}
+	for _, p := range parts {
+		if p.name != "" && !slices.Contains(Builtins, p.name) {
+			return fmt.Errorf("%s: {%s} is not a built-in, the only placeholders a default can have", where, p.name)
 		}
 	}
 	return nil
@@ -250,14 +274,14 @@ func (c Command) Environ(vars map[string]string) []string {
 	return out
 }
 
-// Values are the command's inputs as given, by name, the default for any not given. An input it does not
-// have, or a required one left empty, is an error.
-func (c Command) Values(given map[string]string) (map[string]string, error) {
-	return inputValues(c.Name, c.Inputs, given)
+// Values are the command's inputs as given, by name, the default with vars, the built-ins, for any not
+// given. An input it does not have, or a required one left empty, is an error.
+func (c Command) Values(given, vars map[string]string) (map[string]string, error) {
+	return inputValues(c.Name, c.Inputs, given, vars)
 }
 
-// inputValues are the values of inputs, those of owner, as given, the default for any not given.
-func inputValues(owner string, inputs []Input, given map[string]string) (map[string]string, error) {
+// inputValues are the values of inputs, those of owner, as given, the default with vars for any not given.
+func inputValues(owner string, inputs []Input, given, vars map[string]string) (map[string]string, error) {
 	out := map[string]string{}
 	for name := range given {
 		if !slices.ContainsFunc(inputs, func(in Input) bool { return in.Name == name }) {
@@ -267,7 +291,7 @@ func inputValues(owner string, inputs []Input, given map[string]string) (map[str
 	for _, in := range inputs {
 		v, ok := given[in.Name]
 		if !ok {
-			v = in.Default
+			v = in.DefaultWith(vars)
 		}
 		if in.Required && strings.TrimSpace(v) == "" {
 			return nil, fmt.Errorf("%s needs %s", owner, in.Label)

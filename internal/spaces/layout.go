@@ -17,10 +17,10 @@ type LayoutRun struct {
 	PR int
 }
 
-// NewLayoutRun is l to open with inputs, the defaults filled in. A required input left empty, or one l
-// does not have, is an error.
-func NewLayoutRun(l config.Layout, inputs map[string]string) (LayoutRun, error) {
-	values, err := l.Values(inputs)
+// NewLayoutRun is l to open with inputs, the defaults filled in with vars, the built-ins. A required input
+// left empty, or one l does not have, is an error.
+func NewLayoutRun(l config.Layout, inputs, vars map[string]string) (LayoutRun, error) {
+	values, err := l.Values(inputs, vars)
 	if err != nil {
 		return LayoutRun{}, err
 	}
@@ -225,10 +225,12 @@ func freshLayout(global config.Config, wt Worktree) (cfg config.Config, space Sp
 	if !ok {
 		return cfg, Space{}, Worktree{}, LayoutRun{}, false, nil
 	}
-	lr, err = NewLayoutRun(l, nil)
+	pr := WorktreePR(space, found)
+	lr, err = NewLayoutRun(l, nil, BuiltinVars(space, found, pr))
 	if err != nil {
 		return cfg, Space{}, Worktree{}, LayoutRun{}, false, err
 	}
+	lr.PR = pr
 	return cfg, space, found, lr, true, nil
 }
 

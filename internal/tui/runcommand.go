@@ -32,6 +32,8 @@ type runForm struct {
 	th      *look.Theme
 	targets []runTarget
 	cmds    choiceFields[config.Command]
+	// vars are the first target's built-ins, which the inputs' defaults are shown with.
+	vars map[string]string
 	// open overrides where the command opens, empty for where it is configured to.
 	open string
 	// windows says whether the one worktree's session has windows, without which the command is its first
@@ -56,8 +58,10 @@ type ranMsg struct{ err error }
 func newRunForm(targets []runTarget, st kitty.State, name string, inputs map[string]string, open string) *runForm {
 	th := look.New(true)
 	_, windows := st.Sessions[targets[0].wt.Session]
-	f := &runForm{th: th, targets: targets, open: open, windows: windows,
-		cmds: newCommandFields(th, commonCommands(targets), false, name, inputs)}
+	first := targets[0]
+	vars := spaces.BuiltinVars(first.space, first.wt, spaces.WorktreePR(first.space, first.wt))
+	f := &runForm{th: th, targets: targets, vars: vars, open: open, windows: windows,
+		cmds: newCommandFields(th, commonCommands(targets), false, name, inputs, vars)}
 	moveFocus(f.fields(), &f.focus, 0)
 	return f
 }
@@ -147,11 +151,12 @@ func opensBeside(open, s string) string {
 }
 
 // run runs the chosen command and leaves, or says why it cannot: its inputs are checked as the first
-// target's command has them before running anything.
+// target's command has them before running anything. An input left at its default is left to each
+// target, which fills it in with its own built-ins.
 func (f *runForm) run() tea.Cmd {
 	cmd, _ := f.cmds.chosen()
-	values := f.cmds.values()
-	if _, err := spaces.NewRun(cmd, values); err != nil {
+	values := f.cmds.edited()
+	if _, err := spaces.NewRun(cmd, f.cmds.values(), f.vars); err != nil {
 		f.err = err
 		return nil
 	}
@@ -182,7 +187,8 @@ func runIn(targets []runTarget, name string, values map[string]string, open stri
 	return errors.Join(errs...)
 }
 
-// run runs t's command called name with the inputs of values it has, see runIn.
+// run runs t's command called name with the inputs of values it has, the rest at their defaults with t's
+// built-ins, see runIn.
 func (t runTarget) run(st kitty.State, name string, values map[string]string, open string, stay bool) error {
 	cmd, ok := t.cfg.Command(name)
 	if !ok {
@@ -194,10 +200,12 @@ func (t runTarget) run(st kitty.State, name string, values map[string]string, op
 			inputs[in.Name] = v
 		}
 	}
-	r, err := spaces.NewRun(cmd, inputs)
+	pr := spaces.WorktreePR(t.space, t.wt)
+	r, err := spaces.NewRun(cmd, inputs, spaces.BuiltinVars(t.space, t.wt, pr))
 	if err != nil {
 		return err
 	}
+	r.PR = pr
 	if open != "" {
 		r.Open = open
 	}
@@ -376,7 +384,8 @@ func RunCommandNow(global config.Config, dirs []string, name string, inputs map[
 	if err != nil {
 		return err
 	}
-	if _, err := spaces.NewRun(cmd, inputs); err != nil {
+	first := targets[0]
+	if _, err := spaces.NewRun(cmd, inputs, spaces.BuiltinVars(first.space, first.wt, spaces.WorktreePR(first.space, first.wt))); err != nil {
 		return err
 	}
 	return runIn(targets, name, inputs, open)

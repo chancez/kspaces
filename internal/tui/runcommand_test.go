@@ -327,3 +327,59 @@ func TestRunSeveral(t *testing.T) {
 		t.Errorf("failures %q, want %q", got, want)
 	}
 }
+
+// In several worktrees an input left at its default is filled in for each with its own built-ins, the
+// form showing the first's; one typed in is the same in each.
+func TestRunSeveralDefaults(t *testing.T) {
+	root := mainRepo(t)
+	cfg, err := config.Parse(`
+[[commands]]
+name = "note"
+run = ["note", "{msg}"]
+inputs = [{ name = "msg", default = "on {branch}" }]
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Spaces = []string{root}
+	space := spaces.LoadSpace(root)
+	var dirs []string
+	for _, name := range []string{"fix", "dev"} {
+		wt, err := spaces.CreateWorktree(space, name, filepath.Join(root, ".worktrees", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		dirs = append(dirs, wt.Path)
+	}
+	calls := fakeKittenLs(t, "[]")
+	msgs := func() []string {
+		var out []string
+		for _, c := range calls() {
+			if _, v, ok := strings.Cut(c, "KSPACES_INPUT_MSG="); ok {
+				out = append(out, strings.TrimSuffix(v, "'"))
+			}
+		}
+		return out
+	}
+	targets, _, err := findRun(cfg, dirs, "note", nil, "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := newRunForm(targets, kitty.State{}, "note", nil, "")
+	f.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
+	shown := f.cmds.values()["msg"]
+	_, run := f.Update(keyMsg("enter"))
+	f.Update(run())
+	typeInto(f, "!")
+	_, run = f.Update(keyMsg("enter"))
+	f.Update(run())
+	type result struct {
+		Shown string
+		Ran   []string
+	}
+	got := result{shown, msgs()}
+	want := result{"on fix", []string{"on fix", "on dev", "on fix!", "on fix!"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+}

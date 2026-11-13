@@ -25,6 +25,8 @@ type layoutForm struct {
 	space   spaces.Space
 	wt      spaces.Worktree
 	layouts choiceFields[config.Layout]
+	// vars are the worktree's built-ins, which the inputs' defaults use.
+	vars map[string]string
 	// windows says whether the session has windows, without which the layout opens it.
 	windows bool
 	// focus is the index in fields of the field that has focus.
@@ -45,8 +47,9 @@ type layoutOpenedMsg struct{ err error }
 func newLayoutForm(cfg config.Config, space spaces.Space, wt spaces.Worktree, st kitty.State, name string, inputs map[string]string) *layoutForm {
 	th := look.New(true)
 	_, windows := st.Sessions[wt.Session]
-	f := &layoutForm{th: th, cfg: cfg, space: space, wt: wt, windows: windows,
-		layouts: newLayoutFields(th, cfg.Layouts, true, name, inputs)}
+	vars := spaces.BuiltinVars(space, wt, spaces.WorktreePR(space, wt))
+	f := &layoutForm{th: th, cfg: cfg, space: space, wt: wt, vars: vars, windows: windows,
+		layouts: newLayoutFields(th, cfg.Layouts, true, name, inputs, vars)}
 	moveFocus(f.fields(), &f.focus, 0)
 	return f
 }
@@ -88,7 +91,7 @@ func (f *layoutForm) cycleLayout(delta int) tea.Cmd {
 // open opens the chosen layout, or the shell tab, and leaves, or says why it cannot.
 func (f *layoutForm) open() tea.Cmd {
 	l, layout := f.layouts.chosen()
-	lr, err := spaces.NewLayoutRun(l, f.layouts.values())
+	lr, err := spaces.NewLayoutRun(l, f.layouts.values(), f.vars)
 	if layout && err != nil {
 		f.err = err
 		return nil
@@ -285,10 +288,12 @@ func OpenLayoutNow(global config.Config, dir, name string, inputs map[string]str
 	if err != nil {
 		return err
 	}
-	lr, err := spaces.NewLayoutRun(l, inputs)
+	pr := spaces.WorktreePR(space, wt)
+	lr, err := spaces.NewLayoutRun(l, inputs, spaces.BuiltinVars(space, wt, pr))
 	if err != nil {
 		return err
 	}
+	lr.PR = pr
 	st, err := kitty.LoadState(kitty.SelfWindowID())
 	if err != nil {
 		return err

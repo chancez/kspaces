@@ -32,6 +32,9 @@ type choiceFields[T any] struct {
 	// sel is the chosen one's index in choices, -1 for none.
 	sel    int
 	inputs [][]field
+	// defaults are the defaults each choice's inputs were last filled in with, for setVars to tell an
+	// input left as it was.
+	defaults [][]string
 	// list is the list of choices, while it is open.
 	list *choiceList
 }
@@ -53,13 +56,13 @@ const (
 
 // newCommandFields are the fields for cmds, see newChoiceFields, their inputs taking several lines. The
 // list says what each runs. optional offers none of them.
-func newCommandFields(th *look.Theme, cmds []config.Command, optional bool, name string, values map[string]string) choiceFields[config.Command] {
+func newCommandFields(th *look.Theme, cmds []config.Command, optional bool, name string, values, vars map[string]string) choiceFields[config.Command] {
 	var none *noChoice
 	if optional {
 		none = noCommand
 	}
 	return newChoiceFields(th, commandZone, cmds, func(c config.Command) string { return c.Name },
-		func(c config.Command) []config.Input { return c.Inputs }, commandDetail, true, none, name, values)
+		func(c config.Command) []config.Input { return c.Inputs }, commandDetail, true, none, name, values, vars)
 }
 
 // commandDetail is the command line c runs.
@@ -67,13 +70,13 @@ func commandDetail(c config.Command) string { return strings.Join(c.Run, " ") }
 
 // newLayoutFields are the fields for layouts, see newChoiceFields, their inputs taking several lines. The
 // list says how many tabs and panes each has. optional offers a shell tab in place of them.
-func newLayoutFields(th *look.Theme, layouts []config.Layout, optional bool, name string, values map[string]string) choiceFields[config.Layout] {
+func newLayoutFields(th *look.Theme, layouts []config.Layout, optional bool, name string, values, vars map[string]string) choiceFields[config.Layout] {
 	var none *noChoice
 	if optional {
 		none = shellLayout
 	}
 	return newChoiceFields(th, layoutZone, layouts, func(l config.Layout) string { return l.Name },
-		func(l config.Layout) []config.Input { return l.Inputs }, layoutDetail, true, none, name, values)
+		func(l config.Layout) []config.Input { return l.Inputs }, layoutDetail, true, none, name, values, vars)
 }
 
 // layoutDetail is how many tabs and panes l has.
@@ -87,11 +90,13 @@ func layoutDetail(l config.Layout) string {
 
 // newChoiceFields are the fields for choices, with the one called name chosen, or none, when it is a
 // choice, or the first when there is no such choice, and its inputs filled in from values, the rest with
-// their defaults. Each input is a textField when multiline says so, else a lineField.
-func newChoiceFields[T any](th *look.Theme, label string, choices []T, nameOf func(T) string, inputOf func(T) []config.Input, detailOf func(T) string, multiline bool, none *noChoice, name string, values map[string]string) choiceFields[T] {
+// their defaults with vars, the built-ins. Each input is a textField when multiline says so, else a
+// lineField.
+func newChoiceFields[T any](th *look.Theme, label string, choices []T, nameOf func(T) string, inputOf func(T) []config.Input, detailOf func(T) string, multiline bool, none *noChoice, name string, values, vars map[string]string) choiceFields[T] {
 	c := choiceFields[T]{th: th, label: label, zone: label, choices: choices, nameOf: nameOf, inputOf: inputOf, detailOf: detailOf, none: none}
 	for _, ch := range choices {
 		var ins []field
+		var defaults []string
 		for _, in := range inputOf(ch) {
 			placeholder := ""
 			if in.Required {
@@ -105,7 +110,8 @@ func newChoiceFields[T any](th *look.Theme, label string, choices []T, nameOf fu
 				b := newLineField(th, placeholder)
 				box = &b
 			}
-			v := in.Default
+			v := in.DefaultWith(vars)
+			defaults = append(defaults, v)
 			if given, ok := values[in.Name]; ok && nameOf(ch) == name {
 				v = given
 			}
@@ -113,9 +119,25 @@ func newChoiceFields[T any](th *look.Theme, label string, choices []T, nameOf fu
 			ins = append(ins, box)
 		}
 		c.inputs = append(c.inputs, ins)
+		c.defaults = append(c.defaults, defaults)
 	}
 	c.choose(name)
 	return c
+}
+
+// setVars fills the inputs left at their defaults in again with their defaults with vars, as the
+// built-ins they use have changed, such as the branch of the new worktree form. An input given a value
+// by newChoiceFields that is its default too counts as left at it.
+func (c *choiceFields[T]) setVars(vars map[string]string) {
+	for i, ch := range c.choices {
+		for j, in := range c.inputOf(ch) {
+			v := in.DefaultWith(vars)
+			if box := c.inputs[i][j]; box.Value() == c.defaults[i][j] && v != c.defaults[i][j] {
+				box.fill(v)
+			}
+			c.defaults[i][j] = v
+		}
+	}
 }
 
 // picks says whether there is a choice to show.
@@ -178,6 +200,22 @@ func (c *choiceFields[T]) values() map[string]string {
 	out := map[string]string{}
 	for i, in := range c.inputOf(ch) {
 		out[in.Name] = c.inputs[c.sel][i].Value()
+	}
+	return out
+}
+
+// edited are the chosen one's fields that differ from their defaults, by input name, so a field left at
+// its default can be filled in with another worktree's built-ins.
+func (c *choiceFields[T]) edited() map[string]string {
+	ch, ok := c.chosen()
+	if !ok {
+		return nil
+	}
+	out := map[string]string{}
+	for i, in := range c.inputOf(ch) {
+		if v := c.inputs[c.sel][i].Value(); v != c.defaults[c.sel][i] {
+			out[in.Name] = v
+		}
 	}
 	return out
 }

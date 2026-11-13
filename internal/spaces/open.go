@@ -90,7 +90,8 @@ func opensAfresh(cfg config.Config, st kitty.State, wt Worktree) bool {
 
 // OpensDefaultLayout says whether OpenWorktree would open wt, a worktree of space as listed, with its
 // default layout, so that OpenOptions.NoLayout changes what it opens. A default that needs inputs is not
-// opened anyway.
+// opened anyway. Its inputs' defaults are filled in without the worktree's PR, which git is not asked
+// for here, as a menu asks this as it is drawn.
 func OpensDefaultLayout(cfg config.Config, st kitty.State, space Space, wt Worktree) bool {
 	if wt.Path == "" || len(space.Worktrees) == 0 || !opensAfresh(cfg, st, wt) {
 		return false
@@ -100,7 +101,7 @@ func OpensDefaultLayout(cfg config.Config, st kitty.State, space Space, wt Workt
 	if !ok {
 		return false
 	}
-	_, err := NewLayoutRun(l, nil)
+	_, err := NewLayoutRun(l, nil, BuiltinVars(space, wt, 0))
 	return err == nil
 }
 

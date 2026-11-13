@@ -88,7 +88,7 @@ func TestBuildLayout(t *testing.T) {
 	space := Space{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Branch: "main", Session: "gr"}}}
 	wt := Worktree{Path: "/src/gr/.worktrees/fix", Branch: "pr/me/fix", Session: "gr@fix"}
 	l, _ := cfg.Layout("agent")
-	lr, err := NewLayoutRun(l, map[string]string{"prompt": "fix\nit"})
+	lr, err := NewLayoutRun(l, map[string]string{"prompt": "fix\nit"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +177,7 @@ panes = [
 	}
 	space := Space{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Branch: "main", Session: "gr"}}}
 	l, _ := cfg.Layout("watch")
-	lr, err := NewLayoutRun(l, nil)
+	lr, err := NewLayoutRun(l, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

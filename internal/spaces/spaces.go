@@ -114,7 +114,13 @@ func CreateWorktree(space Space, branch, dir string) (Worktree, error) {
 	if err != nil {
 		return Worktree{}, err
 	}
-	return Worktree{Path: path, Branch: branch, Session: sessionName(space.Name, false, path)}, nil
+	return LinkedWorktree(space, branch, path), nil
+}
+
+// LinkedWorktree is the linked worktree of space at path on branch, as CreateWorktree makes it, its
+// session named.
+func LinkedWorktree(space Space, branch, path string) Worktree {
+	return Worktree{Path: path, Branch: branch, Session: sessionName(space.Name, false, path)}
 }
 
 // Find is the space given by root or name, or, with an empty query, the space of the session of the

@@ -78,7 +78,8 @@ starting a new one, as the [forms](sidebar.md#the-menu) say. An input has:
 - `name`: lowercase letters, digits and `_`, used as `{name}` in templates;
 - `type`: optional, `string`, text, of one line or several, the only type so far;
 - `label`: optional, the name by default;
-- `default`: optional; a multi-line TOML string, `"""` to `"""`, for several lines;
+- `default`: optional, a template of the built-ins below, such as `"Review PR #{pr}"`; a multi-line TOML
+  string, `"""` to `"""`, for several lines;
 - `required`: optional; an empty required input refuses to run.
 
 A command with several inputs or long ones can list them as tables of their own instead, each
@@ -93,6 +94,11 @@ value's newlines stay in its word, so `claude {prompt}` gets a prompt of several
 out: `["claude", "{prompt?}"]` runs `claude` alone for an empty prompt, rather than with an empty argument,
 and `"--pr={pr?}"` goes when there is no PR. `{{` and `}}` are a literal brace. Anything else in braces, a bad input or an unknown `open` is an error when the
 config loads.
+
+An input's default can use the built-ins, not other inputs. The forms show it filled in, and the new
+worktree form fills it in again as the branch field changes, until it is typed in: `{pr}` is the PR's
+number once the field names one, and `{branch}` its branch once looked up. `--yes` and opening a default
+layout afresh fill it in the same way. A default with a literal brace writes it `{{` or `}}`.
 
 The command also gets `KSPACES_SPACE`, `KSPACES_ROOT`, `KSPACES_WORKTREE`, `KSPACES_BRANCH`, `KSPACES_BASE`,
 `KSPACES_SESSION`, `KSPACES_PR` and `KSPACES_INPUT_NAME` for each input, then `env`, which can override them.

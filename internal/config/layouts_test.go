@@ -215,7 +215,7 @@ panes = [{ command = "claude" }, { command = "codex", split = "right" }, { run =
 	}
 	var got []result
 	for _, given := range []map[string]string{{"prompt": "hi"}, {}, {"prompt": "hi", "x": "1"}} {
-		v, err := l.Values(given)
+		v, err := l.Values(given, nil)
 		got = append(got, result{v, errString(err)})
 	}
 	want := []result{

@@ -126,6 +126,14 @@ run = ["x"]
 [[commands.inputs]]
 name = "p"
 lable = "P"`, "unknown keys: commands.inputs.lable"},
+		{`[[commands]]
+name = "a"
+run = ["x", "{p}", "{q}"]
+inputs = [{ name = "p" }, { name = "q", default = "{p}" }]`, "commands: a: input q default: {p} is not a built-in, the only placeholders a default can have"},
+		{`[[commands]]
+name = "a"
+run = ["x"]
+inputs = [{ name = "p", default = "{" }]`, `commands: a: input p default: "{" has a { with no }; write {{ for a brace`},
 	} {
 		_, err := Parse(c.in)
 		if got := errString(err); got != c.want {
@@ -183,12 +191,15 @@ name = "model"
 	}
 }
 
-// Values fills in defaults, and refuses an input the command lacks or a required one left empty.
+// Values fills in defaults, their built-ins substituted, and refuses an input the command lacks or a
+// required one left empty.
 func TestCommandValues(t *testing.T) {
 	c := Command{Name: "claude", Inputs: []Input{
 		{Name: "prompt", Label: "Prompt", Required: true},
 		{Name: "model", Label: "model", Default: "opus"},
+		{Name: "task", Label: "task", Default: "Review PR #{pr} on {branch}, {{as is}}"},
 	}}
+	vars := map[string]string{"pr": "3", "branch": "feat"}
 	type result struct {
 		Values map[string]string
 		Err    string
@@ -196,17 +207,17 @@ func TestCommandValues(t *testing.T) {
 	var got []result
 	for _, given := range []map[string]string{
 		{"prompt": "fix it"},
-		{"prompt": "fix it", "model": ""},
+		{"prompt": "fix it", "model": "", "task": "{pr}"},
 		{"prompt": "  "},
 		{},
 		{"prompt": "x", "temperature": "1"},
 	} {
-		v, err := c.Values(given)
+		v, err := c.Values(given, vars)
 		got = append(got, result{v, errString(err)})
 	}
 	want := []result{
-		{map[string]string{"prompt": "fix it", "model": "opus"}, "<nil>"},
-		{map[string]string{"prompt": "fix it", "model": ""}, "<nil>"},
+		{map[string]string{"prompt": "fix it", "model": "opus", "task": "Review PR #3 on feat, {as is}"}, "<nil>"},
+		{map[string]string{"prompt": "fix it", "model": "", "task": "{pr}"}, "<nil>"},
 		{nil, "claude needs Prompt"},
 		{nil, "claude needs Prompt"},
 		{nil, "claude has no input temperature"},

@@ -153,6 +153,56 @@ func TestNewWorktreeFormStartsOnPR(t *testing.T) {
 	}
 }
 
+// An input's default is filled in with the built-ins of the worktree the form would create, and follows
+// the branch field while left as it was: a PR's number before it is looked up, then its branch. An input
+// typed in keeps what was typed.
+func TestNewWorktreeFormDefaults(t *testing.T) {
+	root := mainRepo(t)
+	fakeGH(t, map[string]string{
+		"3": `{"headRefName":"feat","headRepositoryOwner":{"login":"o"},"isCrossRepository":false,"number":3,"title":"Add feat","url":"https://github.com/o/r/pull/3"}`,
+	})
+	cfg, err := config.Parse(`
+[[commands]]
+name = "claude"
+run = ["claude", "{prompt}"]
+inputs = [{ name = "prompt", label = "Prompt", default = "Review PR #{pr} on {branch}" }]
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	space := spaces.Space{Name: "gr", Root: root, Worktrees: []spaces.Worktree{{Path: root, Branch: "main", Session: "gr"}}}
+	f := newForm(cfg, space)
+	f.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+	f.Update(keyMsg("tab"))
+	f.Update(keyMsg("tab"))
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+	prompt := func() string { return f.cmds.values()["prompt"] }
+	got := []string{prompt()}
+	typeInto(f, "fix")
+	got = append(got, prompt())
+	f.Update(keyMsg("ctrl+u"))
+	typeInto(f, "#3")
+	got = append(got, prompt())
+	lookUpPR(t, f)
+	got = append(got, prompt())
+	f.Update(keyMsg("tab"))
+	f.Update(keyMsg("tab"))
+	f.Update(keyMsg("tab"))
+	typeInto(f, "!")
+	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+	f.Update(keyMsg("ctrl+u"))
+	typeInto(f, "other")
+	got = append(got, prompt())
+	want := []string{"Review PR # on ", "Review PR # on fix", "Review PR #3 on ", "Review PR #3 on feat", "Review PR #3 on feat!"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+}
+
 // With commands configured the form chooses one, none at first, and has a field for each of its inputs;
 // tab goes through them all, left and right or a click change the command. A required input left empty
 // refuses to create. Created, the worktree's first tab runs the command: kspaces sends kitty launch with

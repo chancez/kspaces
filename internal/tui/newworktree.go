@@ -45,10 +45,12 @@ type newWorktreeForm struct {
 	isPR    bool
 	prSeq   int
 	lookups map[string]prLookup
-	busy    bool
-	err     error
-	width   int
-	height  int
+	// vars are the built-ins of the worktree the form would create now, which the inputs' defaults use.
+	vars   map[string]string
+	busy   bool
+	err    error
+	width  int
+	height int
 	// zones and buttons are where the last frame drew its buttons, and what each runs, for a click.
 	zones   map[string][]look.Zone
 	buttons controls[*newWorktreeForm]
@@ -85,8 +87,8 @@ func newForm(cfg config.Config, space spaces.Space) *newWorktreeForm {
 	branch.fill(spaces.BranchStart(cfg))
 	branch.Focus()
 	f := &newWorktreeForm{th: th, cfg: cfg, space: space, branch: branch, dir: newLineField(th, ""), lookups: map[string]prLookup{}}
-	f.layouts = newLayoutFields(th, cfg.Layouts, true, cfg.LayoutFor(space.Name, true), nil)
-	f.cmds = newCommandFields(th, cfg.Commands, true, "", nil)
+	f.layouts = newLayoutFields(th, cfg.Layouts, true, cfg.LayoutFor(space.Name, true), nil, nil)
+	f.cmds = newCommandFields(th, cfg.Commands, true, "", nil, nil)
 	f.followBranch()
 	return f
 }
@@ -123,7 +125,7 @@ func (f *newWorktreeForm) plan() (branch, dir string) {
 func (f *newWorktreeForm) create() tea.Cmd {
 	var layout *spaces.LayoutRun
 	if l, ok := f.layouts.chosen(); ok {
-		lr, err := spaces.NewLayoutRun(l, f.layouts.values())
+		lr, err := spaces.NewLayoutRun(l, f.layouts.values(), f.vars)
 		if err != nil {
 			f.err = err
 			return nil
@@ -132,7 +134,7 @@ func (f *newWorktreeForm) create() tea.Cmd {
 	}
 	var run *spaces.Run
 	if cmd, ok := f.cmds.chosen(); ok {
-		r, err := spaces.NewRun(cmd, f.cmds.values())
+		r, err := spaces.NewRun(cmd, f.cmds.values(), f.vars)
 		if err != nil {
 			f.err = err
 			return nil
@@ -342,8 +344,9 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // followBranch works out whether the branch field names a PR, and makes the directory's placeholder the
-// default for the branch it would create, so the form always shows where the worktree would go. A PR the
-// field has come to name is looked up once it rests on it, which the command it returns waits for.
+// default for the branch it would create, so the form always shows where the worktree would go, and the
+// inputs left at their defaults follow it too. A PR the field has come to name is looked up once it rests
+// on it, which the command it returns waits for.
 func (f *newWorktreeForm) followBranch() tea.Cmd {
 	var cmd tea.Cmd
 	if typed := f.branch.Value(); typed != f.typed {
@@ -365,12 +368,19 @@ func (f *newWorktreeForm) followBranch() tea.Cmd {
 			}
 		}
 	}
-	branch, _ := f.plan()
+	branch, planned := f.plan()
 	dir := spaces.WorktreeDir(f.cfg, f.space.Root, branch, "")
 	if rel, err := filepath.Rel(f.space.Root, dir); err == nil {
 		dir = rel
 	}
 	f.dir.Placeholder = dir
+	pr := 0
+	if f.isPR {
+		pr = f.pr.Number
+	}
+	f.vars = spaces.BuiltinVars(f.space, spaces.LinkedWorktree(f.space, branch, planned), pr)
+	f.layouts.setVars(f.vars)
+	f.cmds.setVars(f.vars)
 	return cmd
 }
 

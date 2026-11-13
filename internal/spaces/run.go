@@ -24,10 +24,10 @@ type Run struct {
 	Stay bool
 }
 
-// NewRun is cmd to run with inputs, the defaults filled in, where it is configured to open. A required
-// input left empty, or one cmd does not have, is an error.
-func NewRun(cmd config.Command, inputs map[string]string) (Run, error) {
-	values, err := cmd.Values(inputs)
+// NewRun is cmd to run with inputs, the defaults filled in with vars, the built-ins, where it is
+// configured to open. A required input left empty, or one cmd does not have, is an error.
+func NewRun(cmd config.Command, inputs, vars map[string]string) (Run, error) {
+	values, err := cmd.Values(inputs, vars)
 	if err != nil {
 		return Run{}, err
 	}
@@ -72,6 +72,16 @@ func RunCommand(cfg config.Config, st kitty.State, space Space, wt Worktree, r R
 
 // commandVars are the values of the placeholders of a command run in wt: the built-ins, then the inputs.
 func commandVars(space Space, wt Worktree, r Run) map[string]string {
+	vars := BuiltinVars(space, wt, r.PR)
+	for k, v := range r.Inputs {
+		vars[k] = v
+	}
+	return vars
+}
+
+// BuiltinVars are the values of the built-in placeholders, see config.Builtins, for wt, a worktree of
+// space, and pr, its PR, 0 when not known.
+func BuiltinVars(space Space, wt Worktree, pr int) map[string]string {
 	vars := map[string]string{
 		"space":    space.Name,
 		"root":     space.Root,
@@ -84,11 +94,8 @@ func commandVars(space Space, wt Worktree, r Run) map[string]string {
 	if len(space.Worktrees) > 0 {
 		vars["base"] = space.Worktrees[0].Branch
 	}
-	if r.PR > 0 {
-		vars["pr"] = strconv.Itoa(r.PR)
-	}
-	for k, v := range r.Inputs {
-		vars[k] = v
+	if pr > 0 {
+		vars["pr"] = strconv.Itoa(pr)
 	}
 	return vars
 }

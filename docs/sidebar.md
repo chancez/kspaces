@@ -309,8 +309,9 @@ Run switches to the session and opens it there. `kspaces run NAME PATH...` with 
 **Run in N worktrees**, listing their sessions and offering the commands every worktree's space has, by
 name, in the first's order, NAME chosen, or else the first of them; none in common is an error. Run opens
 the command in each, as its own space configures it and with the inputs it has, without switching
-sessions: launch keeps the focus, so the form stays in view. One failing does not stop the rest, and the
-form stays, a line for each that failed saying why. `--yes` runs in each without the form.
+sessions: launch keeps the focus, so the form stays in view. An input left at its default, shown filled in
+for the first worktree, is filled in for each with its own built-ins. One failing does not stop the rest,
+and the form stays, a line for each that failed saying why. `--yes` runs in each without the form.
 
 **Open layout** chooses a layout, the worktree's default at first, else the first configured, or `shell`,
 listed first as in the new worktree form, for one tab in the worktree that is a shell, with a `layout`

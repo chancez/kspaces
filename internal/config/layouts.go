@@ -272,10 +272,10 @@ func (cfg Config) PRLayoutFor(space string) string {
 	return cmp.Or(cfg.Space[space].PRLayout, cfg.DefaultPRLayout, cfg.LayoutFor(space, true))
 }
 
-// Values are the layout's inputs as given, by name, the default for any not given. An input it does not
-// have, or a required one left empty, is an error.
-func (l Layout) Values(given map[string]string) (map[string]string, error) {
-	return inputValues(l.Name, l.Inputs, given)
+// Values are the layout's inputs as given, by name, the default with vars, the built-ins, for any not
+// given. An input it does not have, or a required one left empty, is an error.
+func (l Layout) Values(given, vars map[string]string) (map[string]string, error) {
+	return inputValues(l.Name, l.Inputs, given, vars)
 }
 
 // PaneCommand is what pane p of l runs: its configured command, or its run as a command with l's inputs.

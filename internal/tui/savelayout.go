@@ -103,9 +103,9 @@ func newSaveLayoutForm(global config.Config, space spaces.Space, wt spaces.Workt
 	}
 	plain := func(s string) string { return s }
 	none := func(string) []config.Input { return nil }
-	f.scope = newChoiceFields(th, scopeZone, []string{thisTab, everyTab}, plain, none, nil, false, nil, scope, nil)
+	f.scope = newChoiceFields(th, scopeZone, []string{thisTab, everyTab}, plain, none, nil, false, nil, scope, nil, nil)
 	// The space's file first, so a layout of one repository stays out of the global config.
-	f.target = newChoiceFields(th, targetZone, []string{space.Name + "'s " + config.SpaceFileName, globalTarget}, plain, none, nil, false, nil, "", nil)
+	f.target = newChoiceFields(th, targetZone, []string{space.Name + "'s " + config.SpaceFileName, globalTarget}, plain, none, nil, false, nil, "", nil, nil)
 	if data, err := os.ReadFile(space.ConfigPath()); err == nil {
 		f.own.exists = true
 		if file, err := config.ParseSpaceFile(string(data)); err == nil {
@@ -128,7 +128,7 @@ func newSaveLayoutForm(global config.Config, space spaces.Space, wt spaces.Workt
 					return runInput
 				}
 				return nil
-			}, nil, false, nil, prefill(cfg, prog), nil)
+			}, nil, false, nil, prefill(cfg, prog), nil, nil)
 			c.zone = fmt.Sprintf("pane:%d:%d", t, p)
 			// The run box has the command line whatever is chosen, for switching to it. It is one line, as
 			// the line is split into words.
