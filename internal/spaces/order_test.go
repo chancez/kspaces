@@ -61,7 +61,7 @@ func TestOrderModes(t *testing.T) {
 	} {
 		others, spaces, order := orderFixture()
 		order.Mode, order.Held = c.mode, c.held
-		if got := rowNames(BuildRows(others, spaces, nil, order)); !reflect.DeepEqual(got, c.want) {
+		if got := rowNames(BuildRows(others, spaces, nil, nil, order)); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%q held %v:\ngot  %q\nwant %q", c.mode, c.held, got, c.want)
 		}
 		// The snapshot keeps its own order.

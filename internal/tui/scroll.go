@@ -54,11 +54,11 @@ func (m *sidebar) scrollSpacesToCursor() {
 	}
 }
 
-// entriesIn counts the rows from up to to that are entries, not the blank rows between groups of spaces.
+// entriesIn counts the rows from up to to that are entries, not the blank rows between spaces.
 func (m *sidebar) entriesIn(from, to int) int {
 	n := 0
 	for _, r := range m.rows[from:to] {
-		if r.Space != nil {
+		if !r.Blank() {
 			n++
 		}
 	}

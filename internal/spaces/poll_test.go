@@ -97,7 +97,7 @@ func TestPollerWithoutLock(t *testing.T) {
 func TestSharedView(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	dock := map[string]string{"kspaces": "1"}
-	cfg := config.Config{SessionsDir: "/sessions"}
+	cfg := config.Config{SessionsDir: "/sessions", Space: map[string]config.SpaceSettings{"gr": {Group: "work"}}, Groups: []string{"work", "home"}}
 	sh := Shared{
 		Config: &cfg,
 		Spaces: []sharedSpace{
@@ -120,7 +120,7 @@ func TestSharedView(t *testing.T) {
 		return snap
 	}
 	spaces := []Space{
-		{Name: "gr", Root: "/src/gr", Worktrees: sh.Spaces[0].Worktrees, Missing: []Worktree{{Session: "gr@gone"}}},
+		{Name: "gr", Root: "/src/gr", Group: "work", Worktrees: sh.Spaces[0].Worktrees, Missing: []Worktree{{Session: "gr@gone"}}},
 		{Name: "broken", Root: "/src/broken", Err: errors.New("not a git repository")},
 	}
 	common := kitty.State{
@@ -134,9 +134,9 @@ func TestSharedView(t *testing.T) {
 		return Snapshot{
 			Config: &cfg, Spaces: spaces,
 			Others: []Space{{Name: "notes", Worktrees: []Worktree{{Session: "notes"}}}},
-			Folded: map[string]bool{}, Saved: map[string]bool{"gr": true, "notes": true, "gr@gone": true}, Kitty: st,
-			// Nothing saved: manual, with kitty's times.
-			Order: Order{Mode: SortManual, Worktrees: map[string][]string{}, Focused: st.Focused},
+			Folded: map[string]bool{}, Hidden: map[string]bool{}, Saved: map[string]bool{"gr": true, "notes": true, "gr@gone": true}, Kitty: st,
+			// Nothing saved: manual, with kitty's times, and config.toml's groups.
+			Order: Order{Mode: SortManual, Worktrees: map[string][]string{}, Groups: []string{"work", "home"}, Focused: st.Focused},
 		}
 	}
 	for self, w := range map[int]Snapshot{11: want("gr", 10, "/src/gr"), 21: want("gr@dev", 20, "/src/gr/dev")} {

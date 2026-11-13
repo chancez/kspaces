@@ -71,7 +71,7 @@ func (m *sidebar) clickError(t interact.Target[*sidebar], msg tea.MouseClickMsg)
 	case tea.MouseLeft:
 		return runFirst(m, t, actShowError)
 	case tea.MouseRight:
-		m.openMenu(t, msg.Y)
+		m.openMenu(msg.Y, t)
 		if m.menu != nil {
 			m.menu.ofError = true
 		}

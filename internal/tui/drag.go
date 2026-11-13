@@ -60,7 +60,7 @@ func (m *sidebar) dragTo(y int) {
 	if on != "" {
 		o := m.rowOrder()
 		o.Held = next.held()
-		rows := spaces.BuildRows(m.others, m.spaces, m.folded, o)
+		rows := spaces.BuildRows(m.others, m.spaces, m.folded, m.hidden, o)
 		if i >= 0 && i < len(rows) && dragItem(rows[i], p.row) == on {
 			return
 		}
@@ -71,20 +71,29 @@ func (m *sidebar) dragTo(y int) {
 }
 
 // dropAt is where the dragged row goes with the mouse on row i, among its own, and what the mouse is on
-// that it moves past: a space's root or a worktree's session, empty for none.
+// that it moves past: a space's root or a worktree's session, empty for none. A space moves among the
+// spaces of its group only, so the mouse above their rows puts it first, and below them last.
 func (m *sidebar) dropAt(i int) (to int, on string, ok bool) {
 	p := m.press
 	if p.row.Main {
-		last := len(p.drag.roots) - 1
+		// The rows of the spaces of the dragged one's group, which BuildRows lists together.
+		first, last := -1, -1
+		for j, r := range m.rows {
+			if r.Space != nil && !r.Other && r.Space.Group == p.row.Space.Group {
+				if first < 0 {
+					first = j
+				}
+				last = j
+			}
+		}
+		_, n := p.drag.place(p.row)
 		switch {
-		case i < 0:
-			return 0, "", true
-		case i >= len(m.rows):
-			return last, "", true
-		case m.rows[i].Space == nil:
+		case i >= 0 && i < len(m.rows) && m.rows[i].Blank():
 			return 0, "", false
-		case m.rows[i].Other:
+		case i < first:
 			return 0, "", true
+		case i > last:
+			return n - 1, "", true
 		}
 		to, _ := p.drag.place(spaces.Row{Space: m.rows[i].Space, Main: true})
 		return to, m.rows[i].Space.Root, true
@@ -123,7 +132,8 @@ func dragItem(r, dragged spaces.Row) string {
 	return ""
 }
 
-// release ends the press: a drag keeps the order it moved to, and a click opens its row when let go on it.
+// release ends the press: a drag keeps the order it moved to, and a click opens its row when let go on it,
+// or folds the group of a group's header, which has nothing to open.
 func (m *sidebar) release(x, y int) tea.Cmd {
 	p := m.press
 	m.press = nil
@@ -140,7 +150,7 @@ func (m *sidebar) release(x, y int) tea.Cmd {
 	}
 	m.cursor = i
 	t, _ := m.entryTarget(i)
-	return runFirst(m, t, actOpenWorktree)
+	return runFirst(m, t, actOpenWorktree, actFoldGroup, actUnfoldGroup)
 }
 
 // cancelPress lets go of the press, and puts the rows back where a drag found them.

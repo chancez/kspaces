@@ -82,6 +82,9 @@ type Order struct {
 	// Worktrees is the manual order of linked worktrees, by space root: their directory names. Those it
 	// does not name follow in git's order.
 	Worktrees map[string][]string
+	// Groups is the order of the groups, config.toml's groups: those it does not list follow, by name.
+	// Spaces in no group come before them all, and each group's spaces are in the mode's order.
+	Groups []string
 	// Focused is when each session was last focused, see kitty.State.Focused.
 	Focused map[string]float64
 	// Statuses are kitty's, for SortStatus.
@@ -115,6 +118,51 @@ func (o Order) arrange(others, spaces []Space) ([]Space, []Space) {
 	}
 	sortBy(o, spaces, func(s Space) string { return s.Root }, spaceSessions)
 	return others, spaces
+}
+
+// grouped is spaces, in their order, by group, see Order.Groups: those in no group first, under the
+// empty name, then each group a space is in.
+func (o Order) grouped(spaces []Space) []*Group {
+	by := map[string]*Group{}
+	var names []string
+	for i := range spaces {
+		s := &spaces[i]
+		g, ok := by[s.Group]
+		if !ok {
+			g = &Group{Name: s.Group}
+			by[s.Group] = g
+			names = append(names, s.Group)
+		}
+		g.Spaces = append(g.Spaces, s)
+	}
+	rank := func(name string) int {
+		if name == "" {
+			return -1
+		}
+		if i := slices.Index(o.Groups, name); i >= 0 {
+			return i
+		}
+		return len(o.Groups)
+	}
+	slices.SortFunc(names, func(a, b string) int {
+		return cmp.Or(cmp.Compare(rank(a), rank(b)), cmp.Compare(a, b))
+	})
+	out := make([]*Group, len(names))
+	for i, name := range names {
+		out[i] = by[name]
+	}
+	return out
+}
+
+// GroupNames are the groups spaces are in, in their order, see Order.Groups.
+func (o Order) GroupNames(spaces []Space) []string {
+	var ans []string
+	for _, g := range o.grouped(spaces) {
+		if g.Name != "" {
+			ans = append(ans, g.Name)
+		}
+	}
+	return ans
 }
 
 // spaceSessions are the sessions of a space's worktrees, missing ones too.

@@ -35,12 +35,16 @@ func (c *contextMenu) height() int {
 	return len(c.items) + len(c.rules) + 1
 }
 
-// openMenu opens the menu of t, drawn from screen row y.
-func (m *sidebar) openMenu(t interact.Target[*sidebar], y int) {
+// openMenu opens the menu of ts, drawn from screen row y.
+func (m *sidebar) openMenu(y int, ts ...interact.Target[*sidebar]) {
 	// Each section's items together, the sections in the order their first items come.
 	var order []string
 	by := map[string][]interact.Bound[*sidebar]{}
-	for _, g := range t.Groups(m) {
+	var groups []interact.Group[*sidebar]
+	for _, t := range ts {
+		groups = append(groups, t.Groups(m)...)
+	}
+	for _, g := range groups {
 		for _, it := range g.Actions {
 			if _, ok := by[it.Section]; !ok {
 				order = append(order, it.Section)
@@ -76,11 +80,11 @@ func (m *sidebar) menuAtCursor() {
 	case !ok:
 	case m.cursor < len(m.rows):
 		if m.cursor >= m.offset {
-			m.openMenu(t, headerRows+m.cursor-m.offset)
+			m.openMenu(headerRows+m.cursor-m.offset, t)
 		}
 	default:
 		if zones := m.zones[fmt.Sprintf(entryZone, m.cursor)]; len(zones) > 0 {
-			m.openMenu(t, zones[0].Y)
+			m.openMenu(zones[0].Y, t)
 		}
 	}
 }
@@ -192,6 +196,40 @@ func (m *sidebar) toggleFold(root string) {
 			m.cursor = i
 		}
 	}
+	m.scrollToCursor()
+}
+
+// toggleGroupFold hides or shows the spaces of the group called name, in every sidebar, as toggleFold
+// does a space's worktrees.
+func (m *sidebar) toggleGroupFold(name string) {
+	key := spaces.GroupKey(name)
+	m.folded[key] = !m.folded[key]
+	if err := spaces.SaveFolded(m.folded); err != nil {
+		m.failed = err
+	}
+	m.setRows()
+	for i, r := range m.rows {
+		if r.Group != nil && r.Group.Name == name {
+			m.cursor = i
+		}
+	}
+	m.scrollToCursor()
+}
+
+// toggleHidden leaves the group called name out of the list, or puts it back, in every sidebar. Its
+// status entries go and come with it, see spaces.Shown.
+func (m *sidebar) toggleHidden(name string) {
+	if m.hidden == nil {
+		m.hidden = map[string]bool{}
+	}
+	m.hidden[name] = !m.hidden[name]
+	if err := spaces.SaveHidden(m.hidden); err != nil {
+		m.failed = err
+	}
+	at := m.cursorAt()
+	m.kitty.Statuses = spaces.Shown(m.cfg, m.hidden, m.statuses)
+	m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))
+	m.rebuildRows(at)
 	m.scrollToCursor()
 }
 

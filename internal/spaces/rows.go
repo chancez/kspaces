@@ -11,7 +11,7 @@ import (
 	"github.com/chancez/kspaces/internal/kitty"
 )
 
-// Row is one line of the sidebar's list. The zero row is the blank line between groups.
+// Row is one line of the sidebar's list. The zero row is the blank line between spaces.
 type Row struct {
 	Space *Space
 	// Nil when the space's worktrees could not be listed.
@@ -22,8 +22,21 @@ type Row struct {
 	Other bool
 	// A missing worktree of the space, see Space.Missing. Its Worktree has no path.
 	Missing bool
-	// On a space's own row: its linked worktrees are hidden.
+	// On a space's own row: its linked worktrees are hidden. On a group's header: its spaces are.
 	Folded bool
+	// A group's header, which has no Space, heading its spaces' rows.
+	Group *Group
+}
+
+// Group is a group of spaces, as its header has it: its name, and its spaces in the rows' order.
+type Group struct {
+	Name   string
+	Spaces []*Space
+}
+
+// Blank reports whether r is the blank line between spaces, which is no entry.
+func (r Row) Blank() bool {
+	return r.Space == nil && r.Group == nil
 }
 
 // Dir names a linked worktree's row: its directory, or for a missing one the directory its session is
@@ -35,34 +48,50 @@ func (r Row) Dir() string {
 	return filepath.Base(r.Worktree.Path)
 }
 
-// BuildRows lists the sessions that belong to no space first, then each space followed by its linked
-// worktrees and its missing ones, with a blank row between groups and between spaces, all in order's
-// order. A space's own row opens its main worktree. The linked and missing worktrees of a space whose root
-// is in folded are left out. The rows point into copies of others and spaces.
-func BuildRows(others, spaces []Space, folded map[string]bool, order Order) []Row {
+// BuildRows lists the sessions that belong to no space first, then the spaces in no group, then each
+// group's header followed by its spaces, each space followed by its linked worktrees and its missing ones,
+// with a blank row between spaces and above each header, all in order's order. A space's own row opens
+// its main worktree. The linked and missing worktrees of a space whose root is in folded are left out, as
+// are the spaces of a group whose GroupKey is; the groups in hidden, by name, are left out whole. The
+// rows point into copies of others and spaces.
+func BuildRows(others, spaces []Space, folded, hidden map[string]bool, order Order) []Row {
 	others, spaces = order.arrange(others, spaces)
 	var rows []Row
 	for i := range others {
 		rows = append(rows, Row{Space: &others[i], Worktree: &others[i].Worktrees[0], Main: true, Other: true})
 	}
-	for i := range spaces {
-		if len(rows) > 0 {
-			rows = append(rows, Row{})
+	for _, g := range order.grouped(spaces) {
+		if g.Name != "" {
+			if hidden[g.Name] {
+				continue
+			}
+			if len(rows) > 0 {
+				rows = append(rows, Row{})
+			}
+			header := Row{Group: g, Folded: folded[GroupKey(g.Name)]}
+			if rows = append(rows, header); header.Folded {
+				continue
+			}
 		}
-		s := &spaces[i]
-		r := Row{Space: s, Main: true, Folded: folded[s.Root] && s.HasLinked()}
-		if len(s.Worktrees) > 0 {
-			r.Worktree = &s.Worktrees[0]
-		}
-		rows = append(rows, r)
-		if r.Folded {
-			continue
-		}
-		for j := 1; j < len(s.Worktrees); j++ {
-			rows = append(rows, Row{Space: s, Worktree: &s.Worktrees[j]})
-		}
-		for j := range s.Missing {
-			rows = append(rows, Row{Space: s, Worktree: &s.Missing[j], Missing: true})
+		for j, s := range g.Spaces {
+			// A group's first space goes right under its header.
+			if len(rows) > 0 && (j > 0 || g.Name == "") {
+				rows = append(rows, Row{})
+			}
+			r := Row{Space: s, Main: true, Folded: folded[s.Root] && s.HasLinked()}
+			if len(s.Worktrees) > 0 {
+				r.Worktree = &s.Worktrees[0]
+			}
+			rows = append(rows, r)
+			if r.Folded {
+				continue
+			}
+			for k := 1; k < len(s.Worktrees); k++ {
+				rows = append(rows, Row{Space: s, Worktree: &s.Worktrees[k]})
+			}
+			for k := range s.Missing {
+				rows = append(rows, Row{Space: s, Worktree: &s.Missing[k], Missing: true})
+			}
 		}
 	}
 	return rows
@@ -141,8 +170,11 @@ type Snapshot struct {
 	Spaces []Space
 	// Sessions that belong to no space, see placeSessions.
 	Others []Space
-	// Roots of the spaces whose linked worktrees are hidden.
+	// Roots of the spaces whose linked worktrees are hidden, and the GroupKey of each group whose spaces
+	// are.
 	Folded map[string]bool
+	// The groups left out of the sidebar, by name, see LoadHidden.
+	Hidden map[string]bool
 	// How the rows are ordered: the sort mode and the worktrees' manual order, saved as the folded spaces
 	// are, with kitty's focus times and statuses.
 	Order Order

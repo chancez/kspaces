@@ -86,16 +86,16 @@ func LoadShared() Shared {
 	return sh
 }
 
-// View is the snapshot sh is from the window self, or kitty.FocusedWindow. The folded spaces, the sort
-// mode and the worktrees' manual order are read here rather than shared, so a change shows in the sidebar
-// that made it at once.
+// View is the snapshot sh is from the window self, or kitty.FocusedWindow. The folded spaces and groups,
+// the hidden groups, the sort mode and the worktrees' manual order are read here rather than shared, so a
+// change shows in the sidebar that made it at once.
 func (sh Shared) View(self int) Snapshot {
 	if sh.Config == nil {
 		return Snapshot{Err: errors.New(sh.Err)}
 	}
 	spaces := make([]Space, len(sh.Spaces))
 	for i, s := range sh.Spaces {
-		spaces[i] = Space{Name: s.Name, Root: s.Root, Worktrees: s.Worktrees, Config: s.Config, Untrusted: s.Untrusted}
+		spaces[i] = Space{Name: s.Name, Root: s.Root, Worktrees: s.Worktrees, Group: sh.Config.Space[s.Name].Group, Config: s.Config, Untrusted: s.Untrusted}
 		if s.Err != "" {
 			spaces[i].Err = errors.New(s.Err)
 		}
@@ -110,8 +110,8 @@ func (sh Shared) View(self int) Snapshot {
 	}
 	// The missing worktrees go in the spaces, which are this view's own copies: what the leader shares, and
 	// asks git about in targets, is only what git lists.
-	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, st.Sessions, sh.Saved), Folded: LoadFolded(), Saved: saved, Kitty: st}
-	snap.Order = Order{Mode: LoadSort(), Worktrees: LoadOrder(), Focused: st.Focused, Statuses: st.Statuses}
+	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, st.Sessions, sh.Saved), Folded: LoadFolded(), Hidden: LoadHidden(), Saved: saved, Kitty: st}
+	snap.Order = Order{Mode: LoadSort(), Worktrees: LoadOrder(), Groups: sh.Config.Groups, Focused: st.Focused, Statuses: st.Statuses}
 	if sh.KittyErr != "" {
 		snap.Err = errors.New(sh.KittyErr)
 	}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/tui/interact"
 )
 
 // The spaces list's order: the sort mode every sidebar shares, and moving rows by hand.
@@ -40,10 +41,14 @@ func (m *sidebar) setSort(mode spaces.SortMode) {
 }
 
 // openSortMenu opens the spaces list's menu, of the sort button, the title and the list's empty rows,
-// drawn from screen row y: the sort modes, the one chosen now marked and selected, and the attention
-// filter, marked while it is on.
+// drawn from screen row y: the sort modes, the one chosen now marked and selected, the attention filter,
+// marked while it is on, and each group, marked while it is shown.
 func (m *sidebar) openSortMenu(y int) {
-	m.openMenu(theSort.Target(sortSubject{}), y)
+	targets := []interact.Target[*sidebar]{theSort.Target(sortSubject{})}
+	for _, name := range m.order.GroupNames(m.spaces) {
+		targets = append(targets, theGroups.Target(groupFilterSubject{name: name}))
+	}
+	m.openMenu(y, targets...)
 	if m.menu == nil {
 		return
 	}
@@ -54,6 +59,8 @@ func (m *sidebar) openSortMenu(y int) {
 			m.menu.chosen[i], m.menu.sel = true, i
 		case it.Is(actAttentionItem):
 			m.menu.chosen[i] = m.attending
+		case it.Is(actShowGroup):
+			m.menu.chosen[i] = !m.hidden[it.Title]
 		}
 	}
 }
@@ -63,21 +70,24 @@ func (m *sidebar) openSortMenu(y int) {
 type arrangement struct {
 	// The sessions in no space, which do not move but are held where they are with the rest.
 	others []string
-	roots  []string
-	// By root.
+	// Each group's spaces together, as BuildRows lists them.
+	roots []string
+	// By root: the group of each space, and its linked worktrees.
+	groups map[string]string
 	linked map[string][]spaces.Worktree
 }
 
-// shown is the order the rows are in, folded spaces' worktrees too.
+// shown is the order the rows are in, folded spaces' worktrees too, and folded and hidden groups' spaces.
 func (m *sidebar) shown() arrangement {
-	a := arrangement{linked: map[string][]spaces.Worktree{}}
-	for _, r := range spaces.BuildRows(m.others, m.spaces, nil, m.rowOrder()) {
+	a := arrangement{groups: map[string]string{}, linked: map[string][]spaces.Worktree{}}
+	for _, r := range spaces.BuildRows(m.others, m.spaces, nil, nil, m.rowOrder()) {
 		switch {
 		case r.Space == nil || r.Missing:
 		case r.Other:
 			a.others = append(a.others, r.Worktree.Session)
 		case r.Main:
 			a.roots = append(a.roots, r.Space.Root)
+			a.groups[r.Space.Root] = r.Space.Group
 		default:
 			a.linked[r.Space.Root] = append(a.linked[r.Space.Root], *r.Worktree)
 		}
@@ -108,14 +118,29 @@ func movable(r spaces.Row) bool {
 	return r.Space != nil && !r.Other && !r.Missing && (r.Main || r.Worktree != nil)
 }
 
-// place is where r is in a, and how many it is among: a space among the spaces, a linked worktree among
-// its space's. -1 when a does not have it.
+// place is where r is in a, and how many it is among: a space among the spaces of its group, a linked
+// worktree among its space's. -1 when a does not have it.
 func (a arrangement) place(r spaces.Row) (int, int) {
 	if r.Main {
-		return slices.Index(a.roots, r.Space.Root), len(a.roots)
+		start, n := a.group(r.Space.Root)
+		return slices.Index(a.roots[start:start+n], r.Space.Root), n
 	}
 	wts := a.linked[r.Space.Root]
 	return slices.IndexFunc(wts, func(wt spaces.Worktree) bool { return wt.Session == r.Worktree.Session }), len(wts)
+}
+
+// group is where the spaces of root's group start in a.roots, and how many there are; none when a does
+// not have root.
+func (a arrangement) group(root string) (start, n int) {
+	g, ok := a.groups[root]
+	if !ok {
+		return 0, 0
+	}
+	start = slices.IndexFunc(a.roots, func(r string) bool { return a.groups[r] == g })
+	for start+n < len(a.roots) && a.groups[a.roots[start+n]] == g {
+		n++
+	}
+	return start, n
 }
 
 // move is a with r moved to place to among its own, a copy.
@@ -125,9 +150,10 @@ func (a arrangement) move(r spaces.Row, to int) arrangement {
 		return a
 	}
 	to = min(max(to, 0), n-1)
-	out := arrangement{others: a.others, roots: a.roots, linked: maps.Clone(a.linked)}
+	out := arrangement{others: a.others, roots: a.roots, groups: a.groups, linked: maps.Clone(a.linked)}
 	if r.Main {
-		out.roots = moved(a.roots, from, to)
+		start, _ := a.group(r.Space.Root)
+		out.roots = moved(a.roots, start+from, start+to)
 	} else {
 		out.linked[r.Space.Root] = moved(a.linked[r.Space.Root], from, to)
 	}
@@ -154,9 +180,13 @@ func dirs(wts []spaces.Worktree) []string {
 // fresh load follows for what the config now says.
 func (m *sidebar) keep(a arrangement, r spaces.Row) tea.Cmd {
 	automatic := m.sortMode() != spaces.SortManual
+	// config.toml's order as the manual mode shows it, each group's spaces together: a move that leaves
+	// it as it is, as of a worktree, need not rewrite the file only to group them there too.
 	var listed []string
-	for _, s := range m.spaces {
-		listed = append(listed, s.Root)
+	for _, row := range spaces.BuildRows(nil, m.spaces, nil, nil, spaces.Order{Groups: m.order.Groups}) {
+		if row.Main {
+			listed = append(listed, row.Space.Root)
+		}
 	}
 	if !slices.Equal(a.roots, listed) {
 		if err := config.SaveSpacesOrder(a.roots); err != nil {

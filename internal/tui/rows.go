@@ -29,10 +29,18 @@ const (
 	attentionZone = "attention"
 )
 
-// rowSessions are the worktrees a row stands for: its own, and for a folded space all of the space's,
-// missing ones too.
+// rowSessions are the worktrees a row stands for: its own, for a folded space all of the space's, missing
+// ones too, and for a folded group's header all of its spaces'.
 func rowSessions(r spaces.Row) []spaces.Worktree {
 	switch {
+	case r.Group != nil && r.Folded:
+		var ans []spaces.Worktree
+		for _, s := range r.Group.Spaces {
+			ans = slices.Concat(ans, s.Worktrees, s.Missing)
+		}
+		return ans
+	case r.Group != nil:
+		return nil
 	case r.Folded:
 		return slices.Concat(r.Space.Worktrees, r.Space.Missing)
 	case r.Worktree != nil:
@@ -56,7 +64,10 @@ func rowHolds(r spaces.Row, session string) bool {
 // worktree has the gone marker and `gone` for its branch, faint only once its session has no windows.
 func (m *sidebar) renderRow(i int) string {
 	r, width, th := m.rows[i], m.contentWidth(), m.th
-	if r.Space == nil {
+	switch {
+	case r.Group != nil:
+		return m.renderHeader(i)
+	case r.Space == nil:
 		return th.Draw(look.Plain, width)
 	}
 	caret := []look.Span{look.NoCaret()}
@@ -138,6 +149,35 @@ func (m *sidebar) renderRow(i int) string {
 	case m.dragging(r), i == m.cursor && m.navigating(), m.hoverShown && rowKey(r) == m.hoverRow:
 		surface = look.Cursor
 	case current:
+		surface = look.Current
+	}
+	return th.DrawZone(fmt.Sprintf(entryZone, i), surface, width, spans...)
+}
+
+// renderHeader draws row i, a group's header, marked as its entry, as a divider: a rule in the caret
+// column, the group's name, its fold icon, but while filtering, which ignores folds, and the rule on to
+// the right edge. A narrow sidebar loses the rule after the icon first, then the name's end, so the icon
+// stays. A folded group stands for its spaces' sessions, so it is current when one of them is.
+func (m *sidebar) renderHeader(i int) string {
+	r, width, th := m.rows[i], m.contentWidth(), m.th
+	lead := []look.Span{th.GroupRule(th.Width(look.NoCaret())), look.Muted(" ")}
+	var fold []look.Span
+	if !m.filtering {
+		fold = append([]look.Span{look.Muted(" ")}, look.Mark(fmt.Sprintf(caretZone, i), look.GroupFold(r.Folded)...)...)
+	}
+	room := max(width-th.Width(lead...)-th.Width(fold...), 0)
+	spans := append(append(lead, th.Cut(room, look.GroupHeader(r.Group.Name))...), fold...)
+	if rest := width - th.Width(spans...); rest > 0 {
+		if len(fold) == 0 {
+			spans, rest = append(spans, look.Muted(" ")), rest-1
+		}
+		spans = append(spans, th.GroupRule(rest))
+	}
+	surface := look.Plain
+	switch {
+	case i == m.cursor && m.navigating():
+		surface = look.Cursor
+	case rowHolds(r, m.kitty.Current):
 		surface = look.Current
 	}
 	return th.DrawZone(fmt.Sprintf(entryZone, i), surface, width, spans...)

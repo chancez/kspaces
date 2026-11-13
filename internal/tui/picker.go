@@ -35,7 +35,7 @@ func (p pickItems) String(i int) string { return p[i].text }
 func (p pickItems) Len() int            { return len(p) }
 
 // pickItemsFrom lists the windows that report a status first, most urgent first, then every session and
-// worktree in sidebar order.
+// worktree in sidebar order, a grouped space's under its group's name, so a query finds them by it.
 func pickItemsFrom(snap spaces.Snapshot) pickItems {
 	var items pickItems
 	for i := range snap.Kitty.Statuses {
@@ -53,11 +53,14 @@ func pickItemsFrom(snap spaces.Snapshot) pickItems {
 		}
 		items = append(items, pickItem{text: joinDetail(name, detail), nameLen: len(name), icon: look.StateMarker(s.State), status: s})
 	}
-	for _, r := range spaces.BuildRows(snap.Others, snap.Spaces, nil, snap.Order) {
+	for _, r := range spaces.BuildRows(snap.Others, snap.Spaces, nil, nil, snap.Order) {
 		if r.Worktree == nil {
 			continue
 		}
 		name := r.Space.Name
+		if r.Space.Group != "" {
+			name = r.Space.Group + " / " + name
+		}
 		if !r.Main {
 			name += " / " + r.Dir()
 		}

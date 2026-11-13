@@ -23,6 +23,12 @@ type entrySubject struct {
 	row   spaces.Row
 }
 
+// groupSubject is a group's header in the spaces list, by the group's name.
+type groupSubject struct{ name string }
+
+// groupFilterSubject is a group in the spaces list's menu, which shows or hides it.
+type groupFilterSubject struct{ name string }
+
 // statusSubject is an entry of the sidebar's status list, by its index in the statuses.
 type statusSubject struct {
 	index  int
@@ -264,6 +270,22 @@ var (
 	}
 )
 
+// A group's header's. A click on it does what space does, as there is nothing to open.
+var (
+	actFoldGroup = &interact.Action[*sidebar, groupSubject]{
+		Title:   "Fold group",
+		Section: "Group",
+		Applies: func(m *sidebar, s groupSubject) bool { return !m.filtering && !m.folded[spaces.GroupKey(s.name)] },
+		Run:     func(m *sidebar, s groupSubject) tea.Cmd { m.toggleGroupFold(s.name); return nil },
+	}
+	actUnfoldGroup = &interact.Action[*sidebar, groupSubject]{
+		Title:   "Unfold group",
+		Section: "Group",
+		Applies: func(m *sidebar, s groupSubject) bool { return !m.filtering && m.folded[spaces.GroupKey(s.name)] },
+		Run:     func(m *sidebar, s groupSubject) tea.Cmd { m.toggleGroupFold(s.name); return nil },
+	}
+)
+
 // The status list's entries.
 var (
 	actOpenWindow = &interact.Action[*sidebar, statusSubject]{
@@ -383,6 +405,14 @@ var actAttentionItem = &interact.Action[*sidebar, sortSubject]{
 	Title:   "Only what is not idle",
 	Section: "Filter",
 	Run:     func(m *sidebar, _ sortSubject) tea.Cmd { return m.toggleAttention() },
+}
+
+// actShowGroup shows or hides a group, in the spaces list's menu, which marks it while it is shown.
+var actShowGroup = &interact.Action[*sidebar, groupFilterSubject]{
+	Title:   "group",
+	Name:    func(_ *sidebar, s groupFilterSubject) string { return s.name },
+	Section: "Groups",
+	Run:     func(m *sidebar, s groupFilterSubject) tea.Cmd { m.toggleHidden(s.name); return nil },
 }
 
 // The filter's: moving over the rows it shows, opening one, and closing it. Every other key types.
@@ -793,30 +823,34 @@ var (
 )
 
 var (
-	entryKind  *interact.Kind[*sidebar, entrySubject]
-	statusKind *interact.Kind[*sidebar, statusSubject]
-	paneKind   *interact.Kind[*sidebar, paneSubject]
-	spacesKind *interact.Kind[*sidebar, spacesSubject]
-	menuKind   *interact.Kind[*sidebar, menuSubject]
-	pickerKind *interact.Kind[*picker, pickerSubject]
-	formKind   *interact.Kind[*newWorktreeForm, formSubject]
-	removeKind *interact.Kind[*removeWorktreeForm, removeSubject]
-	closeKind  *interact.Kind[*closeSessionForm, closeSubject]
-	forgetKind *interact.Kind[*forgetSessionForm, forgetSubject]
-	addKind    *interact.Kind[*addSpaceForm, addSubject]
-	cleanKind  *interact.Kind[*cleanupForm, cleanupSubject]
-	runKind    *interact.Kind[*runForm, runSubject]
-	layoutKind *interact.Kind[*layoutForm, layoutSubject]
-	saveKind   *interact.Kind[*saveLayoutForm, saveSubject]
-	trustKind  *interact.Kind[*trustForm, trustSubject]
-	replyKind  *interact.Kind[*replyForm, replySubject]
-	errorKind  *interact.Kind[*sidebar, errorSubject]
-	showKind   *interact.Kind[*errorForm, showSubject]
-	filterKind *interact.Kind[*sidebar, filterSubject]
-	listKind   *interact.Kind[*choiceList, listSubject]
-	sortKind   *interact.Kind[*sidebar, sortSubject]
+	entryKind     *interact.Kind[*sidebar, entrySubject]
+	groupKind     *interact.Kind[*sidebar, groupSubject]
+	groupShowKind *interact.Kind[*sidebar, groupFilterSubject]
+	statusKind    *interact.Kind[*sidebar, statusSubject]
+	paneKind      *interact.Kind[*sidebar, paneSubject]
+	spacesKind    *interact.Kind[*sidebar, spacesSubject]
+	menuKind      *interact.Kind[*sidebar, menuSubject]
+	pickerKind    *interact.Kind[*picker, pickerSubject]
+	formKind      *interact.Kind[*newWorktreeForm, formSubject]
+	removeKind    *interact.Kind[*removeWorktreeForm, removeSubject]
+	closeKind     *interact.Kind[*closeSessionForm, closeSubject]
+	forgetKind    *interact.Kind[*forgetSessionForm, forgetSubject]
+	addKind       *interact.Kind[*addSpaceForm, addSubject]
+	cleanKind     *interact.Kind[*cleanupForm, cleanupSubject]
+	runKind       *interact.Kind[*runForm, runSubject]
+	layoutKind    *interact.Kind[*layoutForm, layoutSubject]
+	saveKind      *interact.Kind[*saveLayoutForm, saveSubject]
+	trustKind     *interact.Kind[*trustForm, trustSubject]
+	replyKind     *interact.Kind[*replyForm, replySubject]
+	errorKind     *interact.Kind[*sidebar, errorSubject]
+	showKind      *interact.Kind[*errorForm, showSubject]
+	filterKind    *interact.Kind[*sidebar, filterSubject]
+	listKind      *interact.Kind[*choiceList, listSubject]
+	sortKind      *interact.Kind[*sidebar, sortSubject]
 
 	spacesList    *interact.Place[*sidebar, entrySubject]
+	groupHeaders  *interact.Place[*sidebar, groupSubject]
+	theGroups     *interact.Place[*sidebar, groupFilterSubject]
 	statusList    *interact.Place[*sidebar, statusSubject]
 	thePane       *interact.Place[*sidebar, paneSubject]
 	theMenu       *interact.Place[*sidebar, menuSubject]
@@ -863,6 +897,12 @@ func init() {
 	interact.Via(entryKind, func(entrySubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	spacesList = interact.List(entryKind)
 	spacesList.Bind(actOpenWorktree, "enter/l", "open", "enter", "l")
+
+	groupKind = interact.NewKind(func(s groupSubject) string { return s.name }, actFoldGroup, actUnfoldGroup)
+	groupKind.Bind(actFoldGroup, "space", "fold or unfold the group", "space")
+	groupKind.Bind(actUnfoldGroup, "", "", "space")
+	interact.Via(groupKind, func(groupSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
+	groupHeaders = interact.List(groupKind)
 
 	statusKind = interact.NewKind(func(s statusSubject) string { return s.status.Session }, actOpenWindow, actReply)
 	statusKind.Bind(actReply, "t", "reply", "t")
@@ -1034,6 +1074,8 @@ func init() {
 		sortActions[spaces.SortManual], sortActions[spaces.SortActivity], sortActions[spaces.SortStatus],
 		actAttentionItem)
 	theSort = interact.List(sortKind)
+	groupShowKind = interact.NewKind(func(groupFilterSubject) string { return "Groups" }, actShowGroup)
+	theGroups = interact.List(groupShowKind)
 
 	listKind = interact.NewKind(func(listSubject) string { return "Choices" },
 		actListDown, actListUp, actListPick, actListErase, actListClose, actListQuit)
@@ -1063,6 +1105,8 @@ func (m *sidebar) errorTarget() (interact.Target[*sidebar], bool) {
 // there: a blank row between groups is none.
 func (m *sidebar) entryTarget(i int) (interact.Target[*sidebar], bool) {
 	switch {
+	case i >= 0 && i < len(m.rows) && m.rows[i].Group != nil:
+		return groupHeaders.Target(groupSubject{name: m.rows[i].Group.Name}), true
 	case i >= 0 && i < len(m.rows) && m.rows[i].Space != nil:
 		return spacesList.Target(entrySubject{index: i, row: m.rows[i]}), true
 	case i >= len(m.rows) && i < m.numEntries():

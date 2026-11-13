@@ -52,6 +52,8 @@ type sidebar struct {
 	spaces []spaces.Space
 	others []spaces.Space
 	folded map[string]bool
+	// The groups left out of the list, see spaces.Snapshot.
+	hidden map[string]bool
 	// How the rows are ordered, see spaces.Snapshot, and the order held while the mouse is on them, see
 	// keepOrder.
 	order spaces.Order
@@ -59,7 +61,9 @@ type sidebar struct {
 	// Sessions with a saved file, see spaces.Snapshot.
 	saved map[string]bool
 	kitty kitty.State
-	rows  []spaces.Row
+	// kitty's statuses, hidden groups' too, which kitty.Statuses leaves out, see spaces.Shown.
+	statuses []status.Status
+	rows     []spaces.Row
 	// The context menu, nil when closed.
 	menu   *contextMenu
 	cursor int
@@ -116,7 +120,7 @@ type sidebar struct {
 
 func newSidebar(self int) *sidebar {
 	th := look.New(true)
-	return &sidebar{th: th, self: self, folded: map[string]bool{}, mouse: &pixelMouse{}, filter: newFilter(th), poller: spaces.NewPoller()}
+	return &sidebar{th: th, self: self, folded: map[string]bool{}, hidden: map[string]bool{}, mouse: &pixelMouse{}, filter: newFilter(th), poller: spaces.NewPoller()}
 }
 
 // navigating is whether keys are moving the cursor, so it and the entry under it should be drawn.
@@ -244,6 +248,8 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Where the cursor is goes by the rows and entries it was drawn on, before they change.
 			at := m.cursorAt()
 			m.cfg, m.spaces, m.others, m.folded, m.saved, m.kitty = *msg.Config, msg.Spaces, msg.Others, msg.Folded, msg.Saved, msg.Kitty
+			m.hidden, m.statuses = msg.Hidden, msg.Kitty.Statuses
+			m.kitty.Statuses = spaces.Shown(m.cfg, m.hidden, m.statuses)
 			m.order = msg.Order
 			m.git = msg.Git
 			m.rebuildRows(at)
@@ -323,10 +329,10 @@ func (m *sidebar) scrollToCursor() {
 	m.scrollSpacesToCursor()
 }
 
-// moveCursor moves by delta entries, stepping over the blank row between groups of spaces.
+// moveCursor moves by delta entries, stepping over the blank row between spaces.
 func (m *sidebar) moveCursor(delta int) {
 	for i := m.cursor + delta; i >= 0 && i < m.numEntries(); i += delta {
-		if i >= len(m.rows) || m.rows[i].Space != nil {
+		if i >= len(m.rows) || !m.rows[i].Blank() {
 			m.cursor = i
 			break
 		}

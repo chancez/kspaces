@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -50,13 +52,44 @@ func writeState(name string, data []byte) error {
 	return os.Rename(tmp, path)
 }
 
-// The spaces whose linked worktrees are hidden in the sidebar, by root, a line each.
+// The spaces whose linked worktrees are hidden in the sidebar, by root, and the groups whose spaces are,
+// by GroupKey, a line each.
 const foldedFile = "folded"
 
-// LoadFolded reads the folded spaces. A missing file folds none.
+// GroupKey is how the folded file names the group called name. A root is a path, absolute once ~/ is
+// expanded, as kitty opens sessions in it from anywhere, so it never starts with group:.
+func GroupKey(name string) string {
+	return "group:" + name
+}
+
+// LoadFolded reads the folded spaces and groups. A missing file folds none.
 func LoadFolded() map[string]bool {
+	return readLines(foldedFile)
+}
+
+// SaveFolded writes the folded spaces and groups.
+func SaveFolded(folded map[string]bool) error {
+	return writeLines(foldedFile, folded)
+}
+
+// The groups left out of the sidebar, by name, a line each. Shared, as the folds are, so hiding a group
+// hides it in every tab's sidebar, and it stays hidden after a restart.
+const hiddenFile = "hidden"
+
+// LoadHidden reads the hidden groups. A missing file hides none.
+func LoadHidden() map[string]bool {
+	return readLines(hiddenFile)
+}
+
+// SaveHidden writes the hidden groups.
+func SaveHidden(hidden map[string]bool) error {
+	return writeLines(hiddenFile, hidden)
+}
+
+// readLines is the set of lines of the state file name.
+func readLines(name string) map[string]bool {
 	ans := map[string]bool{}
-	sc := bufio.NewScanner(bytes.NewReader(readState(foldedFile)))
+	sc := bufio.NewScanner(bytes.NewReader(readState(name)))
 	for sc.Scan() {
 		if line := strings.TrimSpace(sc.Text()); line != "" {
 			ans[line] = true
@@ -65,13 +98,14 @@ func LoadFolded() map[string]bool {
 	return ans
 }
 
-// SaveFolded writes the folded spaces.
-func SaveFolded(folded map[string]bool) error {
+// writeLines replaces the state file name with the lines set in lines, sorted, so it reads the same
+// whatever order the map has.
+func writeLines(name string, lines map[string]bool) error {
 	var b strings.Builder
-	for root, ok := range folded {
-		if ok {
-			b.WriteString(root + "\n")
+	for _, line := range slices.Sorted(maps.Keys(lines)) {
+		if lines[line] {
+			b.WriteString(line + "\n")
 		}
 	}
-	return writeState(foldedFile, []byte(b.String()))
+	return writeState(name, []byte(b.String()))
 }

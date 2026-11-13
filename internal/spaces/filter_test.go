@@ -38,13 +38,13 @@ func TestAttentionRows(t *testing.T) {
 		statusOf("api@old", "done"),
 	}
 	folded := map[string]bool{"/src/docs": true, "/src/web": true}
-	got := rowNames(AttentionRows(BuildRows(others, spaces, folded, Order{}), statuses))
+	got := rowNames(AttentionRows(BuildRows(others, spaces, folded, nil, Order{}), statuses))
 	want := []string{"scratch", "", "gr", "gr@fix", "", "kitty", "", "docs (folded)", "", "api", "api@old"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %q\nwant %q", got, want)
 	}
 	// Nothing needs me: no rows at all.
-	if got := AttentionRows(BuildRows(others, spaces, folded, Order{}), []status.Status{statusOf("gr", "idle")}); got != nil {
+	if got := AttentionRows(BuildRows(others, spaces, folded, nil, Order{}), []status.Status{statusOf("gr", "idle")}); got != nil {
 		t.Fatalf("got %q, want none", rowNames(got))
 	}
 }

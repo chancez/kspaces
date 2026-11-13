@@ -122,7 +122,7 @@ func (m *sidebar) emptyText() string {
 // the query does not narrow.
 func (m *sidebar) moveFiltered(delta int) {
 	for i := m.cursor + delta; i >= 0 && i < len(m.rows); i += delta {
-		if m.rows[i].Space != nil {
+		if !m.rows[i].Blank() {
 			m.cursor = i
 			break
 		}
@@ -160,9 +160,9 @@ func (m *sidebar) setRows() {
 func (m *sidebar) rebuildRows(at cursorPos) {
 	key, entry := at.key, at.entry
 	if m.filtering {
-		m.rows = filterRows(spaces.BuildRows(m.others, m.spaces, nil, m.rowOrder()), m.filter.Value())
+		m.rows = filterRows(spaces.BuildRows(m.others, m.spaces, nil, m.hidden, m.rowOrder()), m.filter.Value())
 	} else {
-		m.rows = spaces.BuildRows(m.others, m.spaces, m.folded, m.rowOrder())
+		m.rows = spaces.BuildRows(m.others, m.spaces, m.folded, m.hidden, m.rowOrder())
 	}
 	if m.attending {
 		m.rows = spaces.AttentionRows(m.rows, m.kitty.Statuses)
@@ -190,7 +190,7 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 		return
 	}
 	for i, r := range m.rows {
-		if r.Space != nil {
+		if !r.Blank() {
 			m.cursor = i
 			return
 		}
@@ -201,14 +201,17 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 	}
 }
 
-// rowKey names the entry a row is, the same across refreshes and filters: its session, or for a space
-// whose worktrees could not be listed its root. The blank row is none.
+// rowKey names the entry a row is, the same across refreshes and filters: its session, for a space whose
+// worktrees could not be listed its root, and for a group's header the group's key in the folded file. The
+// blank row is none.
 func rowKey(r spaces.Row) string {
 	switch {
 	case r.Worktree != nil:
 		return r.Worktree.Session
 	case r.Space != nil:
 		return r.Space.Root
+	case r.Group != nil:
+		return spaces.GroupKey(r.Group.Name)
 	}
 	return ""
 }

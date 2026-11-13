@@ -1,6 +1,10 @@
 package spaces
 
 import (
+	"path/filepath"
+	"slices"
+	"strings"
+
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/status"
@@ -23,6 +27,28 @@ func Attention(statuses []status.Status) []status.Status {
 	return ans
 }
 
+// Shown are the statuses but those of the sessions of spaces in hidden groups, which are out of sight: a
+// space's sessions by their names, the space's own or SPACE@DIR, as only the config is read. A session in
+// no space is always shown.
+func Shown(cfg config.Config, hidden map[string]bool, statuses []status.Status) []status.Status {
+	var gone []string
+	for _, root := range cfg.Spaces {
+		if name := filepath.Base(root); hidden[cfg.Space[name].Group] {
+			gone = append(gone, name)
+		}
+	}
+	if len(gone) == 0 {
+		return statuses
+	}
+	var ans []status.Status
+	for _, s := range statuses {
+		if !slices.ContainsFunc(gone, func(name string) bool { return s.Session == name || strings.HasPrefix(s.Session, name+"@") }) {
+			ans = append(ans, s)
+		}
+	}
+	return ans
+}
+
 // attentionStep is the status delta places from the window current among those that need me, wrapping
 // around, or false when none does. From a window that is not one of them, a step forward lands on the most
 // urgent and a step back on the least.
@@ -41,8 +67,9 @@ func attentionStep(statuses []status.Status, current, delta int) (status.Status,
 }
 
 // Attend focuses the window delta places from the focused one among those that need me, see
-// attentionStep. With none, it does nothing: there is nothing to go to, which is not an error. Only kitty
-// and the config are read, as the spaces' worktrees play no part.
+// attentionStep, but for those in hidden groups, see Shown. With none, it does nothing: there is nothing
+// to go to, which is not an error. Only kitty, the config and the hidden groups are read, as the spaces'
+// worktrees play no part.
 func Attend(delta int) error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -53,7 +80,7 @@ func Attend(delta int) error {
 		return err
 	}
 	// Seen from the focused window, Home is that window: the one focused most recently in its tab.
-	s, ok := attentionStep(st.Statuses, st.Home, delta)
+	s, ok := attentionStep(Shown(cfg, LoadHidden(), st.Statuses), st.Home, delta)
 	if !ok {
 		return nil
 	}

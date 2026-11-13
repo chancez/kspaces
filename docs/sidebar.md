@@ -77,8 +77,37 @@ not. `f` or the funnel again shows the whole list. It is each sidebar's own and 
 end with navigating as the query does.
 
 A right click on the SPACES title or its buttons, or on an empty row of the list, opens the list's menu:
-the sort modes, see [Order](#order), and in a Filter section `Only what is not idle`, ticked while the
-attention filter is on, which turns it on and off.
+the sort modes, see [Order](#order), in a Filter section `Only what is not idle`, ticked while the
+attention filter is on, which turns it on and off, and with [groups](#groups) configured a Groups section.
+
+## Groups
+
+With spaces in [groups](kitty.md#spaces-and-sessions), set in config.toml, the spaces in no group come
+first, under no header, after the sessions in no space; then each group, in `groups`' order, those it
+does not list after by name. A group has a header row above its spaces, drawn as a divider rather than a
+row: a rule in the column of the spaces' fold triangles, the group's name in capitals, its fold icon,
+and the rule on to the right edge, all muted, as a quieter SPACES. The icon is an open folder while the
+group's spaces show and a closed one when it is folded, a minus and a plus in Unicode and ASCII, where
+the rule is `-`. A narrow sidebar drops the rule after the icon first, then cuts the name, keeping the
+icon. While filtering, which ignores folds, there is no icon. Within a group the spaces are in the
+[sort mode](#order) in use.
+
+Clicking anywhere on a header, its rule, its name or its icon, or `space` on it, folds the group's spaces
+into it, as a
+space folds its worktrees; its menu has **Fold group** and **Unfold group**. Folded groups are kept with
+the folded spaces, in `$XDG_STATE_HOME/kspaces/folded`, as `group:NAME`, which no space's root is. A
+folded group's header stands for its spaces' sessions, as a folded space does for its worktrees: it is a
+bar while the sidebar's own session is in it, and the attention filter shows it when any of them is not
+idle.
+
+The list's menu has a Groups section, each group ticked while it shows; choosing one hides it, header and
+spaces, and choosing it again shows it. Hidden groups are kept in `$XDG_STATE_HOME/kspaces/hidden`, so
+every sidebar hides them, unlike the attention filter, which is each sidebar's own: there is a sidebar in
+every tab, and hiding work for the evening should not take a click in each, nor come back with a restart.
+A hidden group is out of sight, so its sessions no longer call for attention: their entries leave the
+STATUS list, `!` and `kspaces next --attention` skip them, and the attention filter, which shows only
+rows, has none of them. They are found by name, the space's or `SPACE@DIR`. The picker still lists them,
+as it searches everything. The sessions in no space are in no group, and always show.
 
 ## Order
 
@@ -93,7 +122,8 @@ to the next way, as `s` does; a right click opens the list's menu, the three tic
 | Status | a warning sign; `!` in Unicode and ASCII | the most urgent status first, as the status list ranks them, blocked, failed, done, working, idle, then none; a space by its most urgent session, ties by activity |
 
 In every mode a space's main worktree stays its own row, first, and its missing worktrees last; only its
-linked worktrees move within it. The sessions in no space stay above the spaces, ordered the same way, by
+linked worktrees move within it. Spaces in [groups](#groups) are sorted within their group, and the groups
+keep their order. The sessions in no space stay above the spaces, ordered the same way, by
 name when manual. Activity is when one of a session's windows, docks left out, was last focused, as
 kitty's `ls` reports it. The mode is kept in `$XDG_STATE_HOME/kspaces/sort`, manual until one is chosen,
 so every tab's sidebar sorts the same way.
@@ -107,10 +137,13 @@ The rows show where it goes as the mouse moves, the dragged row lit, and letting
 or a right click while dragging puts it back. A press let go of on the row it was on is a click, which is
 why a row opens when the mouse is let go rather than pressed. `K` and `J` move the cursor's row up and
 down the same way. A session in no space and a missing worktree do not move, and neither does anything
-while a filter is on. Moving a space rewrites the order of `spaces` in config.toml, as text, each entry
-with the comments on the lines right above it and after it on its line, through a symlinked config to its
-target. Moving a worktree keeps its space's order, by the worktrees' directories, in
-`$XDG_STATE_HOME/kspaces/order`. Either moves the order of every sidebar.
+while a filter is on. A space moves among the spaces of its group, or of none: `K` on the first of them
+or `J` on the last does nothing, and dragging it past them leaves it first or last; groups are not
+reordered by moving, only by `groups` in config.toml. Moving a space rewrites the order of `spaces` in
+config.toml, as text, each entry with the comments on the lines right above it and after it on its line,
+through a symlinked config to its target, each group's spaces together as the list shows them. Moving a
+worktree keeps its space's order, by the worktrees' directories, in `$XDG_STATE_HOME/kspaces/order`.
+Either moves the order of every sidebar.
 
 Moving in activity or status switches to manual, starting from the order shown: the spaces are written to
 config.toml as they were shown and every space's worktrees saved as they were shown, then the move is
@@ -123,8 +156,9 @@ sections, each named on the rule above it: what acts on the row's session, then 
 the space as a whole, the same from any of its rows. A status entry's has Open and Reply. A menu of one
 section names none. `j` / `k` and the mouse go over the items only. `esc`, a click outside it, or a click
 in another window closes it. On a hover popup, a right click is on the entry it shows. On the SPACES
-title, its buttons or an empty row of the list, a right click opens the list's own menu, of the sort modes
-and the attention filter; see [Spaces](#spaces).
+title, its buttons or an empty row of the list, a right click opens the list's own menu, of the sort modes,
+the attention filter and the groups; see [Spaces](#spaces). A group's header's has Fold group or Unfold
+group, and Add space.
 
 | Section | Item | Key | Does |
 |---|---|---|---|
@@ -142,6 +176,7 @@ and the attention filter; see [Spaces](#spaces).
 | Space | Fold / Unfold worktrees | `space` | hide or show a space's linked worktrees |
 | Space | Clean up worktrees | `p` | remove the space's linked worktrees that look done with, on a space's row |
 | Space | Trust space config | | show what the space's own config adds, and trust it, in a form; while its `.kspaces.toml` is untrusted or changed |
+| Group | Fold / Unfold group | `space` | hide or show a group's spaces, on its header |
 | Space | Add space | `a` | add a repository to the spaces, in a form; on every row |
 
 Each item that changes something opens a form in a popup, with buttons and keys to confirm or cancel: an
@@ -299,7 +334,8 @@ TEXT opens the form. [docs/kitty.md](kitty.md#replying-to-a-window) says how the
 ## Status
 
 The STATUS list shows every window whose program reports its state with OSC 7501, kitty's program status
-protocol, grouped as Blocked, Failed, Done, Working and Idle. Each entry has the session, how long ago the
+protocol, but for the sessions of [hidden groups](#groups), grouped as Blocked, Failed, Done, Working and
+Idle. Each entry has the session, how long ago the
 state changed, and a summary: progress, the title or the message. Clicking an entry, or `enter` on it,
 focuses its window.
 
@@ -327,7 +363,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `j` / `k` | down / up |
 | `g` / `G` | first / last row |
 | `enter` / `l` | open |
-| `space` | fold or unfold |
+| `space` | fold or unfold the space's worktrees, or on a group's header the group's spaces |
 | `m` | menu |
 | `n`, `c`, `x` | new worktree, close session, remove worktree (forget, on a missing worktree) |
 | `p` | clean up the space's worktrees, on a space's row |
@@ -341,7 +377,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `/` | filter the spaces list; see [Spaces](#spaces) |
 | `f` | show only what is not idle, or everything again; see [Spaces](#spaces) |
 | `s` | sort the list the next way; see [Order](#order) |
-| `K` / `J` | move the cursor's space, or linked worktree within its space, up / down |
+| `K` / `J` | move the cursor's space within its group, or linked worktree within its space, up / down |
 | `r` | refresh, which also happens every two seconds |
 | `esc` / `q` | give focus back to the window it came from |
 
@@ -352,7 +388,9 @@ clicking that row scrolls a page.
 
 `kspaces pick`, which kitty.conf's `kspaces_pick` runs in a popup, an overlay over the window the key was
 pressed in or a 120 by 32 panel for it, as `[sidebar] popup` says, lists the status entries and then
-every session and worktree in the sidebar's order, narrowed by a fuzzy query. `enter` switches to the
+every session and worktree in the sidebar's order, narrowed by a fuzzy query. A space in a group is listed
+after its group's name, `work / gr` and `work / gr / dev`, so the group's name finds its entries.
+`enter` switches to the
 entry under the cursor. `shift+enter`, or `alt+enter` for a terminal that sends `shift+enter` as `enter`,
 switches to it without its [default layout](kitty.md#layouts), as **Open without layout** does; the last
 line says `shift+enter switch without layout` after the count while that is what the entry would open

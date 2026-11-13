@@ -60,11 +60,16 @@ branch refs/heads/main
 	}
 }
 
-// rowNames shows rows as their worktree's session, with "" for the blank rows between groups.
+// rowNames shows rows as their worktree's session, with "" for the blank rows between spaces and a
+// group's header as [NAME].
 func rowNames(rows []Row) []string {
 	var ans []string
 	for _, r := range rows {
 		switch {
+		case r.Group != nil && r.Folded:
+			ans = append(ans, "["+r.Group.Name+"] (folded)")
+		case r.Group != nil:
+			ans = append(ans, "["+r.Group.Name+"]")
 		case r.Space == nil:
 			ans = append(ans, "")
 		case r.Folded:
@@ -84,7 +89,7 @@ func TestBuildRows(t *testing.T) {
 		{Name: "docs", Root: "/src/docs", Worktrees: []Worktree{{Session: "docs"}, {Session: "docs@notes"}}},
 	}
 	// Folding a space with no linked worktrees changes nothing.
-	got := rowNames(BuildRows(others, spaces, map[string]bool{"/src/docs": true, "/src/kitty": true}, Order{}))
+	got := rowNames(BuildRows(others, spaces, map[string]bool{"/src/docs": true, "/src/kitty": true}, nil, Order{}))
 	want := []string{"default", "", "gr", "gr@dev", "gr@fix", "", "kitty", "", "docs (folded)"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %q\nwant %q", got, want)
@@ -198,7 +203,7 @@ func TestMissingRows(t *testing.T) {
 	open := map[string]int{"gr": 1, "gr@open": 2, "kitty@x": 3, "default": 4}
 	others := placeSessions(spaces, open, []string{"gr@saved", "default"})
 	gr := &spaces[0]
-	got := BuildRows(others, spaces, nil, Order{})
+	got := BuildRows(others, spaces, nil, nil, Order{})
 	want := []Row{
 		{Space: &others[0], Worktree: &others[0].Worktrees[0], Main: true, Other: true},
 		{Space: &others[1], Worktree: &others[1].Worktrees[0], Main: true, Other: true},
@@ -224,7 +229,7 @@ func TestMissingRows(t *testing.T) {
 
 	// Missing ones alone make a space foldable, and folding hides them.
 	solo := []Space{{Name: "kitty", Root: "/src/kitty", Worktrees: []Worktree{{Path: "/src/kitty", Session: "kitty"}}, Missing: []Worktree{{Session: "kitty@x"}}}}
-	got = BuildRows(nil, solo, map[string]bool{"/src/kitty": true}, Order{})
+	got = BuildRows(nil, solo, map[string]bool{"/src/kitty": true}, nil, Order{})
 	if want := []Row{{Space: &solo[0], Worktree: &solo[0].Worktrees[0], Main: true, Folded: true}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("folded %#v\nwant %#v", got, want)
 	}

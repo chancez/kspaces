@@ -16,7 +16,7 @@ func Cycle(delta int) error {
 	}
 	var open []Worktree
 	current := -1
-	for _, r := range BuildRows(snap.Others, snap.Spaces, nil, snap.Order) {
+	for _, r := range BuildRows(snap.Others, snap.Spaces, nil, nil, snap.Order) {
 		if r.Worktree == nil {
 			continue
 		}
