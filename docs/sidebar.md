@@ -1,5 +1,8 @@
 # The sidebar
 
+The sidebar fills its dock and draws no line against the window beside it: kitty's dock border, if any,
+is the separator. The cursor's bar shows while keys move it.
+
 ## Spaces
 
 Each row starts with a fold triangle for a space with linked worktrees, then an icon: a repository for a

@@ -382,7 +382,8 @@ kitty can dock a window to one tab only, so a sidebar in every tab is one `kspac
 
 - docks `kspaces sidebar` at the left of every tab that belongs to a session, with the `kspaces` user
   variable and `--keep-focus`;
-- sizes the docks to `[sidebar] width`, and resizes them when it changes;
+- sizes the docks to `[sidebar] width`, all of it the sidebar's (kitty's dock border, if any, is the
+  separator), and resizes them when it changes;
 - hides the tab bar of the panels kspaces opens, marked with the `kspaces_popup` user variable: kitty has
   no option for one OS window's tab bar, and `tab_bar_filter` always shows the active tab, so it sets
   kitty's own flag for it, which a config reload resets and its next check, within two seconds, sets again;

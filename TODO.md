@@ -30,7 +30,6 @@
   starts with one shell, and kspaces opens `default` with `launch`.
 - Windows in no session are saved into `default` at quit and come back labelled `default`, including one
   open only then, such as a tab switcher in an OS window of its own. Left as is for now.
-- kitty's own dock border can sit next to the sidebar's, which may look like a double line.
 - The dotfiles' `cm_reap.py` kills a multiplexer session when one of two windows showing it closes.
 
 ## kitty work
