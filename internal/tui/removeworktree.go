@@ -211,10 +211,7 @@ func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string, dele
 	if err != nil {
 		return err
 	}
-	var pr *gh.PR
-	if known, ok := spaces.NewPoller().Git()[wt.Path]; ok && known.PRBranch == wt.Branch && !known.PRAt.IsZero() {
-		pr = known.PR
-	}
+	pr, _ := spaces.NewPoller().Git()[wt.Path].KnownPR(wt.Branch)
 	f, err := newRemoveForm(cfg, space, wt, st, pr, deleteBranch)
 	if err != nil {
 		return err

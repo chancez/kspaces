@@ -135,3 +135,27 @@ func TestWatcher(t *testing.T) {
 		t.Errorf("seeded watcher asked %q, want %q", got, want)
 	}
 }
+
+// A PR is known of the branch gh was asked about, none included, and not of another branch or before gh
+// was asked.
+func TestKnownPR(t *testing.T) {
+	at := time.Unix(1_000_000, 0)
+	type known struct {
+		PR *gh.PR
+		OK bool
+	}
+	var got []known
+	for _, st := range []State{
+		{PR: &gh.PR{Number: 7, State: "open"}, PRAt: at, PRBranch: "dev"},
+		{PRAt: at, PRBranch: "dev"},
+		{PR: &gh.PR{Number: 7, State: "open"}, PRAt: at, PRBranch: "old"},
+		{},
+	} {
+		pr, ok := st.KnownPR("dev")
+		got = append(got, known{pr, ok})
+	}
+	want := []known{{&gh.PR{Number: 7, State: "open"}, true}, {nil, true}, {}, {}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v\nwant %+v", got, want)
+	}
+}

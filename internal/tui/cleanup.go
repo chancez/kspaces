@@ -228,8 +228,8 @@ func RunCleanup(ctx context.Context, cfg config.Config, root string) error {
 	}
 	known := spaces.NewPoller().Git()
 	pr := func(wt spaces.Worktree) *gh.PR {
-		if st, ok := known[wt.Path]; ok && st.PRBranch == wt.Branch && !st.PRAt.IsZero() {
-			return st.PR
+		if p, ok := known[wt.Path].KnownPR(wt.Branch); ok {
+			return p
 		}
 		p, _ := gh.BranchPR(space.Root, wt.Branch)
 		return p

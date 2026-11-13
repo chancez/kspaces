@@ -36,6 +36,15 @@ type State struct {
 	PRBranch string    `json:"pr_branch,omitempty"`
 }
 
+// KnownPR is the PR gh last said branch has, and whether gh has said, as a state of another branch, or
+// one not asked about yet, says nothing of it.
+func (s State) KnownPR(branch string) (*gh.PR, bool) {
+	if s.PRBranch != branch || s.PRAt.IsZero() {
+		return nil, false
+	}
+	return s.PR, true
+}
+
 // ReadStatus runs git status in the worktree at dir. It takes no optional locks, so running it in the
 // background never gets in the way of git run by hand.
 func ReadStatus(dir string) (Status, error) {
