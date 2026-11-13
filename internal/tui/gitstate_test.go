@@ -73,6 +73,30 @@ func TestGitStateOnRows(t *testing.T) {
 	}
 }
 
+// A worktree's name gives way to its changes and its PR, not to ahead and behind, down to a few cells.
+func TestLongNameGivesWayToGitState(t *testing.T) {
+	e := newSidebarEnv(t)
+	snap := gitFixture()
+	long := "/src/gr/.worktrees/intent_sync_api_updates"
+	snap.Spaces[0].Worktrees = append(snap.Spaces[0].Worktrees, spaces.Worktree{Path: long, Branch: "intent_sync_api_updates", Session: "gr@intent_sync_api_updates"})
+	snap.Git[long] = gitstate.State{Status: &gitstate.Status{Changes: 2, Ahead: 4}, PR: &gitstate.PR{Number: 11243, State: "open"}}
+	e.m.Update(snap)
+	row := func() string { return e.screen()[7] }
+	for _, tc := range []struct {
+		width int
+		want  string
+	}{
+		{44, "  " + branchIcon + "intent_sync_api_updates   \u25cf2 \u21914 #11243"},
+		{30, "  " + branchIcon + "intent_sync... \u25cf2 #11243"},
+		{16, "  " + branchIcon + "inte... \u25cf2"},
+	} {
+		e.m.Update(tea.WindowSizeMsg{Width: tc.width, Height: 40})
+		if got := row(); got != tc.want {
+			t.Errorf("row at %d is %q, want %q", tc.width, got, tc.want)
+		}
+	}
+}
+
 // The picker's preview of a worktree says what git and gh say of it, once they have.
 func TestPickerPreviewGitState(t *testing.T) {
 	m := newPicker(0)

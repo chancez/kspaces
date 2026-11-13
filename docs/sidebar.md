@@ -11,11 +11,11 @@ drawn as a bar.
 At the right end of a worktree's row, a space's own row included, is what git and GitHub say of it: a dot
 and 3 for three files not committed, an up arrow and 2 and a down arrow and 1 for two commits ahead of its
 upstream and one behind, and `#123` for its branch's PR, green when open, grey as a draft, purple merged
-and red closed. The branch is cut to make room for them; in a narrow sidebar ahead and behind go first,
-then the PR, and the changes last. Only the leading sidebar asks: `git status` every 10 seconds, and
-`gh pr list --head BRANCH` every 3 minutes, which needs gh signed in to GitHub. Without gh, a GitHub remote
-or a network there is no PR, and none is looked up for the repository's default branch. `r` asks both
-again at once.
+and red closed. The branch is cut to make room for them, and a long worktree name for the changes and the
+PR, down to 6 cells; in a narrow sidebar ahead and behind go first, then the PR, and the changes last.
+Only the leading sidebar asks: `git status` every 10 seconds, and `gh pr list --head BRANCH` every 3
+minutes, which needs gh signed in to GitHub. Without gh, a GitHub remote or a network there is no PR, and
+none is looked up for the repository's default branch. `r` asks both again at once.
 
 A space with its [own config](kitty.md#per-space-config) that is not in use says why on its own row, where
 the git state goes: a lock and `untrusted config` (`?` in Unicode and ASCII) while the file is not trusted

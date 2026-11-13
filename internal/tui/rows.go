@@ -89,16 +89,32 @@ func (m *sidebar) renderRow(i int) string {
 	}
 	faint := !open
 	head := append(caret, icon...)
-	spans := append(head, look.DimIf(faint, th.Cut(max(width-th.Width(head...), 0), label)...)...)
-	rest := width - th.Width(spans...)
+	room := max(width-th.Width(head...), 0)
 	// The git state takes the right end, after a space, and the branch what is left between. A space whose
 	// own config is not in use says so there instead, on its own row.
+	gitRow := r.Worktree != nil && !r.Folded && !r.Other && !r.Missing
+	var pieces [3][]look.Span
+	if gitRow {
+		pieces = gitPieces(m.git[r.Worktree.Path])
+	}
+	// The name gives way to the changes and the PR, down to labelFloor cells, so a long name does not hide
+	// them. Ahead and behind get only what the name leaves.
+	nameRoom := room
+	if gitRow {
+		kept := pieces
+		kept[1] = nil
+		if w := th.Width(m.fitGit(kept, room-min(th.Width(label), labelFloor)-1)...); w > 0 {
+			nameRoom = room - w - 1
+		}
+	}
+	spans := append(head, look.DimIf(faint, th.Cut(nameRoom, label)...)...)
+	rest := width - th.Width(spans...)
 	var git []look.Span
 	switch {
 	case r.Main && !r.Other && (r.Space.Untrusted || r.Space.ConfigErr != nil):
 		git = look.DimIf(!open, m.configSpans(*r.Space, rest-1)...)
-	case r.Worktree != nil && !r.Folded && !r.Other && !r.Missing:
-		git = look.DimIf(!open, m.gitSpans(m.git[r.Worktree.Path], rest-1)...)
+	case gitRow:
+		git = look.DimIf(!open, m.fitGit(pieces, rest-1)...)
 	}
 	if w := th.Width(git...); w > 0 {
 		rest -= w + 1
@@ -139,10 +155,12 @@ func (m *sidebar) configSpans(s spaces.Space, width int) []look.Span {
 	return nil
 }
 
-// gitSpans is a worktree's git state in at most width cells: the files it has not committed, how far it
-// is ahead of and behind its upstream, and its pull request, a space apart. What does not fit is left
-// out, ahead and behind first and the changes last, as they are what removing the worktree loses.
-func (m *sidebar) gitSpans(st gitstate.State, width int) []look.Span {
+// labelFloor is the fewest cells a row's name gives way to its git state down to.
+const labelFloor = 6
+
+// gitPieces are a worktree's git state, apart: the files it has not committed, how far it is ahead of
+// and behind its upstream, and its pull request.
+func gitPieces(st gitstate.State) [3][]look.Span {
 	var pieces [3][]look.Span
 	if s := st.Status; s != nil {
 		if s.Changes > 0 {
@@ -153,6 +171,12 @@ func (m *sidebar) gitSpans(st gitstate.State, width int) []look.Span {
 	if st.PR != nil {
 		pieces[2] = []look.Span{look.PRNumber(*st.PR)}
 	}
+	return pieces
+}
+
+// fitGit is gitPieces in at most width cells, a space apart. What does not fit is left out, ahead and
+// behind first and the changes last, as they are what removing the worktree loses.
+func (m *sidebar) fitGit(pieces [3][]look.Span, width int) []look.Span {
 	join := func() []look.Span {
 		var out []look.Span
 		for _, p := range pieces {
