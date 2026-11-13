@@ -43,16 +43,39 @@ func realDir(t *testing.T) string {
 // gh pr view runs in the directory given, and what it says of a PR from a fork comes back flat.
 func TestViewPR(t *testing.T) {
 	dir := realDir(t)
-	args := fakeGH(t, `echo '{"headRefName":"main","headRepositoryOwner":{"id":"U_2","login":"forker"},"isCrossRepository":true,"number":7,"title":"Fix from a fork","url":"https://github.com/o/r/pull/7"}'`+"\n")
+	args := fakeGH(t, `echo '{"author":{"login":"forker"},"headRefName":"main","headRepositoryOwner":{"id":"U_2","login":"forker"},"isCrossRepository":true,"isDraft":true,"number":7,"title":"Fix from a fork","url":"https://github.com/o/r/pull/7"}'`+"\n")
 	got, err := ViewPR(dir, "https://github.com/o/r/pull/7")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := (PRView{Number: 7, Title: "Fix from a fork", HeadRef: "main", Owner: "forker", Cross: true, URL: "https://github.com/o/r/pull/7"}); got != want {
+	if want := (PRView{Number: 7, Title: "Fix from a fork", Author: "forker", Draft: true, HeadRef: "main", Owner: "forker", Cross: true, URL: "https://github.com/o/r/pull/7"}); got != want {
 		t.Errorf("got %+v\nwant %+v", got, want)
 	}
-	if got, want := args(), []string{dir, "pr", "view", "https://github.com/o/r/pull/7", "--json", "number,headRefName,headRepositoryOwner,isCrossRepository,title,url"}; !reflect.DeepEqual(got, want) {
+	if got, want := args(), []string{dir, "pr", "view", "https://github.com/o/r/pull/7", "--json", viewFields}; !reflect.DeepEqual(got, want) {
 		t.Errorf("gh ran as %q\nwant %q", got, want)
+	}
+}
+
+// gh pr list lists the open PRs, newest first as gh has them, each as gh pr view says it; its error is
+// gh's message.
+func TestOpenPRs(t *testing.T) {
+	dir := realDir(t)
+	args := fakeGH(t, `echo '[{"author":{"login":"me"},"headRefName":"feat","headRepositoryOwner":{"login":"o"},"isCrossRepository":false,"isDraft":false,"number":9,"title":"Add feat","url":"https://github.com/o/r/pull/9"},`+
+		`{"author":{"login":"forker"},"headRefName":"main","headRepositoryOwner":{"login":"forker"},"isCrossRepository":true,"isDraft":true,"number":7,"title":"Fix","url":"https://github.com/o/r/pull/7"}]'`+"\n")
+	got, err := OpenPRs(dir)
+	want := []PRView{
+		{Number: 9, Title: "Add feat", Author: "me", HeadRef: "feat", Owner: "o", URL: "https://github.com/o/r/pull/9"},
+		{Number: 7, Title: "Fix", Author: "forker", Draft: true, HeadRef: "main", Owner: "forker", Cross: true, URL: "https://github.com/o/r/pull/7"},
+	}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v, %v\nwant %+v", got, err, want)
+	}
+	if got, want := args(), []string{dir, "pr", "list", "--state", "open", "--limit", "100", "--json", viewFields}; !reflect.DeepEqual(got, want) {
+		t.Errorf("gh ran as %q\nwant %q", got, want)
+	}
+	fakeGH(t, "echo 'no git remotes found' >&2\nexit 1\n")
+	if _, err := OpenPRs(dir); err == nil || err.Error() != "no git remotes found" {
+		t.Errorf("gh failing: %v", err)
 	}
 }
 

@@ -46,10 +46,13 @@ const (
 	ReviewRequired         Review = "review_required"
 )
 
-// PRView is what ViewPR says of a PR, as much as checking it out needs.
+// PRView is what ViewPR and OpenPRs say of a PR, as much as choosing it and checking it out need.
 type PRView struct {
 	Number int
 	Title  string
+	// Who opened it, by login, and whether it is a draft.
+	Author string
+	Draft  bool
 	// The branch the PR is from, in the repository it is from, and that repository's owner.
 	HeadRef, Owner string
 	// From another repository than the one it is to, such as a fork.
@@ -58,8 +61,37 @@ type PRView struct {
 	URL string
 }
 
-// viewFields are what ViewPR asks gh for, PRView's.
-const viewFields = "number,headRefName,headRepositoryOwner,isCrossRepository,title,url"
+// viewFields are what ViewPR and OpenPRs ask gh for, PRView's.
+const viewFields = "number,title,author,isDraft,headRefName,headRepositoryOwner,isCrossRepository,url"
+
+// prJSON is a PR as gh's --json of viewFields has it.
+type prJSON struct {
+	Number int    `json:"number"`
+	Title  string `json:"title"`
+	Author struct {
+		Login string `json:"login"`
+	} `json:"author"`
+	IsDraft             bool   `json:"isDraft"`
+	HeadRefName         string `json:"headRefName"`
+	HeadRepositoryOwner struct {
+		Login string `json:"login"`
+	} `json:"headRepositoryOwner"`
+	IsCrossRepository bool   `json:"isCrossRepository"`
+	URL               string `json:"url"`
+}
+
+func (p prJSON) view() PRView {
+	return PRView{
+		Number:  p.Number,
+		Title:   p.Title,
+		Author:  p.Author.Login,
+		Draft:   p.IsDraft,
+		HeadRef: p.HeadRefName,
+		Owner:   p.HeadRepositoryOwner.Login,
+		Cross:   p.IsCrossRepository,
+		URL:     p.URL,
+	}
+}
 
 // ViewPR looks up the PR pr, a number or a URL, with gh run in dir, so a number is one of the PRs of the
 // GitHub repository dir's remotes point to. The error is gh's own message, such as for a PR that does not
@@ -69,30 +101,38 @@ func ViewPR(dir, pr string) (PRView, error) {
 	if err != nil {
 		return PRView{}, err
 	}
-	var got struct {
-		Number              int    `json:"number"`
-		HeadRefName         string `json:"headRefName"`
-		HeadRepositoryOwner struct {
-			Login string `json:"login"`
-		} `json:"headRepositoryOwner"`
-		IsCrossRepository bool   `json:"isCrossRepository"`
-		Title             string `json:"title"`
-		URL               string `json:"url"`
-	}
+	var got prJSON
 	if err := json.Unmarshal(out, &got); err != nil {
 		return PRView{}, fmt.Errorf("parsing gh pr view: %w", err)
 	}
-	return PRView{
-		Number:  got.Number,
-		Title:   got.Title,
-		HeadRef: got.HeadRefName,
-		Owner:   got.HeadRepositoryOwner.Login,
-		Cross:   got.IsCrossRepository,
-		URL:     got.URL,
-	}, nil
+	return got.view(), nil
 }
 
-// branchTimeout is how long BranchPR lets gh take, as it goes over the network in the background.
+// openLimit is how many open PRs OpenPRs asks for, the newest.
+const openLimit = 100
+
+// OpenPRs are the open PRs of the GitHub repository dir's remotes point to, newest first, as many as
+// openLimit, with gh run in dir. It goes over the network, so it gives up after branchTimeout. The error
+// is gh's own message, as ViewPR's.
+func OpenPRs(dir string) ([]PRView, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), branchTimeout)
+	defer cancel()
+	out, err := run(ctx, dir, "listing PRs", "pr", "list", "--state", "open", "--limit", strconv.Itoa(openLimit), "--json", viewFields)
+	if err != nil {
+		return nil, err
+	}
+	var got []prJSON
+	if err := json.Unmarshal(out, &got); err != nil {
+		return nil, fmt.Errorf("parsing gh pr list: %w", err)
+	}
+	views := make([]PRView, len(got))
+	for i, p := range got {
+		views[i] = p.view()
+	}
+	return views, nil
+}
+
+// branchTimeout is how long BranchPR and OpenPRs let gh take, as they go over the network.
 const branchTimeout = 30 * time.Second
 
 // BranchPR asks gh for the pull request of branch in the repository at root, nil when there is none. The
