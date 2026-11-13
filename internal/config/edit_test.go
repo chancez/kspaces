@@ -148,6 +148,42 @@ func TestAddSpace(t *testing.T) {
 	}
 }
 
+// AddSpace appends a plain path after inline entries as after paths, a table's commas, braces and strings
+// being one entry, and its comment staying with it; a root an inline entry has is already a space.
+func TestAddSpaceInline(t *testing.T) {
+	t.Setenv("HOME", "/home/me")
+	for _, c := range []struct{ name, in, want string }{
+		{
+			name: "multi-line, a table with a comment before a path",
+			in:   "spaces = [\n  { path = \"~/a\", group = \"work\" }, # mine\n  \"~/b\",\n]\n",
+			want: "spaces = [\n  { path = \"~/a\", group = \"work\" }, # mine\n  \"~/b\",\n  \"~/c\",\n]\n",
+		},
+		{
+			name: "multi-line, a table last with no comma and a comment",
+			in:   "spaces = [\n  \"~/b\",\n  { path = \"~/a\", group = \"w, x\" } # mine\n]\n",
+			want: "spaces = [\n  \"~/b\",\n  { path = \"~/a\", group = \"w, x\" }, # mine\n  \"~/c\"\n]\n",
+		},
+		{
+			name: "single-line",
+			in:   "spaces = [{ path = \"~/a\", group = \"work\" }, \"~/b\"] # mine\n",
+			want: "spaces = [{ path = \"~/a\", group = \"work\" }, \"~/b\", \"~/c\"] # mine\n",
+		},
+		{
+			name: "braces and brackets in a table's strings",
+			in:   "spaces = [{ path = \"~/a}]\", group = \"{w]\" }]\n",
+			want: "spaces = [{ path = \"~/a}]\", group = \"{w]\" }, \"~/c\"]\n",
+		},
+	} {
+		got, err := AddSpace(c.in, "/home/me/c")
+		if err != nil || got != c.want {
+			t.Errorf("%s: %v\n%s\nwant\n%s", c.name, err, got, c.want)
+		}
+	}
+	if got, err := AddSpace("spaces = [{ path = \"~/c\", group = \"work\" }]\n", "/home/me/c"); err == nil || err.Error() != "~/c is already a space" {
+		t.Errorf("adding a root a table has: %q, %v", got, err)
+	}
+}
+
 // SaveSpace writes through a symlinked config, keeping the link and the file's mode, and creates a
 // missing one.
 func TestSaveSpace(t *testing.T) {
@@ -260,6 +296,18 @@ func TestReorderSpaces(t *testing.T) {
 			in:    "launch = [\"spaces = [\", \"~/x\"]\nspaces = [\n\t\"~/a\",\n\t\"~/b\",\n]\n\n[sidebar]\nwidth = 30\n",
 			order: []string{"/home/me/b", "/home/me/a"},
 			want:  "launch = [\"spaces = [\", \"~/x\"]\nspaces = [\n\t\"~/b\",\n\t\"~/a\",\n]\n\n[sidebar]\nwidth = 30\n",
+		},
+		{
+			name:  "inline tables move whole, with their comments",
+			in:    "spaces = [\n  # at work\n  { path = \"~/a\", group = \"work, mostly\", layout = \"x\" }, # a's\n  \"~/b\", # b's\n  { path = \"/src/c\" },\n]\n\n[[layouts]]\nname = \"x\"\ntabs = [{ panes = [{}] }]\n",
+			order: []string{"/home/me/b", "/src/c", "/home/me/a"},
+			want:  "spaces = [\n  \"~/b\", # b's\n  { path = \"/src/c\" },\n  # at work\n  { path = \"~/a\", group = \"work, mostly\", layout = \"x\" }, # a's\n]\n\n[[layouts]]\nname = \"x\"\ntabs = [{ panes = [{}] }]\n",
+		},
+		{
+			name:  "single-line, a table with braces and commas in its strings",
+			in:    "spaces = [{ path = \"~/a}\", group = \"{w, x}\" }, \"~/b\"] # mine\n",
+			order: []string{"/home/me/b", "/home/me/a}"},
+			want:  "spaces = [\"~/b\", { path = \"~/a}\", group = \"{w, x}\" }] # mine\n",
 		},
 	} {
 		got, err := ReorderSpaces(c.in, c.order)

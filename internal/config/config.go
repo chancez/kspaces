@@ -33,8 +33,9 @@ import (
 //	name = "gr"
 //	run = ["gr"]
 type Config struct {
-	// Roots of the repositories shown as spaces, in the order they are listed.
-	Spaces []string `toml:"spaces"`
+	// Roots of the repositories shown as spaces, in the order they are listed. The file can list each as
+	// a path or as an inline table with a path, see spaceEntries, which Parse reads.
+	Spaces []string `toml:"-"`
 	// The kitty action every window kspaces opens for a session goes through, such as a worktree's first
 	// tab, with kspaces' own options appended: --type, --cwd, --add-to-session and the like, then any
 	// command. A kitten that passes them on to launch can stand in for it.
@@ -140,18 +141,26 @@ func Parse(data string) (Config, error) {
 	if err != nil {
 		return Config{}, fmt.Errorf("finding the home directory: %w", err)
 	}
-	cfg := Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: defaultWorktreeDir}, Sidebar: Sidebar{Width: DefaultSidebarWidth, Popup: PopupOverlay}}
-	md, err := toml.Decode(data, &cfg)
+	file := struct {
+		Config
+		Spaces spaceEntries `toml:"spaces"`
+	}{Config: Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: defaultWorktreeDir}, Sidebar: Sidebar{Width: DefaultSidebarWidth, Popup: PopupOverlay}}}
+	md, err := toml.Decode(data, &file)
 	if err != nil {
 		return Config{}, err
 	}
-	if keys := md.Undecoded(); len(keys) > 0 {
-		names := make([]string, len(keys))
-		for i, k := range keys {
-			names[i] = k.String()
+	var names []string
+	for _, k := range md.Undecoded() {
+		// The entries of spaces are read by spaceEntries, which says what is wrong with their keys.
+		if len(k) > 1 && k[0] == "spaces" {
+			continue
 		}
+		names = append(names, k.String())
+	}
+	if len(names) > 0 {
 		return Config{}, fmt.Errorf("unknown keys: %s", strings.Join(names, ", "))
 	}
+	cfg := file.Config
 	// The toml package skips a value of the wrong type for a map rather than failing, and `space` is also
 	// what a typo of `spaces` looks like.
 	if typ := md.Type("space"); typ != "" && typ != "Hash" {
@@ -178,8 +187,11 @@ func Parse(data string) (Config, error) {
 		}
 		return p
 	}
-	for i, s := range cfg.Spaces {
-		cfg.Spaces[i] = expand(s)
+	for _, e := range file.Spaces {
+		cfg.Spaces = append(cfg.Spaces, expand(e.path))
+	}
+	if err := mergeSpaceEntries(&cfg, file.Spaces, func(name, key string) bool { return md.IsDefined("space", name, key) }); err != nil {
+		return Config{}, err
 	}
 	cfg.SessionsDir = expand(cfg.SessionsDir)
 	if err := checkLayouts(&cfg); err != nil {

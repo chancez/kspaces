@@ -89,11 +89,17 @@ saver, commands and layouts.
 Then list your spaces in `~/.config/kspaces/config.toml`:
 
 ```toml
-# Repositories, in the sidebar's manual order, which moving a space there rewrites. ~/ is expanded.
-spaces = ["~/projects/gr", "~/projects/kitty"]
+# Repositories, in the sidebar's manual order, which moving a space there rewrites. ~/ is expanded. An
+# entry is a path, or a table of its path and what a [space.NAME] table below says, such as the group
+# the sidebar lists it under.
+spaces = [
+  { path = "~/projects/gr", group = "work" },
+  { path = "~/projects/kitty", group = "personal" },
+  "~/.dotfiles",
+]
 
-# The order of the groups the sidebar lists spaces under, each set in its [space.NAME] below; any group
-# not listed after them, by name, and spaces in none first.
+# The order of the groups the sidebar lists spaces under; any group not listed after them, by name, and
+# spaces in none first.
 groups = ["work", "personal"]
 
 # Where kitty session files are kept, as SESSION.kitty-session, to reopen a worktree's session from.
@@ -135,14 +141,13 @@ panes = [
   { split = "below", of = 1, size = 30 },
 ]
 
-# Per space, by name: the layout its linked worktrees' sessions open with afresh, when there is no saved
-# session to restore, and the new worktree form's at first. `layout` is the main worktree's, and a
-# top-level `layout`, before any table, the default for every space. A layout needing an input with no
-# default, as claude's prompt, is opened afresh as one shell tab, and the sidebar says so. `group` is the
-# group the sidebar lists it under.
+# Per space, by name, its directory's, as well as or instead of in its spaces entry: the layout its
+# linked worktrees' sessions open with afresh, when there is no saved session to restore, and the new
+# worktree form's at first. `layout` is the main worktree's, and a top-level `layout`, before any table,
+# the default for every space. A layout needing an input with no default, as claude's prompt, is opened
+# afresh as one shell tab, and the sidebar says so. `group` is the group the sidebar lists it under.
 [space.gr]
 worktree_layout = "agent"
-group = "work"
 
 # The sidebar's width in columns, 12 to 120, and where its forms and the picker open: "overlay", over the
 # window they are for, or "panel", a centered OS window of a fixed size (macOS, Wayland with layer shell,

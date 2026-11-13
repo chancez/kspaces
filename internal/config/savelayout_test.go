@@ -111,7 +111,7 @@ func TestAddLayoutRefused(t *testing.T) {
 			"the config's layouts are not all [[layouts]] tables, so one cannot be replaced in place"},
 		{savedCommands, broken, false,
 			`saving layout agent would break the config, so it was left as is: layouts: agent: tab 1 pane 1: command is "nope", no command has that name`},
-		{"spaces = 1", saved, false, "the config has an error to fix first: toml: line 1 (last key \"spaces\"): incompatible types: TOML value has type int64; destination has type slice"},
+		{"spaces = 1", saved, false, "the config has an error to fix first: toml: line 1 (last key \"spaces\"): spaces must be a list of paths, or of { path = ... } tables"},
 	} {
 		got, err := AddLayout(c.in, c.l, c.replace)
 		if errString(err) != c.want {

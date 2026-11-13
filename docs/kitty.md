@@ -6,14 +6,35 @@ A space is a repository root listed in the config. Its worktrees come from `git 
 show up on their own. Each worktree is a kitty session: the main worktree's is named after the space
 (`gr`), a linked worktree's `SPACE@DIR` (`gr@dev`).
 
+An entry of `spaces` is the root's path, or an inline table of its `path` and any of the keys a
+`[space.NAME]` table takes, `group`, `layout` and `worktree_layout`, meaning the same:
+
+```toml
+spaces = [
+  { path = "~/projects/work/hubble-timescape", group = "work" },
+  { path = "~/projects/gr", group = "tools" },
+  "~/.dotfiles",
+]
+
+[space.gr]                     # by the space's name, its directory's
+worktree_layout = "agent"
+```
+
+The inline form suits a setting or two, kept on the space's line; a `[space.NAME]` table suits more, or
+values too long for one line, as TOML's inline tables cannot span lines. The key is `path` rather than
+`name`: a space's name is its directory's, `hubble-timescape` here, and `name =` would read as a name
+to show it by. A space can use both, for different keys: the two are merged. A key set in both, or by
+two entries whose directories have one name, is an error naming them, rather than one silently winning.
+An inline table needs a non-empty `path`, and a key a `[space.NAME]` table does not take is an error.
+Moving a space in the sidebar moves its inline table whole, with its comments; adding one appends its
+path.
+
 Spaces can be put in groups, such as work and personal, which the [sidebar](sidebar.md#groups) lists each
 under a header of its own and can fold or hide:
 
 ```toml
 groups = ["work", "personal"]  # the order of the groups; any other after them, by name
-
-[space.gr]                     # by the space's name
-group = "work"
+spaces = [{ path = "~/projects/gr", group = "work" }]
 ```
 
 A space with no `group` is in none, and is listed before the groups, under no header. Only config.toml
