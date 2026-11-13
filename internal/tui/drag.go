@@ -17,6 +17,11 @@ type press struct {
 	key string
 	// drag is the order the rows will be left in, nil until the mouse moves off the row.
 	drag *arrangement
+	// In the select mode the press paints rather than drags, see paintTo: the rows the mouse passes are
+	// ticked when paint is, else unticked, and last is the row painted last.
+	painting bool
+	paint    bool
+	last     int
 }
 
 // dragging reports whether r is the row being dragged.
@@ -35,10 +40,15 @@ func (m *sidebar) rowAtY(y int) int {
 	return min(m.offset+y-headerRows, len(m.rows))
 }
 
-// dragTo moves the row pressed on to where the mouse is, at screen row y, once it is off the row.
+// dragTo moves the row pressed on to where the mouse is, at screen row y, once it is off the row. In the
+// select mode nothing moves, and a press that ticked its row paints instead.
 func (m *sidebar) dragTo(y int) {
 	p := m.press
-	if p == nil || m.narrowed() || !movable(p.row) {
+	if p != nil && p.painting {
+		m.paintTo(y)
+		return
+	}
+	if p == nil || m.selecting || m.narrowed() || !movable(p.row) {
 		return
 	}
 	i := m.rowAtY(y)
@@ -133,12 +143,13 @@ func dragItem(r, dragged spaces.Row) string {
 }
 
 // release ends the press: a drag keeps the order it moved to, and a click opens its row when let go on it,
-// or folds the group of a group's header, which has nothing to open.
+// or folds the group of a group's header, which has nothing to open. In the select mode the press did all
+// there is to do.
 func (m *sidebar) release(x, y int) tea.Cmd {
 	p := m.press
 	m.press = nil
 	switch {
-	case p == nil:
+	case p == nil, p.painting, m.selecting:
 		return nil
 	case p.drag != nil:
 		return m.keep(*p.drag, p.row)

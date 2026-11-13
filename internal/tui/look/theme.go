@@ -66,6 +66,8 @@ const (
 	elBranch
 	// elCaret folds a space's linked worktrees.
 	elCaret
+	// elTick is a row's box in the select mode while it is ticked, or partly.
+	elTick
 	// elSession marks a session that is current or open.
 	elSession
 	elBroken
@@ -123,6 +125,7 @@ var elementNames = [numElements]string{
 	elWorktree:               "worktree",
 	elBranch:                 "branch",
 	elCaret:                  "caret",
+	elTick:                   "tick",
 	elSession:                "session",
 	elBroken:                 "broken",
 	elGone:                   "gone",
@@ -227,6 +230,7 @@ func New(isDark bool) *Theme {
 		elWorktree:               lipgloss.NewStyle(),
 		elBranch:                 fg(p.muted),
 		elCaret:                  fg(p.muted),
+		elTick:                   fg(p.accent),
 		elSession:                fg(p.success),
 		elBroken:                 fg(p.danger),
 		elGone:                   fg(p.attention),

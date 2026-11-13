@@ -59,6 +59,11 @@ const (
 	GlyphChangesRequested
 	// GlyphUntrusted marks a space whose own config is not trusted, so not in use.
 	GlyphUntrusted
+	// GlyphUnticked, GlyphTicked and GlyphPartlyTicked are a row's box in the select mode: a space's row or
+	// a group's header is partly ticked when only some of the rows it stands for are.
+	GlyphUnticked
+	GlyphTicked
+	GlyphPartlyTicked
 	// The corners and sides of the border a popup in a panel is drawn in.
 	GlyphFrameTopLeft
 	GlyphFrameTopRight
@@ -72,9 +77,9 @@ const (
 )
 
 // glyphSets are each glyphs' symbols, by role. Each is one cell wide, so a row's columns stay put
-// whichever is drawn; only ASCII's cut mark is wider, as ASCII has no one-cell ellipsis. Nerd Font icons
-// are Font Awesome's and Codicons', at the code points Nerd Fonts
-// keeps them at.
+// whichever is drawn, but ASCII's boxes, which take three cells as they do in a form, and its cut mark,
+// as ASCII has no one-cell ellipsis. Nerd Font icons are Font Awesome's and Codicons', at the code points
+// Nerd Fonts keeps them at.
 var glyphSets = map[Glyphs][numGlyphs]string{
 	GlyphsASCII: {
 		GlyphOpen:             "v",
@@ -111,6 +116,9 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphApproved:         "A",
 		GlyphChangesRequested: "R",
 		GlyphUntrusted:        "?",
+		GlyphUnticked:         "[ ]",
+		GlyphTicked:           "[x]",
+		GlyphPartlyTicked:     "[-]",
 		GlyphFrameTopLeft:     "+",
 		GlyphFrameTopRight:    "+",
 		GlyphFrameBottomLeft:  "+",
@@ -154,6 +162,9 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphApproved:         "\u2605", // black star
 		GlyphChangesRequested: "\u00b1", // plus-minus sign, changes
 		GlyphUntrusted:        "?",
+		GlyphUnticked:         "\u2610", // ballot box
+		GlyphTicked:           "\u2611", // ballot box with check
+		GlyphPartlyTicked:     "\u229f", // squared minus
 		GlyphFrameTopLeft:     "\u256d", // box drawings light arc down and right
 		GlyphFrameTopRight:    "\u256e", // box drawings light arc down and left
 		GlyphFrameBottomLeft:  "\u2570", // box drawings light arc up and right
@@ -202,6 +213,11 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphChangesRequested: "\u00b1",
 		// Followed by two spaces, as a marker is, since kitty draws it over the first.
 		GlyphUntrusted: "\uf023", // lock
+		// Unicode's, as the triangles: a Font Awesome square is drawn over two cells, and a box is followed by
+		// one space.
+		GlyphUnticked:     "\u2610",
+		GlyphTicked:       "\u2611",
+		GlyphPartlyTicked: "\u229f",
 		// Box drawings, as Unicode's: kitty draws them itself, joined.
 		GlyphFrameTopLeft:     "\u256d",
 		GlyphFrameTopRight:    "\u256e",

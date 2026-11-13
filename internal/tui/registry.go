@@ -89,6 +89,9 @@ type errorSubject struct{ text string }
 // showSubject is the show error form.
 type showSubject struct{}
 
+// selectSubject is the select mode, while it is on: the ticked rows, and what acts on them.
+type selectSubject struct{}
+
 // do adapts a function that changes the model without a command.
 func do[M, S any](f func(m M)) func(M, S) tea.Cmd {
 	return func(m M, _ S) tea.Cmd { f(m); return nil }
@@ -268,6 +271,13 @@ var (
 			return m.trustConfig(s.row.Space.Root)
 		},
 	}
+	// actSelectRow turns the select mode on with the row ticked.
+	actSelectRow = &interact.Action[*sidebar, entrySubject]{
+		Title:   "Select",
+		Section: sectionSpace,
+		Applies: func(m *sidebar, s entrySubject) bool { return !m.selecting && s.row.Worktree != nil },
+		Run:     func(m *sidebar, s entrySubject) tea.Cmd { m.tickRow(rowKey(s.row)); return nil },
+	}
 )
 
 // A group's header's. A click on it does what space does, as there is nothing to open.
@@ -283,6 +293,12 @@ var (
 		Section: "Group",
 		Applies: func(m *sidebar, s groupSubject) bool { return !m.filtering && m.folded[spaces.GroupKey(s.name)] },
 		Run:     func(m *sidebar, s groupSubject) tea.Cmd { m.toggleGroupFold(s.name); return nil },
+	}
+	actSelectGroup = &interact.Action[*sidebar, groupSubject]{
+		Title:   "Select",
+		Section: sectionSpace,
+		Applies: func(m *sidebar, _ groupSubject) bool { return !m.selecting },
+		Run:     func(m *sidebar, s groupSubject) tea.Cmd { m.tickRow(spaces.GroupKey(s.name)); return nil },
 	}
 )
 
@@ -383,6 +399,26 @@ var (
 	actMoveDown = paneAction("move down", func(m *sidebar) tea.Cmd { return m.moveRow(1) })
 )
 
+// actSelect turns the select mode on, see select.go.
+var actSelect = paneAction("select", func(m *sidebar) tea.Cmd { m.startSelect(); return nil })
+
+// The select mode's: ticking rows, and leaving. Each applies throughout the mode, so a key that does
+// nothing here does not reach the cursor's row, where x would remove its one worktree.
+var (
+	actTick = &interact.Action[*sidebar, selectSubject]{
+		Title: "tick",
+		Run:   do[*sidebar, selectSubject]((*sidebar).tickCursor),
+	}
+	actTickAll = &interact.Action[*sidebar, selectSubject]{
+		Title: "tick all",
+		Run:   do[*sidebar, selectSubject]((*sidebar).tickAll),
+	}
+	actEndSelect = &interact.Action[*sidebar, selectSubject]{
+		Title: "Cancel",
+		Run:   do[*sidebar, selectSubject]((*sidebar).endSelect),
+	}
+)
+
 // sortAction chooses mode from the sort button's menu.
 func sortAction(title string, mode spaces.SortMode) *interact.Action[*sidebar, sortSubject] {
 	return &interact.Action[*sidebar, sortSubject]{
@@ -405,6 +441,14 @@ var actAttentionItem = &interact.Action[*sidebar, sortSubject]{
 	Title:   "Only what is not idle",
 	Section: "Filter",
 	Run:     func(m *sidebar, _ sortSubject) tea.Cmd { return m.toggleAttention() },
+}
+
+// actSelectList turns the select mode on from the spaces list's menu, with nothing ticked.
+var actSelectList = &interact.Action[*sidebar, sortSubject]{
+	Title:   "Select",
+	Section: "Rows",
+	Applies: func(m *sidebar, _ sortSubject) bool { return !m.selecting },
+	Run:     func(m *sidebar, _ sortSubject) tea.Cmd { m.startSelect(); return nil },
 }
 
 // actShowGroup shows or hides a group, in the spaces list's menu, which marks it while it is shown.
@@ -828,6 +872,7 @@ var (
 	groupShowKind *interact.Kind[*sidebar, groupFilterSubject]
 	statusKind    *interact.Kind[*sidebar, statusSubject]
 	paneKind      *interact.Kind[*sidebar, paneSubject]
+	selectKind    *interact.Kind[*sidebar, selectSubject]
 	spacesKind    *interact.Kind[*sidebar, spacesSubject]
 	menuKind      *interact.Kind[*sidebar, menuSubject]
 	pickerKind    *interact.Kind[*picker, pickerSubject]
@@ -871,6 +916,7 @@ var (
 	theFilter     *interact.Place[*sidebar, filterSubject]
 	theSort       *interact.Place[*sidebar, sortSubject]
 	theChoiceList *interact.Place[*choiceList, listSubject]
+	theSelection  *interact.Place[*sidebar, selectSubject]
 )
 
 // Kinds and places are made in init, as their actions run code that reads them.
@@ -881,7 +927,7 @@ func init() {
 	spacesKind.Bind(actAddSpace, "a", "add space", "a")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actOpenPlain, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actFold, actUnfold, actCleanup, actTrustConfig)
+		actOpenWorktree, actOpenPlain, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actFold, actUnfold, actCleanup, actTrustConfig, actSelectRow)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
@@ -898,7 +944,7 @@ func init() {
 	spacesList = interact.List(entryKind)
 	spacesList.Bind(actOpenWorktree, "enter/l", "open", "enter", "l")
 
-	groupKind = interact.NewKind(func(s groupSubject) string { return s.name }, actFoldGroup, actUnfoldGroup)
+	groupKind = interact.NewKind(func(s groupSubject) string { return s.name }, actFoldGroup, actUnfoldGroup, actSelectGroup)
 	groupKind.Bind(actFoldGroup, "space", "fold or unfold the group", "space")
 	groupKind.Bind(actUnfoldGroup, "", "", "space")
 	interact.Via(groupKind, func(groupSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
@@ -911,7 +957,7 @@ func init() {
 
 	paneKind = interact.NewKind(func(paneSubject) string { return "Sidebar" },
 		actDown, actUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit,
-		actAttend, actFilter, actAttention, actCycleSort, actMoveUp, actMoveDown)
+		actAttend, actFilter, actAttention, actCycleSort, actMoveUp, actMoveDown, actSelect)
 	paneKind.Bind(actDown, "j/k", "down/up", "j", "down")
 	paneKind.Bind(actUp, "", "", "k", "up")
 	paneKind.Bind(actTop, "g/G", "top/bottom", "g", "home")
@@ -927,8 +973,15 @@ func init() {
 	paneKind.Bind(actCycleSort, "s", "change the sort mode", "s")
 	paneKind.Bind(actMoveUp, "K/J", "move the row up/down", "K")
 	paneKind.Bind(actMoveDown, "", "", "J")
+	paneKind.Bind(actSelect, "v", "select rows to act on", "v")
 	interact.Via(paneKind, func(paneSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	thePane = interact.List(paneKind)
+
+	selectKind = interact.NewKind(func(selectSubject) string { return "Select" }, actTick, actTickAll, actEndSelect)
+	selectKind.Bind(actTick, "space", "tick the row", "space")
+	selectKind.Bind(actTickAll, "A", "tick every row", "A")
+	selectKind.Bind(actEndSelect, "esc", "leave the select mode", "esc")
+	theSelection = interact.List(selectKind)
 
 	menuKind = interact.NewKind(func(menuSubject) string { return "Menu" },
 		actMenuDown, actMenuUp, actMenuRun, actMenuClose, actMenuQuit)
@@ -1072,7 +1125,7 @@ func init() {
 
 	sortKind = interact.NewKind(func(sortSubject) string { return "Sort" },
 		sortActions[spaces.SortManual], sortActions[spaces.SortActivity], sortActions[spaces.SortStatus],
-		actAttentionItem)
+		actAttentionItem, actSelectList)
 	theSort = interact.List(sortKind)
 	groupShowKind = interact.NewKind(func(groupFilterSubject) string { return "Groups" }, actShowGroup)
 	theGroups = interact.List(groupShowKind)
@@ -1116,9 +1169,12 @@ func (m *sidebar) entryTarget(i int) (interact.Target[*sidebar], bool) {
 	return interact.Target[*sidebar]{}, false
 }
 
-// chain is what a key reaches: the cursor's entry, then the sidebar.
+// chain is what a key reaches: the select mode while it is on, the cursor's entry, then the sidebar.
 func (m *sidebar) chain() []interact.Target[*sidebar] {
 	var out []interact.Target[*sidebar]
+	if m.selecting {
+		out = append(out, theSelection.Target(selectSubject{}))
+	}
 	if t, ok := m.entryTarget(m.cursor); ok {
 		out = append(out, t)
 	}

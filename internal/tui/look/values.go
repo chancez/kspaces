@@ -74,6 +74,28 @@ func Caret(folded bool) []Span {
 // NoCaret is as wide as a caret, for a row without one, and indents linked worktrees under their space.
 func NoCaret() Span { return sp(elCaret, "  ") }
 
+// Tick is how far a row of the spaces list is ticked in the select mode: a space's row and a group's
+// header stand for several rows, and are partly ticked when only some of them are.
+type Tick int
+
+const (
+	Unticked Tick = iota
+	PartlyTicked
+	Ticked
+)
+
+// RowBox is a row's box in the select mode, after its caret: muted while unticked, so the names stay what
+// the eye goes to, and in the accent once ticked.
+func RowBox(t Tick) []Span {
+	switch t {
+	case Ticked:
+		return []Span{glyph(elTick, GlyphTicked, false), sp(elTick, " ")}
+	case PartlyTicked:
+		return []Span{glyph(elTick, GlyphPartlyTicked, false), sp(elTick, " ")}
+	}
+	return []Span{glyph(elMuted, GlyphUnticked, false), sp(elMuted, " ")}
+}
+
 // Space is a space's name, on its own row.
 func Space(s spaces.Space) Span { return sp(elSpace, s.Name) }
 

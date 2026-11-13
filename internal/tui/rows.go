@@ -59,9 +59,10 @@ func rowHolds(r spaces.Row, session string) bool {
 }
 
 // renderRow draws row i of the spaces list, marked as its entry: the fold caret, or as wide a blank, which
-// indents linked worktrees under their space, then the row's icon and its name. The icon says what the row
-// is, and is replaced by the most urgent status of its sessions' windows; see look.RowIcon. A missing
-// worktree has the gone marker and `gone` for its branch, faint only once its session has no windows.
+// indents linked worktrees under their space, its box in the select mode, then the row's icon and its
+// name. The icon says what the row is, and is replaced by the most urgent status of its sessions' windows;
+// see look.RowIcon. A missing worktree has the gone marker and `gone` for its branch, faint only once its
+// session has no windows.
 func (m *sidebar) renderRow(i int) string {
 	r, width, th := m.rows[i], m.contentWidth(), m.th
 	switch {
@@ -101,7 +102,7 @@ func (m *sidebar) renderRow(i int) string {
 		icon = look.DimIf(!open, icon...)
 	}
 	faint := !open
-	head := append(caret, icon...)
+	head := append(append(caret, m.box(i)...), icon...)
 	room := max(width-th.Width(head...), 0)
 	// The git state takes the right end, after a space, and the branch what is left between. A space whose
 	// own config is not in use says so there instead, on its own row.
@@ -154,13 +155,14 @@ func (m *sidebar) renderRow(i int) string {
 	return th.DrawZone(fmt.Sprintf(entryZone, i), surface, width, spans...)
 }
 
-// renderHeader draws row i, a group's header, marked as its entry, as a divider: a rule in the caret
-// column, the group's name, its fold icon, but while filtering, which ignores folds, and the rule on to
-// the right edge. A narrow sidebar loses the rule after the icon first, then the name's end, so the icon
-// stays. A folded group stands for its spaces' sessions, so it is current when one of them is.
+// renderHeader draws row i, a group's header, marked as its entry, as a divider: its box in the select
+// mode, a rule in the caret column, the group's name, its fold icon, but while filtering, which ignores
+// folds, and the rule on to the right edge. A narrow sidebar loses the rule after the icon first, then the
+// name's end, so the icon stays. A folded group stands for its spaces' sessions, so it is current when one
+// of them is.
 func (m *sidebar) renderHeader(i int) string {
 	r, width, th := m.rows[i], m.contentWidth(), m.th
-	lead := []look.Span{th.GroupRule(th.Width(look.NoCaret())), look.Muted(" ")}
+	lead := append(m.box(i), th.GroupRule(th.Width(look.NoCaret())), look.Muted(" "))
 	var fold []look.Span
 	if !m.filtering {
 		fold = append([]look.Span{look.Muted(" ")}, look.Mark(fmt.Sprintf(caretZone, i), look.GroupFold(r.Folded)...)...)
@@ -173,6 +175,7 @@ func (m *sidebar) renderHeader(i int) string {
 		}
 		spans = append(spans, th.GroupRule(rest))
 	}
+
 	surface := look.Plain
 	switch {
 	case i == m.cursor && m.navigating():

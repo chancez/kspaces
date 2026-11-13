@@ -56,12 +56,13 @@ func (m *sidebar) wheel(msg tea.MouseWheelMsg) {
 
 // click acts on what was drawn where the mouse was pressed. A left press on a spaces row moves the cursor
 // to it and holds it until the release, see drag.go; on its caret it folds its space, or on a group's
-// header its group. A left click on a status entry opens it. On a hover popup a click is one on its entry
-// or row rather than on what it covers. A left click on the add button does what a does, on the sort
-// button what s does, and on the attention filter's button what f does. A right click opens a spaces
-// row's menu; on the sort button, the title or the list's empty rows the list's menu, its sort modes, its
-// filter and its groups; while a row is pressed it
-// lets go of it instead. The last line's error, and its popup, take their own clicks, see clickError.
+// header its group. With alt, or in the select mode, the press ticks the row instead, see select.go. A
+// left click on a status entry opens it. On a hover popup a click is one on its entry or row rather than
+// on what it covers. A left click on the add button does what a does, on the sort button what s does, and
+// on the attention filter's button what f does. A right click opens a spaces row's menu; on the sort
+// button, the title or the list's empty rows the list's menu, its sort modes, its filter and its groups;
+// while a row is pressed it lets go of it instead. The last line's error, and its popup, take their own
+// clicks, see clickError.
 func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 	if m.press != nil {
 		m.cancelPress()
@@ -110,6 +111,13 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 			// A row's popup stays until the release, which finds the row by it as the press did.
 			m.hover = 0
 			m.press = &press{row: m.rows[i], key: rowKey(m.rows[i])}
+			// alt rather than shift, which kitty keeps for its own selection.
+			if msg.Mod.Contains(tea.ModAlt) {
+				m.startSelect()
+			}
+			if m.selecting {
+				m.pressTick(i)
+			}
 			return nil
 		}
 		m.unhover()

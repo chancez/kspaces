@@ -102,6 +102,9 @@ type sidebar struct {
 	mouse      *pixelMouse
 	// The left press on a spaces row until its release, nil for none: a click or a drag, see drag.go.
 	press *press
+	// The select mode, see select.go: whether it is on, and the sessions ticked.
+	selecting bool
+	ticked    map[string]bool
 	// Whether the mouse is on the add space button, the sort button or the attention filter's button,
 	// which lights it.
 	addHot, sortHot, attentionHot bool

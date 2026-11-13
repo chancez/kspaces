@@ -369,10 +369,10 @@ func TestRightClickMenu(t *testing.T) {
 	want := []string{
 		menuRule("Session"), " Open", " Save as layout", " Close session",
 		menuRule("Worktree"), " Remove worktree",
-		menuRule("Space"), " New worktree", " Fold worktrees", " Add space",
+		menuRule("Space"), " New worktree", " Fold worktrees", " Select", " Add space",
 		menuRule(""),
 	}
-	if got := e.screen()[y+1 : y+12]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[y+1 : y+13]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{" Open"}) {
@@ -394,8 +394,8 @@ func TestRightClickMenu(t *testing.T) {
 	def := e.row("default")
 	e.click(fmt.Sprintf(entryZone, def), tea.MouseRight)
 	_, y = e.zone(fmt.Sprintf(entryZone, def))
-	want = []string{menuRule("Session"), " Open", " Close session", menuRule("Space"), " Add space", menuRule("")}
-	if got := e.screen()[y+1 : y+7]; !reflect.DeepEqual(got, want) {
+	want = []string{menuRule("Session"), " Open", " Close session", menuRule("Space"), " Select", " Add space", menuRule("")}
+	if got := e.screen()[y+1 : y+8]; !reflect.DeepEqual(got, want) {
 		t.Errorf("default's menu:\n%q\nwant\n%q", got, want)
 	}
 	// A click elsewhere closes it; a right click elsewhere opens that row's instead.
@@ -433,10 +433,10 @@ func TestMenuNarrow(t *testing.T) {
 	want := []string{
 		"\u2500 Session \u2500", " Open", " Save as l\u2026", " Close ses\u2026",
 		"\u2500 Worktr\u2026 \u2500", " Remove wo\u2026",
-		"\u2500 Space \u2500\u2500\u2500", " New workt\u2026", " Fold work\u2026", " Add space",
+		"\u2500 Space \u2500\u2500\u2500", " New workt\u2026", " Fold work\u2026", " Select", " Add space",
 		rule,
 	}
-	if got := e.screen()[y+1 : y+12]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[y+1 : y+13]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 }
@@ -595,11 +595,11 @@ func TestMenuAbove(t *testing.T) {
 	// so the menu has room above.
 	snap := fixture(time.Now())
 	snap.Spaces = snap.Spaces[:1]
-	for _, name := range []string{"notes", "scratch", "mail"} {
+	for _, name := range []string{"notes", "scratch", "mail", "todo"} {
 		snap.Others = append(snap.Others, spaces.Space{Name: name, Worktrees: []spaces.Worktree{{Session: name}}})
 	}
 	e.m.Update(snap)
-	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 18})
+	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 20})
 	e.m.render()
 	fix := e.row("gr@fix")
 	_, y := e.zone(fmt.Sprintf(entryZone, fix))
@@ -607,10 +607,10 @@ func TestMenuAbove(t *testing.T) {
 	want := []string{
 		menuRule("Session"), " Open",
 		menuRule("Worktree"), " Remove worktree",
-		menuRule("Space"), " New worktree", " Fold worktrees", " Add space",
+		menuRule("Space"), " New worktree", " Fold worktrees", " Select", " Add space",
 		menuRule(""),
 	}
-	if got := e.screen()[y-9 : y]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[y-10 : y]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu above row %d:\n%q\nwant\n%q", y, got, want)
 	}
 }
@@ -929,7 +929,7 @@ func TestErrorOnLastLine(t *testing.T) {
 
 // In pixel mouse mode, positions are turned into cells, and kitty's event for the mouse leaving the window,
 // which bubbletea reads as motion with the left button, into mouseLeftMsg; between a left press and its
-// release that motion is a drag.
+// release that motion is a drag. The modifiers stay, as alt and a press or a drag selects.
 func TestPixelMouse(t *testing.T) {
 	p := &pixelMouse{on: true, cellW: 10, cellH: 20}
 	got := []tea.Msg{
@@ -938,9 +938,9 @@ func TestPixelMouse(t *testing.T) {
 		p.filter(nil, tea.MouseWheelMsg{X: 5, Y: 399, Button: tea.MouseWheelDown}),
 		p.filter(nil, tea.MouseMotionMsg{X: 3000, Y: 7, Button: tea.MouseLeft}),
 		p.filter(nil, tea.KeyPressMsg{Code: 'j', Text: "j"}),
-		p.filter(nil, tea.MouseClickMsg{X: 60, Y: 40, Button: tea.MouseLeft}),
-		p.filter(nil, tea.MouseMotionMsg{X: 61, Y: 100, Button: tea.MouseLeft}),
-		p.filter(nil, tea.MouseReleaseMsg{X: 61, Y: 120, Button: tea.MouseLeft}),
+		p.filter(nil, tea.MouseClickMsg{X: 60, Y: 40, Button: tea.MouseLeft, Mod: tea.ModAlt}),
+		p.filter(nil, tea.MouseMotionMsg{X: 61, Y: 100, Button: tea.MouseLeft, Mod: tea.ModAlt}),
+		p.filter(nil, tea.MouseReleaseMsg{X: 61, Y: 120, Button: tea.MouseLeft, Mod: tea.ModAlt}),
 		p.filter(nil, tea.MouseMotionMsg{X: 3000, Y: 7, Button: tea.MouseLeft}),
 	}
 	want := []tea.Msg{
@@ -949,9 +949,9 @@ func TestPixelMouse(t *testing.T) {
 		tea.MouseWheelMsg{X: 0, Y: 19, Button: tea.MouseWheelDown},
 		mouseLeftMsg{},
 		tea.KeyPressMsg{Code: 'j', Text: "j"},
-		tea.MouseClickMsg{X: 6, Y: 2, Button: tea.MouseLeft},
-		tea.MouseMotionMsg{X: 6, Y: 5, Button: tea.MouseLeft},
-		tea.MouseReleaseMsg{X: 6, Y: 6, Button: tea.MouseLeft},
+		tea.MouseClickMsg{X: 6, Y: 2, Button: tea.MouseLeft, Mod: tea.ModAlt},
+		tea.MouseMotionMsg{X: 6, Y: 5, Button: tea.MouseLeft, Mod: tea.ModAlt},
+		tea.MouseReleaseMsg{X: 6, Y: 6, Button: tea.MouseLeft, Mod: tea.ModAlt},
 		mouseLeftMsg{},
 	}
 	if !reflect.DeepEqual(got, want) {

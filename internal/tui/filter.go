@@ -167,6 +167,7 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 	if m.attending {
 		m.rows = spaces.AttentionRows(m.rows, m.kitty.Statuses)
 	}
+	m.pruneTicks()
 	if entry >= 0 {
 		m.cursor = min(len(m.rows)+entry, max(m.numEntries()-1, 0))
 		return

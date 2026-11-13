@@ -153,10 +153,10 @@ func TestLayoutKey(t *testing.T) {
 	want := []string{
 		menuRule("Session"), " Open", " Run", " Open layout", " Save as layout", " Close session",
 		menuRule("Worktree"), " Remove worktree",
-		menuRule("Space"), " New worktree", " Fold worktrees", " Add space",
+		menuRule("Space"), " New worktree", " Fold worktrees", " Select", " Add space",
 		menuRule(""),
 	}
-	if got := e.screen()[y+1 : y+14]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[y+1 : y+15]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	e.press("esc")
@@ -701,11 +701,11 @@ func TestOpenWithoutLayoutMenu(t *testing.T) {
 	linked := func(session ...string) []string {
 		return slices.Concat([]string{menuRule("Session"), " Open"}, session, []string{" Open layout",
 			menuRule("Worktree"), " Remove worktree",
-			menuRule("Space"), " New worktree", " Fold worktrees", " Add space", menuRule("")})
+			menuRule("Space"), " New worktree", " Fold worktrees", " Select", " Add space", menuRule("")})
 	}
 	main := func(session ...string) []string {
 		return slices.Concat([]string{menuRule("Session"), " Open"}, session, []string{" Open layout",
-			menuRule("Space"), " New worktree", " Add space", menuRule("")})
+			menuRule("Space"), " New worktree", " Select", " Add space", menuRule("")})
 	}
 	type result struct {
 		Session string
@@ -728,9 +728,9 @@ func TestOpenWithoutLayoutMenu(t *testing.T) {
 		{"kitty", main(" Open without layout")},
 		// With windows open, there is no default layout to skip.
 		{"gr", []string{menuRule("Session"), " Open", " Open layout", " Save as layout", " Close session",
-			menuRule("Space"), " New worktree", " Fold worktrees", " Clean up worktrees", " Add space", menuRule("")}},
-		{"default", []string{menuRule("Session"), " Open", " Close session", menuRule("Space"), " Add space", menuRule("")}},
-		{"gr@gone", []string{menuRule(""), " Fold worktrees", " Add space", menuRule("")}},
+			menuRule("Space"), " New worktree", " Fold worktrees", " Clean up worktrees", " Select", " Add space", menuRule("")}},
+		{"default", []string{menuRule("Session"), " Open", " Close session", menuRule("Space"), " Select", " Add space", menuRule("")}},
+		{"gr@gone", []string{menuRule(""), " Fold worktrees", " Select", " Add space", menuRule("")}},
 	})
 
 	// kitty's saved file restores it, and gr@fix's empty one would not.

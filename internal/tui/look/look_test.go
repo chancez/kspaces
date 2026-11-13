@@ -26,19 +26,20 @@ func TestEveryElementAndSurfaceIsNamed(t *testing.T) {
 	}
 }
 
-// Every glyphs' set draws every role, in one cell, so rows keep their columns whichever is used. ASCII's
-// cut mark is the one exception: it ends a cut, so it moves no column after it.
+// Every glyphs' set draws every role, in one cell, so rows keep their columns whichever is used; ASCII's
+// boxes in three, all of them, so a row keeps its columns ticked or not, and its cut mark, which ends a
+// cut, so it moves no column after it.
 func TestGlyphSets(t *testing.T) {
 	th := New(true)
 	for _, g := range []Glyphs{GlyphsASCII, GlyphsUnicode, GlyphsNerd} {
 		th.SetGlyphs(g)
 		for role := GlyphNone + 1; role < numGlyphs; role++ {
 			want := 1
-			if g == GlyphsASCII && role == GlyphCut {
+			if g == GlyphsASCII && (role == GlyphCut || role == GlyphUnticked || role == GlyphTicked || role == GlyphPartlyTicked) {
 				want = 3
 			}
 			if w := th.Width(glyph(elDefault, role, false)); w != want {
-				t.Errorf("glyphs %d: role %d is %d cells wide", g, role, w)
+				t.Errorf("glyphs %d: role %d is %d cells wide, want %d", g, role, w, want)
 			}
 		}
 	}
