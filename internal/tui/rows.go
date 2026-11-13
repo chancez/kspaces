@@ -25,6 +25,8 @@ const (
 	addZone = "add"
 	// sortZone is the button on the SPACES title that shows and changes the sort mode.
 	sortZone = "sort"
+	// attentionZone is the button on the SPACES title that turns the attention filter on and off.
+	attentionZone = "attention"
 )
 
 // rowSessions are the worktrees a row stands for: its own, and for a folded space all of the space's,

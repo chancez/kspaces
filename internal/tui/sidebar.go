@@ -95,8 +95,9 @@ type sidebar struct {
 	mouse      *pixelMouse
 	// The left press on a spaces row until its release, nil for none: a click or a drag, see drag.go.
 	press *press
-	// Whether the mouse is on the add space button or the sort button, which lights it.
-	addHot, sortHot bool
+	// Whether the mouse is on the add space button, the sort button or the attention filter's button,
+	// which lights it.
+	addHot, sortHot, attentionHot bool
 	// zones are where the last frame drew marked spans, by id, so a click maps back to what was drawn.
 	zones map[string][]look.Zone
 	// The spaces list's filters, see filter.go: the query narrows rows while filtering, and the attention
@@ -261,7 +262,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.release(msg.X, msg.Y)
 	case mouseLeftMsg:
 		m.unhover()
-		m.addHot, m.sortHot = false, false
+		m.addHot, m.sortHot, m.attentionHot = false, false, false
 	case tea.KeyPressMsg:
 		if m.press != nil && m.press.drag != nil && msg.String() == "esc" {
 			m.cancelPress()
@@ -362,13 +363,15 @@ func (m *sidebar) render() string {
 	return out
 }
 
-// titleLine is SPACES with the sort button and the add space button at its right end. The title is cut
-// first, keeping a cell between it and the buttons.
+// titleLine is SPACES with the attention filter's button, the sort button and the add space button at its
+// right end. The cell between the title and the buttons goes before any of the title does, so the
+// narrowest sidebar still reads SPACES; only narrower is the title cut.
 func (m *sidebar) titleLine(width int) string {
 	th := m.th
-	buttons := append(look.Mark(sortZone, look.SortButton(m.order.Mode, m.sortHot)), look.Default(" "))
+	buttons := append(look.Mark(attentionZone, look.AttentionButton(m.attending, m.attentionHot)), look.Default(" "))
+	buttons = append(append(buttons, look.Mark(sortZone, look.SortButton(m.order.Mode, m.sortHot))...), look.Default(" "))
 	buttons = append(buttons, look.Mark(addZone, look.AddButton(m.addHot))...)
-	title := th.Cut(max(width-th.Width(buttons...)-1, 0), look.Title(m.spacesTitle()))
+	title := th.Cut(max(width-th.Width(buttons...), 0), look.Title("SPACES"))
 	gap := look.Default(strings.Repeat(" ", max(width-th.Width(title...)-th.Width(buttons...), 0)))
 	return th.Draw(look.Plain, width, append(append(title, gap), buttons...)...)
 }

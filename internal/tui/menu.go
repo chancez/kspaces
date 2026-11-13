@@ -23,8 +23,9 @@ type contextMenu struct {
 	sel   int
 	// The screen row of the rule above the items.
 	top int
-	// chosen is the item marked as chosen now, as the sort mode in its menu, -1 for none.
-	chosen int
+	// chosen are the items marked as chosen now, by index, as the sort mode in its menu; nil for a menu
+	// of actions rather than choices, which has no column of marks.
+	chosen map[int]bool
 }
 
 // height is how many rows the menu takes: its items, the rules above them and the one below.
@@ -48,7 +49,7 @@ func (m *sidebar) openMenu(t interact.Target[*sidebar], y int) {
 	if len(order) == 0 {
 		return
 	}
-	menu := &contextMenu{rules: map[int]string{}, chosen: -1}
+	menu := &contextMenu{rules: map[int]string{}}
 	for _, s := range order {
 		head := s
 		if len(order) == 1 {
@@ -153,10 +154,10 @@ func (m *sidebar) drawMenu(lines []string) {
 		if i == m.menu.sel {
 			surface = look.Cursor
 		}
-		// A menu of choices marks the chosen one before the labels, a space from them.
+		// A menu of choices marks the chosen ones before the labels, a space from them.
 		lead := []look.Span{look.Text(" ")}
-		if m.menu.chosen >= 0 {
-			lead = []look.Span{look.Chosen(i == m.menu.chosen), look.Text(" ")}
+		if m.menu.chosen != nil {
+			lead = []look.Span{look.Chosen(m.menu.chosen[i]), look.Text(" ")}
 		}
 		label := th.Cut(max(width-th.Width(lead...), 0), look.Text(it.Title))
 		drawn = append(drawn, th.DrawZone(fmt.Sprintf(menuZone, i), surface, width, append(lead, label...)...))

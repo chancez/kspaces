@@ -58,17 +58,24 @@ cursor stays on its row while it shows, and goes to the first row shown when the
 puts it back on its row, or on the folded space that holds it. The filter also goes when navigating ends:
 when the sidebar loses focus, or keys sent without focus stop.
 
-`f` shows only what is going on: the rows whose session has a status that is not idle, blocked, error,
-done or working, with their spaces' rows above them, and a folded space's row when any of its sessions
-has one. The SPACES title reads `SPACES !` while it is on, and with nothing to show the list says
-`Nothing needs you`. It applies along with `/`, so a query narrows what it shows. The cursor stays on
-its row while it shows, and goes to the first row shown when it does not. `f` again shows the whole
-list. It is each sidebar's own and is not saved, nor does it end with navigating as the query does.
+`f`, or a click on the funnel on the SPACES title, left of the sort button, shows only what is going on:
+the rows whose session has a status that is not idle, blocked, error, done or working, with their spaces'
+rows above them, and a folded space's row when any of its sessions has one. The funnel, a white
+down-pointing triangle in Unicode and `Y` in ASCII, is lit in the attention color while the filter is on,
+and with nothing to show the list says `Nothing needs you`. It applies along with `/`, so a query narrows
+what it shows. The cursor stays on its row while it shows, and goes to the first row shown when it does
+not. `f` or the funnel again shows the whole list. It is each sidebar's own and is not saved, nor does it
+end with navigating as the query does.
+
+A right click on the SPACES title or its buttons, or on an empty row of the list, opens the list's menu:
+the sort modes, see [Order](#order), and in a Filter section `Only what is not idle`, ticked while the
+attention filter is on, which turns it on and off.
 
 ## Order
 
 The button left of the plus on the SPACES title shows how the list is sorted, and a click on it goes on
-to the next way, as `s` does; a right click opens a menu of the three, the one in use ticked.
+to the next way, as `s` does; a right click opens the list's menu, the three ticking the one in use, see
+[Spaces](#spaces).
 
 | Mode | Icon | Order |
 |---|---|---|
@@ -106,7 +113,9 @@ Right-click a row or a status entry, or press `m` on it. The menu lists what app
 sections, each named on the rule above it: what acts on the row's session, then on its worktree, then on
 the space as a whole, the same from any of its rows. A status entry's has Open and Reply. A menu of one
 section names none. `j` / `k` and the mouse go over the items only. `esc`, a click outside it, or a click
-in another window closes it. On a hover popup, a right click is on the entry it shows.
+in another window closes it. On a hover popup, a right click is on the entry it shows. On the SPACES
+title, its buttons or an empty row of the list, a right click opens the list's own menu, of the sort modes
+and the attention filter; see [Spaces](#spaces).
 
 | Section | Item | Key | Does |
 |---|---|---|---|

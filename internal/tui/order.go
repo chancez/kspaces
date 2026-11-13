@@ -39,16 +39,21 @@ func (m *sidebar) setSort(mode spaces.SortMode) {
 	m.scrollToCursor()
 }
 
-// openSortMenu opens the sort button's menu, drawn from screen row y, with the mode chosen now marked and
-// selected.
+// openSortMenu opens the spaces list's menu, of the sort button, the title and the list's empty rows,
+// drawn from screen row y: the sort modes, the one chosen now marked and selected, and the attention
+// filter, marked while it is on.
 func (m *sidebar) openSortMenu(y int) {
 	m.openMenu(theSort.Target(sortSubject{}), y)
 	if m.menu == nil {
 		return
 	}
+	m.menu.chosen = map[int]bool{}
 	for i, it := range m.menu.items {
-		if it.Is(sortActions[m.sortMode()]) {
-			m.menu.chosen, m.menu.sel = i, i
+		switch {
+		case it.Is(sortActions[m.sortMode()]):
+			m.menu.chosen[i], m.menu.sel = true, i
+		case it.Is(actAttentionItem):
+			m.menu.chosen[i] = m.attending
 		}
 	}
 }

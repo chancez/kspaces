@@ -109,14 +109,6 @@ func (m *sidebar) narrowed() bool {
 	return m.filtering || m.attending
 }
 
-// spacesTitle is the spaces list's title, marked while the attention filter is on.
-func (m *sidebar) spacesTitle() string {
-	if m.attending {
-		return "SPACES !"
-	}
-	return "SPACES"
-}
-
 // emptyText is what the spaces list says when a filter leaves it no rows: that nothing needs me when only
 // the attention filter narrows it, else that the query matches nothing.
 func (m *sidebar) emptyText() string {

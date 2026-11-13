@@ -73,7 +73,8 @@ type listSubject struct{}
 // filterSubject is the spaces list's filter, while it is open.
 type filterSubject struct{}
 
-// sortSubject is the sort button on the SPACES title, whose menu chooses the sort mode.
+// sortSubject is the spaces list as a whole, whose menu, of the sort button, the SPACES title and the
+// list's empty rows, chooses the sort mode and turns the attention filter on and off.
 type sortSubject struct{}
 
 // do adapts a function that changes the model without a command.
@@ -359,6 +360,14 @@ var sortActions = map[spaces.SortMode]*interact.Action[*sidebar, sortSubject]{
 	spaces.SortManual:   sortAction("Manual", spaces.SortManual),
 	spaces.SortActivity: sortAction("Activity", spaces.SortActivity),
 	spaces.SortStatus:   sortAction("Status", spaces.SortStatus),
+}
+
+// actAttentionItem is the attention filter in the spaces list's menu, in a section of its own as it is a
+// switch rather than one of the sort modes.
+var actAttentionItem = &interact.Action[*sidebar, sortSubject]{
+	Title:   "Only what is not idle",
+	Section: "Filter",
+	Run:     func(m *sidebar, _ sortSubject) tea.Cmd { return m.toggleAttention() },
 }
 
 // The filter's: moving over the rows it shows, opening one, and closing it. Every other key types.
@@ -980,7 +989,8 @@ func init() {
 	theFilter = interact.List(filterKind)
 
 	sortKind = interact.NewKind(func(sortSubject) string { return "Sort" },
-		sortActions[spaces.SortManual], sortActions[spaces.SortActivity], sortActions[spaces.SortStatus])
+		sortActions[spaces.SortManual], sortActions[spaces.SortActivity], sortActions[spaces.SortStatus],
+		actAttentionItem)
 	theSort = interact.List(sortKind)
 
 	listKind = interact.NewKind(func(listSubject) string { return "Choices" },

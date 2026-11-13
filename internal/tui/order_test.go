@@ -65,7 +65,7 @@ var (
 	}
 	// gr by fix, the most recent, then kitty and docs; broken never focused.
 	activityScreen = []string{
-		"SPACES                    \uf017 \uf067",
+		"SPACES                  \uf0b0 \uf017 \uf067",
 		"",
 		"  " + termIcon + "default",
 		"",
@@ -81,7 +81,7 @@ var (
 	}
 	// gr by dev, blocked, then docs by notes, working; kitty and broken have none, kitty focused later.
 	statusScreen = []string{
-		"SPACES                    \uf071 \uf067",
+		"SPACES                  \uf0b0 \uf071 \uf067",
 		"",
 		"  " + termIcon + "default",
 		"",
@@ -149,12 +149,15 @@ func TestSortButton(t *testing.T) {
 }
 
 // A right click on the sort button opens a menu of the modes under it, the one chosen now marked and
-// selected; choosing one sorts by it.
+// selected, and the attention filter in a section of its own; choosing a mode sorts by it.
 func TestSortMenu(t *testing.T) {
 	e := newOrderEnv(t)
 	e.click(sortZone, tea.MouseRight)
-	want := []string{menuRule(""), "\uf00c Manual", "  Activity", "  Status", menuRule("")}
-	if got := e.screen()[1:6]; !reflect.DeepEqual(got, want) {
+	want := []string{
+		menuRule("Sort"), "\uf00c Manual", "  Activity", "  Status",
+		menuRule("Filter"), "  Only what is not idle", menuRule(""),
+	}
+	if got := e.screen()[1:8]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"\uf00c Manual"}) {
@@ -168,8 +171,11 @@ func TestSortMenu(t *testing.T) {
 		t.Errorf("saved %q", got)
 	}
 	e.click(sortZone, tea.MouseRight)
-	want = []string{menuRule(""), "  Manual", "  Activity", "\uf00c Status", menuRule("")}
-	if got := e.screen()[1:6]; !reflect.DeepEqual(got, want) {
+	want = []string{
+		menuRule("Sort"), "  Manual", "  Activity", "\uf00c Status",
+		menuRule("Filter"), "  Only what is not idle", menuRule(""),
+	}
+	if got := e.screen()[1:8]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu again:\n%q\nwant\n%q", got, want)
 	}
 }
