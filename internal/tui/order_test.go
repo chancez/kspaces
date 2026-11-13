@@ -65,7 +65,7 @@ var (
 	}
 	// gr by fix, the most recent, then kitty and docs; broken never focused.
 	activityScreen = []string{
-		"SPACES                  \uf0b0 \uf017 \uf067",
+		"SPACES                   \uf0b0 \uf017 \uf067",
 		"",
 		"  " + termIcon + "default",
 		"",
@@ -81,7 +81,7 @@ var (
 	}
 	// gr by dev, blocked, then docs by notes, working; kitty and broken have none, kitty focused later.
 	statusScreen = []string{
-		"SPACES                  \uf0b0 \uf071 \uf067",
+		"SPACES                   \uf0b0 \uf071 \uf067",
 		"",
 		"  " + termIcon + "default",
 		"",

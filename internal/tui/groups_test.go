@@ -57,9 +57,9 @@ var (
 	groupDocs   = "\u25b6 \uf110  docs main"
 	groupKitty  = "  " + repoIcon + "kitty master"
 	groupBroken = "  \uf00d  broken"
-	workHeader  = headerLine(false, "WORK", 29)
-	homeHeader  = headerLine(false, "PERSONAL", 29)
-	workFolded  = heldHeaderLine(true, "WORK", 29)
+	workHeader  = headerLine(false, "WORK", 30)
+	homeHeader  = headerLine(false, "PERSONAL", 30)
+	workFolded  = heldHeaderLine(true, "WORK", 30)
 )
 
 // headerLine is a group's header in a list width cells wide: a rule in the caret column, its name, its
@@ -83,21 +83,21 @@ func heldHeaderLine(folded bool, name string, width int) string {
 // folded or not.
 func TestGroupHeaderWidths(t *testing.T) {
 	wide := func(rows ...string) []string {
-		return append([]string{"SPACES                \uf0b0 \uf0c9 \uf067", "", "  " + termIcon + "default", "", groupBroken, ""}, rows...)
+		return append([]string{"SPACES                 \uf0b0 \uf0c9 \uf067", "", "  " + termIcon + "default", "", groupBroken, ""}, rows...)
 	}
 	narrow := func(rows ...string) []string {
-		return append([]string{"SPACES\uf0b0 \uf0c9 \uf067", "", "  " + termIcon + "defau\u2026", "", groupBroken, ""}, rows...)
+		return append([]string{"SPACES \uf0b0 \uf0c9 \uf067", "", "  " + termIcon + "default", "", groupBroken, ""}, rows...)
 	}
-	grNarrow := []string{"\u25bc " + repoIcon + "gr ma\u2026", here + blocked + "dev p\u2026", "  " + branchIcon + "fix f\u2026", "", "\u25b6 \uf110  docs"}
+	grNarrow := []string{"\u25bc " + repoIcon + "gr main", here + blocked + "dev pr\u2026", "  " + branchIcon + "fix fix", "", "\u25b6 \uf110  docs m\u2026"}
 	for _, c := range []struct {
 		width  int
 		folded bool
 		want   []string
 	}{
-		{config.DefaultSidebarWidth, false, wide(headerLine(false, "WORK", 27), groupGr[0], groupGr[1], groupGr[2], "", groupDocs, "", headerLine(false, "PERSONAL", 27), groupKitty)},
-		{config.DefaultSidebarWidth, true, wide(heldHeaderLine(true, "WORK", 27), "", headerLine(true, "PERSONAL", 27))},
-		{config.MinSidebarWidth, false, narrow(append(append([]string{"\u2500\u2500 WORK \uf07c"}, grNarrow...), "", "\u2500\u2500 PER\u2026 \uf07c", "  "+repoIcon+"kitty")...)},
-		{config.MinSidebarWidth, true, narrow(here+" WORK \uf07b", "", "\u2500\u2500 PER\u2026 \uf07b")},
+		{config.DefaultSidebarWidth, false, wide(headerLine(false, "WORK", 28), groupGr[0], groupGr[1], groupGr[2], "", groupDocs, "", headerLine(false, "PERSONAL", 28), groupKitty)},
+		{config.DefaultSidebarWidth, true, wide(heldHeaderLine(true, "WORK", 28), "", headerLine(true, "PERSONAL", 28))},
+		{config.MinSidebarWidth, false, narrow(append(append([]string{"\u2500\u2500 WORK \uf07c  \u2500"}, grNarrow...), "", "\u2500\u2500 PERS\u2026 \uf07c", "  "+repoIcon+"kitty")...)},
+		{config.MinSidebarWidth, true, narrow(here+" WORK \uf07b  \u2500", "", "\u2500\u2500 PERS\u2026 \uf07b")},
 	} {
 		e := newGroupsEnv(t)
 		e.m.Update(tea.WindowSizeMsg{Width: c.width, Height: 40})
@@ -115,7 +115,7 @@ func TestGroupHeaderWidths(t *testing.T) {
 	e := newGroupsEnv(t)
 	e.m.Update(tea.FocusMsg{})
 	e.press("/", "k")
-	want := []string{spacesTitle, filterPrompt + "k", groupBroken, "", "\u2500\u2500 PERSONAL " + strings.Repeat("\u2500", 29-12), groupKitty}
+	want := []string{spacesTitle, filterPrompt + "k", groupBroken, "", "\u2500\u2500 PERSONAL " + strings.Repeat("\u2500", 30-12), groupKitty}
 	if got := e.spacesScreen(); !reflect.DeepEqual(got, want) {
 		t.Errorf("filtering:\n%q\nwant\n%q", got, want)
 	}

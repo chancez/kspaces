@@ -98,11 +98,11 @@ func TestAttentionButton(t *testing.T) {
 	}
 
 	e.m.Update(tea.WindowSizeMsg{Width: 12, Height: 40})
-	if got, want := e.screen()[0], "SPACES\uf0b0 \uf0c9 \uf067"; got != want {
+	if got, want := e.screen()[0], "SPACES \uf0b0 \uf0c9 \uf067"; got != want {
 		t.Errorf("narrowest title %q, want %q", got, want)
 	}
 	e.click(attentionZone, tea.MouseLeft)
-	if got, want := e.screen()[0], "SPACES\uf0b0 \uf0c9 \uf067"; got != want || !e.m.attending {
+	if got, want := e.screen()[0], "SPACES \uf0b0 \uf0c9 \uf067"; got != want || !e.m.attending {
 		t.Errorf("narrowest title clicked on, attending %v: %q, want %q", e.m.attending, got, want)
 	}
 }

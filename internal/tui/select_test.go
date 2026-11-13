@@ -294,12 +294,12 @@ func TestSelectGroupHeader(t *testing.T) {
 		spacesTitle, "",
 		"  " + unticked + termIcon + "default", "",
 		"    \uf00d  broken", "",
-		partly + headerLine(false, "WORK", 27),
+		partly + headerLine(false, "WORK", 28),
 		"\u25bc " + partly + repoIcon + "gr main",
 		here + unticked + blocked + "dev pr/me/dev",
 		"  " + ticked + branchIcon + "fix fix", "",
 		"\u25b6 " + ticked + "\uf110  docs main", "",
-		ticked + headerLine(false, "PERSONAL", 27),
+		ticked + headerLine(false, "PERSONAL", 28),
 		"  " + ticked + repoIcon + "kitty master",
 	}
 	if got := e.spacesScreen(); !reflect.DeepEqual(got, want) {

@@ -34,11 +34,11 @@ func TestSpaceConfigOnRows(t *testing.T) {
 	want := []string{
 		"  " + termIcon + "default",
 		"",
-		"\u25bc " + repoIcon + "gr" + pad(3) + "\uf023  untrusted config",
-		here + blocked + "dev pr/me/\u2026 \u25cf3 \u21912\u21931 #123",
-		"  " + branchIcon + "fix fix" + pad(14) + "#98",
+		"\u25bc " + repoIcon + "gr m\u2026 \uf023  untrusted config",
+		here + blocked + "dev pr/me/d\u2026 \u25cf3 \u21912\u21931 #123",
+		"  " + branchIcon + "fix fix" + pad(15) + "#98",
 		"",
-		"  " + repoIcon + "kitty m\u2026 \uf00d  config error",
+		"  " + repoIcon + "kitty ma\u2026 \uf00d  config error",
 		"",
 		"\u25b6 \uf110  docs main",
 		"",
@@ -47,7 +47,7 @@ func TestSpaceConfigOnRows(t *testing.T) {
 	if got := rows(); !reflect.DeepEqual(got, want) {
 		t.Errorf("rows at 30:\n%q\nwant\n%q", got, want)
 	}
-	e.m.Update(tea.WindowSizeMsg{Width: 22, Height: 40})
+	e.m.Update(tea.WindowSizeMsg{Width: 21, Height: 40})
 	want = []string{
 		"  " + termIcon + "default",
 		"",
@@ -62,9 +62,9 @@ func TestSpaceConfigOnRows(t *testing.T) {
 		"  \uf00d  broken",
 	}
 	if got := rows(); !reflect.DeepEqual(got, want) {
-		t.Errorf("rows at 22:\n%q\nwant\n%q", got, want)
+		t.Errorf("rows at 21:\n%q\nwant\n%q", got, want)
 	}
-	e.m.Update(tea.WindowSizeMsg{Width: 14, Height: 40})
+	e.m.Update(tea.WindowSizeMsg{Width: 13, Height: 40})
 	want = []string{
 		"  " + termIcon + "default",
 		"",
@@ -79,7 +79,7 @@ func TestSpaceConfigOnRows(t *testing.T) {
 		"  \uf00d  broken",
 	}
 	if got := rows(); !reflect.DeepEqual(got, want) {
-		t.Errorf("rows at 14:\n%q\nwant\n%q", got, want)
+		t.Errorf("rows at 13:\n%q\nwant\n%q", got, want)
 	}
 }
 

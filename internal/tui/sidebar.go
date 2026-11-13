@@ -333,9 +333,8 @@ func (m *sidebar) layout() layout {
 	return l
 }
 
-// contentWidth leaves the last column for the border against the window the sidebar is docked to.
 func (m *sidebar) contentWidth() int {
-	return max(m.width-1, 1)
+	return max(m.width, 1)
 }
 
 // scrollToCursor scrolls the list the cursor is in so its entry shows.
@@ -423,7 +422,7 @@ func (m *sidebar) frame() string {
 	}
 	statusList, _ := m.statusLines()
 	lines = append(lines, statusList...)
-	// Fill the height so the border runs the full length of the dock, with errors on the last line.
+	// Fill the height, with errors on the last line.
 	for len(lines) < m.height-1 {
 		lines = append(lines, "")
 	}
@@ -446,15 +445,12 @@ func (m *sidebar) frame() string {
 		status = th.Render(look.Plain, th.Cut(width, *m.notice)...)
 	}
 	lines = append(lines, status)
-	// The border against the window the dock is next to, in the accent while keys move the cursor.
-	border := th.Render(look.Plain, look.Border("\u2502", m.navigating()))
 	var b strings.Builder
 	for i, line := range lines {
 		if i > 0 {
 			b.WriteByte('\n')
 		}
 		b.WriteString(look.Fit(line, width))
-		b.WriteString(border)
 	}
 	return b.String()
 }

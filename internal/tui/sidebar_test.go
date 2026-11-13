@@ -113,11 +113,11 @@ func (e *sidebarEnv) press(keys ...string) tea.Cmd {
 	return cmd
 }
 
-// screen is the frame without its styles, a line each, without the border.
+// screen is the frame without its styles, a line each.
 func (e *sidebarEnv) screen() []string {
 	var out []string
 	for _, l := range strings.Split(ansi.Strip(e.m.render()), "\n") {
-		out = append(out, strings.TrimRight(strings.TrimSuffix(l, "\u2502"), " "))
+		out = append(out, strings.TrimRight(l, " "))
 	}
 	return out
 }
@@ -236,8 +236,8 @@ const (
 const here = "\u258e "
 
 // spacesTitle is the SPACES title with the attention filter's button, the sort button, manual, and the
-// add button in the last of the 29 columns before the border.
-const spacesTitle = "SPACES" + "                  " + "\uf0b0 \uf0c9 \uf067"
+// add button in the last of the 30 columns.
+const spacesTitle = "SPACES" + "                   " + "\uf0b0 \uf0c9 \uf067"
 
 // The spaces list: sessions in no space, then each space and its linked worktrees. A row starts with
 // the fold caret, or as wide a blank, then its icon: what the row is, or the most urgent state of its
@@ -283,7 +283,7 @@ func TestStatusGroupsOnScreen(t *testing.T) {
 		want := []string{
 			"STATUS",
 			"Blocked 1",
-			blocked + "dev                  +1 5m",
+			blocked + "dev                   +1 5m",
 			"   claude \u00b7 approve",
 			"",
 			"Failed 1",
@@ -291,8 +291,8 @@ func TestStatusGroupsOnScreen(t *testing.T) {
 			"   exit 1",
 			"",
 			"Working 1",
-			"\uf110  notes                   3h",
-			"   make \u00b7 \u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 40%",
+			"\uf110  notes                    3h",
+			"   make \u00b7 \u2588\u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 40%",
 			"",
 			"Idle 1",
 			"\uf10c  default",
@@ -365,9 +365,9 @@ func TestFoldKey(t *testing.T) {
 // menuRule is a menu's rule in the 30 cell sidebar, with a section's name on it, or plain for "".
 func menuRule(head string) string {
 	if head == "" {
-		return strings.Repeat("\u2500", 29)
+		return strings.Repeat("\u2500", 30)
 	}
-	return "\u2500 " + head + " " + strings.Repeat("\u2500", 29-3-len(head))
+	return "\u2500 " + head + " " + strings.Repeat("\u2500", 30-3-len(head))
 }
 
 // A right click, or m, opens the row's menu below it, its items under their sections; the mouse
@@ -440,11 +440,11 @@ func TestMenuNarrow(t *testing.T) {
 	dev := e.row("gr@dev")
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
-	rule := strings.Repeat("\u2500", 11)
+	rule := strings.Repeat("\u2500", 12)
 	want := []string{
-		"\u2500 Session \u2500", " Open", " Save as l\u2026", " Close ses\u2026",
-		"\u2500 Worktr\u2026 \u2500", " Remove wo\u2026",
-		"\u2500 Space \u2500\u2500\u2500", " New workt\u2026", " Fold work\u2026", " Select", " Add space",
+		"\u2500 Session \u2500\u2500", " Open", " Save as la\u2026", " Close sess\u2026",
+		"\u2500 Worktree \u2500", " Remove wor\u2026",
+		"\u2500 Space \u2500\u2500\u2500\u2500", " New worktr\u2026", " Fold workt\u2026", " Select", " Add space",
 		rule,
 	}
 	if got := e.screen()[y+1 : y+13]; !reflect.DeepEqual(got, want) {
@@ -594,7 +594,7 @@ func TestAddSpaceButton(t *testing.T) {
 	}
 
 	e.m.Update(tea.WindowSizeMsg{Width: 12, Height: 40})
-	if got, want := e.screen()[0], "SPACES\uf0b0 \uf0c9 \uf067"; got != want {
+	if got, want := e.screen()[0], "SPACES \uf0b0 \uf0c9 \uf067"; got != want {
 		t.Errorf("narrowest title %q, want %q", got, want)
 	}
 }
@@ -695,8 +695,8 @@ func TestHoverPopup(t *testing.T) {
 		e := newSidebarEnv(t)
 		e.hover(fmt.Sprintf(entryZone, e.entry(20)))
 		_, top := e.zone(popupZone)
-		rule := strings.Repeat("\u2500", 29)
-		want := []string{blocked + "dev                  +1 5m", "   claude", "   wants permission", "   approve", "   id deploy", "   working build", rule}
+		rule := strings.Repeat("\u2500", 30)
+		want := []string{blocked + "dev                   +1 5m", "   claude", "   wants permission", "   approve", "   id deploy", "   working build", rule}
 		if got := e.screen()[top : top+len(want)]; !reflect.DeepEqual(got, want) {
 			t.Errorf("popup:\n%q\nwant\n%q", got, want)
 		}
@@ -794,7 +794,7 @@ func TestRowHoverPopup(t *testing.T) {
 			t.Errorf("the popup showed after %v", waited)
 		}
 		want := []string{
-			"  " + branchIcon + "fix fix" + strings.Repeat(" ", 14) + "#98",
+			"  " + branchIcon + "fix fix" + strings.Repeat(" ", 15) + "#98",
 			"space    gr",
 			"path     .worktrees/fix",
 			"branch   fix",
@@ -803,8 +803,8 @@ func TestRowHoverPopup(t *testing.T) {
 			"pr       #98 merged",
 			"session  gr@fix",
 			"windows  none open",
-			"saved    no sessions directo\u2026",
-			strings.Repeat("\u2500", 29),
+			"saved    no sessions directory",
+			strings.Repeat("\u2500", 30),
 		}
 		if got := popup(); !reflect.DeepEqual(got, want) {
 			t.Errorf("popup:\n%q\nwant\n%q", got, want)
@@ -930,7 +930,7 @@ func TestErrorOnLastLine(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(spaces.Snapshot{Err: errors.New("config.toml: unknown keys: space")})
 	lines := e.screen()
-	if got := lines[len(lines)-1]; got != "config.toml: unknown keys: s\u2026" {
+	if got := lines[len(lines)-1]; got != "config.toml: unknown keys: sp\u2026" {
 		t.Errorf("last line %q", got)
 	}
 	if !e.has("\u25bc " + repoIcon + "gr main") {

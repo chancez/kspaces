@@ -87,8 +87,8 @@ func barItem(name, count, key string, width, countW, keyW int) string {
 func TestSelectBar(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.press("v")
-	rule := strings.Repeat("\u2500", 29)
-	item := func(name, count, key string) string { return barItem(name, count, key, 29, 1, 3) }
+	rule := strings.Repeat("\u2500", 30)
+	item := func(name, count, key string) string { return barItem(name, count, key, 30, 1, 3) }
 	check := func(name string, bar, buttons []string) {
 		t.Helper()
 		if got := e.bar(); !reflect.DeepEqual(got, bar) {
@@ -98,13 +98,13 @@ func TestSelectBar(t *testing.T) {
 			t.Errorf("%s, rows that can be clicked %q, want %q", name, got, buttons)
 		}
 	}
-	check("nothing ticked", []string{barTitle("0 selected", 29), item("Remove", "-", "x"), item("Close", "-", "c"),
-		item("Forget", "-", "F"), item("Cancel", "", "esc"), "Click or drag over rows to t\u2026", rule, "STATUS"}, []string{"Cancel"})
+	check("nothing ticked", []string{barTitle("0 selected", 30), item("Remove", "-", "x"), item("Close", "-", "c"),
+		item("Forget", "-", "F"), item("Cancel", "", "esc"), "Click or drag over rows to ti\u2026", rule, "STATUS"}, []string{"Cancel"})
 	e.clickRow(e.row("gr@fix"))
-	check("fix ticked, no windows, no saved file", []string{barTitle("1 selected", 29), item("Remove", "1", "x"), item("Close", "-", "c"),
+	check("fix ticked, no windows, no saved file", []string{barTitle("1 selected", 30), item("Remove", "1", "x"), item("Close", "-", "c"),
 		item("Forget", "-", "F"), item("Cancel", "", "esc"), "Nothing to close or forget", rule, "STATUS"}, []string{"Cancel", "Remove"})
 	e.clickRow(e.row("gr@dev"))
-	ticked := []string{barTitle("2 selected", 29), item("Remove", "2", "x"), item("Close", "1", "c"),
+	ticked := []string{barTitle("2 selected", 30), item("Remove", "2", "x"), item("Close", "1", "c"),
 		item("Forget", "-", "F"), item("Cancel", "", "esc"), "Nothing to forget", rule, "STATUS"}
 	check("dev ticked, with windows", ticked, []string{"Cancel", "Close", "Remove"})
 
@@ -124,7 +124,7 @@ func TestSelectBar(t *testing.T) {
 		t.Errorf("on Forget, the hint says %q, lit %q", got, lit)
 	}
 	e.m.Update(tea.MouseMotionMsg{X: 25, Y: e.barRowY("Remove")})
-	if got, lit := e.bar()[5], e.highlighted(); got != "Removes 2 worktrees, asking \u2026" || !reflect.DeepEqual(lit, []string{ticked[1]}) {
+	if got, lit := e.bar()[5], e.highlighted(); got != "Removes 2 worktrees, asking f\u2026" || !reflect.DeepEqual(lit, []string{ticked[1]}) {
 		t.Errorf("on Remove, the hint says %q, lit %q", got, lit)
 	}
 
@@ -143,13 +143,13 @@ func TestSelectBar(t *testing.T) {
 
 	e.m.Update(tea.WindowSizeMsg{Width: 14, Height: 40})
 	e.m.render()
-	narrow := func(name, key string) string { return barItem(name, "", key, 13, 0, 3) }
-	check("narrow, the counts left out", []string{barTitle("2", 13), narrow("Remove", "x"), narrow("Close", "c"), narrow("Forget", "F"),
-		narrow("Cancel", "esc"), "Nothing to f\u2026", strings.Repeat("\u2500", 13), "STATUS"}, []string{"Cancel", "Close", "Remove"})
+	narrow := func(name, key string) string { return barItem(name, "", key, 14, 0, 3) }
+	check("narrow, the counts left out", []string{barTitle("2", 14), narrow("Remove", "x"), narrow("Close", "c"), narrow("Forget", "F"),
+		narrow("Cancel", "esc"), "Nothing to fo\u2026", strings.Repeat("\u2500", 14), "STATUS"}, []string{"Cancel", "Close", "Remove"})
 	e.m.Update(tea.WindowSizeMsg{Width: 12, Height: 40})
 	e.m.render()
-	check("narrowest, the keys left out too", []string{barTitle("2", 11), " Remove", " Close", " Forget", " Cancel",
-		"Nothing to\u2026", strings.Repeat("\u2500", 11), "STATUS"}, []string{"Cancel", "Close", "Remove"})
+	check("narrowest, the keys left out too", []string{barTitle("2", 12), " Remove", " Close", " Forget", " Cancel",
+		"Nothing to \u2026", strings.Repeat("\u2500", 12), "STATUS"}, []string{"Cancel", "Close", "Remove"})
 
 	snap := fixture(time.Now())
 	cfg := testCommands(t)
@@ -157,7 +157,7 @@ func TestSelectBar(t *testing.T) {
 	e.m.Update(snap)
 	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 40})
 	e.m.render()
-	check("with commands", []string{barTitle("2 selected", 29), item("Remove", "2", "x"), item("Close", "1", "c"), item("Forget", "-", "F"),
+	check("with commands", []string{barTitle("2 selected", 30), item("Remove", "2", "x"), item("Close", "1", "c"), item("Forget", "-", "F"),
 		item("Run", "2", "R"), item("Cancel", "", "esc"), "Nothing to forget", rule, "STATUS"}, []string{"Cancel", "Close", "Remove", "Run"})
 }
 

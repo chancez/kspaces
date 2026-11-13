@@ -43,9 +43,9 @@ func TestGitStateOnRows(t *testing.T) {
 	want := []string{
 		"  " + termIcon + "default",
 		"",
-		"\u25bc " + repoIcon + "gr main" + pad(15) + "\u25cf1",
-		here + blocked + "dev pr/me/\u2026 \u25cf3 \u21912\u21931 #123",
-		"  " + branchIcon + "fix fix" + pad(14) + "#98",
+		"\u25bc " + repoIcon + "gr main" + pad(16) + "\u25cf1",
+		here + blocked + "dev pr/me/d\u2026 \u25cf3 \u21912\u21931 #123",
+		"  " + branchIcon + "fix fix" + pad(15) + "#98",
 		"",
 		"  " + repoIcon + "kitty master",
 		"",
@@ -57,7 +57,7 @@ func TestGitStateOnRows(t *testing.T) {
 		t.Errorf("rows at 30:\n%q\nwant\n%q", got, want)
 	}
 
-	e.m.Update(tea.WindowSizeMsg{Width: 14, Height: 40})
+	e.m.Update(tea.WindowSizeMsg{Width: 13, Height: 40})
 	want = []string{
 		"  " + termIcon + "default",
 		"",
@@ -72,7 +72,7 @@ func TestGitStateOnRows(t *testing.T) {
 		"  \uf00d  broken",
 	}
 	if got := rows(); !reflect.DeepEqual(got, want) {
-		t.Errorf("rows at 14:\n%q\nwant\n%q", got, want)
+		t.Errorf("rows at 13:\n%q\nwant\n%q", got, want)
 	}
 }
 
@@ -89,9 +89,9 @@ func TestLongNameGivesWayToGitState(t *testing.T) {
 		width int
 		want  string
 	}{
-		{44, "  " + branchIcon + "intent_sync_api_updates   \u25cf2 \u21914 #11243"},
-		{30, "  " + branchIcon + "intent_sync_a\u2026 \u25cf2 #11243"},
-		{16, "  " + branchIcon + "intent\u2026 \u25cf2"},
+		{43, "  " + branchIcon + "intent_sync_api_updates   \u25cf2 \u21914 #11243"},
+		{30, "  " + branchIcon + "intent_sync_ap\u2026 \u25cf2 #11243"},
+		{15, "  " + branchIcon + "intent\u2026 \u25cf2"},
 	} {
 		e.m.Update(tea.WindowSizeMsg{Width: tc.width, Height: 40})
 		if got := row(); got != tc.want {
@@ -114,11 +114,11 @@ func TestPRChecksAndReviewOnRows(t *testing.T) {
 			snap := gitFixture()
 			snap.Git["/src/gr/.worktrees/fix"] = gitstate.State{Status: &gitstate.Status{Upstream: "origin/fix"}, PR: &gh.PR{Number: 98, State: "open", Checks: c, Review: r}}
 			e.m.Update(snap)
-			for _, width := range []int{30, 16, 14, 13} {
+			for _, width := range []int{30, 15, 13, 12} {
 				e.m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
 				got = append(got, fmt.Sprintf("%s %s %d: %s", c, r, width, e.screen()[6]))
 			}
-			// At 16 the git state has 6 cells, which a PR with both its checks and its review overruns, and
+			// At 15 the git state has 6 cells, which a PR with both its checks and its review overruns, and
 			// the branch gets what a PR's number alone leaves.
 			full, mid := "#98"+checks[c]+reviews[r], "  "+branchIcon+"fix  #98"+checks[c]+reviews[r]
 			switch {
@@ -128,10 +128,10 @@ func TestPRChecksAndReviewOnRows(t *testing.T) {
 				mid = "  " + branchIcon + "fix f\u2026 #98"
 			}
 			want = append(want,
-				fmt.Sprintf("%s %s 30: %s", c, r, "  "+branchIcon+"fix fix"+pad(17-len([]rune(full)))+full),
-				fmt.Sprintf("%s %s 16: %s", c, r, mid),
-				fmt.Sprintf("%s %s 14: %s", c, r, "  "+branchIcon+"fix  #98"),
-				fmt.Sprintf("%s %s 13: %s", c, r, "  "+branchIcon+"fix #98"),
+				fmt.Sprintf("%s %s 30: %s", c, r, "  "+branchIcon+"fix fix"+pad(18-len([]rune(full)))+full),
+				fmt.Sprintf("%s %s 15: %s", c, r, mid),
+				fmt.Sprintf("%s %s 13: %s", c, r, "  "+branchIcon+"fix  #98"),
+				fmt.Sprintf("%s %s 12: %s", c, r, "  "+branchIcon+"fix #98"),
 			)
 		}
 	}
@@ -150,13 +150,13 @@ func TestLongNameGivesWayToPRChecks(t *testing.T) {
 	snap.Git[long] = gitstate.State{Status: &gitstate.Status{Changes: 2, Ahead: 4}, PR: &gh.PR{Number: 11243, State: "open", Checks: gh.ChecksFailing, Review: gh.ReviewChangesRequested}}
 	e.m.Update(snap)
 	var got []string
-	for _, width := range []int{44, 30, 24, 22, 21} {
+	for _, width := range []int{43, 30, 23, 21, 20} {
 		e.m.Update(tea.WindowSizeMsg{Width: width, Height: 40})
 		got = append(got, e.screen()[7])
 	}
 	want := []string{
 		"  " + branchIcon + "intent_sync_api_updates  \u25cf2 #11243 \u2717 \u00b1",
-		"  " + branchIcon + "intent_sy\u2026 \u25cf2 #11243 \u2717 \u00b1",
+		"  " + branchIcon + "intent_syn\u2026 \u25cf2 #11243 \u2717 \u00b1",
 		"  " + branchIcon + "inten\u2026 \u25cf2 #11243 \u2717",
 		"  " + branchIcon + "inten\u2026 \u25cf2 #11243",
 		"  " + branchIcon + "intent_sync\u2026 \u25cf2",
@@ -367,7 +367,7 @@ func TestActionErrorStays(t *testing.T) {
 	want := [][]string{
 		saying("no pull request found"),
 		saying("no pull request found"),
-		saying("config.toml: unknown keys: s\u2026"),
+		saying("config.toml: unknown keys: sp\u2026"),
 		before,
 		before,
 	}

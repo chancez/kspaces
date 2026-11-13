@@ -63,7 +63,7 @@ type Config struct {
 // Sidebar is how the sidebar's dock is laid out, and where its forms and the picker open. kitty sizes the
 // dock, so kitty.conf's watcher reads Width rather than kspaces; kspaces checks it with the rest.
 type Sidebar struct {
-	// The dock's width in columns, the right border included.
+	// The dock's width in columns.
 	Width int `toml:"width"`
 	// Where the forms and the picker open: PopupOverlay or PopupPanel.
 	Popup string `toml:"popup"`

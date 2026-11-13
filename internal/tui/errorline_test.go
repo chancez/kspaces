@@ -39,9 +39,9 @@ func TestErrorPopup(t *testing.T) {
 		copy(out[len(out)-len(rows):], rows)
 		return out
 	}
-	rule := strings.Repeat("\u2500", 29)
+	rule := strings.Repeat("\u2500", 30)
 	long := "To get started with GitHub CLI, please run:  gh auth login\nAlternatively, populate the GH_TOKEN environment variable."
-	cut := "To get started with GitHub C\u2026"
+	cut := "To get started with GitHub CL\u2026"
 
 	show := func(msgs ...tea.Msg) {
 		for _, msg := range msgs {
@@ -67,8 +67,8 @@ func TestErrorPopup(t *testing.T) {
 	got = append(got, e.screen())
 	want := [][]string{
 		append(slices.Clone(before[:len(before)-1]), "no pull request found"),
-		above(rule, "To get started with GitHub", "CLI, please run: gh auth", "login", "Alternatively, populate the", "GH_TOKEN environment", "variable.", cut),
-		above(rule, "To get started with GitHub", "CLI, please run: gh auth", "login", "Alternatively, populate the", "GH_TOKEN environment", "variable.", cut),
+		above(rule, "To get started with GitHub", "CLI, please run: gh auth login", "Alternatively, populate the", "GH_TOKEN environment variable.", cut),
+		above(rule, "To get started with GitHub", "CLI, please run: gh auth login", "Alternatively, populate the", "GH_TOKEN environment variable.", cut),
 		append(slices.Clone(before[:len(before)-1]), cut),
 		append(slices.Clone(before[:len(before)-1]), cut),
 	}
@@ -82,7 +82,7 @@ func TestErrorPopup(t *testing.T) {
 	e.hover(errorZone)
 	if got, want := e.screen(), []string{
 		spacesTitle, "",
-		rule, "To get started with GitHub", "CLI, please run: gh auth", "login", cut,
+		rule, "To get started with GitHub", "CLI, please run: gh auth login", "Alternatively, populate the", cut,
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("in a short sidebar:\n%q\nwant\n%q", got, want)
 	}

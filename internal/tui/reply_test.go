@@ -185,11 +185,11 @@ func TestReplyKey(t *testing.T) {
 func TestStatusRightClick(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		e := newSidebarEnv(t)
-		rule := strings.Repeat("\u2500", 29)
+		rule := strings.Repeat("\u2500", 30)
 		top := []string{
 			spacesTitle, "", "  \uf120  default", "", "\u25bc \uf401  gr main", here + "\uf071  dev pr/me/dev", "  \ue725  fix fix", "",
 			"  \uf401  kitty master", "", "\u25b6 \uf110  docs main", "", "  \uf00d  broken", "", "", "", "", "", "", "", "", "",
-			rule, "STATUS", "Blocked 1", "\uf071  dev                  +1 5m", "   claude \u00b7 approve", "", "Failed 1", "\ue654  scratch",
+			rule, "STATUS", "Blocked 1", "\uf071  dev                   +1 5m", "   claude \u00b7 approve", "", "Failed 1", "\ue654  scratch",
 		}
 		menu := []string{rule, " Open", " Reply", rule}
 		screen := func(lines ...[]string) []string {
@@ -200,7 +200,7 @@ func TestStatusRightClick(t *testing.T) {
 			return out
 		}
 		e.click(fmt.Sprintf(entryZone, e.entry(21)), tea.MouseRight)
-		want := screen(top, menu, []string{"   make \u00b7 \u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 40%", "", "Idle 1", "\uf10c  default", "   claude", ""})
+		want := screen(top, menu, []string{"   make \u00b7 \u2588\u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 40%", "", "Idle 1", "\uf10c  default", "   claude", ""})
 		if got := e.screen(); !reflect.DeepEqual(got, want) {
 			t.Errorf("on the failed entry:\n%q\nwant\n%q", got, want)
 		}

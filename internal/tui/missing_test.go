@@ -75,7 +75,7 @@ func TestMissingWorktreesOnScreen(t *testing.T) {
 		"  " + branchIcon + "dev dev",
 		"  " + goneIcon + "open gone",
 		"  " + goneIcon + "saved gone",
-		strings.Repeat("\u2500", 29),
+		strings.Repeat("\u2500", 30),
 		"STATUS",
 		"Nothing to report",
 		"",
