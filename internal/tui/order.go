@@ -33,7 +33,7 @@ func (m *sidebar) sortMode() spaces.SortMode {
 func (m *sidebar) setSort(mode spaces.SortMode) {
 	m.order.Mode, m.held = mode, nil
 	if err := spaces.SaveSort(mode); err != nil {
-		m.err = err
+		m.failed = err
 	}
 	m.setRows()
 	m.scrollToCursor()
@@ -155,7 +155,7 @@ func (m *sidebar) keep(a arrangement, r spaces.Row) tea.Cmd {
 	}
 	if !slices.Equal(a.roots, listed) {
 		if err := config.SaveSpacesOrder(a.roots); err != nil {
-			m.err = err
+			m.failed = err
 			return nil
 		}
 		byRoot := map[string]spaces.Space{}
@@ -178,7 +178,7 @@ func (m *sidebar) keep(a arrangement, r spaces.Row) tea.Cmd {
 	}
 	if !maps.EqualFunc(saved, m.order.Worktrees, slices.Equal) {
 		if err := spaces.SaveOrder(saved); err != nil {
-			m.err = err
+			m.failed = err
 		}
 		m.order.Worktrees = saved
 	}
@@ -186,7 +186,7 @@ func (m *sidebar) keep(a arrangement, r spaces.Row) tea.Cmd {
 	if automatic {
 		m.order.Mode = spaces.SortManual
 		if err := spaces.SaveSort(spaces.SortManual); err != nil {
-			m.err = err
+			m.failed = err
 		}
 	}
 	m.setRows()

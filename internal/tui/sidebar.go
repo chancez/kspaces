@@ -37,6 +37,9 @@ const rowHoverDelay = 2 * time.Second
 
 type tickMsg struct{}
 
+// failedMsg is an action run off the UI loop failing, as gh failing to open a PR.
+type failedMsg struct{ err error }
+
 // rowHoverMsg is rowHoverDelay passing since the mouse came to rest on a row, the gen-th time it did.
 type rowHoverMsg struct {
 	gen int
@@ -65,7 +68,11 @@ type sidebar struct {
 	statusOffset int
 	width        int
 	height       int
-	err          error
+	// err is the last load's error, until a load works.
+	err error
+	// failed is the last action's error. It is the user's own doing, so it shows over err, and stays
+	// through the loads after it until a key or a click: a poll every second would otherwise wipe it.
+	failed error
 	// notice is what the last line says when there is no error: that the kitty files are out of date.
 	notice *look.Span
 	// Whether kitty has given the sidebar keyboard focus.
@@ -153,7 +160,7 @@ func (m *sidebar) openWindowCmd(s status.Status) tea.Cmd {
 	cfg, st, self, p := m.cfg, m.kitty, m.self, m.poller
 	return func() tea.Msg {
 		if err := spaces.OpenWindow(cfg, st, s.Window, s.Session); err != nil {
-			return spaces.Snapshot{Err: err}
+			return failedMsg{err}
 		}
 		return p.Poll(true).View(self)
 	}
@@ -163,7 +170,7 @@ func (m *sidebar) openWorktreeCmd(wt spaces.Worktree, opts spaces.OpenOptions) t
 	cfg, st, self, p := m.cfg, m.kitty, m.self, m.poller
 	return func() tea.Msg {
 		if err := spaces.OpenWorktree(cfg, st, wt, opts); err != nil {
-			return spaces.Snapshot{Err: err}
+			return failedMsg{err}
 		}
 		return p.Poll(true).View(self)
 	}
@@ -173,6 +180,11 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var start tea.Cmd
 	if _, ok := msg.(tea.MouseMsg); ok {
 		start = m.mouse.start()
+	}
+	switch msg.(type) {
+	case tea.KeyPressMsg, tea.MouseClickMsg:
+		// The user has seen the error and moved on; what they do now may fail anew.
+		m.failed = nil
 	}
 	_, cmd := m.update(msg)
 	// The filter belongs to navigating: it goes when the keys stop coming, so no sidebar is left narrowed.
@@ -215,6 +227,8 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case glueMsg:
 		m.notice = &msg.notice
+	case failedMsg:
+		m.failed = msg.err
 	case spaces.Snapshot:
 		m.err = msg.Err
 		if msg.Config != nil {
@@ -319,7 +333,7 @@ func (m *sidebar) leave() tea.Cmd {
 	}
 	return func() tea.Msg {
 		if err := spaces.Leave(st); err != nil {
-			return spaces.Snapshot{Err: err}
+			return failedMsg{err}
 		}
 		return nil
 	}
@@ -385,6 +399,8 @@ func (m *sidebar) frame() string {
 	m.drawMenu(lines)
 	status := ""
 	switch {
+	case m.failed != nil:
+		status = th.Render(look.Plain, th.Cut(width, look.Error(m.failed.Error()))...)
 	case m.err != nil:
 		status = th.Render(look.Plain, th.Cut(width, look.Error(m.err.Error()))...)
 	case m.notice != nil:

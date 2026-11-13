@@ -249,7 +249,7 @@ func (m *sidebar) cleanup(root string) tea.Cmd {
 	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
 		if err := spaces.AskCleanup(cfg, st, root); err != nil {
-			return spaces.Snapshot{Err: err}
+			return failedMsg{err}
 		}
 		return nil
 	}

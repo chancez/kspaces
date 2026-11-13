@@ -1,10 +1,12 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -244,5 +246,59 @@ func TestOpenPR(t *testing.T) {
 	lines := e.screen()
 	if got := lines[len(lines)-1]; got != "no pull request found" {
 		t.Errorf("last line %q, want gh's error", got)
+	}
+}
+
+// gh failing to open a PR is an action's error: it stays on the last line through the loads after it,
+// and over a load's own error, until a key or a click. A load's error shows until a load works.
+func TestActionErrorStays(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(tea.FocusMsg{})
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	snap := gitFixture()
+	snap.Spaces[0].Worktrees[1].Path = dir
+	snap.Git[dir] = snap.Git["/src/gr/.worktrees/dev"]
+	e.m.Update(snap)
+	dev := e.row("gr@dev")
+	e.m.cursor = dev
+	before := e.screen()
+	fakeGh(t, true)
+	fail := func() {
+		t.Helper()
+		e.m.Update(e.press("b")())
+	}
+	// What a tick does: its poll loads snap again. The poll asks kitty, so the test hands over its snapshot.
+	tick := func() {
+		e.m.Update(tickMsg{})
+		e.m.Update(snap)
+	}
+	saying := func(last string) []string { return append(slices.Clone(before[:len(before)-1]), last) }
+
+	var got [][]string
+	fail()
+	tick()
+	got = append(got, e.screen())
+	e.m.Update(spaces.Snapshot{Err: errors.New("config.toml: unknown keys: space")})
+	got = append(got, e.screen())
+	e.press("down", "up")
+	got = append(got, e.screen())
+	tick()
+	got = append(got, e.screen())
+	fail()
+	tick()
+	e.click(fmt.Sprintf(entryZone, dev), tea.MouseLeft)
+	got = append(got, e.screen())
+	want := [][]string{
+		saying("no pull request found"),
+		saying("no pull request found"),
+		saying("config.toml: unknown keys:..."),
+		before,
+		before,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("screens:\n%q\nwant\n%q", got, want)
 	}
 }

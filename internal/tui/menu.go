@@ -174,7 +174,7 @@ func (m *sidebar) menuRule(head string, width int) string {
 func (m *sidebar) toggleFold(root string) {
 	m.folded[root] = !m.folded[root]
 	if err := spaces.SaveFolded(m.folded); err != nil {
-		m.err = err
+		m.failed = err
 	}
 	m.setRows()
 	for i, r := range m.rows {
@@ -191,7 +191,7 @@ func (m *sidebar) newWorktree(root string) tea.Cmd {
 	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
 		if err := spaces.NewWorktree(cfg, st, root); err != nil {
-			return spaces.Snapshot{Err: err}
+			return failedMsg{err}
 		}
 		return nil
 	}
@@ -202,7 +202,7 @@ func (m *sidebar) removeWorktree(path string) tea.Cmd {
 	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
 		if err := spaces.AskRemoveWorktree(cfg, st, path); err != nil {
-			return spaces.Snapshot{Err: err}
+			return failedMsg{err}
 		}
 		return nil
 	}
@@ -214,7 +214,7 @@ func (m *sidebar) runCommand(r spaces.Row) tea.Cmd {
 	cfg, st, path, name := m.cfg, m.kitty, r.Worktree.Path, r.Space.ConfigOf(m.cfg).Commands[0].Name
 	return func() tea.Msg {
 		if err := spaces.AskRunCommand(cfg, st, name, path); err != nil {
-			return spaces.Snapshot{Err: err}
+			return failedMsg{err}
 		}
 		return nil
 	}
@@ -230,7 +230,7 @@ func (m *sidebar) openLayout(r spaces.Row) tea.Cmd {
 	}
 	return func() tea.Msg {
 		if err := spaces.AskOpenLayout(global, st, name, path); err != nil {
-			return spaces.Snapshot{Err: err}
+			return failedMsg{err}
 		}
 		return nil
 	}
@@ -242,7 +242,7 @@ func (m *sidebar) saveLayout(path string) tea.Cmd {
 	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
 		if err := spaces.AskSaveLayout(cfg, st, path); err != nil {
-			return spaces.Snapshot{Err: err}
+			return failedMsg{err}
 		}
 		return nil
 	}
@@ -261,7 +261,7 @@ func (m *sidebar) rowPR(r spaces.Row) *gh.PR {
 func openPR(dir string, number int) tea.Cmd {
 	return func() tea.Msg {
 		if err := gh.Browse(dir, number); err != nil {
-			return spaces.Snapshot{Err: err}
+			return failedMsg{err}
 		}
 		return nil
 	}
@@ -272,7 +272,7 @@ func (m *sidebar) closeSession(session string) tea.Cmd {
 	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
 		if err := spaces.AskCloseSession(cfg, st, session); err != nil {
-			return spaces.Snapshot{Err: err}
+			return failedMsg{err}
 		}
 		return nil
 	}
@@ -283,7 +283,7 @@ func (m *sidebar) forgetSession(session string) tea.Cmd {
 	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
 		if err := spaces.AskForgetSession(cfg, st, session); err != nil {
-			return spaces.Snapshot{Err: err}
+			return failedMsg{err}
 		}
 		return nil
 	}
@@ -295,7 +295,7 @@ func (m *sidebar) trustConfig(root string) tea.Cmd {
 	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
 		if err := spaces.AskTrust(cfg, st, root); err != nil {
-			return spaces.Snapshot{Err: err}
+			return failedMsg{err}
 		}
 		return nil
 	}
@@ -307,7 +307,7 @@ func (m *sidebar) addSpace() tea.Cmd {
 	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
 		if err := spaces.AskAddSpace(cfg, st); err != nil {
-			return spaces.Snapshot{Err: err}
+			return failedMsg{err}
 		}
 		return nil
 	}
