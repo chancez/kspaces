@@ -37,35 +37,48 @@ CONFIG_CHECK_SECONDS = 2
 _scheduled = False
 # A pass of add_docks that schedule could not get a timer for, left to the config check.
 _missed = False
-# The config's sidebar width, and the modification time of the config it was read from.
+# The config's sidebar width, and the files it was read from with their modification times.
 _width = (DEFAULT_WIDTH, None)
 
 
-def config_path():
+# config_paths are kspaces' config files: config.toml, then every other .toml file beside it by name,
+# hidden ones left out, as kspaces reads them.
+def config_paths():
     base = os.environ.get('XDG_CONFIG_HOME') or os.path.expanduser('~/.config')
-    return os.path.join(base, 'kspaces', 'config.toml')
+    d = os.path.join(base, 'kspaces')
+    try:
+        names = sorted(n for n in os.listdir(d) if n.endswith('.toml') and not n.startswith('.') and n != 'config.toml')
+    except OSError:
+        names = []
+    return [os.path.join(d, n) for n in ['config.toml'] + names]
 
 
-# sidebar_width is [sidebar] width from kspaces' config, read again only when the file changes. kspaces
-# checks the config itself and shows what is wrong with it in the sidebar, so here a value it would reject
-# just keeps the width there was.
+# sidebar_width is [sidebar] width from kspaces' config, from the file that sets it, read again only when
+# the files change. kspaces checks the config itself and shows what is wrong with it in the sidebar, so
+# here a value it would reject just keeps the width there was.
 def sidebar_width():
     global _width
-    try:
-        mtime = os.stat(config_path()).st_mtime
-    except OSError:
+    stamps = []
+    for path in config_paths():
+        try:
+            stamps.append((path, os.stat(path).st_mtime))
+        except OSError:
+            pass
+    if not stamps or stamps == _width[1]:
         return _width[0]
-    if mtime == _width[1]:
-        return _width[0]
-    width = _width[0]
+    width = DEFAULT_WIDTH
     try:
-        with open(config_path(), 'rb') as f:
-            value = tomllib.load(f).get('sidebar', {}).get('width', DEFAULT_WIDTH)
-        if isinstance(value, int) and 12 <= value <= 120:
-            width = value
+        for path, _ in stamps:
+            with open(path, 'rb') as f:
+                sidebar = tomllib.load(f).get('sidebar', {})
+            if isinstance(sidebar, dict) and 'width' in sidebar:
+                width = sidebar['width']
+                break
+        if not (isinstance(width, int) and 12 <= width <= 120):
+            width = _width[0]
     except (OSError, ValueError):
-        pass
-    _width = (width, mtime)
+        width = _width[0]
+    _width = (width, stamps)
     return width
 
 
