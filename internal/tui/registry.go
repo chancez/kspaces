@@ -64,6 +64,9 @@ type saveSubject struct{}
 // trustSubject is the trust space config form.
 type trustSubject struct{}
 
+// replySubject is the reply form.
+type replySubject struct{}
+
 // listSubject is a choice field's open list.
 type listSubject struct{}
 
@@ -255,14 +258,24 @@ var (
 )
 
 // The status list's entries.
-var actOpenWindow = &interact.Action[*sidebar, statusSubject]{
-	Title:   "Open",
-	Section: sectionSession,
-	Run: func(m *sidebar, s statusSubject) tea.Cmd {
-		m.remote = false
-		return m.openWindowCmd(s.status)
-	},
-}
+var (
+	actOpenWindow = &interact.Action[*sidebar, statusSubject]{
+		Title:   "Open",
+		Section: sectionSession,
+		Run: func(m *sidebar, s statusSubject) tea.Cmd {
+			m.remote = false
+			return m.openWindowCmd(s.status)
+		},
+	}
+	actReply = &interact.Action[*sidebar, statusSubject]{
+		Title:   "Reply",
+		Section: sectionSession,
+		Run: func(m *sidebar, s statusSubject) tea.Cmd {
+			m.remote = false
+			return m.reply(s.status.Window)
+		},
+	}
+)
 
 // The spaces list's own, offered on every row and on the sidebar.
 var actAddSpace = &interact.Action[*sidebar, spacesSubject]{
@@ -726,6 +739,22 @@ var (
 	actAddCancel = quit[*addSpaceForm, addSubject]()
 )
 
+// The reply form's. Every other key types.
+var (
+	actReplySend = &interact.Action[*replyForm, replySubject]{
+		Title:   "send",
+		Applies: func(f *replyForm, _ replySubject) bool { return !f.busy },
+		Run:     func(f *replyForm, _ replySubject) tea.Cmd { return f.reply(true) },
+	}
+	// actReplyType sends the text with no Enter after it, as a choice menu takes a single key.
+	actReplyType = &interact.Action[*replyForm, replySubject]{
+		Title:   "send without enter",
+		Applies: func(f *replyForm, _ replySubject) bool { return !f.busy && f.in.Value() != "" },
+		Run:     func(f *replyForm, _ replySubject) tea.Cmd { return f.reply(false) },
+	}
+	actReplyCancel = quit[*replyForm, replySubject]()
+)
+
 var (
 	entryKind  *interact.Kind[*sidebar, entrySubject]
 	statusKind *interact.Kind[*sidebar, statusSubject]
@@ -743,6 +772,7 @@ var (
 	layoutKind *interact.Kind[*layoutForm, layoutSubject]
 	saveKind   *interact.Kind[*saveLayoutForm, saveSubject]
 	trustKind  *interact.Kind[*trustForm, trustSubject]
+	replyKind  *interact.Kind[*replyForm, replySubject]
 	filterKind *interact.Kind[*sidebar, filterSubject]
 	listKind   *interact.Kind[*choiceList, listSubject]
 	sortKind   *interact.Kind[*sidebar, sortSubject]
@@ -762,6 +792,7 @@ var (
 	theLayoutForm *interact.Place[*layoutForm, layoutSubject]
 	theSaveForm   *interact.Place[*saveLayoutForm, saveSubject]
 	theTrustForm  *interact.Place[*trustForm, trustSubject]
+	theReplyForm  *interact.Place[*replyForm, replySubject]
 	theFilter     *interact.Place[*sidebar, filterSubject]
 	theSort       *interact.Place[*sidebar, sortSubject]
 	theChoiceList *interact.Place[*choiceList, listSubject]
@@ -792,7 +823,8 @@ func init() {
 	spacesList = interact.List(entryKind)
 	spacesList.Bind(actOpenWorktree, "enter/l", "open", "enter", "l")
 
-	statusKind = interact.NewKind(func(s statusSubject) string { return s.status.Session }, actOpenWindow)
+	statusKind = interact.NewKind(func(s statusSubject) string { return s.status.Session }, actOpenWindow, actReply)
+	statusKind.Bind(actReply, "t", "reply", "t")
 	statusList = interact.List(statusKind)
 	statusList.Bind(actOpenWindow, "enter/l", "open", "enter", "l")
 
@@ -887,6 +919,12 @@ func init() {
 	addKind.Bind(actAdd, "enter", "add", "enter")
 	addKind.Bind(actAddCancel, "esc", "cancel", "esc", "ctrl+c")
 	theAddForm = interact.List(addKind)
+
+	replyKind = interact.NewKind(func(replySubject) string { return "Reply" }, actReplySend, actReplyType, actReplyCancel)
+	replyKind.Bind(actReplySend, "enter", "send", "enter")
+	replyKind.Bind(actReplyType, "ctrl+s", "send without enter", "ctrl+s")
+	replyKind.Bind(actReplyCancel, "esc", "cancel", "esc", "ctrl+c")
+	theReplyForm = interact.List(replyKind)
 
 	runKind = interact.NewKind(func(runSubject) string { return "Run" },
 		actRunNextField, actRunPrevField, actRunNextCommand, actRunPrevCommand, actRunList, actRun, actRunCancel)

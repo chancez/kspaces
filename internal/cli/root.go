@@ -66,6 +66,7 @@ default ~/.config/kspaces/config.toml.`,
 		a.closeCommand(),
 		a.forgetCommand(),
 		a.trustCommand(),
+		a.replyCommand(),
 		a.addCommand(),
 		a.kittyCommand(),
 	)

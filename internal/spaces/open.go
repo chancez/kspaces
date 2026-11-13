@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -259,6 +260,12 @@ func AskForgetSession(cfg config.Config, st kitty.State, session string) error {
 // AskTrust opens the form that trusts the own config of the space at root, in a popup as NewWorktree's.
 func AskTrust(cfg config.Config, st kitty.State, root string) error {
 	return launchForm(cfg, st, listPanel, "trust", root)
+}
+
+// AskReply opens the form that replies to window, in a popup as NewWorktree's, of a list's size, as it
+// shows the window's screen.
+func AskReply(cfg config.Config, st kitty.State, window int) error {
+	return launchForm(cfg, st, listPanel, "reply", strconv.Itoa(window))
 }
 
 // ForgetSession deletes the saved file of session, so kitty does not restore it: for a missing worktree,

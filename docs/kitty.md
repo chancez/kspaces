@@ -395,9 +395,10 @@ popup = "panel"
   ```
 
   A form is 90 by 24 cells; Save as layout, clean up and Trust space config, which list what they act on,
-  100 by 32; the picker 120 by 32, room for its preview beside the list. A panel is drawn in a rounded
-  border in the accent, `+`, `-` and `|` in ASCII, a form's heading set into its top and its buttons and
-  keys on the row above its bottom; the watcher hides its tab bar. An overlay is drawn as it always was.
+  and Reply, which shows a window's screen, 100 by 32; the picker 120 by 32, room for its preview beside
+  the list. A panel is drawn in a rounded border in the accent, `+`, `-` and `|` in ASCII, a form's heading
+  set into its top and its buttons and keys on the row above its bottom; the watcher hides its tab bar. An
+  overlay is drawn as it always was.
   A panel closes when it loses focus, so none is left behind, unseen, in another window's way; one that is
   working, such as switching sessions, which moves the keyboard itself, finishes first, and one that then
   fails takes the keyboard back to say why. Closing one any other way, with `esc` or by finishing without
@@ -425,6 +426,17 @@ docks no sidebar in it and the session saver never saves it, and it carries the 
 `kspaces_picker` user variable as an overlay does. While one has focus no window in a session has, as for
 any other OS window: `tab_bar_filter`'s `session:~` above keeps the tab bar on the session last switched
 to.
+
+## Replying to a window
+
+A status entry's Reply, `t` in the sidebar, and `kspaces reply WINDOW_ID [TEXT]` type into a window
+without switching to it, with `kitten @ send-text --match id:N -- TEXT`. The text goes to the program as
+the bytes of what it says, a newline as a line feed, then Enter as a carriage return, `\r`, unless sent
+without Enter; a backslash is doubled, as kitten reads its text with bash's `$'...'` escapes, so it goes
+as one. send-text writes to the window's terminal, past kitty's keyboard handling, so a program in the
+kitty keyboard protocol's first mode, disambiguate, gets what typing sends there, Enter as `\r`; one that
+asks for every key as an escape code gets the bytes all the same, not the codes its keys would send. A
+window running `cm attach` passes them on to the program in its session as they are.
 
 ## Keys without focusing the sidebar
 

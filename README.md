@@ -199,6 +199,8 @@ kspaces close [SESSION]  close every window of a session, after confirming
 kspaces forget SESSION   delete the saved file of a session with no windows, after confirming
 kspaces trust [PATH]     trust the .kspaces.toml of the space PATH is in, after seeing what it adds in a
   --yes, --revoke        form; --yes without asking, --revoke to forget it
+kspaces reply WINDOW_ID [TEXT]  type TEXT and Enter into a window without switching to it; no TEXT: a form
+  --no-enter             showing its screen; --no-enter sends TEXT alone, as for a single key
 kspaces remove PATH      close a linked worktree's session and remove the worktree, after confirming
   --delete-branch        and then its branch, if merged; --force-branch even if not, losing its commits
 kspaces cleanup SPACE    remove the worktrees whose PR is merged, upstream gone or branch merged, in a form
