@@ -251,6 +251,46 @@ Not everything kitty arranges can be saved: the biases of `tall`, `fat` and the 
 session's tabs in another OS window come back as tabs of the one it opens in; a pane's scrollback, and what
 a program does when it starts again, are not kept.
 
+## More config files
+
+The config can be split across files: config.toml, then every other `.toml` file beside it in
+`~/.config/kspaces`, by name, hidden ones left out. A `work.toml` kept out of dotfiles can add a job's spaces,
+groups, commands and layouts, and config.toml stays the same on every machine:
+
+```toml
+# work.toml, beside config.toml
+spaces = [
+  { path = "~/projects/work/api", group = "work" },
+  { path = "~/projects/work/web", group = "work" },
+]
+
+[space.api]                    # a key config.toml's [space.api] does not set
+worktree_layout = "review"
+
+[[layouts]]                    # can run config.toml's commands, and config.toml can open it
+name = "review"
+tabs = [{ panes = [{ command = "gr" }] }]
+```
+
+They add up as one file saying all of it would:
+
+- `spaces`, `groups`, `[[commands]]` and `[[layouts]]` are listed one file's after another's. config.toml's
+  `groups` can name a group only another file has spaces in: `groups = ["work", "tools"]` puts `work` first
+  where `work.toml` exists, and a group no space is in is left out elsewhere.
+- `[space.NAME]` tables, and inline `spaces` entries, are merged by key.
+- Every other setting, `launch`, `sessions`, `layout`, a key of `[worktrees]`, `[sidebar]` or `[kitty]`, and
+  each key of a space, is one file's to set. Set in two files, or a command, layout or group defined in two,
+  it is an error naming both, rather than one silently winning.
+
+An error in one file names that file, and one only the files together have, such as a layout running a
+command none defines, names the directory. Without config.toml the other files are the config.
+
+Edits go to the file they belong to, checked with the other files: adding a space appends it to
+config.toml; saving a layout replaces it in the file that has it, and adds a new one to config.toml.
+Moving a space reorders its own file's `spaces`. The sidebar lists a group's spaces as the files do, one
+file's after another's, so moving a space before one from a file earlier than its own is an error, and
+the files are left as they were.
+
 ## Per-space config
 
 Some layouts and commands belong to one repository, and a work repository's should not end up in

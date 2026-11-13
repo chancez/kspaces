@@ -147,9 +147,10 @@ down the same way. A session in no space and a missing worktree do not move, and
 while a filter is on, nor by dragging in the [select mode](#selecting), where a drag ticks rows. A space
 moves among the spaces of its group, or of none: `K` on the first of them or `J` on the last does nothing,
 and dragging it past them leaves it first or last; groups are not reordered by moving, only by `groups`
-in config.toml. Moving a space rewrites the order of `spaces` in
-config.toml, as text, each entry with the comments on the lines right above it and after it on its line,
-through a symlinked config to its target, each group's spaces together as the list shows them. Moving a
+in config.toml. Moving a space rewrites the order of `spaces` in config.toml, or in the
+[config file](kitty.md#more-config-files) that lists it, as text, each entry with the comments on the lines
+right above it and after it on its line, through a symlinked config to its target, each group's spaces
+together as the list shows them. Moving a
 worktree keeps its space's order, by the worktrees' directories, in `$XDG_STATE_HOME/kspaces/order`.
 Either moves the order of every sidebar.
 

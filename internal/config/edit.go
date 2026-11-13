@@ -18,7 +18,16 @@ import (
 // with ~/ for the home directory. The result is parsed back and must list the spaces it listed and then
 // root, so a mistake in the edit is an error rather than a broken config.
 func AddSpace(text, root string) (string, error) {
-	before, err := Parse(text)
+	return addSpace(text, root, func(text string) (Config, []string, error) {
+		cfg, err := Parse(text)
+		return cfg, cfg.Spaces, err
+	})
+}
+
+// addSpace is AddSpace with parse reading a text as the config it makes and the spaces the text itself
+// lists.
+func addSpace(text, root string, parse func(string) (Config, []string, error)) (string, error) {
+	before, own, err := parse(text)
 	if err != nil {
 		return "", fmt.Errorf("the config has an error to fix first: %w", err)
 	}
@@ -29,29 +38,29 @@ func AddSpace(text, root string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	after, err := Parse(out)
+	_, after, err := parse(out)
 	if err != nil {
 		return "", fmt.Errorf("adding %s would break the config, so it was left as is: %w", Tilde(root), err)
 	}
-	if want := append(slices.Clone(before.Spaces), root); !slices.Equal(after.Spaces, want) {
-		return "", fmt.Errorf("adding %s would list spaces %q, so the config was left as is", Tilde(root), after.Spaces)
+	if want := append(slices.Clone(own), root); !slices.Equal(after, want) {
+		return "", fmt.Errorf("adding %s would list spaces %q, so the config was left as is", Tilde(root), after)
 	}
 	return out, nil
 }
 
-// SaveSpace adds root to the spaces of the config file Load reads, see AddSpace and editFile. A missing
-// config is created.
+// SaveSpace adds root to the spaces of config.toml, see AddSpace and EditFile, checked merged with the
+// other config files. A missing config is created.
 func SaveSpace(root string) error {
-	return editFile(func(text string) (string, error) { return AddSpace(text, root) })
-}
-
-// editFile rewrites the config file Load reads with edit, see EditFile.
-func editFile(edit func(text string) (string, error)) error {
-	path, err := filePath()
+	files, err := readFiles()
 	if err != nil {
 		return err
 	}
-	return EditFile(path, edit)
+	return EditFile(files.paths[0], func(text string) (string, error) {
+		return addSpace(text, root, func(text string) (Config, []string, error) {
+			cfg, p, err := files.with(0, text)
+			return cfg, p.cfg.Spaces, err
+		})
+	})
 }
 
 // EditFile rewrites the config file at path, the global config or a space's, with edit. A symlinked

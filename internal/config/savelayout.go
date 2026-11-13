@@ -47,6 +47,7 @@ func addLayout(text string, l Layout, replace bool, parse func(string) (Config, 
 	want := before
 	want.Layouts = slices.Clone(before.Layouts)
 	var out string
+	added := false
 	switch at := slices.Index(own, l.Name); {
 	case at < 0:
 		out = appendBlock(text, block)
@@ -54,7 +55,7 @@ func addLayout(text string, l Layout, replace bool, parse func(string) (Config, 
 		if i := slices.IndexFunc(want.Layouts, func(x Layout) bool { return x.Name == l.Name }); i >= 0 {
 			want.Layouts[i] = l
 		} else {
-			want.Layouts = append(want.Layouts, l)
+			added = true
 		}
 	case !replace:
 		return "", fmt.Errorf("a layout called %s exists", l.Name)
@@ -67,6 +68,14 @@ func addLayout(text string, l Layout, replace bool, parse func(string) (Config, 
 	after, _, err := parse(out)
 	if err != nil {
 		return "", fmt.Errorf("saving layout %s would break the config, so it was left as is: %w", l.Name, err)
+	}
+	// A new layout is after the text's own, which the layouts of the files after it may follow.
+	if added {
+		i := slices.IndexFunc(after.Layouts, func(x Layout) bool { return x.Name == l.Name })
+		if i < 0 || i > len(want.Layouts) {
+			i = len(want.Layouts)
+		}
+		want.Layouts = slices.Insert(want.Layouts, i, l)
 	}
 	// The inputs are what Parse works out from the commands, which are as they were.
 	for i := range want.Layouts {
@@ -88,10 +97,26 @@ func layoutNames(ls []Layout) []string {
 	return names
 }
 
-// SaveLayout adds l to the config file Load reads, or replaces the one called the same when replace says
-// to, see AddLayout and editFile.
+// SaveLayout adds l to config.toml, or replaces the one called the same when replace says to, in the
+// config file that has it, see AddLayout and EditFile, checked merged with the other config files.
 func SaveLayout(l Layout, replace bool) error {
-	return editFile(func(text string) (string, error) { return AddLayout(text, l, replace) })
+	files, err := readFiles()
+	if err != nil {
+		return err
+	}
+	at := 0
+	for i, text := range files.texts {
+		if p, err := decode(text); err == nil && slices.ContainsFunc(p.cfg.Layouts, func(x Layout) bool { return x.Name == l.Name }) {
+			at = i
+			break
+		}
+	}
+	return EditFile(files.paths[at], func(text string) (string, error) {
+		return addLayout(text, l, replace, func(text string) (Config, []string, error) {
+			cfg, p, err := files.with(at, text)
+			return cfg, layoutNames(p.cfg.Layouts), err
+		})
+	})
 }
 
 // layoutBlock is l as a [[layouts]] table, each tab a [[layouts.tabs]] with its panes inline, a line each.

@@ -163,7 +163,9 @@ auto_install = true
 save_sessions = true
 ```
 
-Every key is optional. An unknown key is an error.
+Every key is optional. An unknown key is an error. Other `.toml` files beside config.toml, such as a
+`work.toml` kept out of dotfiles, are read after it and add their spaces, groups, commands and layouts; a
+setting in two files is an error. See [docs/kitty.md](docs/kitty.md#more-config-files).
 
 A repository's own layouts and commands can live with it, rather than in your dotfiles, in `.kspaces.toml`
 at the top of its main worktree, which its linked worktrees share. They are added to config.toml's for that

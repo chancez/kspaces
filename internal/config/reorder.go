@@ -1,32 +1,45 @@
 package config
 
 import (
+	"errors"
 	"fmt"
+	"maps"
+	"path/filepath"
 	"slices"
 	"strings"
 )
 
-// Moving a space in the sidebar reorders config.toml's spaces as text, as AddSpace adds one: each entry
+// Moving a space in the sidebar reorders the config's spaces as text, as AddSpace adds one: each entry
 // moves with its comments, and the array keeps its layout, its commas and the comments that belong to no
 // entry where they were.
 
 // ReorderSpaces is the config text with its spaces listed in order, which must be the roots it lists, as
 // Parse reads them, in another order. The result is parsed back and must list them in that order.
 func ReorderSpaces(text string, order []string) (string, error) {
-	before, err := Parse(text)
+	return reorderSpaces(text, order, func(text string) ([]string, error) {
+		cfg, err := Parse(text)
+		return cfg.Spaces, err
+	})
+}
+
+var errSpacesChanged = errors.New("the spaces have changed since the sidebar read them")
+
+// reorderSpaces is ReorderSpaces with spacesOf reading the spaces a text lists.
+func reorderSpaces(text string, order []string, spacesOf func(string) ([]string, error)) (string, error) {
+	before, err := spacesOf(text)
 	if err != nil {
 		return "", fmt.Errorf("the config has an error to fix first: %w", err)
 	}
-	if !slices.Equal(slices.Sorted(slices.Values(before.Spaces)), slices.Sorted(slices.Values(order))) {
-		return "", fmt.Errorf("the spaces have changed since the sidebar read them")
+	if !slices.Equal(slices.Sorted(slices.Values(before)), slices.Sorted(slices.Values(order))) {
+		return "", errSpacesChanged
 	}
-	if slices.Equal(before.Spaces, order) {
+	if slices.Equal(before, order) {
 		return text, nil
 	}
-	// The entry of before.Spaces that goes in each place, the first not yet placed of equal ones.
+	// The entry of before that goes in each place, the first not yet placed of equal ones.
 	from, used := make([]int, len(order)), make([]bool, len(order))
 	for j, root := range order {
-		for i, r := range before.Spaces {
+		for i, r := range before {
 			if r == root && !used[i] {
 				from[j], used[i] = i, true
 				break
@@ -37,19 +50,99 @@ func ReorderSpaces(text string, order []string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	after, err := Parse(out)
+	after, err := spacesOf(out)
 	if err != nil {
 		return "", fmt.Errorf("reordering the spaces would break the config, so it was left as is: %w", err)
 	}
-	if !slices.Equal(after.Spaces, order) {
-		return "", fmt.Errorf("reordering the spaces would list %q, so the config was left as is", after.Spaces)
+	if !slices.Equal(after, order) {
+		return "", fmt.Errorf("reordering the spaces would list %q, so the config was left as is", after)
 	}
 	return out, nil
 }
 
-// SaveSpacesOrder reorders the spaces of the config file Load reads, see ReorderSpaces and editFile.
+// SaveSpacesOrder reorders the spaces of the config files, see ReorderSpaces and EditFile: each file's
+// among the places it lists them in. The sidebar lists a group's spaces as the files do, one file's after
+// another's, so an order that puts a space before one of a file before its own is an error, as the files
+// cannot say it.
 func SaveSpacesOrder(order []string) error {
-	return editFile(func(text string) (string, error) { return ReorderSpaces(text, order) })
+	files, err := readFiles()
+	if err != nil {
+		return err
+	}
+	before, err := parse(files.paths, files.texts)
+	if err != nil {
+		return fmt.Errorf("the config has an error to fix first: %w", err)
+	}
+	if !slices.Equal(slices.Sorted(slices.Values(before.Spaces)), slices.Sorted(slices.Values(order))) {
+		return errSpacesChanged
+	}
+	// Each file's spaces in order, a root listed twice taken by the first files to list it.
+	left := make([]map[string]int, len(files.texts))
+	for i, text := range files.texts {
+		p, err := decode(text)
+		if err != nil {
+			return err
+		}
+		left[i] = map[string]int{}
+		for _, root := range p.cfg.Spaces {
+			left[i][root]++
+		}
+	}
+	own, fileOf := make([][]string, len(files.texts)), map[string]int{}
+	for _, root := range order {
+		i := slices.IndexFunc(left, func(n map[string]int) bool { return n[root] > 0 })
+		left[i][root]--
+		own[i] = append(own[i], root)
+		if _, ok := fileOf[root]; !ok {
+			fileOf[root] = i
+		}
+	}
+	texts := slices.Clone(files.texts)
+	for i, text := range files.texts {
+		texts[i], err = reorderSpaces(text, own[i], func(text string) ([]string, error) {
+			p, err := decode(text)
+			return p.cfg.Spaces, err
+		})
+		if err != nil {
+			return fmt.Errorf("%s: %w", files.paths[i], err)
+		}
+	}
+	after, err := parse(files.paths, texts)
+	if err != nil {
+		return fmt.Errorf("reordering the spaces would break the config, so it was left as is: %w", err)
+	}
+	group := func(roots []string) map[string][]string {
+		ans := map[string][]string{}
+		for _, root := range roots {
+			g := after.Space[filepath.Base(root)].Group
+			ans[g] = append(ans[g], root)
+		}
+		return ans
+	}
+	want, got := group(order), group(after.Spaces)
+	for _, g := range slices.Sorted(maps.Keys(want)) {
+		for k, a := range want[g] {
+			if b := got[g][k]; a != b {
+				return fmt.Errorf("%s cannot go before %s: it is in %s, whose spaces come after %s's", filepath.Base(a), filepath.Base(b),
+					filepath.Base(files.paths[fileOf[a]]), filepath.Base(files.paths[fileOf[b]]))
+			}
+		}
+	}
+	for i := range texts {
+		if texts[i] == files.texts[i] {
+			continue
+		}
+		err := EditFile(files.paths[i], func(text string) (string, error) {
+			if text != files.texts[i] {
+				return "", errSpacesChanged
+			}
+			return texts[i], nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // spaceEntry is an item of the spaces array with what moves with it, each a range of the text: the
