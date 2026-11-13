@@ -74,9 +74,9 @@ func ResolvePR(space Space, ref PRRef) (PR, error) {
 	pr := PR{
 		Number:  got.Number,
 		Title:   got.Title,
-		HeadRef: got.HeadRefName,
-		Owner:   got.HeadRepositoryOwner.Login,
-		Cross:   got.IsCrossRepository,
+		HeadRef: got.HeadRef,
+		Owner:   got.Owner,
+		Cross:   got.Cross,
 		Remote:  prRemote(git.Remotes(space.Root), got.URL),
 	}
 	if !pr.Cross {

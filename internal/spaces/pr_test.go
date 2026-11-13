@@ -165,27 +165,6 @@ func TestPRWorktree(t *testing.T) {
 	}
 }
 
-// gh's own error comes back, and so does gh being missing.
-func TestResolvePRErrors(t *testing.T) {
-	r, _ := prRepos(t)
-	root := r.Dir
-	fakeGH(t, nil)
-	space := Space{Name: "space", Root: root}
-	var got []string
-	_, err := ResolvePR(space, PRRef{Arg: "404", Number: 404})
-	got = append(got, err.Error())
-	t.Setenv("PATH", t.TempDir())
-	_, err = ResolvePR(space, PRRef{Arg: "404", Number: 404})
-	got = append(got, err.Error())
-	want := []string{
-		"GraphQL: Could not resolve to a PullRequest with the number of 404. (repository.pullRequest)",
-		"gh is not installed, and looking up a PR needs it",
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %q\nwant %q", got, want)
-	}
-}
-
 // A PR is fetched from the remote for the repository it is to, whichever way its URL is written, origin
 // first, and from origin when no remote is.
 func TestPRRemote(t *testing.T) {

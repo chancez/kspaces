@@ -1,7 +1,9 @@
-// Package gh asks GitHub's gh about pull requests.
+// Package gh is how kspaces asks GitHub, through GitHub's gh: about pull requests, and to open one in the
+// browser. gh runs in a repository's directory, so it works out the GitHub repository from the remotes.
 package gh
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,63 +12,77 @@ import (
 	"strings"
 )
 
-// PR is the part of `gh pr view --json` kspaces checks a pull request out from.
-type PR struct {
-	Number int `json:"number"`
-	// The branch the PR is from, in the repository it is from.
-	HeadRefName         string `json:"headRefName"`
-	HeadRepositoryOwner Owner  `json:"headRepositoryOwner"`
-	// Set when the PR is from another repository than the one it is to, such as a fork.
-	IsCrossRepository bool   `json:"isCrossRepository"`
-	Title             string `json:"title"`
+// PRView is what ViewPR says of a PR, as much as checking it out needs.
+type PRView struct {
+	Number int
+	Title  string
+	// The branch the PR is from, in the repository it is from, and that repository's owner.
+	HeadRef, Owner string
+	// From another repository than the one it is to, such as a fork.
+	Cross bool
 	// The PR's page, which names the repository it is to, for picking the remote to fetch it from.
-	URL string `json:"url"`
+	URL string
 }
 
-// Owner is the user or organization a repository belongs to.
-type Owner struct {
-	Login string `json:"login"`
-}
-
-// fields are what ViewPR asks gh for, PR's.
-const fields = "number,headRefName,headRepositoryOwner,isCrossRepository,title,url"
+// viewFields are what ViewPR asks gh for, PRView's.
+const viewFields = "number,headRefName,headRepositoryOwner,isCrossRepository,title,url"
 
 // ViewPR looks up the PR pr, a number or a URL, with gh run in dir, so a number is one of the PRs of the
 // GitHub repository dir's remotes point to. The error is gh's own message, such as for a PR that does not
 // exist or a repository not on GitHub.
-func ViewPR(dir, pr string) (PR, error) {
-	cmd := exec.Command("gh", "pr", "view", pr, "--json", fields)
-	cmd.Dir = dir
-	out, err := cmd.Output()
+func ViewPR(dir, pr string) (PRView, error) {
+	out, err := run(context.Background(), dir, "looking up a PR", "pr", "view", pr, "--json", viewFields)
 	if err != nil {
-		return PR{}, ghError(err, "looking up a PR", "gh pr view")
+		return PRView{}, err
 	}
-	var ans PR
-	if err := json.Unmarshal(out, &ans); err != nil {
-		return PR{}, fmt.Errorf("parsing gh pr view: %w", err)
+	var got struct {
+		Number              int    `json:"number"`
+		HeadRefName         string `json:"headRefName"`
+		HeadRepositoryOwner struct {
+			Login string `json:"login"`
+		} `json:"headRepositoryOwner"`
+		IsCrossRepository bool   `json:"isCrossRepository"`
+		Title             string `json:"title"`
+		URL               string `json:"url"`
 	}
-	return ans, nil
+	if err := json.Unmarshal(out, &got); err != nil {
+		return PRView{}, fmt.Errorf("parsing gh pr view: %w", err)
+	}
+	return PRView{
+		Number:  got.Number,
+		Title:   got.Title,
+		HeadRef: got.HeadRefName,
+		Owner:   got.HeadRepositoryOwner.Login,
+		Cross:   got.IsCrossRepository,
+		URL:     got.URL,
+	}, nil
 }
 
 // Browse opens PR number in the browser, with gh run in dir for the repository it is of. The error is
-// gh's own message, as ViewPR's.
+// gh's own message, as ViewPR's. It has no timeout, as gh may wait on the browser it starts.
 func Browse(dir string, number int) error {
-	cmd := exec.Command("gh", "browse", strconv.Itoa(number))
-	cmd.Dir = dir
-	if _, err := cmd.Output(); err != nil {
-		return ghError(err, "opening a PR", "gh browse")
-	}
-	return nil
+	_, err := run(context.Background(), dir, "opening a PR", "browse", strconv.Itoa(number))
+	return err
 }
 
-// ghError is err from running gh, for doing what, as gh's message when it said one.
-func ghError(err error, doing, name string) error {
+// run runs gh with args in dir, for doing what, until ctx is done, and returns what it printed. The error
+// is gh's message when it said one.
+func run(ctx context.Context, dir, doing string, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, "gh", args...)
+	cmd.Dir = dir
+	out, err := cmd.Output()
 	var ee *exec.ExitError
 	switch {
+	case err == nil:
+		return out, nil
 	case errors.Is(err, exec.ErrNotFound):
-		return fmt.Errorf("gh is not installed, and %s needs it", doing)
+		return nil, fmt.Errorf("gh is not installed, and %s needs it", doing)
 	case errors.As(err, &ee) && len(ee.Stderr) > 0:
-		return errors.New(strings.TrimSpace(string(ee.Stderr)))
+		return nil, errors.New(strings.TrimSpace(string(ee.Stderr)))
 	}
-	return fmt.Errorf("%s: %w", name, err)
+	name := "gh " + args[0]
+	if args[0] == "pr" {
+		name += " " + args[1]
+	}
+	return nil, fmt.Errorf("%s: %w", name, err)
 }
