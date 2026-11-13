@@ -4,6 +4,8 @@ import (
 	"maps"
 	"sync"
 	"time"
+
+	"github.com/chancez/kspaces/internal/gh"
 )
 
 // How often a worktree's status is read again, and its branch's pull request looked up. gh goes over the
@@ -32,19 +34,19 @@ type Watcher struct {
 	busy     bool
 
 	readStatus func(dir string) (Status, error)
-	lookupPR   func(root, branch string) (*PR, error)
+	lookupPR   func(root, branch string) (*gh.PR, error)
 	now        func() time.Time
 	start      func(func())
 }
 
 // NewWatcher is a watcher that asks git and gh.
 func NewWatcher() *Watcher {
-	return WatcherOf(ReadStatus, LookupPR, time.Now, func(f func()) { go f() })
+	return WatcherOf(ReadStatus, gh.BranchPR, time.Now, func(f func()) { go f() })
 }
 
 // WatcherOf is a watcher that asks readStatus and lookupPR, on the clock now, and starts each pass with
 // start, for tests to run them at once.
-func WatcherOf(readStatus func(string) (Status, error), lookupPR func(string, string) (*PR, error), now func() time.Time, start func(func())) *Watcher {
+func WatcherOf(readStatus func(string) (Status, error), lookupPR func(string, string) (*gh.PR, error), now func() time.Time, start func(func())) *Watcher {
 	return &Watcher{states: map[string]State{}, statusAt: map[string]time.Time{}, readStatus: readStatus, lookupPR: lookupPR, now: now, start: start}
 }
 

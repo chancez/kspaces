@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chancez/kspaces/internal/gitstate"
+	"github.com/chancez/kspaces/internal/gh"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/status"
 )
@@ -371,10 +371,10 @@ func configMark(mark, text element, g Glyph, words string) []Span {
 var prStates = map[string]element{"open": elPROpen, "draft": elPRDraft, "merged": elPRMerged, "closed": elPRClosed}
 
 // PRNumber is a pull request by its number, in the color of its state.
-func PRNumber(pr gitstate.PR) Span { return sp(prStates[pr.State], fmt.Sprintf("#%d", pr.Number)) }
+func PRNumber(pr gh.PR) Span { return sp(prStates[pr.State], fmt.Sprintf("#%d", pr.Number)) }
 
 // PRState is a pull request's state, in its color.
-func PRState(pr gitstate.PR) Span { return sp(prStates[pr.State], pr.State) }
+func PRState(pr gh.PR) Span { return sp(prStates[pr.State], pr.State) }
 
 // Checkbox is a box, ticked when checked, or greyed for one that cannot be.
 func Checkbox(checked, off bool) Span {

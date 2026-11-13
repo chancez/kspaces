@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/chancez/kspaces/internal/gh"
 )
 
 func TestParseStatus(t *testing.T) {
@@ -43,41 +45,17 @@ func TestParseStatus(t *testing.T) {
 	}
 }
 
-func TestParsePRs(t *testing.T) {
-	for name, tc := range map[string]struct {
-		in   string
-		want *PR
-	}{
-		"open":   {`[{"number":12,"state":"OPEN","isDraft":false,"isCrossRepository":false}]`, &PR{12, "open"}},
-		"draft":  {`[{"number":13,"state":"OPEN","isDraft":true,"isCrossRepository":false}]`, &PR{13, "draft"}},
-		"merged": {`[{"number":14,"state":"MERGED","isDraft":false,"isCrossRepository":false}]`, &PR{14, "merged"}},
-		"closed": {`[{"number":15,"state":"CLOSED","isDraft":false,"isCrossRepository":false}]`, &PR{15, "closed"}},
-		"none":   {`[]`, nil},
-		// The newest from the repository itself, over a fork's of the same name.
-		"a fork's first": {`[{"number":20,"state":"OPEN","isCrossRepository":true},{"number":16,"state":"MERGED","isCrossRepository":false},{"number":9,"state":"CLOSED","isCrossRepository":false}]`, &PR{16, "merged"}},
-		"only a fork's":  {`[{"number":20,"state":"OPEN","isCrossRepository":true}]`, &PR{20, "open"}},
-	} {
-		got, err := ParsePRs([]byte(tc.in))
-		if err != nil || !reflect.DeepEqual(got, tc.want) {
-			t.Errorf("%s: got %+v, %v, want %+v", name, got, err, tc.want)
-		}
-	}
-	if _, err := ParsePRs([]byte("not json")); err == nil {
-		t.Error("no error for output that is not JSON")
-	}
-}
-
 // watchEnv is a watcher whose passes run at once, on a clock the test moves, recording what it asks.
 type watchEnv struct {
 	w      *Watcher
 	now    time.Time
 	asked  []string
-	prs    map[string]*PR
+	prs    map[string]*gh.PR
 	failPR bool
 }
 
 func newWatchEnv() *watchEnv {
-	e := &watchEnv{now: time.Unix(1_000_000, 0), prs: map[string]*PR{"dev": {7, "open"}}}
+	e := &watchEnv{now: time.Unix(1_000_000, 0), prs: map[string]*gh.PR{"dev": {Number: 7, State: "open"}}}
 	e.w = WatcherOf(
 		func(dir string) (Status, error) {
 			e.asked = append(e.asked, "status "+dir)
@@ -86,7 +64,7 @@ func newWatchEnv() *watchEnv {
 			}
 			return Status{Changes: 1}, nil
 		},
-		func(root, branch string) (*PR, error) {
+		func(root, branch string) (*gh.PR, error) {
 			e.asked = append(e.asked, "pr "+branch)
 			if e.failPR {
 				return nil, errors.New("gh: not logged in")
@@ -129,7 +107,7 @@ func TestWatcher(t *testing.T) {
 		t.Errorf("asked:\n%q\nwant\n%q", got, want)
 	}
 	at := e.now
-	if got, want := e.w.Update([]Target{dev}), map[string]State{"/src/gr/dev": {Status: &Status{Changes: 1}, PR: &PR{7, "open"}, PRAt: at, PRBranch: "dev"}}; !reflect.DeepEqual(got, want) {
+	if got, want := e.w.Update([]Target{dev}), map[string]State{"/src/gr/dev": {Status: &Status{Changes: 1}, PR: &gh.PR{Number: 7, State: "open"}, PRAt: at, PRBranch: "dev"}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("states %+v, want %+v", got, want)
 	}
 
@@ -137,7 +115,7 @@ func TestWatcher(t *testing.T) {
 	e.failPR = true
 	e.w.Refresh()
 	got = [][]string{e.ask(time.Second, dev)}
-	if st := e.w.Update([]Target{dev})["/src/gr/dev"]; !reflect.DeepEqual(st.PR, &PR{7, "open"}) {
+	if st := e.w.Update([]Target{dev})["/src/gr/dev"]; !reflect.DeepEqual(st.PR, &gh.PR{Number: 7, State: "open"}) {
 		t.Errorf("after a failure: %+v", st.PR)
 	}
 	dev.Branch = "dev2"

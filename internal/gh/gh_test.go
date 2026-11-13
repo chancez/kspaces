@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/chancez/kspaces/internal/gittest"
 )
 
 // fakeGH puts a gh first on PATH that runs script, after recording the directory it ran in and its
@@ -79,5 +81,57 @@ func TestViewPRErrors(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q\nwant %q", got, want)
+	}
+}
+
+// gh pr list runs in the repository for the branch, and the repository's default branch, or no branch,
+// is not asked about.
+func TestBranchPR(t *testing.T) {
+	r := gittest.New(t)
+	r.Commit("first")
+	args := fakeGH(t, `echo '[{"number":12,"state":"OPEN","isDraft":true,"isCrossRepository":false}]'`+"\n")
+	pr, err := BranchPR(r.Dir, "dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (&PR{12, "draft"}); !reflect.DeepEqual(pr, want) {
+		t.Errorf("got %+v, want %+v", pr, want)
+	}
+	if got, want := args(), []string{r.Dir, "pr", "list", "--state", "all", "--head", "dev", "--limit", "10", "--json", "number,state,isDraft,isCrossRepository"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("gh ran as %q\nwant %q", got, want)
+	}
+
+	args = fakeGH(t, "exit 1\n")
+	for _, branch := range []string{"main", ""} {
+		if pr, err := BranchPR(r.Dir, branch); pr != nil || err != nil {
+			t.Errorf("branch %q: got %+v, %v", branch, pr, err)
+		}
+	}
+	if got := args(); got != nil {
+		t.Errorf("gh ran as %q for the default branch or none", got)
+	}
+}
+
+func TestParsePRs(t *testing.T) {
+	for name, tc := range map[string]struct {
+		in   string
+		want *PR
+	}{
+		"open":   {`[{"number":12,"state":"OPEN","isDraft":false,"isCrossRepository":false}]`, &PR{12, "open"}},
+		"draft":  {`[{"number":13,"state":"OPEN","isDraft":true,"isCrossRepository":false}]`, &PR{13, "draft"}},
+		"merged": {`[{"number":14,"state":"MERGED","isDraft":false,"isCrossRepository":false}]`, &PR{14, "merged"}},
+		"closed": {`[{"number":15,"state":"CLOSED","isDraft":false,"isCrossRepository":false}]`, &PR{15, "closed"}},
+		"none":   {`[]`, nil},
+		// The newest from the repository itself, over a fork's of the same name.
+		"a fork's first": {`[{"number":20,"state":"OPEN","isCrossRepository":true},{"number":16,"state":"MERGED","isCrossRepository":false},{"number":9,"state":"CLOSED","isCrossRepository":false}]`, &PR{16, "merged"}},
+		"only a fork's":  {`[{"number":20,"state":"OPEN","isCrossRepository":true}]`, &PR{20, "open"}},
+	} {
+		got, err := parsePRs([]byte(tc.in))
+		if err != nil || !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("%s: got %+v, %v, want %+v", name, got, err, tc.want)
+		}
+	}
+	if _, err := parsePRs([]byte("not json")); err == nil || err.Error() != "parsing gh pr list: invalid character 'o' in literal null (expecting 'u')" {
+		t.Errorf("output that is not JSON: %v", err)
 	}
 }

@@ -11,6 +11,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/chancez/kspaces/internal/gh"
 	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/spaces"
 )
@@ -22,8 +23,8 @@ func gitFixture() spaces.Snapshot {
 	snap := fixture(time.Now())
 	snap.Git = map[string]gitstate.State{
 		"/src/gr":                    {Status: &gitstate.Status{Changes: 1, Upstream: "origin/main"}},
-		"/src/gr/.worktrees/dev":     {Status: &gitstate.Status{Changes: 3, Upstream: "origin/pr/me/dev", Ahead: 2, Behind: 1}, PR: &gitstate.PR{Number: 123, State: "open"}},
-		"/src/gr/.worktrees/fix":     {Status: &gitstate.Status{Upstream: "origin/fix", Gone: true}, PR: &gitstate.PR{Number: 98, State: "merged"}},
+		"/src/gr/.worktrees/dev":     {Status: &gitstate.Status{Changes: 3, Upstream: "origin/pr/me/dev", Ahead: 2, Behind: 1}, PR: &gh.PR{Number: 123, State: "open"}},
+		"/src/gr/.worktrees/fix":     {Status: &gitstate.Status{Upstream: "origin/fix", Gone: true}, PR: &gh.PR{Number: 98, State: "merged"}},
 		"/src/kitty":                 {Status: &gitstate.Status{Upstream: "origin/master"}},
 		"/src/docs/.worktrees/notes": {Status: &gitstate.Status{Changes: 5}},
 	}
@@ -79,7 +80,7 @@ func TestLongNameGivesWayToGitState(t *testing.T) {
 	snap := gitFixture()
 	long := "/src/gr/.worktrees/intent_sync_api_updates"
 	snap.Spaces[0].Worktrees = append(snap.Spaces[0].Worktrees, spaces.Worktree{Path: long, Branch: "intent_sync_api_updates", Session: "gr@intent_sync_api_updates"})
-	snap.Git[long] = gitstate.State{Status: &gitstate.Status{Changes: 2, Ahead: 4}, PR: &gitstate.PR{Number: 11243, State: "open"}}
+	snap.Git[long] = gitstate.State{Status: &gitstate.Status{Changes: 2, Ahead: 4}, PR: &gh.PR{Number: 11243, State: "open"}}
 	e.m.Update(snap)
 	row := func() string { return e.screen()[7] }
 	for _, tc := range []struct {

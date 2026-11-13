@@ -10,7 +10,17 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/chancez/kspaces/internal/git"
 )
+
+// PR is the pull request of a branch, as the sidebar shows it.
+type PR struct {
+	Number int `json:"number"`
+	// State is open, draft, merged or closed.
+	State string `json:"state"`
+}
 
 // PRView is what ViewPR says of a PR, as much as checking it out needs.
 type PRView struct {
@@ -56,6 +66,59 @@ func ViewPR(dir, pr string) (PRView, error) {
 		Cross:   got.IsCrossRepository,
 		URL:     got.URL,
 	}, nil
+}
+
+// branchTimeout is how long BranchPR lets gh take, as it goes over the network in the background.
+const branchTimeout = 30 * time.Second
+
+// BranchPR asks gh for the pull request of branch in the repository at root, nil when there is none. The
+// repository's default branch is left out without asking: pull requests from forks are often named after
+// it.
+func BranchPR(root, branch string) (*PR, error) {
+	if branch == "" || branch == git.DefaultBranch(root) {
+		return nil, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), branchTimeout)
+	defer cancel()
+	out, err := run(ctx, root, "looking up a branch's PR", "pr", "list", "--state", "all", "--head", branch, "--limit", "10",
+		"--json", "number,state,isDraft,isCrossRepository")
+	if err != nil {
+		return nil, err
+	}
+	return parsePRs(out)
+}
+
+// parsePRs reads `gh pr list --json number,state,isDraft,isCrossRepository`, newest first, and picks the
+// newest from the repository itself over one from a fork of the same name.
+func parsePRs(data []byte) (*PR, error) {
+	var prs []struct {
+		Number            int    `json:"number"`
+		State             string `json:"state"`
+		IsDraft           bool   `json:"isDraft"`
+		IsCrossRepository bool   `json:"isCrossRepository"`
+	}
+	if err := json.Unmarshal(data, &prs); err != nil {
+		return nil, fmt.Errorf("parsing gh pr list: %w", err)
+	}
+	pick := -1
+	for i, pr := range prs {
+		if !pr.IsCrossRepository {
+			pick = i
+			break
+		}
+		if pick < 0 {
+			pick = i
+		}
+	}
+	if pick < 0 {
+		return nil, nil
+	}
+	pr := prs[pick]
+	state := strings.ToLower(pr.State)
+	if state == "open" && pr.IsDraft {
+		state = "draft"
+	}
+	return &PR{Number: pr.Number, State: state}, nil
 }
 
 // Browse opens PR number in the browser, with gh run in dir for the repository it is of. The error is

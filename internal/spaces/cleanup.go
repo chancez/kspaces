@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/gh"
 	"github.com/chancez/kspaces/internal/git"
-	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
 )
 
@@ -26,7 +26,7 @@ type Cleanup struct {
 // Cleanups are the linked worktrees of space that look done with. pr is the PR of a worktree's branch,
 // nil for none or not known. A branch merged into the main worktree's counts only once it has moved
 // since it was made: a new one, not worked on yet, is merged too.
-func Cleanups(space Space, pr func(Worktree) *gitstate.PR) ([]Cleanup, error) {
+func Cleanups(space Space, pr func(Worktree) *gh.PR) ([]Cleanup, error) {
 	if space.Err != nil {
 		return nil, space.Err
 	}

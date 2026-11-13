@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/gh"
 	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
 )
@@ -164,9 +165,9 @@ func TestPollerGitStates(t *testing.T) {
 				asked = append(asked, "status "+dir)
 				return gitstate.Status{Changes: 2}, nil
 			},
-			func(root, branch string) (*gitstate.PR, error) {
+			func(root, branch string) (*gh.PR, error) {
 				asked = append(asked, "pr "+branch)
-				return &gitstate.PR{Number: 7, State: "merged"}, nil
+				return &gh.PR{Number: 7, State: "merged"}, nil
 			},
 			func() time.Time { return now },
 			func(f func()) { f() },
@@ -192,8 +193,8 @@ func TestPollerGitStates(t *testing.T) {
 	}
 
 	states := map[string]gitstate.State{
-		"/src/gr":     {Status: &gitstate.Status{Changes: 2}, PR: &gitstate.PR{Number: 7, State: "merged"}, PRAt: now, PRBranch: "main"},
-		"/src/gr/dev": {Status: &gitstate.Status{Changes: 2}, PR: &gitstate.PR{Number: 7, State: "merged"}, PRAt: now, PRBranch: "dev"},
+		"/src/gr":     {Status: &gitstate.Status{Changes: 2}, PR: &gh.PR{Number: 7, State: "merged"}, PRAt: now, PRBranch: "main"},
+		"/src/gr/dev": {Status: &gitstate.Status{Changes: 2}, PR: &gh.PR{Number: 7, State: "merged"}, PRAt: now, PRBranch: "dev"},
 	}
 	got := [][]string{poll(pa, false), poll(pb, false)}
 	if sh := pb.Poll(false); !reflect.DeepEqual(sh.Git, states) {

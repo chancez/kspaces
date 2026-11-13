@@ -9,7 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/config"
-	"github.com/chancez/kspaces/internal/gitstate"
+	"github.com/chancez/kspaces/internal/gh"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui/interact"
 	"github.com/chancez/kspaces/internal/tui/look"
@@ -227,11 +227,11 @@ func RunCleanup(ctx context.Context, cfg config.Config, root string) error {
 		return err
 	}
 	known := spaces.NewPoller().Git()
-	pr := func(wt spaces.Worktree) *gitstate.PR {
+	pr := func(wt spaces.Worktree) *gh.PR {
 		if st, ok := known[wt.Path]; ok && st.PRBranch == wt.Branch && !st.PRAt.IsZero() {
 			return st.PR
 		}
-		p, _ := gitstate.LookupPR(space.Root, wt.Branch)
+		p, _ := gh.BranchPR(space.Root, wt.Branch)
 		return p
 	}
 	items, err := spaces.Cleanups(space, pr)

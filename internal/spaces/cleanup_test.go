@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/chancez/kspaces/internal/gh"
 	"github.com/chancez/kspaces/internal/git"
-	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/gittest"
 )
 
@@ -38,8 +38,8 @@ func TestCleanups(t *testing.T) {
 	r.Git("worktree", "add", "-q", "--detach", wt("detached"))
 
 	space := LoadSpace(root)
-	prs := map[string]*gitstate.PR{"pr": {Number: 12, State: "merged"}, "open": {Number: 13, State: "open"}, "merged": {Number: 9, State: "closed"}}
-	got, err := Cleanups(space, func(wt Worktree) *gitstate.PR { return prs[wt.Branch] })
+	prs := map[string]*gh.PR{"pr": {Number: 12, State: "merged"}, "open": {Number: 13, State: "open"}, "merged": {Number: 9, State: "closed"}}
+	got, err := Cleanups(space, func(wt Worktree) *gh.PR { return prs[wt.Branch] })
 	if err != nil {
 		t.Fatal(err)
 	}

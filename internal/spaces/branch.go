@@ -3,8 +3,8 @@ package spaces
 import (
 	"fmt"
 
+	"github.com/chancez/kspaces/internal/gh"
 	"github.com/chancez/kspaces/internal/git"
-	"github.com/chancez/kspaces/internal/gitstate"
 )
 
 // Branch is what deleting a linked worktree's branch along with it would lose, for the forms that offer
@@ -33,7 +33,7 @@ func (b Branch) Lost() int {
 // BranchOf is wt's branch, a linked worktree of space, as deleting it would find it. base is the default
 // branch, which is kept, as is a branch another worktree has checked out or one whose commits cannot be
 // counted. pr is the branch's PR, nil for none or not known.
-func BranchOf(space Space, base string, wt Worktree, pr *gitstate.PR) Branch {
+func BranchOf(space Space, base string, wt Worktree, pr *gh.PR) Branch {
 	b := Branch{Name: wt.Branch}
 	if b.Name == "" {
 		b.Kept = "HEAD is detached"

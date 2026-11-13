@@ -11,7 +11,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/chancez/kspaces/internal/config"
-	"github.com/chancez/kspaces/internal/gitstate"
+	"github.com/chancez/kspaces/internal/gh"
 	"github.com/chancez/kspaces/internal/gittest"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
@@ -38,7 +38,7 @@ func TestRemoveFormDeleteBranch(t *testing.T) {
 	r.Worktree("twice", wt("twice"))
 	r.Git("worktree", "add", "-q", "-f", wt("twice2"), "twice")
 	space := spaces.LoadSpace(r.Dir)
-	form := func(name string, pr *gitstate.PR) *removeWorktreeForm {
+	form := func(name string, pr *gh.PR) *removeWorktreeForm {
 		for _, w := range space.Worktrees {
 			if w.Path == wt(name) {
 				f, err := newRemoveForm(config.Config{}, space, w, kitty.State{}, pr, false)
@@ -107,7 +107,7 @@ func TestRemoveFormDeleteBranch(t *testing.T) {
 	got = append(got, check{"unmerged, clicked", screen(lost)})
 	want = append(want, check{"unmerged, clicked", with("unmerged", "unmerged deleted", "  [x] Delete branch unmerged d  2 commits not merged, lost")})
 
-	squashed := form("squashed", &gitstate.PR{Number: 12, State: "merged"})
+	squashed := form("squashed", &gh.PR{Number: 12, State: "merged"})
 	squashed.Update(keyMsg("d"))
 	got = append(got, check{"squashed, on", screen(squashed)})
 	want = append(want, check{"squashed, on", with("squashed", "squashed deleted", "  [x] Delete branch squashed d  merged by PR #12, nothing lost")})

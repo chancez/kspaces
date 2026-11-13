@@ -10,8 +10,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/gh"
 	"github.com/chancez/kspaces/internal/git"
-	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui/interact"
@@ -186,7 +186,7 @@ func plural(n int, what string) string {
 
 // newRemoveForm is the form for removing wt from space, with what kitty and git say about it now. pr is
 // the branch's PR, nil for none or not known. deleteBranch ticks deleting the branch, if it is offered.
-func newRemoveForm(cfg config.Config, space spaces.Space, wt spaces.Worktree, st kitty.State, pr *gitstate.PR, deleteBranch bool) (*removeWorktreeForm, error) {
+func newRemoveForm(cfg config.Config, space spaces.Space, wt spaces.Worktree, st kitty.State, pr *gh.PR, deleteBranch bool) (*removeWorktreeForm, error) {
 	changes, err := git.Changes(wt.Path)
 	if err != nil {
 		return nil, fmt.Errorf("checking %s for changes: %w", wt.Path, err)
@@ -211,7 +211,7 @@ func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string, dele
 	if err != nil {
 		return err
 	}
-	var pr *gitstate.PR
+	var pr *gh.PR
 	if known, ok := spaces.NewPoller().Git()[wt.Path]; ok && known.PRBranch == wt.Branch && !known.PRAt.IsZero() {
 		pr = known.PR
 	}

@@ -1,18 +1,16 @@
 // Package gitstate is what git and GitHub say of a worktree beyond its branch: the files it has not
 // committed, the commits it is ahead of and behind its upstream, and the pull request of its branch. A
-// Watcher keeps them, asking git and gh again only now and then.
+// Watcher keeps them, asking git and, through package gh, GitHub again only now and then.
 package gitstate
 
 import (
 	"bufio"
-	"context"
-	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/chancez/kspaces/internal/git"
+	"github.com/chancez/kspaces/internal/gh"
 )
 
 // Status is what `git status` says of a worktree.
@@ -27,19 +25,12 @@ type Status struct {
 	Gone bool `json:"gone,omitempty"`
 }
 
-// PR is the pull request of a branch.
-type PR struct {
-	Number int `json:"number"`
-	// State is open, draft, merged or closed.
-	State string `json:"state"`
-}
-
 // State is what is known of a worktree.
 type State struct {
 	// Status is nil until git status has answered.
 	Status *Status `json:"status,omitempty"`
 	// PR is nil when the branch has none, or gh could not say.
-	PR *PR `json:"pr,omitempty"`
+	PR *gh.PR `json:"pr,omitempty"`
 	// When gh was last asked, and for which branch.
 	PRAt     time.Time `json:"pr_at,omitzero"`
 	PRBranch string    `json:"pr_branch,omitempty"`
@@ -77,59 +68,4 @@ func ParseStatus(porcelain string) Status {
 	}
 	s.Gone = s.Upstream != "" && !ab
 	return s
-}
-
-// ghTimeout is how long gh may take, as it goes over the network.
-const ghTimeout = 30 * time.Second
-
-// LookupPR asks gh for the pull request of branch in the repository at root, nil when there is none. The
-// repository's default branch is left out without asking: pull requests from forks are often named after
-// it.
-func LookupPR(root, branch string) (*PR, error) {
-	if branch == "" || branch == git.DefaultBranch(root) {
-		return nil, nil
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), ghTimeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "gh", "pr", "list", "--state", "all", "--head", branch, "--limit", "10",
-		"--json", "number,state,isDraft,isCrossRepository")
-	cmd.Dir = root
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
-	return ParsePRs(out)
-}
-
-// ParsePRs reads `gh pr list --json number,state,isDraft,isCrossRepository`, newest first, and picks the
-// newest from the repository itself over one from a fork of the same name.
-func ParsePRs(data []byte) (*PR, error) {
-	var prs []struct {
-		Number            int    `json:"number"`
-		State             string `json:"state"`
-		IsDraft           bool   `json:"isDraft"`
-		IsCrossRepository bool   `json:"isCrossRepository"`
-	}
-	if err := json.Unmarshal(data, &prs); err != nil {
-		return nil, fmt.Errorf("parsing gh pr list: %w", err)
-	}
-	pick := -1
-	for i, pr := range prs {
-		if !pr.IsCrossRepository {
-			pick = i
-			break
-		}
-		if pick < 0 {
-			pick = i
-		}
-	}
-	if pick < 0 {
-		return nil, nil
-	}
-	pr := prs[pick]
-	state := strings.ToLower(pr.State)
-	if state == "open" && pr.IsDraft {
-		state = "draft"
-	}
-	return &PR{Number: pr.Number, State: state}, nil
 }

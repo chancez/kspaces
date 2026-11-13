@@ -6,7 +6,6 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/gh"
-	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui/interact"
 	"github.com/chancez/kspaces/internal/tui/look"
@@ -250,7 +249,7 @@ func (m *sidebar) saveLayout(path string) tea.Cmd {
 }
 
 // rowPR is the PR of r's worktree's branch the poller found, the one its row shows, nil for none.
-func (m *sidebar) rowPR(r spaces.Row) *gitstate.PR {
+func (m *sidebar) rowPR(r spaces.Row) *gh.PR {
 	if r.Worktree == nil {
 		return nil
 	}

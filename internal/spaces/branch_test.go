@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/gh"
 	"github.com/chancez/kspaces/internal/git"
-	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/gittest"
 )
 
@@ -41,13 +41,13 @@ func TestBranchOf(t *testing.T) {
 	twice := Worktree{Path: wt("twice"), Branch: "merged"}
 	elsewhere := space
 	elsewhere.Worktrees = append(slices.Clone(space.Worktrees), twice)
-	merged := &gitstate.PR{Number: 12, State: "merged"}
+	merged := &gh.PR{Number: 12, State: "merged"}
 	got := []Branch{
 		BranchOf(space, "main", detached, nil),
 		BranchOf(space, "main", onMain, nil),
 		BranchOf(elsewhere, "main", twice, nil),
 		BranchOf(space, "main", byBranch["merged"], merged),
-		BranchOf(space, "main", byBranch["unmerged"], &gitstate.PR{Number: 13, State: "open"}),
+		BranchOf(space, "main", byBranch["unmerged"], &gh.PR{Number: 13, State: "open"}),
 		BranchOf(space, "main", byBranch["squashed"], merged),
 	}
 	want := []Branch{
