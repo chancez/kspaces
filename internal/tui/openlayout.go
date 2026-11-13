@@ -193,16 +193,22 @@ func (f *layoutForm) render() string {
 	if fields := f.layouts.lines(f.onLayout(), width); len(fields) > 0 {
 		lines = append(append(lines, fields...), "")
 	}
-	tabs := []string{"A tab of a shell"}
+	var tabs []string
 	if l, ok := f.layouts.chosen(); ok {
 		tabs = layoutTabs(l)
 	}
 	for _, s := range tabs {
 		lines = append(lines, muted(s))
 	}
-	if f.windows {
+	_, chosen := f.layouts.chosen()
+	switch {
+	case !chosen && f.windows:
+		lines = append(lines, muted("Adds one tab, a shell, to "+f.wt.Session), "")
+	case !chosen:
+		lines = append(lines, muted("Opens "+f.wt.Session+" with one tab, a shell, as it has no windows"), "")
+	case f.windows:
 		lines = append(lines, muted("Adds its tabs to "+f.wt.Session), "")
-	} else {
+	default:
 		lines = append(lines, muted("Opens "+f.wt.Session+" with its tabs, as it has no windows"), "")
 	}
 	switch {

@@ -164,12 +164,7 @@ run = ["gr"]
 			}
 			lines = append(lines, s)
 		}
-		// On a choice enter opens its list rather than creating.
-		keys := "   Create enter    Cancel esc   tab next field"
-		if hint != "" {
-			keys = "   Create    Cancel esc   tab next field" + hint
-		}
-		return append(lines, "", keys, "")
+		return append(lines, "", "   Create enter    Cancel esc   tab next field"+hint, "")
 	}
 	typeInto(f, "fix")
 	if got, want := formScreen(f), screen([]string{"  command    < none >"}, ""); !reflect.DeepEqual(got, want) {
@@ -179,14 +174,14 @@ run = ["gr"]
 	f.Update(keyMsg("tab"))
 	f.Update(keyMsg("tab"))
 	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	hint := "  left/right command  enter/space list"
-	want := screen([]string{"  command    < claude >  left/right change  enter list", "  Prompt     required"}, hint, "Runs claude in the first tab")
+	hint := "  left/right command  space list"
+	want := screen([]string{"  command    < claude >  left/right change  space list", "  Prompt     required"}, hint, "Runs claude in the first tab")
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("claude chosen:\n%q\nwant\n%q", got, want)
 	}
 	// Round through gr and none, by key and from the list, back to claude.
 	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	if got, want := formScreen(f), screen([]string{"  command    < gr >  left/right change  enter list"}, hint, "Runs gr in the first tab"); !reflect.DeepEqual(got, want) {
+	if got, want := formScreen(f), screen([]string{"  command    < gr >  left/right change  space list"}, hint, "Runs gr in the first tab"); !reflect.DeepEqual(got, want) {
 		t.Errorf("gr chosen:\n%q\nwant\n%q", got, want)
 	}
 	clickOn(t, f, "< gr >")

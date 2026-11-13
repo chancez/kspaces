@@ -144,15 +144,15 @@ func TestRunForm(t *testing.T) {
 		return f
 	}
 	f := sized(newRunForm(cfg, space, wt, open, "gr", nil, ""))
-	want := screen([]string{"  command    < gr >  left/right change  enter list"}, "Runs gr", "Opens in a split beside gr@fix's window", "",
-		" Run    Cancel esc   left/right command  enter/space list", "")
+	want := screen([]string{"  command    < gr >  left/right change  space list"}, "Runs gr", "Opens in a split beside gr@fix's window", "",
+		" Run enter    Cancel esc   left/right command  space list", "")
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("gr:\n%q\nwant\n%q", got, want)
 	}
 	// The list says what each command runs.
-	f.Update(keyMsg("enter"))
+	f.Update(keyMsg("space"))
 	rule := "             " + strings.Repeat("\u2500", 55)
-	want = []string{"", "  Run in gr@fix", "", "  command    < gr >  left/right change  enter list",
+	want = []string{"", "  Run in gr@fix", "", "  command    < gr >  left/right change  space list",
 		rule, "               claude  claude {prompt}", "             \uf00c gr  gr", rule,
 		"  up/down move  type filter  enter choose  esc close", ""}
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
@@ -170,7 +170,7 @@ func TestRunForm(t *testing.T) {
 
 	// Prefilled, for one run in an overlay, and with the session closed.
 	if got, want := formScreen(sized(newRunForm(cfg, space, wt, open, "claude", map[string]string{"prompt": "hi"}, "overlay")))[3:8],
-		[]string{"  command    < claude >  left/right change  enter list", "  Prompt     hi", "", "  Runs claude", "  Opens over gr@fix's window, closing back to it"}; !reflect.DeepEqual(got, want) {
+		[]string{"  command    < claude >  left/right change  space list", "  Prompt     hi", "", "  Runs claude", "  Opens over gr@fix's window, closing back to it"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("prefilled:\n%q\nwant\n%q", got, want)
 	}
 	if got, want := formScreen(sized(newRunForm(cfg, space, wt, kitty.State{}, "gr", nil, "")))[6], "  Opens as the first tab of gr@fix, which has no windows"; got != want {
@@ -184,6 +184,8 @@ func TestRunForm(t *testing.T) {
 	}
 
 	typeInto(f, "fix it")
+	// enter runs from the choice too, as from any field.
+	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
 	_, cmd := f.Update(keyMsg("enter"))
 	if cmd == nil {
 		t.Fatal("enter ran nothing")

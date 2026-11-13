@@ -122,8 +122,9 @@ func TestRemoveFormDeleteBranch(t *testing.T) {
 		t.Fatal(err)
 	}
 	var calls, wantCalls [][]string
-	for _, f := range []*removeWorktreeForm{onMain, merged, lost, squashed} {
-		_, cmd := f.Update(keyMsg("y"))
+	// enter removes as y does.
+	for i, f := range []*removeWorktreeForm{onMain, merged, lost, squashed} {
+		_, cmd := f.Update(keyMsg([]string{"y", "enter"}[i%2]))
 		if msg := cmd(); msg != (removedMsg{}) {
 			t.Errorf("removing %s said %v", f.wt.Path, msg)
 		}

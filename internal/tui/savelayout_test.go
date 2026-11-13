@@ -144,13 +144,13 @@ func TestSaveLayoutFormChoices(t *testing.T) {
 	thisTab := []string{
 		"", "  Save gr@fix as a layout", "",
 		"  name       required",
-		"  save       < this tab >  left/right change  enter list",
+		"  save       < this tab >  left/right change  space list",
 		"  save to    < the global config >",
 		"  tab 1, pane 1: make watch {x}",
 		"  runs       < run >",
 		"  run        make watch {{x}}",
 		"", "  Adds 1 tab to the global config", "",
-		"   Save    Cancel esc   tab next field  left/right choose  enter/space list", "",
+		"   Save enter    Cancel esc   tab next field  left/right choose  space list", "",
 	}
 	if got := formScreen(f); !reflect.DeepEqual(got, thisTab) {
 		t.Errorf("this tab:\n%q\nwant\n%q", got, thisTab)
@@ -159,12 +159,12 @@ func TestSaveLayoutFormChoices(t *testing.T) {
 	f.Update(keyMsg("tab"))
 	f.Update(keyMsg("tab"))
 	right(f)
-	if got := formScreen(f)[7]; got != "  runs       < shell >  left/right change  enter list" {
+	if got := formScreen(f)[7]; got != "  runs       < shell >  left/right change  space list" {
 		t.Errorf("after run: %q", got)
 	}
 	right(f)
 	right(f)
-	if got := formScreen(f)[7:9]; !reflect.DeepEqual(got, []string{"  runs       < review >  left/right change  enter list", ""}) {
+	if got := formScreen(f)[7:9]; !reflect.DeepEqual(got, []string{"  runs       < review >  left/right change  space list", ""}) {
 		t.Errorf("round to the commands: %q", got)
 	}
 	// A click opens the list, with no more than the names, and typing finds one.
@@ -178,7 +178,7 @@ func TestSaveLayoutFormChoices(t *testing.T) {
 		"  save       < this tab >",
 		"  save to    < the global config >",
 		"  tab 1, pane 1: make watch {x}",
-		"  runs       < review >  left/right change  enter list",
+		"  runs       < review >  left/right change  space list",
 		rule, "               claude", "             \uf00c review", "               run", "               shell", rule,
 		"  up/down move  type filter  enter choose  esc close", "",
 	}
@@ -187,7 +187,7 @@ func TestSaveLayoutFormChoices(t *testing.T) {
 	}
 	typeInto(f, "ru")
 	f.Update(keyMsg("enter"))
-	if got := formScreen(f)[7:9]; !reflect.DeepEqual(got, []string{"  runs       < run >  left/right change  enter list", "  run        make watch {{x}}"}) {
+	if got := formScreen(f)[7:9]; !reflect.DeepEqual(got, []string{"  runs       < run >  left/right change  space list", "  run        make watch {{x}}"}) {
 		t.Errorf("after the list: %q", got)
 	}
 	// Prefilled from the command line, this tab first.
@@ -412,7 +412,7 @@ func TestSaveLayoutToSpaceFile(t *testing.T) {
 	f.Update(keyMsg("tab"))
 	f.Update(keyMsg("tab"))
 	right(f)
-	if got := formScreen(f)[5:7]; !reflect.DeepEqual(got, []string{"  save to    < the global config >  left/right change  enter list", "  tab 1, pane 1: make watch {x}"}) {
+	if got := formScreen(f)[5:7]; !reflect.DeepEqual(got, []string{"  save to    < the global config >  left/right change  space list", "  tab 1, pane 1: make watch {x}"}) {
 		t.Errorf("to the global config: %q", got)
 	}
 }

@@ -145,17 +145,17 @@ is not on GitHub, the form shows gh's error as it does git's.
 With [commands](kitty.md#running-commands) configured, the form has a `command` field below the directory,
 `none` at first, and below it a field for each input of the command chosen. `tab` and `shift+tab` go round
 all the fields. A choice like `command` is drawn `< claude >`, and while it has focus says
-`left/right change  enter list` after it, and the keys row lists `left/right` and `enter/space`:
-`left` and `right` go to the one before or after; `enter`, `space` or a click opens a list below the
-field, or above it when it would run off the bottom, of every choice, the one chosen marked and
-selected, a layout with how many tabs and panes it has and a command with its command line. In the list
-`up`, `down`, and `j` and `k` before anything is typed, move; typing keeps the choices with what is typed
-in their names, shown on the list's top rule, and `backspace` takes it back; `enter` or a click chooses;
-`esc` or a click outside the list closes it as it was. A list longer than the screen has room for
-scrolls, with how many are out of view above and below. While it is open the form's keys are the list's,
-so `enter` there never submits the form, nor `esc` cancels it; and as `enter` on a choice opens its list,
-the form's button says no key there, and `enter` submits from the other fields. Every form with a choice,
-below, has these. With a command chosen, the new session's first tab runs it rather than a shell, and
+`left/right change  space list` after it, and the keys row lists `left/right` and `space`: `left` and
+`right` go to the one before or after; `space` or a click opens a list below the field, or above it when
+it would run off the bottom, of every choice, the one chosen marked and selected, a layout with how many
+tabs and panes it has and a command with its command line. In the list `up`, `down`, and `j` and `k`
+before anything is typed, move; typing keeps the choices with what is typed in their names, shown on the
+list's top rule, and `backspace` takes it back; `enter` or a click chooses; `esc` or a click outside the
+list closes it as it was. A list longer than the screen has room for scrolls, with how many are out of
+view above and below. While it is open the form's keys are the list's, so `enter` there chooses and
+never submits the form, nor `esc` cancels it. Otherwise `enter` submits the form from any field, a
+choice included, as the button, `Create enter`, says. Every form with a choice, below, has these. With a
+command chosen, the new session's first tab runs it rather than a shell, and
 starts your shell once it exits. A required input left empty refuses to create.
 
 An input's field takes several lines, for a prompt: `shift+enter` starts a new one, as do `alt+enter` and
@@ -177,10 +177,10 @@ Run switches to the session and opens it there.
 **Open layout** chooses a layout, the worktree's default at first, else the first configured, or `shell`,
 listed first as in the new worktree form, for one tab in the worktree that is a shell, with a `layout`
 field, and has a field for each of its inputs. It says what each tab holds, and whether the tabs go after
-the session's own or, for a session with no windows, open it. Open builds them, as
-[layouts](kitty.md#layouts) says, and switches to the session; `shell` adds a tab as `launch` opens it,
-by the window switching to the session focuses, or opens a session with no windows with it alone, as
-**Open without layout** does.
+the session's own or, for a session with no windows, open it; for `shell` it says it adds one tab, a
+shell, or opens the session with it. Open builds them, as [layouts](kitty.md#layouts) says, and switches
+to the session; `shell` adds a tab as `launch` opens it, by the window switching to the session focuses,
+or opens a session with no windows with it alone, as **Open without layout** does.
 
 **Save as layout** saves the session's tabs, as kitty has them, as a [layout](kitty.md#saving-a-layout):
 a `name` field, then `save`, `every tab` at first or `this tab`, which is the tab the sidebar is in for its
@@ -202,7 +202,8 @@ in, its name filled in, with `--tab` for this tab at first: the one kspaces runs
 session's.
 
 **Close session** closes every window the way closing them by hand does, so whatever kitty.conf runs when a
-window closes still runs.
+window closes still runs. It, Remove worktree, Clean up worktrees, Forget and Trust space config confirm
+with `y` or `enter`, and cancel with `n` or `esc`.
 
 **Remove worktree** shows the directory, the session's windows and the files that are not committed, which
 are lost. It closes the session, waits for its windows to go, deletes the session's saved file and runs

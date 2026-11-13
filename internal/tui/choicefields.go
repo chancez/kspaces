@@ -12,8 +12,8 @@ import (
 
 // choiceFields choose one of the configured commands or layouts, T, and fill in its inputs, for the new
 // worktree form, the run form and the layout form. Each choice keeps its own text boxes, so switching
-// between them loses nothing typed. left and right go through the choices, and enter, space or a click
-// opens a list of them to choose from.
+// between them loses nothing typed. left and right go through the choices, and space or a click opens a
+// list of them to choose from; enter submits the form, as from any field.
 type choiceFields[T any] struct {
 	th *look.Theme
 	// label is what the form calls the choice.
@@ -195,7 +195,7 @@ func (c *choiceFields[T]) lines(selFocused bool, width int) []string {
 		}
 		spans := look.Mark(c.zone, arrow("<"), look.Text(" "+name+" "), arrow(">"))
 		if room := width - labelWidth - th.Width(spans...); selFocused && room > 0 {
-			spans = append(spans, th.Cut(room, look.Muted("  left/right change  enter list"))...)
+			spans = append(spans, th.Cut(room, look.Muted("  left/right change  space list"))...)
 		}
 		out = append(out, th.DrawCut(look.Plain, labelWidth-1, look.Label(c.label))+" "+th.Render(look.Plain, spans...))
 	}
@@ -275,7 +275,7 @@ func listHints() []look.Span {
 
 // choiceHints are the keys of a focused choice, what changes called what, for a form's key hints.
 func choiceHints(what string) []look.Span {
-	return []look.Span{look.Text("  "), look.Key("left/right"), look.KeyDesc(" " + what), look.Text("  "), look.Key("enter/space"), look.KeyDesc(" list")}
+	return []look.Span{look.Text("  "), look.Key("left/right"), look.KeyDesc(" " + what), look.Text("  "), look.Key("space"), look.KeyDesc(" list")}
 }
 
 // isInput says whether msg is a key or the mouse, which an open list takes from its form.

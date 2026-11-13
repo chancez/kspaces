@@ -27,8 +27,8 @@ func TestRunFormClickField(t *testing.T) {
 	screen := func(command, prompt, keys string) []string {
 		return []string{"", "  Run in gr@fix", "", command, prompt, "", "  Runs claude", "  Opens in a new tab in gr@fix", "", keys, ""}
 	}
-	want := screen("  command    < claude >  left/right change  enter list", "  Prompt     fix it",
-		"   Run    Cancel esc   tab next field  left/right command  enter/space list")
+	want := screen("  command    < claude >  left/right change  space list", "  Prompt     fix it",
+		"   Run enter    Cancel esc   tab next field  left/right command  space list")
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("at first:\n%q\nwant\n%q", got, want)
 	}
@@ -48,8 +48,8 @@ func TestRunFormClickField(t *testing.T) {
 	}
 	// Tab goes on from the field clicked, round to the choice.
 	f.Update(keyMsg("tab"))
-	if got, want := formScreen(f), screen("  command    < claude >  left/right change  enter list", "  Prompt     fix Xit!Y",
-		"   Run    Cancel esc   tab next field  left/right command  enter/space list"); !reflect.DeepEqual(got, want) {
+	if got, want := formScreen(f), screen("  command    < claude >  left/right change  space list", "  Prompt     fix Xit!Y",
+		"   Run enter    Cancel esc   tab next field  left/right command  space list"); !reflect.DeepEqual(got, want) {
 		t.Errorf("tab after:\n%q\nwant\n%q", got, want)
 	}
 }
@@ -206,8 +206,8 @@ func TestTextFieldScrolls(t *testing.T) {
 		lines := []string{"", "  Open a layout in gr@fix", "", "  layout     < agent >"}
 		keys := "   Open enter    Cancel esc   tab next field  shift+enter newline"
 		if onChoice {
-			lines[3] += "  left/right change  enter list"
-			keys = "   Open    Cancel esc   tab next field  left/right layout  enter/space list"
+			lines[3] += "  left/right change  space list"
+			keys = "   Open enter    Cancel esc   tab next field  left/right layout  space list"
 		}
 		for i := first; i < first+6; i++ {
 			label := "             "
