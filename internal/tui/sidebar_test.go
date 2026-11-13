@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -121,11 +122,18 @@ func (e *sidebarEnv) screen() []string {
 	return out
 }
 
-// highlighted are the lines drawn in reverse video, the cursor's bar, without their styles.
+// cursorBg is the cursor bar's background as an SGR parameter, which marks the lines drawn on it.
+func cursorBg(th *look.Theme) string {
+	return regexp.MustCompile(`48;2;\d+;\d+;\d+`).FindString(th.Render(look.Cursor, look.Default(" ")))
+}
+
+// highlighted are the lines drawn on the cursor's bar, or holding the filter's text cursor, reversed,
+// without their styles.
 func (e *sidebarEnv) highlighted() []string {
 	var out []string
+	bg := cursorBg(e.m.th)
 	for _, l := range strings.Split(e.m.render(), "\n") {
-		if strings.Contains(l, "\x1b[7m") {
+		if strings.Contains(l, bg) || strings.Contains(l, "\x1b[7m") {
 			out = append(out, strings.TrimRight(strings.TrimSuffix(ansi.Strip(l), "\u2502"), " "))
 		}
 	}

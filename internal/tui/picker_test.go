@@ -69,7 +69,7 @@ func TestPicker(t *testing.T) {
 	m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	m.Update(tea.KeyPressMsg{Code: 'n', Mod: tea.ModCtrl})
 	lines := strings.Split(m.render(), "\n")
-	if !strings.Contains(lines[2], m.th.Render(look.Plain, look.Match("g"))) || !strings.Contains(lines[3], "\x1b[7m") {
+	if !strings.Contains(lines[2], m.th.Render(look.Plain, look.Match("g"))) || !strings.Contains(lines[3], cursorBg(m.th)) {
 		t.Errorf("after gr and ctrl+n:\n%q", lines[2:4])
 	}
 	if got := pickerScreen(m)[25]; got != "4/11" {

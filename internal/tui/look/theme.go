@@ -205,14 +205,16 @@ var surfaceNames = [numSurfaces]string{
 }
 
 // surfaceStyle is how a surface draws. A soft surface keeps its elements' colors. A solid one draws them
-// all in its own colors, bold when it is: a bar reads as one piece, and colored text on a solid color is
-// unreadable. A reversed one swaps the terminal's own colors, so it shows in any theme.
+// all in its own colors, bold when it is, or when its element is with keepBold: a bar reads as one piece,
+// and colored text on a solid color is unreadable. A reversed one swaps the terminal's own colors, so it
+// shows in any theme.
 type surfaceStyle struct {
-	bg      color.Color
-	solid   bool
-	fg      color.Color
-	bold    bool
-	reverse bool
+	bg       color.Color
+	solid    bool
+	fg       color.Color
+	bold     bool
+	keepBold bool
+	reverse  bool
 }
 
 // Theme is the registry: the roles, and the style they give each element and surface.
@@ -281,8 +283,10 @@ func New(isDark bool) *Theme {
 		elReviewChangesRequested: fg(p.danger),
 	}
 	t.surfaces = [numSurfaces]surfaceStyle{
-		Plain:  {},
-		Cursor: {solid: true, reverse: true},
+		Plain: {},
+		// The chips' quiet shade, the text in the terminal's own color with its bold: a reversed bar was
+		// dark text on a bright one, louder than what it marks.
+		Cursor: {bg: p.controlBg, solid: true, keepBold: true},
 		// A chip, as gr's and GitHub's buttons: a quiet shade the label stays bold on, in the text's own
 		// color, rather than reversed, which reads as a selected row.
 		Control: {bg: p.controlBg},
@@ -305,7 +309,8 @@ func (t *Theme) SetDark(isDark bool) {
 func (t *Theme) style(el element, p Prop, s Surface) lipgloss.Style {
 	ss := t.surfaces[s]
 	if ss.solid {
-		st := lipgloss.NewStyle().Bold(ss.bold).Reverse(ss.reverse != (p&Lit != 0))
+		bold := ss.bold || ss.keepBold && (t.elements[el].GetBold() || p&Strong != 0)
+		st := lipgloss.NewStyle().Bold(bold).Reverse(ss.reverse != (p&Lit != 0))
 		if ss.fg != nil {
 			st = st.Foreground(ss.fg)
 		}

@@ -112,9 +112,10 @@ func TestThemeDraw(t *testing.T) {
 			got:  th.Draw(Plain, 6, Space(spaces.Space{Name: "gr"}), Branch(spaces.Worktree{Branch: " x"})),
 			want: lipgloss.NewStyle().Bold(true).Foreground(p.accent).Render("gr") + lipgloss.NewStyle().Foreground(p.muted).Render(" x") + "  ",
 		},
-		"the cursor reverses the whole line": {
-			got:  th.Draw(Cursor, 6, Space(spaces.Space{Name: "gr"}), Branch(spaces.Worktree{Branch: " x"})),
-			want: lipgloss.NewStyle().Reverse(true).Render("gr x  "),
+		"the cursor is a bar of the chips' shade, the text in its own color, its bold kept": {
+			got: th.Draw(Cursor, 6, Space(spaces.Space{Name: "gr"}), Branch(spaces.Worktree{Branch: " x"})),
+			want: lipgloss.NewStyle().Background(charcoal).Bold(true).Render("gr") +
+				lipgloss.NewStyle().Background(charcoal).Render(" x  "),
 		},
 		"the current session is marked at its edge in the accent, its name bold": {
 			got: th.Render(Plain, append(CurrentEdge(), Worktree(spaces.Worktree{Path: "/src/gr/dev"}).With(Strong))...),
