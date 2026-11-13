@@ -25,7 +25,7 @@ Blocked 1
 - Create, close and remove worktrees and sessions from a right-click menu.
 - See each worktree's uncommitted changes, how far it is ahead of and behind its upstream, and its PR.
 - See which programs are blocked, failed, done or working, from kitty's program status protocol (OSC 7501).
-- Switch with a fuzzy picker, or to the next and previous session.
+- Switch with a fuzzy picker, to the next and previous session, or back to the one used before.
 - Filter the list as you type, and jump to the windows whose programs are blocked, failed or done.
 
 ## Install
@@ -188,6 +188,7 @@ kspaces open [PATH]      switch to the session of the worktree at PATH or the cu
   --no-layout            --no-layout opens one tab where the default layout would open
 kspaces next, prev       switch to the next or previous session with windows open
   --attention            or to the next or previous window that is blocked, failed or done
+kspaces recent           switch to the session used before this one, as alt-tab does: twice goes back
 kspaces new [SPACE]      create a worktree, in a form
 kspaces run NAME [PATH]  run a configured command in the worktree at PATH or the current directory,
   --input K=V, --yes     in a form, with inputs filled in; --yes without asking

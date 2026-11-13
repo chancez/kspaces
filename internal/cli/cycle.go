@@ -25,3 +25,13 @@ func (a *app) cycleCommand(name, short string, delta int) *cobra.Command {
 		"step through the windows whose program is blocked, failed or done instead, most urgent first")
 	return cmd
 }
+
+// recentCommand acts on the window that has the keyboard too, so it suits a kitty mapping.
+func (a *app) recentCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "recent",
+		Short: "Switch to the session used before this one, so twice goes back, as alt-tab does",
+		Args:  cobra.NoArgs,
+		RunE:  func(*cobra.Command, []string) error { return spaces.Recent() },
+	}
+}

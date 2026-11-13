@@ -99,10 +99,11 @@ watcher %s
 action_alias kspaces_toggle kitten %s
 action_alias kspaces_focus kitten %s
 
-# The picker, and the next and previous session with windows open.
+# The picker; the next and previous session with windows open, and the one used before this one.
 action_alias kspaces_pick %s
 action_alias kspaces_next launch --type=background --allow-remote-control kspaces next
 action_alias kspaces_prev launch --type=background --allow-remote-control kspaces prev
+action_alias kspaces_recent launch --type=background --allow-remote-control kspaces recent
 
 # The next and previous window whose program needs you: blocked, failed or done.
 action_alias kspaces_attention_next launch --type=background --allow-remote-control kspaces next --attention

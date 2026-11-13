@@ -71,10 +71,11 @@ watcher /cfg/kitty/kspaces/kspaces_watcher.py
 action_alias kspaces_toggle kitten /cfg/kitty/kspaces/kspaces_toggle.py
 action_alias kspaces_focus kitten /cfg/kitty/kspaces/kspaces_focus.py
 
-# The picker, and the next and previous session with windows open.
+# The picker; the next and previous session with windows open, and the one used before this one.
 `
 	const tail = `action_alias kspaces_next launch --type=background --allow-remote-control kspaces next
 action_alias kspaces_prev launch --type=background --allow-remote-control kspaces prev
+action_alias kspaces_recent launch --type=background --allow-remote-control kspaces recent
 
 # The next and previous window whose program needs you: blocked, failed or done.
 action_alias kspaces_attention_next launch --type=background --allow-remote-control kspaces next --attention
