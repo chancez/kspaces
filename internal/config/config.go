@@ -24,6 +24,7 @@ import (
 //	[worktrees]
 //	dir = ".worktrees"
 //	branch_prefix = "pr/me"
+//	delete_branch = false
 //
 //	[sidebar]
 //	width = 28
@@ -101,12 +102,15 @@ const (
 	MaxSidebarWidth     = 120
 )
 
-// Worktrees are the defaults of the new worktree form.
+// Worktrees are the defaults of the new worktree form and of the forms that remove worktrees.
 type Worktrees struct {
 	// Where new worktrees go, relative to their space's root.
 	Dir string `toml:"dir"`
 	// What new branch names start with, followed by a /, such as `pr/me`. Empty for nothing.
 	BranchPrefix string `toml:"branch_prefix"`
+	// DeleteBranch starts the remove worktree and clean up forms with deleting branches ticked, for the
+	// branches that lose nothing; `kspaces remove --yes` follows its flags alone.
+	DeleteBranch bool `toml:"delete_branch"`
 }
 
 var defaultLaunch = []string{"launch"}

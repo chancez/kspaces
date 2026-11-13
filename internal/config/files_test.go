@@ -47,6 +47,7 @@ worktree_layout = "review"
 
 [worktrees]
 branch_prefix = "pr/me"
+delete_branch = true
 
 [[layouts]]
 name = "review"
@@ -76,6 +77,7 @@ layout = "review"
 [worktrees]
 dir = ".wt"
 branch_prefix = "pr/me"
+delete_branch = true
 
 [space.api]
 group = "work"

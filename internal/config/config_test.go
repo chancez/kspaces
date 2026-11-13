@@ -20,6 +20,7 @@ sessions = "~/.local/share/kitty/sessions"
 
 [worktrees]
 branch_prefix = "pr/me"
+delete_branch = true
 
 [sidebar]
 width = 40
@@ -40,7 +41,7 @@ group = "work"
 		Spaces:      []string{filepath.Join(home, "projects/gr"), "/src/kitty"},
 		Launch:      []string{"kitten", "my_launch.py"},
 		SessionsDir: filepath.Join(home, ".local/share/kitty/sessions"),
-		Worktrees:   Worktrees{Dir: ".worktrees", BranchPrefix: "pr/me"},
+		Worktrees:   Worktrees{Dir: ".worktrees", BranchPrefix: "pr/me", DeleteBranch: true},
 		Sidebar:     Sidebar{Width: 40, Popup: PopupPanel},
 		Kitty:       Kitty{AutoInstall: true},
 		Space:       map[string]SpaceSettings{"gr": {Group: "work"}},

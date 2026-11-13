@@ -41,12 +41,14 @@ type SpaceFile struct {
 	// Nil for a setting the file leaves to the global config.
 	Dir          *string `toml:"-"`
 	BranchPrefix *string `toml:"-"`
+	DeleteBranch *bool   `toml:"-"`
 }
 
 // spaceFileWorktrees is [worktrees] as a space file has it, telling a setting left out from one set empty.
 type spaceFileWorktrees struct {
 	Dir          *string `toml:"dir"`
 	BranchPrefix *string `toml:"branch_prefix"`
+	DeleteBranch *bool   `toml:"delete_branch"`
 }
 
 // globalOnly are the global config's keys a space file cannot have: they are about every space, or name
@@ -88,7 +90,7 @@ func ParseSpaceFile(data string) (SpaceFile, error) {
 		return SpaceFile{}, fmt.Errorf("unknown keys: %s", strings.Join(unknown, ", "))
 	}
 	f := raw.SpaceFile
-	f.Dir, f.BranchPrefix = raw.Worktrees.Dir, raw.Worktrees.BranchPrefix
+	f.Dir, f.BranchPrefix, f.DeleteBranch = raw.Worktrees.Dir, raw.Worktrees.BranchPrefix, raw.Worktrees.DeleteBranch
 	if err := checkCommands(f.Commands); err != nil {
 		return SpaceFile{}, err
 	}
@@ -153,6 +155,9 @@ func (cfg Config) WithSpace(name string, f SpaceFile) (Config, error) {
 	}
 	if f.BranchPrefix != nil {
 		out.Worktrees.BranchPrefix = *f.BranchPrefix
+	}
+	if f.DeleteBranch != nil {
+		out.Worktrees.DeleteBranch = *f.DeleteBranch
 	}
 	// The defaults before the layouts, which would blame the space table the file's take the place of.
 	for _, d := range []struct{ key, layout string }{{"layout", f.Layout}, {"worktree_layout", f.WorktreeLayout}, {"pr_layout", f.PRLayout}} {

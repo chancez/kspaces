@@ -2,6 +2,7 @@ package config
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -60,6 +61,7 @@ func TestWithSpaceMerges(t *testing.T) {
 	f, err := ParseSpaceFile(`
 [worktrees]
 branch_prefix = ""
+delete_branch = true
 
 [[commands]]
 name = "claude"
@@ -91,6 +93,7 @@ layout = "plain"
 [worktrees]
 dir = ".wt"
 branch_prefix = ""
+delete_branch = true
 
 [[commands]]
 name = "review"
@@ -174,6 +177,23 @@ func TestWithSpaceKeepsGroup(t *testing.T) {
 	}
 	want := mustParse(t, spaceGlobal+"group = \"work\"\n")
 	want.Space["gr"] = SpaceSettings{Layout: "plain", WorktreeLayout: "plain", Group: "work"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("merged:\n%#v\nwant\n%#v", got, want)
+	}
+}
+
+// A space file's delete_branch takes the place of the global one either way, and one left out keeps it.
+func TestWithSpaceDeleteBranch(t *testing.T) {
+	global := strings.Replace(spaceGlobal, "[worktrees]\n", "[worktrees]\ndelete_branch = true\n", 1)
+	var got []Config
+	for _, file := range []string{"[worktrees]\ndelete_branch = false", "[worktrees]\ndir = \".wt\""} {
+		cfg, err := withSpace(t, global, file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, cfg)
+	}
+	want := []Config{mustParse(t, spaceGlobal), mustParse(t, global)}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("merged:\n%#v\nwant\n%#v", got, want)
 	}

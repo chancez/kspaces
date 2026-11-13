@@ -341,9 +341,9 @@ tabs = [{ panes = [{ command = "test" }, { command = "claude", split = "right" }
 ```
 
 It can have `[[layouts]]`, `[[commands]]`, `layout`, `worktree_layout`, `pr_layout` and `[worktrees]`'s
-`dir` and `branch_prefix`, checked as config.toml's are; anything else is an error naming the key,
-`spaces`, `launch`, `sessions`, `groups`, `[sidebar]`, `[kitty]` and `[space.NAME]` included, which only
-config.toml has, and so is `group`, which is the space's `[space.NAME]`'s. For
+`dir`, `branch_prefix` and `delete_branch`, checked as config.toml's are; anything else is an error naming
+the key, `spaces`, `launch`, `sessions`, `groups`, `[sidebar]`, `[kitty]` and `[space.NAME]` included, which
+only config.toml has, and so is `group`, which is the space's `[space.NAME]`'s. For
 that space alone, in its forms, its rows' menus, opening its worktrees and `kspaces layout` and `kspaces
 run` in them, its layouts and commands are added to config.toml's, one called as one of config.toml's in
 that one's place, and a layout of either can run a command of either. Its `layout` and `worktree_layout`

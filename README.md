@@ -110,10 +110,13 @@ sessions = "~/.local/share/kitty/sessions"
 # like, then any command. A kitten that passes them on to launch can stand in for it.
 launch = ["launch"]
 
-# Where new worktrees go, under the space's root, and what new branch names start with.
+# Where new worktrees go, under the space's root, and what new branch names start with. delete_branch
+# starts the remove worktree and clean up forms with deleting branches ticked, for those that lose
+# nothing; kspaces remove --yes follows its flags alone. Off by default.
 [worktrees]
 dir = ".worktrees"
 branch_prefix = "pr/me"
+delete_branch = false
 
 # Commands to run in a worktree, from the new worktree form, a worktree's Run or kspaces run. run and
 # env are templates: {prompt} is the input, {worktree}, {branch}, {pr} and the like are built in. With a
