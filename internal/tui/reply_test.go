@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"testing/synctest"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -177,4 +178,41 @@ func TestReplyKey(t *testing.T) {
 	if got := launched(); !reflect.DeepEqual(got, want) {
 		t.Errorf("t launched %q, want %q", got, want)
 	}
+}
+
+// A right click on a status entry opens its menu under the mouse, Open and Reply, as on a spaces row; on
+// an entry's hover popup, the menu of the entry it shows, not of the one it covers.
+func TestStatusRightClick(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		e := newSidebarEnv(t)
+		rule := strings.Repeat("\u2500", 29)
+		top := []string{
+			spacesTitle, "", "  \uf120  default", "", "\u25bc \uf401  gr main", "  \uf071  dev pr/me/dev", "  \ue725  fix fix", "",
+			"  \uf401  kitty master", "", "\u25b6 \uf110  docs main", "", "  \uf00d  broken", "", "", "", "", "", "", "", "", "",
+			rule, "STATUS", "Blocked 1", "\uf071  dev                  +1 5m", "   claude \u00b7 approve", "", "Failed 1", "\ue654  scratch",
+		}
+		menu := []string{rule, " Open", " Reply", rule}
+		screen := func(lines ...[]string) []string {
+			var out []string
+			for _, l := range lines {
+				out = append(out, l...)
+			}
+			return out
+		}
+		e.click(fmt.Sprintf(entryZone, e.entry(21)), tea.MouseRight)
+		want := screen(top, menu, []string{"   make \u00b7 \u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 40%", "", "Idle 1", "\uf10c  default", "   claude", ""})
+		if got := e.screen(); !reflect.DeepEqual(got, want) {
+			t.Errorf("on the failed entry:\n%q\nwant\n%q", got, want)
+		}
+		e.press("esc")
+
+		// The blocked entry's popup covers the failed one.
+		e.hover(fmt.Sprintf(entryZone, e.entry(20)))
+		_, y := e.zone(popupZone)
+		e.clickAt(4, y+5, tea.MouseRight)
+		want = screen(top, []string{"   exit 1"}, menu, []string{"", "Idle 1", "\uf10c  default", "   claude", ""})
+		if got := e.screen(); !reflect.DeepEqual(got, want) || e.m.cursor != e.entry(20) {
+			t.Errorf("on the popup, cursor %d, want %d:\n%q\nwant\n%q", e.m.cursor, e.entry(20), got, want)
+		}
+	})
 }

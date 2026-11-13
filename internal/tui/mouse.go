@@ -110,7 +110,7 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 			m.openSortMenu(msg.Y)
 			return nil
 		}
-		if i, ok := m.clickedEntry(msg.X, msg.Y); ok && i < len(m.rows) {
+		if i, ok := m.clickedEntry(msg.X, msg.Y); ok {
 			m.cursor = i
 			t, _ := m.entryTarget(i)
 			m.openMenu(t, msg.Y)
@@ -119,10 +119,16 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 	return nil
 }
 
-// clickedEntry is the entry a click at x, y is on: the hovered row's on its popup, else the one drawn there.
+// clickedEntry is the entry a click at x, y is on: on a hover popup the entry it shows, a spaces row or a
+// status entry, rather than the one it covers; else the one drawn there.
 func (m *sidebar) clickedEntry(x, y int) (int, bool) {
-	if i := m.hoveredRow(); i >= 0 && m.inZone(popupZone, x, y) {
-		return i, true
+	if m.inZone(popupZone, x, y) {
+		if i := m.hoveredRow(); i >= 0 {
+			return i, true
+		}
+		if j := m.hovered(); j >= 0 {
+			return len(m.rows) + j, true
+		}
 	}
 	return m.entryAt(x, y)
 }
