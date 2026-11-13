@@ -270,7 +270,8 @@ itself is its branch, fetched and tracking the remote's. A PR from a fork is fet
 for something else, and pulls from `pull/N/head`, as `gh pr checkout` sets up a fork it has no remote for.
 The remote is the one for the repository the PR is to, else `origin`. A branch set up for the PR before is
 checked out as it is. When gh cannot say, because it is not installed, there is no such PR or the repository
-is not on GitHub, the form shows gh's error as it does git's.
+is not on GitHub, the form shows gh's error as it does git's. `kspaces new [SPACE] --pr N` opens the form
+on PR N, its number or URL, looked up at once.
 
 With [commands](kitty.md#running-commands) configured, the form has a `command` field below the directory,
 `none` at first, and below it a field for each input of the command chosen. `tab` and `shift+tab` go round

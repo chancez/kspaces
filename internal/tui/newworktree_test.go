@@ -119,6 +119,40 @@ func TestNewWorktreeFormPR(t *testing.T) {
 	}
 }
 
+// kspaces new --pr starts the form on the PR, by its number or URL, looked up from the start; anything
+// else is an error.
+func TestNewWorktreeFormStartsOnPR(t *testing.T) {
+	root := mainRepo(t)
+	fakeGH(t, map[string]string{
+		"3": `{"headRefName":"feat","headRepositoryOwner":{"login":"o"},"isCrossRepository":false,"number":3,"title":"Add feat","url":"https://github.com/o/r/pull/3"}`,
+	})
+	space := spaces.Space{Name: "gr", Root: root, Worktrees: []spaces.Worktree{{Path: root, Branch: "main", Session: "gr"}}}
+	cfg := config.Config{Worktrees: config.Worktrees{Dir: ".worktrees", BranchPrefix: "pr/me"}}
+	var got []string
+	for _, pr := range []string{"3", "https://github.com/o/r/pull/3/files", "main"} {
+		f := newForm(cfg, space)
+		if err := f.startOn(pr); err != nil {
+			got = append(got, err.Error())
+			continue
+		}
+		f.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+		for _, cmd := range f.Init()().(tea.BatchMsg) {
+			if due, ok := cmd().(prDueMsg); ok {
+				_, lookup := f.Update(due)
+				f.Update(lookup())
+			}
+		}
+		got = append(got, strings.Join(formScreen(f)[3:8], "\n"))
+	}
+	found := func(branch string) string {
+		return "  branch     " + branch + "\n  directory  .worktrees/feat\n\n  PR #3 Add feat\n  Checks out feat from origin, tracking it"
+	}
+	want := []string{found("#3"), found("https://github.com/o/r/pull/3/files"), "main is not a PR's number or URL"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+}
+
 // With commands configured the form chooses one, none at first, and has a field for each of its inputs;
 // tab goes through them all, left and right or a click change the command. A required input left empty
 // refuses to create. Created, the worktree's first tab runs the command: kspaces sends kitty launch with

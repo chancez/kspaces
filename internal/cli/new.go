@@ -9,7 +9,8 @@ import (
 )
 
 func (a *app) newCommand() *cobra.Command {
-	return &cobra.Command{
+	var pr string
+	cmd := &cobra.Command{
 		Use:   "new [SPACE]",
 		Short: "Create a worktree and switch to it, in the space given by root or name, or the current one",
 		Args:  cobra.MaximumNArgs(1),
@@ -26,7 +27,9 @@ func (a *app) newCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return tui.RunNewWorktree(cmd.Context(), cfg, space)
+			return tui.RunNewWorktree(cmd.Context(), cfg, space, pr)
 		},
 	}
+	cmd.Flags().StringVar(&pr, "pr", "", "a PR to check out, its number or URL, looked up with gh")
+	return cmd
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -92,8 +93,13 @@ func newForm(cfg config.Config, space spaces.Space) *newWorktreeForm {
 
 type createdMsg struct{ err error }
 
+// Init starts looking up the PR the branch field names at first, as RunNewWorktree fills it in.
 func (f *newWorktreeForm) Init() tea.Cmd {
-	return textinput.Blink
+	if _, asked := f.lookups[f.pr.Arg]; !f.isPR || asked {
+		return textinput.Blink
+	}
+	due := prDueMsg{f.prSeq, f.pr}
+	return tea.Batch(textinput.Blink, func() tea.Msg { return due })
 }
 
 // lookup is what looking up the PR the branch field names has found so far, ok false when it names none.
@@ -479,10 +485,30 @@ func prDoes(pr spaces.PR) string {
 	}
 }
 
+// startOn fills the branch field in with pr, a PR's number or URL, for the form to start on.
+func (f *newWorktreeForm) startOn(pr string) error {
+	if _, err := strconv.Atoi(pr); err == nil {
+		pr = "#" + pr
+	}
+	if _, ok := spaces.ParsePRRef(f.cfg, f.space, pr); !ok {
+		return fmt.Errorf("%s is not a PR's number or URL", pr)
+	}
+	f.branch.fill(pr)
+	f.followBranch()
+	return nil
+}
+
 // RunNewWorktree runs the new worktree form for space, with the config as the space sees it, meant for a
-// kitty popup, until the worktree is created and opened or the form is left.
-func RunNewWorktree(ctx context.Context, cfg config.Config, space spaces.Space) error {
-	if err := runPopup(ctx, newForm(space.ConfigOf(cfg), space)); err != nil {
+// kitty popup, until the worktree is created and opened or the form is left. pr, when not empty, is a PR
+// to check out, its number or URL, which the form starts on.
+func RunNewWorktree(ctx context.Context, cfg config.Config, space spaces.Space, pr string) error {
+	f := newForm(space.ConfigOf(cfg), space)
+	if pr != "" {
+		if err := f.startOn(pr); err != nil {
+			return err
+		}
+	}
+	if err := runPopup(ctx, f); err != nil {
 		return fmt.Errorf("running the new worktree form: %w", err)
 	}
 	return nil

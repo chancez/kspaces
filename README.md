@@ -204,7 +204,7 @@ kspaces open [PATH]      switch to the session of the worktree at PATH or the cu
 kspaces next, prev       switch to the next or previous session with windows open
   --attention            or to the next or previous window that is blocked, failed or done
 kspaces recent           switch to the session used before this one, as alt-tab does: twice goes back
-kspaces new [SPACE]      create a worktree, in a form
+kspaces new [SPACE]      create a worktree, in a form; --pr N starts it on PR N, by number or URL
 kspaces run NAME [PATH...]  run a configured command in the worktrees at PATH or the current directory,
   --input K=V, --yes     in a form, with inputs filled in; --yes without asking
 kspaces layout NAME [PATH]  open a configured layout's tabs in the worktree's session, in a form, as run
