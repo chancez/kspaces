@@ -60,13 +60,16 @@ tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/
    --toggle`, as a proposal after the dock one.
 7. One launcher for every new window: today running each window in a cm session takes a mapping per way
    of opening one (new tab, split, OS window, each through `kitten cm_launch.py`), and kitty's own
-   new_tab, new_window, new_os_window and splits still start the plain shell. `action_alias launch`
-   reaches actions but not the macOS menus, the tab bar's new tab button, `kitten @ launch` or session
-   files, and redefining a built-in action is not documented; `shell` misses windows with a command and
-   is saved without its argv. Filed as an `on_launch` watcher event: kovidgoyal/kitty#10858, closed by the
-   maintainer without a change, saying a watcher cannot read a running process's environment, only cwd
-   and host with caveats. I replied that the environment is not needed, only changing what is launched;
-   no answer yet.
+   new_tab, new_window, new_os_window and splits still start the plain shell. Filed as
+   kovidgoyal/kitty#10858; the maintainer implemented it in f8556bbf8 as `launch_wrapper.py` in the kitty
+   config dir: `prefix_for_launch(ctx)` returns a prefix put before the command of every window opened at
+   the user's request (launch, remote control, sessions, new_* actions, the tab bar's button, the macOS
+   menus, the first window), not kittens or overlays kitty opens itself. kitty keeps knowing the real
+   command, so it saves that in sessions, not the prefix, and calls the function again on restore;
+   `ctx.user_vars` are saved, so a var naming the window's cm session can bring it back to that session.
+   Once a release has it, cm_launch.py's mappings become plain `launch` and the wrapper picks the cm
+   session; it must skip kspaces' own windows (docks, forms, panels, by their vars or `ctx.launch_type`),
+   and cm_reap.py has to find a window's session from its var, as the wrapper is not in `child.argv`.
 8. Resizing docks by dragging their inner border and with `resize_window`: kovidgoyal/kitty#10857,
    implemented by the maintainer in 11cbfdce2. The new size is stored in the dock's spec and saved in
    sessions. Once a release has it, kspaces' 2-second check of `[sidebar] width` must not undo a dragged
