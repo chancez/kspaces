@@ -173,7 +173,7 @@ var (
 		Applies: newWorktreeApplies,
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
-			return m.newWorktree(s.row.Space.Root, false)
+			return m.newWorktree(s.row.Space.Root, spaces.FromBranch)
 		},
 	}
 	actNewWorktreeFromPR = &interact.Action[*sidebar, entrySubject]{
@@ -182,7 +182,16 @@ var (
 		Applies: newWorktreeApplies,
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
-			return m.newWorktree(s.row.Space.Root, true)
+			return m.newWorktree(s.row.Space.Root, spaces.FromPR)
+		},
+	}
+	actNewWorktreeFromIssue = &interact.Action[*sidebar, entrySubject]{
+		Title:   "New worktree from issue",
+		Section: sectionSpace,
+		Applies: newWorktreeApplies,
+		Run: func(m *sidebar, s entrySubject) tea.Cmd {
+			m.remote = false
+			return m.newWorktree(s.row.Space.Root, spaces.FromIssue)
 		},
 	}
 	actRemoveWorktree = &interact.Action[*sidebar, entrySubject]{
@@ -967,11 +976,12 @@ func init() {
 	spacesKind.Bind(actAddSpace, "a", "add space", "a")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actOpenPlain, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actNewWorktreeFromPR, actFold, actUnfold, actCleanup, actTrustConfig, actSelectRow)
+		actOpenWorktree, actOpenPlain, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actNewWorktreeFromPR, actNewWorktreeFromIssue, actFold, actUnfold, actCleanup, actTrustConfig, actSelectRow)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
 	entryKind.Bind(actNewWorktreeFromPR, "N", "new worktree from PR", "N")
+	entryKind.Bind(actNewWorktreeFromIssue, "I", "new worktree from issue", "I")
 	entryKind.Bind(actRunCommand, "R", "run a command", "R")
 	entryKind.Bind(actOpenLayout, "L", "open a layout", "L")
 	entryKind.Bind(actOpenPlain, "o", "open without the default layout", "o")

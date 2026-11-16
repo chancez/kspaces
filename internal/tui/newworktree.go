@@ -16,14 +16,16 @@ import (
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
-// The new worktree form's tabs: a branch to create or check out, or a pull request to check out.
+// The new worktree form's tabs: a branch to create or check out, a pull request to check out, or an issue
+// to create a branch for.
 const (
 	tabBranch = iota
 	tabPR
+	tabIssue
 )
 
 // tabNames are what the tab strip calls the tabs.
-var tabNames = [...]string{"Branch", "Pull request"}
+var tabNames = [...]string{"Branch", "Pull request", "Issue"}
 
 // tabZone is the zone of the tab strip's tabs, by index.
 const tabZone = "tab:%d"
@@ -34,28 +36,35 @@ type worktreeTab struct {
 	// Empty for the default, which spaces.WorktreeDir derives from the branch and the placeholder shows.
 	dir lineField
 	// The layout the session opens with, none for a shell tab, and its inputs. Only with layouts
-	// configured, the branch tab's starting on the space's worktree layout, the PR tab's on its PR layout.
+	// configured, the branch tab's starting on the space's worktree layout, the PR tab's on its PR layout
+	// and the Issue tab's on its issue layout.
 	layouts choiceFields[config.Layout]
 	// The command to run, none for none, and its inputs: as the first tab without a layout, else after
 	// it, where the command opens. Only with commands configured.
 	cmds choiceFields[config.Command]
 }
 
-// newWorktreeForm creates a worktree, on a branch to create or check out or on a pull request, a tab
-// each, and, optionally, where its worktree goes, a layout and a command to run in it, shows what it will
-// do, creates the worktree and switches to its session. The PR tab's field takes a PR's number, URL or
-// title, the open PRs it matches listed below it to choose from. It is meant for a kitty popup, as the
-// sidebar is too narrow to type a name and read back the path in.
+// newWorktreeForm creates a worktree, on a branch to create or check out, on a pull request, or on a
+// branch for an issue, a tab each, and, optionally, where its worktree goes, a layout and a command to run
+// in it, shows what it will do, creates the worktree and switches to its session. The PR and Issue tabs'
+// fields take a number, URL or title, the open ones they match listed below to choose from. It is meant
+// for a kitty popup, as the sidebar is too narrow to type a name and read back the path in.
 type newWorktreeForm struct {
 	th    *look.Theme
 	cfg   config.Config
 	space spaces.Space
 	tab   int
-	tabs  [2]worktreeTab
-	// The branch tab's branch. Typing #N or a PR's URL in it goes to the PR tab.
+	tabs  [3]worktreeTab
+	// The branch tab's branch. Typing #N or a PR's URL in it goes to the PR tab, an issue's URL to the
+	// Issue tab.
 	branch lineField
-	// The PR tab's PR, and the choice of it follow last saw, so a new one clears the error.
-	prs  *ghPicker[gh.PRView, spaces.PR]
+	// The PR tab's PR, and the Issue tab's issue and the branch it creates for it, filled in from the
+	// issue until typed in: issueFilled is what it was last filled in with.
+	prs         *ghPicker[gh.PRView, spaces.PR]
+	issues      *ghPicker[gh.IssueView, gh.IssueView]
+	issueBranch lineField
+	issueFilled string
+	// The choice of the tab shown as follow last saw it, so a new one clears the error.
 	seen spaces.Ref
 	// focus is the index in fields of the field that has focus.
 	focus int
@@ -79,10 +88,14 @@ type createdMsg struct{ err error }
 // prefix, so typing just the name gives PREFIX/NAME; deleting it makes a branch without one.
 func newForm(cfg config.Config, space spaces.Space) *newWorktreeForm {
 	th := look.New(true)
+	start := spaces.BranchStart(cfg)
 	branch := newLineField(th, "")
-	branch.fill(spaces.BranchStart(cfg))
-	f := &newWorktreeForm{th: th, cfg: cfg, space: space, branch: branch, prs: newGHPicker(th, prKind, space), focus: 1}
-	for i, layout := range [...]string{cfg.LayoutFor(space.Name, true), cfg.PRLayoutFor(space.Name)} {
+	branch.fill(start)
+	issueBranch := newLineField(th, "")
+	issueBranch.fill(start)
+	f := &newWorktreeForm{th: th, cfg: cfg, space: space, branch: branch, prs: newGHPicker(th, prKind, space),
+		issues: newGHPicker(th, issueKind, space), issueBranch: issueBranch, issueFilled: start, focus: 1}
+	for i, layout := range [...]string{cfg.LayoutFor(space.Name, true), cfg.PRLayoutFor(space.Name), cfg.IssueLayoutFor(space.Name)} {
 		f.tabs[i] = worktreeTab{
 			dir:     newLineField(th, ""),
 			layouts: newLayoutFields(th, cfg.Layouts, true, layout, nil, nil),
@@ -107,10 +120,13 @@ func (f *newWorktreeForm) Init() tea.Cmd {
 // current is the tab shown.
 func (f *newWorktreeForm) current() *worktreeTab { return &f.tabs[f.tab] }
 
-// shownPicker is the field of the tab shown that picks a PR, nil for the branch tab.
+// shownPicker is the field of the tab shown that picks a PR or an issue, nil for the branch tab.
 func (f *newWorktreeForm) shownPicker() tabPicker {
-	if f.tab == tabPR {
+	switch f.tab {
+	case tabPR:
 		return f.prs
+	case tabIssue:
+		return f.issues
 	}
 	return nil
 }
@@ -127,18 +143,26 @@ func (f *newWorktreeForm) prLookup() (l lookup[spaces.PR], ok bool) {
 // plan is the branch and directory the form would create now. For a PR that is its local branch, empty
 // until it has been looked up.
 func (f *newWorktreeForm) plan() (branch, dir string) {
-	branch = strings.TrimSpace(f.branch.Value())
-	if f.tab == tabPR {
+	switch f.tab {
+	case tabBranch:
+		branch = strings.TrimSpace(f.branch.Value())
+	case tabPR:
 		l, _ := f.prLookup()
 		branch = l.found.Branch
+	case tabIssue:
+		branch = strings.TrimSpace(f.issueBranch.Value())
 	}
 	return branch, spaces.WorktreeDir(f.cfg, f.space.Root, branch, f.current().dir.Value())
 }
 
 func (f *newWorktreeForm) create() tea.Cmd {
 	t := f.current()
-	if f.tab == tabPR && f.prs.chosen.Number == 0 {
+	switch {
+	case f.tab == tabPR && f.prs.chosen.Number == 0:
 		f.err = fmt.Errorf("choose a PR to check out")
+		return nil
+	case f.tab == tabIssue && f.issues.chosen.Number == 0:
+		f.err = fmt.Errorf("choose an issue to create a branch for")
 		return nil
 	}
 	var layout *spaces.LayoutRun
@@ -195,6 +219,23 @@ func (f *newWorktreeForm) create() tea.Cmd {
 		}
 	}
 	branch, dir := f.plan()
+	if f.tab == tabIssue {
+		l, _ := f.issues.lookup()
+		ref := f.issues.chosen
+		return func() tea.Msg {
+			// Recording an issue gh does not know would leave {issue} naming nothing.
+			if !l.done || l.err != nil {
+				if _, err := spaces.ResolveIssue(space, ref); err != nil {
+					return createdMsg{err}
+				}
+			}
+			wt, err := spaces.CreateIssueWorktree(space, ref.Number, branch, dir)
+			if err != nil {
+				return createdMsg{err}
+			}
+			return createdMsg{open(wt, spaces.Links{Issue: ref.Number})}
+		}
+	}
 	return func() tea.Msg {
 		wt, err := spaces.CreateWorktree(space, branch, dir)
 		if err != nil {
@@ -204,13 +245,17 @@ func (f *newWorktreeForm) create() tea.Cmd {
 	}
 }
 
-// fields are the form's fields in order: the tab strip, nil; the branch, or the PR; the directory; the
-// choice of layout, nil, when there is one, and the chosen layout's inputs; then the same for the command.
+// fields are the form's fields in order: the tab strip, nil; the branch, the PR, or the issue and the
+// branch for it; the directory; the choice of layout, nil, when there is one, and the chosen layout's
+// inputs; then the same for the command.
 func (f *newWorktreeForm) fields() []field {
 	t := f.current()
 	out := []field{nil, &f.branch, &t.dir}
-	if p := f.shownPicker(); p != nil {
-		out[1] = p.input()
+	switch f.tab {
+	case tabPR:
+		out[1] = f.prs.input()
+	case tabIssue:
+		out = []field{nil, f.issues.input(), &f.issueBranch, &t.dir}
 	}
 	if t.layouts.picks() {
 		out = append(out, nil)
@@ -223,10 +268,15 @@ func (f *newWorktreeForm) fields() []field {
 }
 
 // layoutAt and commandAt are where in fields the choices of layout and command are, when there are.
-func (f *newWorktreeForm) layoutAt() int { return 3 }
+func (f *newWorktreeForm) layoutAt() int {
+	if f.tab == tabIssue {
+		return 4
+	}
+	return 3
+}
 func (f *newWorktreeForm) commandAt() int {
 	t := f.current()
-	at := 3 + len(t.layouts.fields())
+	at := f.layoutAt() + len(t.layouts.fields())
 	if t.layouts.picks() {
 		at++
 	}
@@ -243,6 +293,8 @@ func (f *newWorktreeForm) focused() field {
 func (f *newWorktreeForm) refocus() tea.Cmd {
 	f.branch.Blur()
 	f.prs.field.Blur()
+	f.issues.field.Blur()
+	f.issueBranch.Blur()
 	for i := range f.tabs {
 		t := &f.tabs[i]
 		t.dir.Blur()
@@ -258,7 +310,7 @@ func (f *newWorktreeForm) nextField() tea.Cmd { return moveFocus(f.fields(), &f.
 func (f *newWorktreeForm) prevField() tea.Cmd { return moveFocus(f.fields(), &f.focus, -1) }
 
 // onTabs, onLayout and onCommand say whether the tab strip, the choice of layout or of command has focus,
-// onPicker whether the field of a tab that picks a PR has.
+// onPicker whether the field of a tab that picks a PR or an issue has.
 func (f *newWorktreeForm) onTabs() bool   { return f.focus == 0 }
 func (f *newWorktreeForm) onPicker() bool { return f.shownPicker() != nil && f.focus == 1 }
 func (f *newWorktreeForm) onLayout() bool {
@@ -348,8 +400,10 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return f, cmd
 		}
 	}
-	if cmd, ok := f.prs.update(msg); ok {
-		return f, tea.Batch(cmd, f.follow())
+	for _, p := range []tabPicker{f.prs, f.issues} {
+		if cmd, ok := p.update(msg); ok {
+			return f, tea.Batch(cmd, f.follow())
+		}
 	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -359,6 +413,8 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		w := max(f.width-4-labelWidth-1, 1)
 		f.branch.SetWidth(w)
 		f.prs.field.SetWidth(w)
+		f.issues.field.SetWidth(w)
+		f.issueBranch.SetWidth(w)
 		for i := range f.tabs {
 			f.tabs[i].dir.SetWidth(w)
 			f.tabs[i].layouts.setWidth(w)
@@ -424,29 +480,45 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return f, tea.Batch(in.update(msg), f.follow())
 }
 
-// follow works out what the branch field names, going to the PR tab for a PR, and what the pickers'
-// fields do, choosing what they name; makes the directory's placeholder the default for the branch the
-// form would create, so the form always shows where the worktree would go; and fills in again the inputs
-// left at their defaults, which follow it too.
+// follow works out what the branch field names, going to the PR tab for a PR and the Issue tab for an
+// issue, and what the pickers' fields do, choosing what they name; fills the issue's branch in again while
+// left as it was; makes the directory's placeholder the default for the branch the form would create, so
+// the form always shows where the worktree would go; and fills in again the inputs left at their defaults,
+// which follow it too.
 func (f *newWorktreeForm) follow() tea.Cmd {
 	var cmds []tea.Cmd
 	if typed := f.branch.Value(); typed != f.typed {
 		f.typed = typed
-		rest := strings.TrimPrefix(strings.TrimSpace(typed), spaces.BranchStart(f.cfg))
-		if number, hash := strings.CutPrefix(rest, "#"); hash || spaces.IsPRURL(rest) {
+		start := spaces.BranchStart(f.cfg)
+		rest := strings.TrimPrefix(strings.TrimSpace(typed), start)
+		switch number, hash := strings.CutPrefix(rest, "#"); {
+		case hash || spaces.IsPRURL(rest):
 			// Typing goes on in the PR field, from what follows the #, or with the URL in it.
 			if hash {
 				rest = number
 			}
-			f.branch.fill(spaces.BranchStart(f.cfg))
+			f.branch.fill(start)
 			f.typed = f.branch.Value()
 			f.prs.field.fill(rest)
 			cmds = append(cmds, f.showTab(tabPR, 1))
+		case spaces.IsIssueURL(rest):
+			f.branch.fill(start)
+			f.typed = f.branch.Value()
+			f.issues.field.fill(rest)
+			cmds = append(cmds, f.showTab(tabIssue, 1))
 		}
 	}
-	cmds = append(cmds, f.prs.refollow())
+	cmds = append(cmds, f.prs.refollow(), f.issues.refollow())
 	if p := f.shownPicker(); p != nil && p.choice() != f.seen {
 		f.seen, f.err = p.choice(), nil
+	}
+	if f.issueBranch.Value() == f.issueFilled {
+		want := spaces.BranchStart(f.cfg)
+		if n := f.issues.chosen.Number; n != 0 {
+			want = spaces.IssueBranch(f.cfg, n, f.issues.title())
+		}
+		f.issueBranch.fill(want)
+		f.issueFilled = want
 	}
 	t := f.current()
 	branch, planned := f.plan()
@@ -455,18 +527,18 @@ func (f *newWorktreeForm) follow() tea.Cmd {
 		dir = rel
 	}
 	t.dir.Placeholder = dir
-	f.vars = spaces.BuiltinVars(f.space, spaces.LinkedWorktree(f.space, branch, planned), spaces.Links{PR: f.prNumber()})
+	f.vars = spaces.BuiltinVars(f.space, spaces.LinkedWorktree(f.space, branch, planned), spaces.Links{PR: f.chosen(tabPR), Issue: f.chosen(tabIssue)})
 	t.layouts.setVars(f.vars)
 	t.cmds.setVars(f.vars)
 	return tea.Batch(cmds...)
 }
 
-// prNumber is the number of the PR chosen while the PR tab is shown, else 0.
-func (f *newWorktreeForm) prNumber() int {
-	if f.tab != tabPR {
-		return 0
+// chosen is the number of the PR or issue chosen on tab while it is shown, else 0.
+func (f *newWorktreeForm) chosen(tab int) int {
+	if p := f.shownPicker(); p != nil && f.tab == tab {
+		return p.choice().Number
 	}
-	return f.prs.chosen.Number
+	return 0
 }
 
 func (f *newWorktreeForm) View() tea.View {
@@ -513,6 +585,9 @@ func (f *newWorktreeForm) render() string {
 	} else {
 		lines = append(lines, fieldLines(th, "branch", &f.branch, width)...)
 	}
+	if f.tab == tabIssue {
+		lines = append(lines, fieldLines(th, "branch", &f.issueBranch, width)...)
+	}
 	lines = append(lines, fieldLines(th, "directory", &t.dir, width)...)
 	layoutAt := len(lines)
 	lines = append(lines, t.layouts.lines(f.onLayout(), width)...)
@@ -529,14 +604,11 @@ func (f *newWorktreeForm) render() string {
 		if l, ok := f.prLookup(); ok && l.done && l.err == nil {
 			lines = append(lines, muted(prDoes(l.found)))
 		}
-	case branch == "" || strings.HasSuffix(branch, "/"):
-		lines = append(lines, muted("Name the branch to create or check out, or # for a PR"))
-	case f.space.HasBranch(branch):
-		lines = append(lines, muted("Checks out the existing branch "+branch))
-	case len(f.space.Worktrees) > 0 && f.space.Worktrees[0].Branch != "":
-		lines = append(lines, muted("Creates "+branch+" from "+f.space.Worktrees[0].Branch))
+		if f.tab == tabIssue && f.issues.chosen.Number != 0 {
+			lines = append(lines, muted(f.branchDoes(branch, "")))
+		}
 	default:
-		lines = append(lines, muted("Creates "+branch))
+		lines = append(lines, muted(f.branchDoes(branch, ", or # for a PR")))
 	}
 	l, layout := t.layouts.chosen()
 	if layout {
@@ -590,6 +662,20 @@ var opensIn = map[string]string{
 	"overlay": "an overlay", "window": "a new OS window",
 }
 
+// branchDoes is what creating the worktree does with branch, or, while it is not a branch's name, to
+// name one, or what else to type.
+func (f *newWorktreeForm) branchDoes(branch, or string) string {
+	switch {
+	case branch == "" || strings.HasSuffix(branch, "/"):
+		return "Name the branch to create or check out" + or
+	case f.space.HasBranch(branch):
+		return "Checks out the existing branch " + branch
+	case len(f.space.Worktrees) > 0 && f.space.Worktrees[0].Branch != "":
+		return "Creates " + branch + " from " + f.space.Worktrees[0].Branch
+	}
+	return "Creates " + branch
+}
+
 // prDoes is what creating the worktree does with pr.
 func prDoes(pr spaces.PR) string {
 	switch {
@@ -604,30 +690,35 @@ func prDoes(pr spaces.PR) string {
 	}
 }
 
-// startOnPR starts the form on the PR tab, its field filled in with pr, a PR's number or URL, when not
-// empty.
-func (f *newWorktreeForm) startOnPR(pr string) error {
-	if pr != "" {
-		if _, ok := spaces.ParsePRRef(pr); !ok {
-			return fmt.Errorf("%s is not a PR's number or URL", pr)
+// startOn starts the form on tab, whose field is p's, filled in with arg, a number or URL of what p picks,
+// when not empty.
+func startOn[V, L any](f *newWorktreeForm, tab int, p *ghPicker[V, L], arg string) error {
+	if arg != "" {
+		if _, ok := p.kind.parse(arg); !ok {
+			return fmt.Errorf("%s is not %s's number or URL", arg, p.kind.one)
 		}
-		f.prs.field.fill(pr)
+		p.field.fill(arg)
 	}
-	f.tab, f.focus = tabPR, 1
+	f.tab, f.focus = tab, 1
 	f.refocus()
 	f.follow()
 	return nil
 }
 
 // RunNewWorktree runs the new worktree form for space, with the config as the space sees it, meant for a
-// kitty popup, until the worktree is created and opened or the form is left. onPR starts it on the PR
-// tab, on pr, a PR's number or URL, when not empty.
-func RunNewWorktree(ctx context.Context, cfg config.Config, space spaces.Space, onPR bool, pr string) error {
+// kitty popup, until the worktree is created and opened or the form is left. It starts on the tab from
+// says, on arg, a PR's or an issue's number or URL, when not empty.
+func RunNewWorktree(ctx context.Context, cfg config.Config, space spaces.Space, from spaces.From, arg string) error {
 	f := newForm(space.ConfigOf(cfg), space)
-	if onPR || pr != "" {
-		if err := f.startOnPR(pr); err != nil {
-			return err
-		}
+	var err error
+	switch from {
+	case spaces.FromPR:
+		err = startOn(f, tabPR, f.prs, arg)
+	case spaces.FromIssue:
+		err = startOn(f, tabIssue, f.issues, arg)
+	}
+	if err != nil {
+		return err
 	}
 	if err := runPopup(ctx, f); err != nil {
 		return fmt.Errorf("running the new worktree form: %w", err)

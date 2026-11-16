@@ -307,7 +307,7 @@ func TestNewWorktreeForm(t *testing.T) {
 		"",
 		"  New worktree in gr",
 		"",
-		"   Branch   Pull request",
+		"   Branch   Pull request   Issue",
 		"",
 		"  branch     pr/me/",
 		"  directory  .worktrees",

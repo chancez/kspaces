@@ -15,21 +15,33 @@ import (
 )
 
 // fakeGH puts a gh first on PATH that answers `gh pr list` with the PRs of open, a JSON list, and `gh pr
-// view N` with prs[N], and fails as gh does for any other PR.
+// view N` with prs[N], and fails as gh does for any other PR; fakeGHIssues does the same for `gh issue`.
 func fakeGH(t *testing.T, open string, prs map[string]string) {
 	t.Helper()
+	writeGH(t, "pr", open, prs)
+}
+
+func fakeGHIssues(t *testing.T, open string, issues map[string]string) {
+	t.Helper()
+	writeGH(t, "issue", open, issues)
+}
+
+func writeGH(t *testing.T, kind, open string, views map[string]string) {
+	t.Helper()
 	dir := t.TempDir()
-	for n, js := range prs {
-		if err := os.WriteFile(filepath.Join(dir, "pr-"+n+".json"), []byte(js), 0o644); err != nil {
+	files := map[string]string{kind + "-open.json": open}
+	for n, js := range views {
+		files[kind+"-"+n+".json"] = js
+	}
+	for name, js := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(js), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := os.WriteFile(filepath.Join(dir, "open.json"), []byte(open), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	script := "#!/bin/sh\n[ \"$2\" = list ] && exec cat " + filepath.Join(dir, "open.json") + "\n" +
-		"n=${3##*/pull/}; n=${n%%/*}\nf=" + dir + "/pr-$n.json\n" +
-		"[ -f \"$f\" ] || { echo \"GraphQL: Could not resolve to a PullRequest with the number of $n. (repository.pullRequest)\" >&2; exit 1; }\n" +
+	script := "#!/bin/sh\n[ \"$2\" = list ] && exec cat " + dir + "/$1-open.json\n" +
+		"case $1 in pr) n=${3##*/pull/} what='a PullRequest' field=pullRequest ;; *) n=${3##*/issues/} what='an issue or pull request' field=issue ;; esac\n" +
+		"n=${n%%[/#?]*}\nf=" + dir + "/$1-$n.json\n" +
+		"[ -f \"$f\" ] || { echo \"GraphQL: Could not resolve to $what with the number of $n. (repository.$field)\" >&2; exit 1; }\n" +
 		"cat \"$f\"\n"
 	if err := os.WriteFile(filepath.Join(dir, "gh"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
@@ -43,6 +55,13 @@ const (
 	feat3 = `{"author":{"login":"me"},"headRefName":"feat","headRepositoryOwner":{"login":"o"},"isCrossRepository":false,"isDraft":false,"number":3,"title":"Add feat","url":"https://github.com/o/r/pull/3"}`
 	fork7 = `{"author":{"login":"forker"},"headRefName":"main","headRepositoryOwner":{"login":"forker"},"isCrossRepository":true,"isDraft":true,"number":7,"title":"Fix from a fork","url":"https://github.com/o/r/pull/7"}`
 	old99 = `{"author":{"login":"me"},"headRefName":"old","headRepositoryOwner":{"login":"o"},"isCrossRepository":false,"isDraft":false,"number":99,"title":"Closed one","url":"https://github.com/o/r/pull/99"}`
+)
+
+// Two open issues, as gh issue list says them, and a closed one gh issue view knows.
+const (
+	crash12 = `{"author":{"login":"you"},"number":12,"title":"Crash on empty input","url":"https://github.com/o/r/issues/12"}`
+	docs9   = `{"author":{"login":"me"},"number":9,"title":"Docs","url":"https://github.com/o/r/issues/9"}`
+	old40   = `{"author":{"login":"me"},"number":40,"title":"Old one","url":"https://github.com/o/r/issues/40"}`
 )
 
 // mainRepo is a repository with a commit on main.
@@ -89,7 +108,7 @@ func TestNewWorktreeFormPR(t *testing.T) {
 	keys := "   Create enter    Cancel esc   tab next field"
 	row := func(s string) string { return "              " + s }
 	screen := func(pr []string, dir string, says ...string) []string {
-		lines := append([]string{"", "  New worktree in gr", "", "   Branch   Pull request", ""}, pr...)
+		lines := append([]string{"", "  New worktree in gr", "", "   Branch   Pull request   Issue", ""}, pr...)
 		lines = append(lines, "  directory  "+dir, "")
 		for _, s := range says {
 			if s != "" {
@@ -176,7 +195,7 @@ func TestNewWorktreeFormClickPR(t *testing.T) {
 	fakeGH(t, "["+feat3+","+fork7+"]", nil)
 	space := spaces.Space{Name: "gr", Root: root, Worktrees: []spaces.Worktree{{Path: root, Branch: "main", Session: "gr"}}}
 	f := newForm(config.Config{Worktrees: config.Worktrees{Dir: ".worktrees"}}, space)
-	if err := f.startOnPR(""); err != nil {
+	if err := startOn(f, tabPR, f.prs, ""); err != nil {
 		t.Fatal(err)
 	}
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 24})
@@ -210,7 +229,7 @@ func TestNewWorktreeFormStartsOnPR(t *testing.T) {
 	var got []result
 	for _, pr := range []string{"", "99", "https://github.com/o/r/pull/99/files", "main"} {
 		f := newForm(cfg, space)
-		if err := f.startOnPR(pr); err != nil {
+		if err := startOn(f, tabPR, f.prs, pr); err != nil {
 			got = append(got, result{Err: err.Error()})
 			continue
 		}
@@ -324,7 +343,7 @@ run = ["gr"]
 	f := newForm(cfg, space)
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	screen := func(fields []string, hint string, says ...string) []string {
-		lines := append([]string{"", "  New worktree in gr", "", "   Branch   Pull request", "", "  branch     pr/me/fix", "  directory  .worktrees/fix"}, fields...)
+		lines := append([]string{"", "  New worktree in gr", "", "   Branch   Pull request   Issue", "", "  branch     pr/me/fix", "  directory  .worktrees/fix"}, fields...)
 		lines = append(lines, "", "  Creates pr/me/fix from main")
 		for _, s := range says {
 			if s != "" {
@@ -391,5 +410,151 @@ run = ["gr"]
 		"@", "action", "goto_session", "gr@fix.kitty-session", "--",
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
+	}
+}
+
+// The Issue tab's field picks an issue as the PR tab's picks a PR, and an issue's URL pasted in the branch
+// field goes to it. Choosing one fills the branch in with the prefix, the issue's number and its title,
+// again as the issue changes until the branch is typed in; the directory and {issue} follow. Created, the
+// worktree records its issue, and the command run in it gets it.
+func TestNewWorktreeFormIssue(t *testing.T) {
+	root := mainRepo(t)
+	fakeGHIssues(t, "["+crash12+","+docs9+"]", map[string]string{"40": old40})
+	dir := t.TempDir()
+	log := filepath.Join(dir, "calls")
+	script := "#!/bin/sh\n{ for a; do printf '%s\\n' \"$a\"; done; echo --; } >> " + log + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "kitten"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("KITTY_INSTALLATION_DIR", "")
+	cfg, err := config.Parse(`
+[worktrees]
+branch_prefix = "pr/me"
+[[commands]]
+name = "claude"
+run = ["claude", "{prompt}"]
+inputs = [{ name = "prompt", label = "Prompt", default = "Fix issue #{issue}" }]
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	space := spaces.Space{Name: "gr", Root: root, Worktrees: []spaces.Worktree{{Path: root, Branch: "main", Session: "gr"}}}
+	f := newForm(cfg, space)
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 24})
+	type result struct {
+		Tab, Issue     int
+		Branch, Prompt string
+	}
+	now := func() result {
+		return result{f.tab, f.issues.chosen.Number, f.issueBranch.Value(), f.tabs[tabIssue].cmds.values()["prompt"]}
+	}
+	shiftTab := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
+
+	f.Update(tea.PasteMsg{Content: "https://github.com/o/r/issues/12"})
+	listOpen(f, f.issues)
+	lookUpChosen(t, f, f.issues)
+	// The command, claude, below the directory.
+	for _, k := range []tea.KeyPressMsg{keyMsg("tab"), keyMsg("tab"), keyMsg("tab"), {Code: tea.KeyRight}, shiftTab, shiftTab, shiftTab} {
+		f.Update(k)
+	}
+	got := []result{now()}
+	// # matches every open issue, down goes to the next.
+	f.Update(keyMsg("ctrl+u"))
+	typeInto(f, "#")
+	f.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	got = append(got, now())
+	// One that is not open is looked up.
+	f.Update(keyMsg("ctrl+u"))
+	typeInto(f, "40")
+	lookUpChosen(t, f, f.issues)
+	got = append(got, now())
+	// Typed in, the branch stays as the issue changes.
+	f.Update(keyMsg("tab"))
+	typeInto(f, "-x")
+	f.Update(shiftTab)
+	f.Update(keyMsg("ctrl+u"))
+	typeInto(f, "12")
+	f.Update(keyMsg("tab"))
+	got = append(got, now())
+	want := []result{
+		{tabIssue, 12, "pr/me/12-crash-on-empty-input", "Fix issue #12"},
+		{tabIssue, 9, "pr/me/9-docs", "Fix issue #9"},
+		{tabIssue, 40, "pr/me/40-old-one", "Fix issue #40"},
+		{tabIssue, 12, "pr/me/40-old-one-x", "Fix issue #12"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v\nwant %+v", got, want)
+	}
+	if got, want := formScreen(f), []string{"", "  New worktree in gr", "", "   Branch   Pull request   Issue", "",
+		"  issue      #12 Crash on empty input", "  branch     pr/me/40-old-one-x", "  directory  .worktrees/40-old-one-x",
+		"  command    < claude >", "  Prompt     Fix issue #12", "",
+		"  Issue #12 Crash on empty input", "  Creates pr/me/40-old-one-x from main", "  Runs claude in the first tab", "",
+		"   Create enter    Cancel esc   tab next field", ""}; !reflect.DeepEqual(got, want) {
+		t.Errorf("form:\n%q\nwant\n%q", got, want)
+	}
+
+	_, cmd := f.Update(keyMsg("enter"))
+	if cmd == nil {
+		t.Fatal("enter created nothing")
+	}
+	if _, quit := f.Update(cmd()); quit == nil || f.err != nil {
+		t.Fatalf("the form stayed: %v", f.err)
+	}
+	wt := filepath.Join(root, ".worktrees", "40-old-one-x")
+	links := spaces.WorktreeLinks(spaces.LoadSpace(root), spaces.Worktree{Path: wt, Branch: "pr/me/40-old-one-x"})
+	data, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	type created struct {
+		Links spaces.Links
+		Ran   []string
+	}
+	if got, want := (created{links, strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")}), (created{spaces.Links{Issue: 12}, []string{
+		"@", "action", "launch", "--type=tab", "--cwd=" + wt, "--add-to-session=gr@40-old-one-x",
+		"--env=KSPACES_SPACE=gr", "--env=KSPACES_ROOT=" + root, "--env=KSPACES_WORKTREE=" + wt, "--env=KSPACES_BRANCH=pr/me/40-old-one-x",
+		"--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr@40-old-one-x", "--env=KSPACES_PR=", "--env=KSPACES_ISSUE=12",
+		"'--env=KSPACES_INPUT_PROMPT=Fix issue #12'", "--hold", "claude", "'Fix issue #12'", "--",
+		"@", "action", "goto_session", "gr@40-old-one-x.kitty-session", "--",
+	}}); !reflect.DeepEqual(got, want) {
+		t.Errorf("created\n%+v\nwant\n%+v", got, want)
+	}
+}
+
+// kspaces new --from-issue starts the form on the Issue tab, and --issue on the issue it names, by number or
+// URL; anything else is an error. With no issue chosen it creates nothing.
+func TestNewWorktreeFormStartsOnIssue(t *testing.T) {
+	root := mainRepo(t)
+	fakeGHIssues(t, "[]", map[string]string{"40": old40})
+	space := spaces.Space{Name: "gr", Root: root, Worktrees: []spaces.Worktree{{Path: root, Branch: "main", Session: "gr"}}}
+	cfg := config.Config{Worktrees: config.Worktrees{Dir: ".worktrees", BranchPrefix: "pr/me"}}
+	type result struct {
+		Branch, Err string
+	}
+	var got []result
+	for _, issue := range []string{"", "40", "https://github.com/o/r/issues/40", "main"} {
+		f := newForm(cfg, space)
+		if err := startOn(f, tabIssue, f.issues, issue); err != nil {
+			got = append(got, result{Err: err.Error()})
+			continue
+		}
+		listOpen(f, f.issues)
+		if f.issues.chosen.Number == 0 {
+			f.create()
+			got = append(got, result{f.issueBranch.Value(), errString(f.err)})
+			continue
+		}
+		lookUpChosen(t, f, f.issues)
+		got = append(got, result{f.issueBranch.Value(), errString(f.err)})
+	}
+	want := []result{
+		{"pr/me/", "choose an issue to create a branch for"},
+		{"pr/me/40-old-one", "<nil>"},
+		{"pr/me/40-old-one", "<nil>"},
+		{Err: "main is not an issue's number or URL"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v\nwant %+v", got, want)
 	}
 }

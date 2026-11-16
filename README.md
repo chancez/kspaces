@@ -155,8 +155,9 @@ tabs = [{ panes = [{ command = "claude", inputs = { prompt = "Review PR #{pr}" }
 # linked worktrees' sessions open with afresh, when there is no saved session to restore, and the new
 # worktree form's at first. `layout` is the main worktree's, and a top-level `layout`, before any table,
 # the default for every space. A layout needing an input with no default, as claude's prompt, is opened
-# afresh as one shell tab, and the sidebar says so. `pr_layout`, here or top-level, is the new worktree
-# form's on its Pull request tab. `group` is the group the sidebar lists it under.
+# afresh as one shell tab, and the sidebar says so. `pr_layout` and `issue_layout`, here or top-level, are
+# the new worktree form's on its Pull request and Issue tabs. `group` is the group the sidebar lists it
+# under.
 [space.gr]
 worktree_layout = "agent"
 pr_layout = "review"
@@ -181,7 +182,7 @@ setting in two files is an error. See [docs/kitty.md](docs/kitty.md#more-config-
 A repository's own layouts and commands can live with it, rather than in your dotfiles, in `.kspaces.toml`
 at the top of its main worktree, which its linked worktrees share. They are added to config.toml's for that
 space alone, a name it has taking config.toml's one's place, and it can set the space's `layout`,
-`worktree_layout`, `pr_layout` and `[worktrees]`:
+`worktree_layout`, `pr_layout`, `issue_layout` and `[worktrees]`:
 
 ```toml
 layout = "tests"
@@ -214,7 +215,8 @@ kspaces open [PATH]      switch to the session of the worktree at PATH or the cu
 kspaces next, prev       switch to the next or previous session with windows open
   --attention            or to the next or previous window that is blocked, failed or done
 kspaces recent           switch to the session used before this one, as alt-tab does: twice goes back
-kspaces new [SPACE]      create a worktree, in a form; --from-pr on its Pull request tab, --pr N on PR N
+kspaces new [SPACE]      create a worktree, in a form; --from-pr on its Pull request tab, --pr N on PR N,
+  --from-issue, --issue  --from-issue on its Issue tab, --issue N on issue N
 kspaces run NAME [PATH...]  run a configured command in the worktrees at PATH or the current directory,
   --input K=V, --yes     in a form, with inputs filled in; --yes without asking
 kspaces layout NAME [PATH]  open a configured layout's tabs in the worktree's session, in a form, as run

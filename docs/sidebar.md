@@ -231,6 +231,7 @@ group, and Add space.
 | Worktree | Forget | `x` | delete the saved session file of a missing worktree with no windows open |
 | Space | New worktree | `n` | create a worktree in the space, in a form |
 | Space | New worktree from PR | `N` | the same form on its Pull request tab, to check out one of the space's open PRs |
+| Space | New worktree from issue | `I` | the same form on its Issue tab, to create a branch for one of the space's open issues |
 | Space | Fold / Unfold worktrees | `space` | hide or show a space's linked worktrees |
 | Space | Clean up worktrees | `p` | remove the space's linked worktrees that look done with, and its missing ones, on a space's row |
 | Space | Trust space config | | show what the space's own config adds, and trust it, in a form; while its `.kspaces.toml` is untrusted or changed |
@@ -258,16 +259,17 @@ line, until the next key or click in the sidebar.
 background, so the sidebar does not wait for it; what it says when it fails shows on the sidebar's last
 line.
 
-**New worktree** and **New worktree from PR** open one form with two tabs, `Branch` and `Pull request`,
-on a strip below its heading, the one shown on a chip. The strip is the form's first field: `left` and
-`right` while it has focus, or a click on a tab, switch tabs. Each tab keeps its own fields, so switching
-loses nothing typed. Create creates from the tab shown.
+**New worktree**, **New worktree from PR** and **New worktree from issue** open one form with three tabs,
+`Branch`, `Pull request` and `Issue`, on a strip below its heading, the one shown on a chip. The strip is
+the form's first field: `left` and `right` while it has focus, or a click on a tab, switch tabs. Each tab
+keeps its own fields, so switching loses nothing typed. Create creates from the tab shown.
 
 The branch tab has a branch field, which starts with `worktrees.branch_prefix/`, and a directory field,
 empty for the default: `worktrees.dir` under the space's root, named after the branch. An existing branch is
 checked out; a new one is created from what the main worktree has checked out. Create switches to the new
 session. Typing `#` in the branch field, after the prefix or in place of it, goes to the PR tab, typing going
-on in its PR field; a PR's URL typed or pasted there goes to the PR tab with it in the PR field.
+on in its PR field; a PR's URL typed or pasted there goes to the PR tab with it in the PR field, and an
+issue's URL to the Issue tab with it in the issue field.
 
 The PR tab's first field is the PR: its number, `#N`, its URL, or words of its title or its author's login,
 as `number, URL or title` says while it is empty. The first time the tab shows, the form lists the space's
@@ -285,8 +287,16 @@ remote for. The remote is the one for the repository the PR is to, else `origin`
 PR before is checked out as it is. When gh cannot say, because it is not installed, there is no such PR or
 the repository is not on GitHub, the form shows gh's error as it does git's.
 
+The Issue tab's first field is the issue, chosen as the PR tab's PR is, from the open issues `gh issue list`
+lists, or looked up with `gh issue view`. Below it is the branch to create for it, filled in with the
+prefix, the issue's number and the words of its title, `pr/me/12-crash-on-empty-input`, and filled in again
+as the issue changes until it is typed in; then the directory, which follows the branch. An existing branch
+is checked out. Create records the issue's number in git config, as the branch's `kspaces-issue`, so
+[`{issue}`](kitty.md#running-commands) is the issue's number in the worktree from then on, for a prompt such
+as `Fix issue #{issue}`. git deletes it with the branch.
+
 `kspaces new [SPACE] --from-pr` opens the form on the PR tab, and `--pr N` on PR N, its number or URL,
-looked up at once.
+looked up at once; `--from-issue` and `--issue N` do the same with the Issue tab.
 
 With [commands](kitty.md#running-commands) configured, the form has a `command` field below the directory,
 `none` at first, and below it a field for each input of the command chosen. `tab` and `shift+tab` go round
@@ -311,10 +321,10 @@ move down. `up` and `down` move between its lines, and leave it only from the fi
 has focus the keys row lists `shift+enter newline`. Every form with an input, below, has these.
 
 With [layouts](kitty.md#layouts) configured, a `layout` field comes before `command`, set at first to the
-space's layout for its linked worktrees, on the PR tab to its [`pr_layout`](kitty.md#layouts), else
-`shell`, listed first as `shell  1 tab, a shell`, and below it a field for each of its inputs. With a layout
-chosen the session opens with its tabs rather than one shell tab; with a command too, the command then runs
-where its `open` says, by the pane the layout left focused.
+space's layout for its linked worktrees, on the PR tab to its [`pr_layout`](kitty.md#layouts) and on the
+Issue tab to its `issue_layout`, else `shell`, listed first as `shell  1 tab, a shell`, and below it a field
+for each of its inputs. With a layout chosen the session opens with its tabs rather than one shell tab;
+with a command too, the command then runs where its `open` says, by the pane the layout left focused.
 
 **Run** chooses a command, with the same `command` field when there is more than one, and has a field for
 each input of the one chosen. It says where the command opens: as the session's first tab when the session

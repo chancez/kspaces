@@ -80,6 +80,20 @@ var prKind = &ghKind[gh.PRView, spaces.PR]{
 	title:   func(pr spaces.PR) string { return pr.Title },
 }
 
+// issueKind is what the Issue tab chooses among: the open issues, choosing one needing nothing more.
+var issueKind = &ghKind[gh.IssueView, gh.IssueView]{
+	label: "issue", start: "Issue", one: "an issue", many: "issues",
+	item: func(v gh.IssueView) ghItem {
+		return ghItem{number: v.Number, title: v.Title, author: v.Author, url: v.URL}
+	},
+	list:    gh.OpenIssues,
+	parse:   spaces.ParseIssueRef,
+	isURL:   spaces.IsIssueURL,
+	open:    func(_ spaces.Space, v gh.IssueView) (gh.IssueView, error) { return v, nil },
+	resolve: spaces.ResolveIssue,
+	title:   func(v gh.IssueView) string { return v.Title },
+}
+
 // ghPicker is a field that chooses a PR or an issue, by its number, URL or title: while it has focus the
 // open ones it matches show below it to choose from, the one highlighted chosen. One that is not open is
 // looked up with gh once the field rests on it.
@@ -321,12 +335,7 @@ func (p *ghPicker[V, L]) lines(th *look.Theme, focused bool, width int) []string
 		if p.chosen.Number == 0 {
 			return fieldLines(th, label, &p.field, width)
 		}
-		title := ""
-		if i := p.openIndex(p.chosen); i >= 0 {
-			title = p.kind.item(p.open.views[i]).title
-		} else if l := p.lookups[p.chosen.Arg]; l.done && l.err == nil {
-			title = p.kind.title(l.found)
-		}
+		title := p.title()
 		return []string{th.DrawZone(fieldZone(&p.field), look.Plain, width,
 			th.Cut(width, look.Label(fmt.Sprintf("%-*s", labelWidth, label)), look.Text(itemName(p.chosen.Number, title)))...)}
 	}
@@ -349,6 +358,17 @@ func (p *ghPicker[V, L]) lines(th *look.Theme, focused bool, width int) []string
 		out = append(out, th.Render(look.Plain, indent, look.Muted(fmt.Sprintf(" %d more", more))))
 	}
 	return out
+}
+
+// title is the title of the one chosen, once known: from the open ones, or from looking it up.
+func (p *ghPicker[V, L]) title() string {
+	if i := p.openIndex(p.chosen); i >= 0 {
+		return p.kind.item(p.open.views[i]).title
+	}
+	if l := p.lookups[p.chosen.Arg]; l.done && l.err == nil {
+		return p.kind.title(l.found)
+	}
+	return ""
 }
 
 // status says, with muted, how looking up the one chosen goes, or, with none chosen, what listing the
