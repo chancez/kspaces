@@ -229,9 +229,9 @@ group, and Add space.
 | Worktree | Open PR #N | `b` | open the branch's PR in the browser with `gh browse N`, on a worktree whose row shows a PR |
 | Worktree | Remove worktree | `x` | close the session and remove a linked worktree |
 | Worktree | Forget | `x` | delete the saved session file of a missing worktree with no windows open |
-| Space | New worktree | `n` | create a worktree in the space, in a form |
+| Space | New worktree | `n` | create a worktree in the space, in a form; on a linked worktree's row, a new branch starts from its branch |
 | Space | New worktree from PR | `N` | the same form on its Pull request tab, to check out one of the space's open PRs |
-| Space | New worktree from issue | `I` | the same form on its Issue tab, to create a branch for one of the space's open issues |
+| Space | New worktree from issue | `I` | the same form on its Issue tab, to create a branch for one of the space's open issues, from the row's branch as New worktree |
 | Space | Fold / Unfold worktrees | `space` | hide or show a space's linked worktrees |
 | Space | Clean up worktrees | `p` | remove the space's linked worktrees that look done with, and its missing ones, on a space's row |
 | Space | Trust space config | | show what the space's own config adds, and trust it, in a form; while its `.kspaces.toml` is untrusted or changed |
@@ -269,7 +269,8 @@ empty for the default: `worktrees.dir` under the space's root, named after the b
 checked out; a new one is created from what the main worktree has checked out. When the space has other
 local branches, a `from` choice below the branch, chosen as `command` below is, picks another to start
 from, to build on another branch's feature: the main worktree's first, then the rest, the last committed
-to first. A base other than the main worktree's is recorded in git config as the branch's `kspaces-base`,
+to first. It starts on the branch of the worktree whose row the form was opened from, else the main
+worktree's. A base other than the main worktree's is recorded in git config as the branch's `kspaces-base`,
 and is [`{base}`](kitty.md#running-commands) in the worktree from then on, so a prompt diffing against
 `{base}` diffs against the branch it was built on. Create switches to the new session. Typing `#` in the
 branch field, after the prefix or in place of it, goes to the PR tab, typing going on in its PR field; a
@@ -301,7 +302,8 @@ the branch's `kspaces-issue`, so [`{issue}`](kitty.md#running-commands) is the i
 worktree from then on, for a prompt such as `Fix issue #{issue}`. git deletes it with the branch.
 
 `kspaces new [SPACE] --from-pr` opens the form on the PR tab, and `--pr N` on PR N, its number or URL,
-looked up at once; `--from-issue` and `--issue N` do the same with the Issue tab.
+looked up at once; `--from-issue` and `--issue N` do the same with the Issue tab. `--base BRANCH` starts
+`from` on a local branch, as a worktree's row does with its branch.
 
 With [commands](kitty.md#running-commands) configured, the form has a `command` field below the directory,
 `none` at first, and below it a field for each input of the command chosen. `tab` and `shift+tab` go round

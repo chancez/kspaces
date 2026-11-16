@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -972,5 +973,38 @@ func TestPixelMouse(t *testing.T) {
 	p.on = false
 	if got := p.filter(nil, tea.MouseMotionMsg{X: 3, Y: 4, Button: tea.MouseLeft}); got != (tea.MouseMotionMsg{X: 3, Y: 4, Button: tea.MouseLeft}) {
 		t.Errorf("off: %#v", got)
+	}
+}
+
+// New worktree, and New worktree from issue, on a linked worktree's row start the new branch from that
+// worktree's branch; on the space's own row, and from a PR, the form starts from the main worktree's.
+func TestNewWorktreeFromRow(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(tea.FocusMsg{})
+	calls := fakeKittenCalls(t)
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct{ session, key string }{{"gr@dev", "n"}, {"gr@dev", "I"}, {"gr@dev", "N"}, {"gr", "n"}} {
+		e.m.cursor = e.row(c.session)
+		if cmd := e.press(c.key); cmd != nil {
+			cmd()
+		}
+	}
+	var got [][]string
+	for _, call := range calls() {
+		if i := slices.Index(call, exe); i >= 0 {
+			got = append(got, call[i+1:])
+		}
+	}
+	want := [][]string{
+		{"new", "--base", "pr/me/dev", "/src/gr"},
+		{"new", "--from-issue", "--base", "pr/me/dev", "/src/gr"},
+		{"new", "--from-pr", "/src/gr"},
+		{"new", "/src/gr"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("launched %q\nwant %q", got, want)
 	}
 }

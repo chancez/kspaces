@@ -9,7 +9,7 @@ import (
 )
 
 func (a *app) newCommand() *cobra.Command {
-	var pr, issue string
+	var pr, issue, base string
 	var fromPR, fromIssue bool
 	cmd := &cobra.Command{
 		Use:   "new [SPACE]",
@@ -35,13 +35,14 @@ func (a *app) newCommand() *cobra.Command {
 			case fromIssue || issue != "":
 				from, arg = spaces.FromIssue, issue
 			}
-			return tui.RunNewWorktree(cmd.Context(), cfg, space, from, arg)
+			return tui.RunNewWorktree(cmd.Context(), cfg, space, from, arg, base)
 		},
 	}
 	cmd.Flags().BoolVar(&fromPR, "from-pr", false, "open on the Pull request tab, to choose one of the open PRs")
 	cmd.Flags().StringVar(&pr, "pr", "", "open on the Pull request tab on this PR, its number or URL")
 	cmd.Flags().BoolVar(&fromIssue, "from-issue", false, "open on the Issue tab, to choose one of the open issues")
 	cmd.Flags().StringVar(&issue, "issue", "", "open on the Issue tab on this issue, its number or URL")
+	cmd.Flags().StringVar(&base, "base", "", "start a new branch from this local branch, rather than the main worktree's")
 	for _, pr := range []string{"from-pr", "pr"} {
 		for _, issue := range []string{"from-issue", "issue"} {
 			cmd.MarkFlagsMutuallyExclusive(pr, issue)

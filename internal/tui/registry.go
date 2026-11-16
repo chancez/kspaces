@@ -173,7 +173,7 @@ var (
 		Applies: newWorktreeApplies,
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
-			return m.newWorktree(s.row.Space.Root, spaces.FromBranch)
+			return m.newWorktree(s.row.Space.Root, spaces.FromBranch, rowBranch(s))
 		},
 	}
 	actNewWorktreeFromPR = &interact.Action[*sidebar, entrySubject]{
@@ -182,7 +182,7 @@ var (
 		Applies: newWorktreeApplies,
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
-			return m.newWorktree(s.row.Space.Root, spaces.FromPR)
+			return m.newWorktree(s.row.Space.Root, spaces.FromPR, "")
 		},
 	}
 	actNewWorktreeFromIssue = &interact.Action[*sidebar, entrySubject]{
@@ -191,7 +191,7 @@ var (
 		Applies: newWorktreeApplies,
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
-			return m.newWorktree(s.row.Space.Root, spaces.FromIssue)
+			return m.newWorktree(s.row.Space.Root, spaces.FromIssue, rowBranch(s))
 		},
 	}
 	actRemoveWorktree = &interact.Action[*sidebar, entrySubject]{

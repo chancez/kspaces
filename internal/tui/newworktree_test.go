@@ -628,3 +628,33 @@ inputs = [{ name = "prompt", label = "Prompt", default = "Diff against {base}" }
 		t.Errorf("created %+v, want %+v", got, want)
 	}
 }
+
+// kspaces new --base, as a worktree's row opens it with its branch, starts the branch and Issue tabs' base
+// on that branch; the main worktree's is the default, and anything but a local branch is an error.
+func TestNewWorktreeFormStartsFrom(t *testing.T) {
+	r := gittest.New(t)
+	r.Commit("first")
+	r.Git("branch", "feat")
+	space := spaces.LoadSpace(r.Dir)
+	type result struct {
+		Branch, Issue, Err string
+	}
+	var got []result
+	for _, base := range []string{"feat", "main", "", "nope"} {
+		f := newForm(config.Config{}, space)
+		if err := f.startFrom(base); err != nil {
+			got = append(got, result{Err: err.Error()})
+			continue
+		}
+		var bases [3]string
+		for _, tab := range []int{tabBranch, tabIssue} {
+			f.tab = tab
+			bases[tab] = f.base()
+		}
+		got = append(got, result{Branch: bases[tabBranch], Issue: bases[tabIssue]})
+	}
+	want := []result{{"feat", "feat", ""}, {}, {}, {Err: "nope is not a local branch"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v\nwant %+v", got, want)
+	}
+}

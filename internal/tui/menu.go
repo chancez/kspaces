@@ -233,16 +233,26 @@ func (m *sidebar) toggleHidden(name string) {
 	m.scrollToCursor()
 }
 
-// newWorktree opens the form that creates a worktree in the space at root, on the tab from says, in a
-// popup for the sidebar's tab: the dock is too narrow to type a name in and read back where it goes.
-func (m *sidebar) newWorktree(root string, from spaces.From) tea.Cmd {
+// newWorktree opens the form that creates a worktree in the space at root, on the tab from says, a new
+// branch starting from base, when not empty, in a popup for the sidebar's tab: the dock is too narrow to
+// type a name in and read back where it goes.
+func (m *sidebar) newWorktree(root string, from spaces.From, base string) tea.Cmd {
 	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
-		if err := spaces.NewWorktree(cfg, st, root, from); err != nil {
+		if err := spaces.NewWorktree(cfg, st, root, from, base); err != nil {
 			return failedMsg{err}
 		}
 		return nil
 	}
+}
+
+// rowBranch is the branch of the linked worktree s is the row of, which a new worktree made from its row
+// starts from; empty for the space's own row, whose branch is the default.
+func rowBranch(s entrySubject) string {
+	if s.row.Main || s.row.Worktree == nil {
+		return ""
+	}
+	return s.row.Worktree.Branch
 }
 
 // removeWorktree opens the form that confirms removing the worktree at path, in a popup as newWorktree's.

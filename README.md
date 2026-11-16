@@ -216,7 +216,8 @@ kspaces next, prev       switch to the next or previous session with windows ope
   --attention            or to the next or previous window that is blocked, failed or done
 kspaces recent           switch to the session used before this one, as alt-tab does: twice goes back
 kspaces new [SPACE]      create a worktree, in a form; --from-pr on its Pull request tab, --pr N on PR N,
-  --from-issue, --issue  --from-issue on its Issue tab, --issue N on issue N
+  --from-issue, --issue  --from-issue on its Issue tab, --issue N on issue N; --base B starts a new branch
+  --base                 from local branch B
 kspaces run NAME [PATH...]  run a configured command in the worktrees at PATH or the current directory,
   --input K=V, --yes     in a form, with inputs filled in; --yes without asking
 kspaces layout NAME [PATH]  open a configured layout's tabs in the worktree's session, in a form, as run

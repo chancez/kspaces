@@ -781,16 +781,35 @@ func startOn[V, L any](f *newWorktreeForm, tab int, p *ghPicker[V, L], arg strin
 	return nil
 }
 
+// startFrom starts the choice of base of the branch and Issue tabs on base, a local branch, when not
+// empty: the branch of the worktree whose row the form was opened from.
+func (f *newWorktreeForm) startFrom(base string) error {
+	if base == "" {
+		return nil
+	}
+	for i := range f.tabs {
+		t := &f.tabs[i].base
+		t.choose(base)
+		if _, ok := t.chosen(); !ok && base != t.none.name {
+			return fmt.Errorf("%s is not a local branch", base)
+		}
+	}
+	f.follow()
+	return nil
+}
+
 // RunNewWorktree runs the new worktree form for space, with the config as the space sees it, meant for a
 // kitty popup, until the worktree is created and opened or the form is left. It starts on the tab from
-// says, on arg, a PR's or an issue's number or URL, when not empty.
-func RunNewWorktree(ctx context.Context, cfg config.Config, space spaces.Space, from spaces.From, arg string) error {
+// says, on arg, a PR's or an issue's number or URL, when not empty, and a new branch's base on base, a
+// local branch, when not empty.
+func RunNewWorktree(ctx context.Context, cfg config.Config, space spaces.Space, from spaces.From, arg, base string) error {
 	f := newForm(space.ConfigOf(cfg), space)
-	var err error
-	switch from {
-	case spaces.FromPR:
+	err := f.startFrom(base)
+	switch {
+	case err != nil:
+	case from == spaces.FromPR:
 		err = startOn(f, tabPR, f.prs, arg)
-	case spaces.FromIssue:
+	case from == spaces.FromIssue:
 		err = startOn(f, tabIssue, f.issues, arg)
 	}
 	if err != nil {

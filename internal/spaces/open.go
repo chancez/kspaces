@@ -228,14 +228,19 @@ const (
 	FromIssue  From = "issue"
 )
 
-// NewWorktree opens the form that creates a worktree in the space at root, on the tab from says, in a
-// popup for the sidebar's tab, as cfg says: the dock is too narrow to type a name in and read back where
-// it goes. A panel is a list form's size, for the list of open PRs or issues.
-func NewWorktree(cfg config.Config, st kitty.State, root string, from From) error {
+// NewWorktree opens the form that creates a worktree in the space at root, on the tab from says, a new
+// branch starting from base when not empty, in a popup for the sidebar's tab, as cfg says: the dock is too
+// narrow to type a name in and read back where it goes. A panel is a list form's size, for the list of open
+// PRs or issues.
+func NewWorktree(cfg config.Config, st kitty.State, root string, from From, base string) error {
+	args := []string{"new"}
 	if from != FromBranch {
-		return launchForm(cfg, st, listPanel, "new", "--from-"+string(from), root)
+		args = append(args, "--from-"+string(from))
 	}
-	return launchForm(cfg, st, listPanel, "new", root)
+	if base != "" {
+		args = append(args, "--base", base)
+	}
+	return launchForm(cfg, st, listPanel, append(args, root)...)
 }
 
 // AskRemoveWorktree opens the form that confirms removing the worktree at path, in a popup as
