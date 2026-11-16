@@ -1,5 +1,6 @@
-// Package gh is how kspaces asks GitHub, through GitHub's gh: about pull requests, and to open one in the
-// browser. gh runs in a repository's directory, so it works out the GitHub repository from the remotes.
+// Package gh is how kspaces asks GitHub, through GitHub's gh: about pull requests and issues, and to open
+// a PR in the browser. gh runs in a repository's directory, so it works out the GitHub repository from the
+// remotes.
 package gh
 
 import (
@@ -244,7 +245,7 @@ func run(ctx context.Context, dir, doing string, args ...string) ([]byte, error)
 		return nil, errors.New(strings.TrimSpace(string(ee.Stderr)))
 	}
 	name := "gh " + args[0]
-	if args[0] == "pr" {
+	if args[0] == "pr" || args[0] == "issue" {
 		name += " " + args[1]
 	}
 	return nil, fmt.Errorf("%s: %w", name, err)
