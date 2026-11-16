@@ -133,10 +133,11 @@ layout = "agent"
 }
 
 // The space file's defaults come first, then its space table's, then the global layout; its linked
-// worktrees' default falls back on its main one before the table's, and a PR's on the linked one.
+// worktrees' default falls back on its main one before the table's, and a PR's and an issue's on the
+// linked one.
 func TestWithSpaceDefaults(t *testing.T) {
 	table := spaceGlobal + "worktree_layout = \"plain\"\n"
-	type result struct{ Main, Linked, PR string }
+	type result struct{ Main, Linked, PR, Issue string }
 	var got []result
 	for _, c := range []struct{ global, file string }{
 		{table, ""},
@@ -144,23 +145,25 @@ func TestWithSpaceDefaults(t *testing.T) {
 		{table, `worktree_layout = "mine"`},
 		{table, "layout = \"plain\"\nworktree_layout = \"mine\""},
 		{`spaces = ["/src/gr"]` + "\nlayout = \"g\"\n[[layouts]]\nname = \"g\"\ntabs = [{ panes = [{}] }]\n", ""},
-		{table + "pr_layout = \"agent\"\n", `worktree_layout = "mine"`},
-		{table + "pr_layout = \"agent\"\n", `pr_layout = "mine"`},
+		{table + "pr_layout = \"agent\"\nissue_layout = \"agent\"\n", `worktree_layout = "mine"`},
+		{table + "pr_layout = \"agent\"\nissue_layout = \"agent\"\n", `pr_layout = "mine"`},
+		{table + "pr_layout = \"agent\"\nissue_layout = \"agent\"\n", `issue_layout = "mine"`},
 	} {
 		cfg, err := withSpace(t, c.global, c.file+"\n[[layouts]]\nname = \"mine\"\ntabs = [{ panes = [{}] }]\n")
 		if err != nil {
 			t.Fatal(err)
 		}
-		got = append(got, result{cfg.LayoutFor("gr", false), cfg.LayoutFor("gr", true), cfg.PRLayoutFor("gr")})
+		got = append(got, result{cfg.LayoutFor("gr", false), cfg.LayoutFor("gr", true), cfg.PRLayoutFor("gr"), cfg.IssueLayoutFor("gr")})
 	}
 	want := []result{
-		{"agent", "plain", "plain"},
-		{"mine", "mine", "mine"},
-		{"agent", "mine", "mine"},
-		{"plain", "mine", "mine"},
-		{"g", "g", "g"},
-		{"agent", "mine", "agent"},
-		{"agent", "plain", "mine"},
+		{"agent", "plain", "plain", "plain"},
+		{"mine", "mine", "mine", "mine"},
+		{"agent", "mine", "mine", "mine"},
+		{"plain", "mine", "mine", "mine"},
+		{"g", "g", "g", "g"},
+		{"agent", "mine", "agent", "agent"},
+		{"agent", "plain", "mine", "agent"},
+		{"agent", "plain", "agent", "mine"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
@@ -205,12 +208,13 @@ func TestSpaceFileErrors(t *testing.T) {
 	for _, c := range []struct{ in, want string }{
 		{"nope = 1\n[worktrees]\ndirr = \"x\"", "unknown keys: nope, worktrees.dirr"},
 		{`spaces = ["/x"]` + "\n[sidebar]\nwidth = 30", "only the global config can have spaces, sidebar"},
-		{"[space.gr]\nlayout = \"agent\"", "space tables are for the global config; a space's file sets its own layout, worktree_layout and pr_layout at the top"},
+		{"[space.gr]\nlayout = \"agent\"", "space tables are for the global config; a space's file sets its own layout, worktree_layout, pr_layout and issue_layout at the top"},
 		{`group = "work"`, "a space's group is set in the global config, as group in its [space.NAME]"},
 		{`groups = ["work"]`, "only the global config can have groups"},
 		{"layout = \"nope\"", `layout is "nope", no layout has that name`},
 		{"worktree_layout = \"nope\"", `worktree_layout is "nope", no layout has that name`},
 		{"pr_layout = \"nope\"", `pr_layout is "nope", no layout has that name`},
+		{"issue_layout = \"nope\"", `issue_layout is "nope", no layout has that name`},
 		{"[[layouts]]\nname = \"a\"\ntabs = [{ panes = [{ command = \"nope\" }] }]", `layouts: a: tab 1 pane 1: command is "nope", no command has that name`},
 		{"[[layouts]]\nname = \"a\"\ntabs = [{ panes = [{}] }]\n[[layouts]]\nname = \"a\"\ntabs = [{ panes = [{}] }]", "layouts: a is defined twice"},
 		{"[[commands]]\nname = \"x\"\nrun = []", "commands: x: run cannot be empty"},

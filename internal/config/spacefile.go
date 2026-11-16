@@ -20,6 +20,7 @@ const SpaceFileName = ".kspaces.toml"
 //	layout = "agent"
 //	worktree_layout = "agent"
 //	pr_layout = "review"
+//	issue_layout = "fix"
 //
 //	[worktrees]
 //	branch_prefix = "pr/me"
@@ -38,6 +39,7 @@ type SpaceFile struct {
 	Layout         string `toml:"layout"`
 	WorktreeLayout string `toml:"worktree_layout"`
 	PRLayout       string `toml:"pr_layout"`
+	IssueLayout    string `toml:"issue_layout"`
 	// Nil for a setting the file leaves to the global config.
 	Dir          *string `toml:"-"`
 	BranchPrefix *string `toml:"-"`
@@ -81,7 +83,7 @@ func ParseSpaceFile(data string) (SpaceFile, error) {
 	}
 	switch {
 	case slices.Contains(global, "space"):
-		return SpaceFile{}, fmt.Errorf("space tables are for the global config; a space's file sets its own layout, worktree_layout and pr_layout at the top")
+		return SpaceFile{}, fmt.Errorf("space tables are for the global config; a space's file sets its own layout, worktree_layout, pr_layout and issue_layout at the top")
 	case slices.Contains(global, "group"):
 		return SpaceFile{}, fmt.Errorf("a space's group is set in the global config, as group in its [space.NAME]")
 	case len(global) > 0:
@@ -135,7 +137,7 @@ func (cfg Config) WithSpace(name string, f SpaceFile) (Config, error) {
 			out.Layouts = append(out.Layouts, l)
 		}
 	}
-	if f.Layout != "" || f.WorktreeLayout != "" || f.PRLayout != "" {
+	if f.Layout != "" || f.WorktreeLayout != "" || f.PRLayout != "" || f.IssueLayout != "" {
 		s := cfg.Space[name]
 		out.Space = maps.Clone(cfg.Space)
 		if out.Space == nil {
@@ -147,6 +149,7 @@ func (cfg Config) WithSpace(name string, f SpaceFile) (Config, error) {
 			Layout:         cmp.Or(f.Layout, s.Layout),
 			WorktreeLayout: cmp.Or(f.WorktreeLayout, f.Layout, s.WorktreeLayout),
 			PRLayout:       cmp.Or(f.PRLayout, s.PRLayout),
+			IssueLayout:    cmp.Or(f.IssueLayout, s.IssueLayout),
 			Group:          s.Group,
 		}
 	}
@@ -160,7 +163,9 @@ func (cfg Config) WithSpace(name string, f SpaceFile) (Config, error) {
 		out.Worktrees.DeleteBranch = *f.DeleteBranch
 	}
 	// The defaults before the layouts, which would blame the space table the file's take the place of.
-	for _, d := range []struct{ key, layout string }{{"layout", f.Layout}, {"worktree_layout", f.WorktreeLayout}, {"pr_layout", f.PRLayout}} {
+	for _, d := range []struct{ key, layout string }{
+		{"layout", f.Layout}, {"worktree_layout", f.WorktreeLayout}, {"pr_layout", f.PRLayout}, {"issue_layout", f.IssueLayout},
+	} {
 		if d.layout != "" && !slices.ContainsFunc(out.Layouts, func(l Layout) bool { return l.Name == d.layout }) {
 			return Config{}, fmt.Errorf("%s is %q, no layout has that name", d.key, d.layout)
 		}

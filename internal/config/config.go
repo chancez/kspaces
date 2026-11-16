@@ -61,6 +61,9 @@ type Config struct {
 	// The layout the new worktree form opens a worktree for a PR with, when the space says none; empty for
 	// the worktree's default, see Config.PRLayoutFor.
 	DefaultPRLayout string `toml:"pr_layout"`
+	// The layout the new worktree form opens a worktree for an issue with, when the space says none; empty
+	// for the worktree's default, see Config.IssueLayoutFor.
+	DefaultIssueLayout string `toml:"issue_layout"`
 	// What each space, by name, says of itself.
 	Space map[string]SpaceSettings `toml:"space"`
 	// The order of the groups spaces are in, see SpaceSettings.Group. A group it does not list comes

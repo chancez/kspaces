@@ -82,6 +82,8 @@ type SpaceSettings struct {
 	WorktreeLayout string `toml:"worktree_layout"`
 	// The layout the new worktree form opens a worktree for a PR with, see Config.PRLayoutFor.
 	PRLayout string `toml:"pr_layout"`
+	// The layout the new worktree form opens a worktree for an issue with, see Config.IssueLayoutFor.
+	IssueLayout string `toml:"issue_layout"`
 	// The group the sidebar lists the space under, such as work; empty for none. Only the global config
 	// sets it: a group is about how every space is shown, which one space's own file has no say in.
 	Group string `toml:"group"`
@@ -116,6 +118,9 @@ func checkLayouts(cfg *Config) error {
 	if err := known("pr_layout", cfg.DefaultPRLayout); err != nil {
 		return err
 	}
+	if err := known("issue_layout", cfg.DefaultIssueLayout); err != nil {
+		return err
+	}
 	names := map[string]bool{}
 	for _, root := range cfg.Spaces {
 		names[filepath.Base(root)] = true
@@ -132,6 +137,9 @@ func checkLayouts(cfg *Config) error {
 			return err
 		}
 		if err := known("space."+name+".pr_layout", s.PRLayout); err != nil {
+			return err
+		}
+		if err := known("space."+name+".issue_layout", s.IssueLayout); err != nil {
 			return err
 		}
 	}
@@ -292,6 +300,13 @@ func (cfg Config) LayoutFor(space string, linked bool) string {
 // else a linked worktree's, see LayoutFor.
 func (cfg Config) PRLayoutFor(space string) string {
 	return cmp.Or(cfg.Space[space].PRLayout, cfg.DefaultPRLayout, cfg.LayoutFor(space, true))
+}
+
+// IssueLayoutFor is the name of the layout the new worktree form opens a worktree of the space called
+// space with when it is for an issue, or empty for a shell: the space's issue_layout, else the global
+// issue_layout, else a linked worktree's, see LayoutFor.
+func (cfg Config) IssueLayoutFor(space string) string {
+	return cmp.Or(cfg.Space[space].IssueLayout, cfg.DefaultIssueLayout, cfg.LayoutFor(space, true))
 }
 
 // Values are the layout's inputs as given, by name, the default with vars, the built-ins, for any not

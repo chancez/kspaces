@@ -136,6 +136,8 @@ tabs = [{ panes = [{ command = "claude" }, { command = "other", split = "right" 
 		{one("[{}]") + "[space.gr]\nlayout = \"nope\"", `space.gr.layout is "nope", no layout has that name`},
 		{one("[{}]") + "[space.gr]\npr_layout = \"nope\"", `space.gr.pr_layout is "nope", no layout has that name`},
 		{`pr_layout = "nope"`, `pr_layout is "nope", no layout has that name`},
+		{one("[{}]") + "[space.gr]\nissue_layout = \"nope\"", `space.gr.issue_layout is "nope", no layout has that name`},
+		{`issue_layout = "nope"`, `issue_layout is "nope", no layout has that name`},
 		{one("[{}]") + "[space.vim]\nlayout = \"a\"", "space.vim: no space is named vim"},
 		{`space = ["~/x"]`, "space must be [space.NAME] tables; the list of spaces is spaces"},
 		{"space = 1", "space must be [space.NAME] tables; the list of spaces is spaces"},
@@ -177,23 +179,23 @@ func TestLayoutFor(t *testing.T) {
 	}
 }
 
-// A worktree for a PR opens with its space's pr_layout, else the global one, else a linked worktree's.
-func TestPRLayoutFor(t *testing.T) {
+// A worktree for a PR or an issue opens with its space's pr_layout or issue_layout, else the global one,
+// else a linked worktree's.
+func TestPRAndIssueLayoutFor(t *testing.T) {
 	spaces := map[string]SpaceSettings{
-		"pr":     {Layout: "main", WorktreeLayout: "linked", PRLayout: "review"},
+		"own":    {Layout: "main", WorktreeLayout: "linked", PRLayout: "review", IssueLayout: "fix"},
 		"linked": {WorktreeLayout: "linked"},
 	}
+	global := Config{DefaultLayout: "global", DefaultPRLayout: "global-pr", DefaultIssueLayout: "global-issue", Space: spaces}
+	bare := Config{DefaultLayout: "global", Space: spaces}
 	got := map[string][]string{}
-	for _, space := range []string{"pr", "linked", "none"} {
-		got[space] = []string{
-			Config{DefaultLayout: "global", DefaultPRLayout: "global-pr", Space: spaces}.PRLayoutFor(space),
-			Config{DefaultLayout: "global", Space: spaces}.PRLayoutFor(space),
-		}
+	for _, space := range []string{"own", "linked", "none"} {
+		got[space] = []string{global.PRLayoutFor(space), bare.PRLayoutFor(space), global.IssueLayoutFor(space), bare.IssueLayoutFor(space)}
 	}
 	want := map[string][]string{
-		"pr":     {"review", "review"},
-		"linked": {"global-pr", "linked"},
-		"none":   {"global-pr", "global"},
+		"own":    {"review", "review", "fix", "fix"},
+		"linked": {"global-pr", "linked", "global-issue", "linked"},
+		"none":   {"global-pr", "global", "global-issue", "global"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v\nwant %v", got, want)
