@@ -558,3 +558,73 @@ func TestNewWorktreeFormStartsOnIssue(t *testing.T) {
 		t.Errorf("got %+v\nwant %+v", got, want)
 	}
 }
+
+// With other local branches, the branch tab chooses the new branch's base, the main worktree's at first,
+// the others the last committed to first, from its list filtered by what is typed too. {base} follows it.
+// Created, the branch starts at the base, which the worktree knows from then on.
+func TestNewWorktreeFormBase(t *testing.T) {
+	r := gittest.New(t)
+	r.Commit("first")
+	r.Git("branch", "old")
+	r.Git("switch", "-q", "-c", "feat")
+	feat := r.Commit("feat")
+	r.Git("switch", "-q", "main")
+	root := r.Dir
+	dir := t.TempDir()
+	script := "#!/bin/sh\nexit 0\n"
+	if err := os.WriteFile(filepath.Join(dir, "kitten"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("KITTY_INSTALLATION_DIR", "")
+	cfg, err := config.Parse(`
+[worktrees]
+branch_prefix = "pr/me"
+[[commands]]
+name = "claude"
+run = ["claude", "{prompt}"]
+inputs = [{ name = "prompt", label = "Prompt", default = "Diff against {base}" }]
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	space := spaces.LoadSpace(root)
+	f := newForm(cfg, space)
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 24})
+	typeInto(f, "stack")
+	shiftTab := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
+	for _, k := range []tea.KeyPressMsg{keyMsg("tab"), keyMsg("tab"), keyMsg("tab"), {Code: tea.KeyRight}, shiftTab, shiftTab} {
+		f.Update(k)
+	}
+	screen := func(base string) []string {
+		return []string{"", "  New worktree in " + space.Name, "", "   Branch   Pull request   Issue", "",
+			"  branch     pr/me/stack", "  from       < " + base + " >  left/right change  space list", "  directory  .worktrees/stack",
+			"  command    < claude >", "  Prompt     Diff against " + base, "",
+			"  Creates pr/me/stack from " + base, "  Runs claude in the first tab", "",
+			"   Create enter    Cancel esc   tab next field  left/right base  space list", ""}
+	}
+	got := [][]string{formScreen(f)}
+	f.Update(keyMsg("space"))
+	typeInto(f, "fe")
+	f.Update(keyMsg("enter"))
+	got = append(got, formScreen(f))
+	if want := [][]string{screen("main"), screen("feat")}; !reflect.DeepEqual(got, want) {
+		t.Errorf("got\n%q\nwant\n%q", got, want)
+	}
+
+	_, cmd := f.Update(keyMsg("enter"))
+	if cmd == nil {
+		t.Fatal("enter created nothing")
+	}
+	if _, quit := f.Update(cmd()); quit == nil || f.err != nil {
+		t.Fatalf("the form stayed: %v", f.err)
+	}
+	wt := spaces.Worktree{Path: filepath.Join(root, ".worktrees", "stack"), Branch: "pr/me/stack"}
+	type created struct {
+		Links spaces.Links
+		Tip   string
+	}
+	if got, want := (created{spaces.WorktreeLinks(space, wt), strings.TrimSpace(r.Git("rev-parse", "pr/me/stack"))}), (created{spaces.Links{Base: "feat"}, feat}); got != want {
+		t.Errorf("created %+v, want %+v", got, want)
+	}
+}

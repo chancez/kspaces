@@ -266,10 +266,15 @@ keeps its own fields, so switching loses nothing typed. Create creates from the 
 
 The branch tab has a branch field, which starts with `worktrees.branch_prefix/`, and a directory field,
 empty for the default: `worktrees.dir` under the space's root, named after the branch. An existing branch is
-checked out; a new one is created from what the main worktree has checked out. Create switches to the new
-session. Typing `#` in the branch field, after the prefix or in place of it, goes to the PR tab, typing going
-on in its PR field; a PR's URL typed or pasted there goes to the PR tab with it in the PR field, and an
-issue's URL to the Issue tab with it in the issue field.
+checked out; a new one is created from what the main worktree has checked out. When the space has other
+local branches, a `from` choice below the branch, chosen as `command` below is, picks another to start
+from, to build on another branch's feature: the main worktree's first, then the rest, the last committed
+to first. A base other than the main worktree's is recorded in git config as the branch's `kspaces-base`,
+and is [`{base}`](kitty.md#running-commands) in the worktree from then on, so a prompt diffing against
+`{base}` diffs against the branch it was built on. Create switches to the new session. Typing `#` in the
+branch field, after the prefix or in place of it, goes to the PR tab, typing going on in its PR field; a
+PR's URL typed or pasted there goes to the PR tab with it in the PR field, and an issue's URL to the Issue
+tab with it in the issue field.
 
 The PR tab's first field is the PR: its number, `#N`, its URL, or words of its title or its author's login,
 as `number, URL or title` says while it is empty. The first time the tab shows, the form lists the space's
@@ -290,10 +295,10 @@ the repository is not on GitHub, the form shows gh's error as it does git's.
 The Issue tab's first field is the issue, chosen as the PR tab's PR is, from the open issues `gh issue list`
 lists, or looked up with `gh issue view`. Below it is the branch to create for it, filled in with the
 prefix, the issue's number and the words of its title, `pr/me/12-crash-on-empty-input`, and filled in again
-as the issue changes until it is typed in; then the directory, which follows the branch. An existing branch
-is checked out. Create records the issue's number in git config, as the branch's `kspaces-issue`, so
-[`{issue}`](kitty.md#running-commands) is the issue's number in the worktree from then on, for a prompt such
-as `Fix issue #{issue}`. git deletes it with the branch.
+as the issue changes until it is typed in; then `from`, as the branch tab's, and the directory, which
+follows the branch. An existing branch is checked out. Create records the issue's number in git config, as
+the branch's `kspaces-issue`, so [`{issue}`](kitty.md#running-commands) is the issue's number in the
+worktree from then on, for a prompt such as `Fix issue #{issue}`. git deletes it with the branch.
 
 `kspaces new [SPACE] --from-pr` opens the form on the PR tab, and `--pr N` on PR N, its number or URL,
 looked up at once; `--from-issue` and `--issue N` do the same with the Issue tab.

@@ -84,6 +84,12 @@ func (s Space) HasBranch(branch string) bool {
 	return git.BranchExists(s.Root, branch)
 }
 
+// LocalBranches are the space's local branches, the last committed to first, none when git cannot say.
+func (s Space) LocalBranches() []string {
+	branches, _ := git.LocalBranches(s.Root)
+	return branches
+}
+
 // BranchStart is what a new branch's name starts with: the configured prefix and a /, or nothing.
 func BranchStart(cfg config.Config) string {
 	if p := strings.Trim(cfg.Worktrees.BranchPrefix, "/"); p != "" {

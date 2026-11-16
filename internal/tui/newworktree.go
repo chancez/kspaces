@@ -31,8 +31,11 @@ var tabNames = [...]string{"Branch", "Pull request", "Issue"}
 const tabZone = "tab:%d"
 
 // worktreeTab is what each tab of the new worktree form has of its own, so switching tabs loses nothing:
-// where the worktree goes, and the layout and command, with their inputs.
+// where a new branch starts from, where the worktree goes, and the layout and command, with their inputs.
 type worktreeTab struct {
+	// The branch a new branch starts from: none for what the main worktree has checked out, or another
+	// local branch. Only on the branch and Issue tabs, with another branch to choose.
+	base choiceFields[string]
 	// Empty for the default, which spaces.WorktreeDir derives from the branch and the placeholder shows.
 	dir lineField
 	// The layout the session opens with, none for a shell tab, and its inputs. Only with layouts
@@ -42,6 +45,22 @@ type worktreeTab struct {
 	// The command to run, none for none, and its inputs: as the first tab without a layout, else after
 	// it, where the command opens. Only with commands configured.
 	cmds choiceFields[config.Command]
+}
+
+// baseZone is the zone the choice of base is drawn in.
+const baseZone = "from"
+
+// newBaseFields are the fields that choose the base of a new branch in space: what the main worktree has
+// checked out, by its branch, first and chosen, then the other local branches, the last committed to
+// first.
+func newBaseFields(th *look.Theme, space spaces.Space) choiceFields[string] {
+	main := "HEAD"
+	if len(space.Worktrees) > 0 && space.Worktrees[0].Branch != "" {
+		main = space.Worktrees[0].Branch
+	}
+	others := slices.DeleteFunc(space.LocalBranches(), func(b string) bool { return b == main })
+	return newChoiceFields(th, baseZone, others, func(b string) string { return b }, func(string) []config.Input { return nil },
+		nil, false, &noChoice{name: main, detail: "the main worktree's"}, "", nil, nil)
 }
 
 // newWorktreeForm creates a worktree, on a branch to create or check out, on a pull request, or on a
@@ -95,8 +114,10 @@ func newForm(cfg config.Config, space spaces.Space) *newWorktreeForm {
 	issueBranch.fill(start)
 	f := &newWorktreeForm{th: th, cfg: cfg, space: space, branch: branch, prs: newGHPicker(th, prKind, space),
 		issues: newGHPicker(th, issueKind, space), issueBranch: issueBranch, issueFilled: start, focus: 1}
+	bases := newBaseFields(th, space)
 	for i, layout := range [...]string{cfg.LayoutFor(space.Name, true), cfg.PRLayoutFor(space.Name), cfg.IssueLayoutFor(space.Name)} {
 		f.tabs[i] = worktreeTab{
+			base:    bases,
 			dir:     newLineField(th, ""),
 			layouts: newLayoutFields(th, cfg.Layouts, true, layout, nil, nil),
 			cmds:    newCommandFields(th, cfg.Commands, true, "", nil, nil),
@@ -219,6 +240,7 @@ func (f *newWorktreeForm) create() tea.Cmd {
 		}
 	}
 	branch, dir := f.plan()
+	base := f.base()
 	if f.tab == tabIssue {
 		l, _ := f.issues.lookup()
 		ref := f.issues.chosen
@@ -229,7 +251,7 @@ func (f *newWorktreeForm) create() tea.Cmd {
 					return createdMsg{err}
 				}
 			}
-			wt, err := spaces.CreateIssueWorktree(space, ref.Number, branch, "", dir)
+			wt, err := spaces.CreateIssueWorktree(space, ref.Number, branch, base, dir)
 			if err != nil {
 				return createdMsg{err}
 			}
@@ -237,7 +259,7 @@ func (f *newWorktreeForm) create() tea.Cmd {
 		}
 	}
 	return func() tea.Msg {
-		wt, err := spaces.CreateWorktree(space, branch, dir)
+		wt, err := spaces.CreateWorktreeFrom(space, branch, base, dir)
 		if err != nil {
 			return createdMsg{err}
 		}
@@ -245,18 +267,30 @@ func (f *newWorktreeForm) create() tea.Cmd {
 	}
 }
 
-// fields are the form's fields in order: the tab strip, nil; the branch, the PR, or the issue and the
-// branch for it; the directory; the choice of layout, nil, when there is one, and the chosen layout's
-// inputs; then the same for the command.
-func (f *newWorktreeForm) fields() []field {
+// head are the fields before the layout's, in order: the tab strip, nil; the branch, the PR, or the issue
+// and the branch for it; the base, nil, when there is a choice of one; the directory.
+func (f *newWorktreeForm) head() []field {
 	t := f.current()
-	out := []field{nil, &f.branch, &t.dir}
+	var out []field
 	switch f.tab {
 	case tabPR:
-		out[1] = f.prs.input()
+		return []field{nil, f.prs.input(), &t.dir}
 	case tabIssue:
-		out = []field{nil, f.issues.input(), &f.issueBranch, &t.dir}
+		out = []field{nil, f.issues.input(), &f.issueBranch}
+	default:
+		out = []field{nil, &f.branch}
 	}
+	if t.base.picks() {
+		out = append(out, nil)
+	}
+	return append(out, &t.dir)
+}
+
+// fields are the form's fields in order: head; the choice of layout, nil, when there is one, and the
+// chosen layout's inputs; then the same for the command.
+func (f *newWorktreeForm) fields() []field {
+	t := f.current()
+	out := f.head()
 	if t.layouts.picks() {
 		out = append(out, nil)
 	}
@@ -267,13 +301,10 @@ func (f *newWorktreeForm) fields() []field {
 	return append(out, t.cmds.fields()...)
 }
 
-// layoutAt and commandAt are where in fields the choices of layout and command are, when there are.
-func (f *newWorktreeForm) layoutAt() int {
-	if f.tab == tabIssue {
-		return 4
-	}
-	return 3
-}
+// baseAt, layoutAt and commandAt are where in fields the choices of base, layout and command are, when
+// there are.
+func (f *newWorktreeForm) baseAt() int   { return len(f.head()) - 2 }
+func (f *newWorktreeForm) layoutAt() int { return len(f.head()) }
 func (f *newWorktreeForm) commandAt() int {
 	t := f.current()
 	at := f.layoutAt() + len(t.layouts.fields())
@@ -281,6 +312,15 @@ func (f *newWorktreeForm) commandAt() int {
 		at++
 	}
 	return at
+}
+
+// base is the branch a new branch starts from, empty for what the main worktree has checked out.
+func (f *newWorktreeForm) base() string {
+	if f.tab == tabPR {
+		return ""
+	}
+	b, _ := f.current().base.chosen()
+	return b
 }
 
 // focused is the field typing goes to, nil for a choice.
@@ -309,10 +349,13 @@ func (f *newWorktreeForm) refocus() tea.Cmd {
 func (f *newWorktreeForm) nextField() tea.Cmd { return moveFocus(f.fields(), &f.focus, 1) }
 func (f *newWorktreeForm) prevField() tea.Cmd { return moveFocus(f.fields(), &f.focus, -1) }
 
-// onTabs, onLayout and onCommand say whether the tab strip, the choice of layout or of command has focus,
-// onPicker whether the field of a tab that picks a PR or an issue has.
+// onTabs, onBase, onLayout and onCommand say whether the tab strip, the choice of base, of layout or of
+// command has focus, onPicker whether the field of a tab that picks a PR or an issue has.
 func (f *newWorktreeForm) onTabs() bool   { return f.focus == 0 }
 func (f *newWorktreeForm) onPicker() bool { return f.shownPicker() != nil && f.focus == 1 }
+func (f *newWorktreeForm) onBase() bool {
+	return f.tab != tabPR && f.current().base.picks() && f.focus == f.baseAt()
+}
 func (f *newWorktreeForm) onLayout() bool {
 	return f.current().layouts.picks() && f.focus == f.layoutAt()
 }
@@ -321,7 +364,9 @@ func (f *newWorktreeForm) onCommand() bool {
 }
 
 // onChoice says whether a choice has focus, which left and right change.
-func (f *newWorktreeForm) onChoice() bool { return f.onTabs() || f.onLayout() || f.onCommand() }
+func (f *newWorktreeForm) onChoice() bool {
+	return f.onTabs() || f.onBase() || f.onLayout() || f.onCommand()
+}
 
 // showTab shows tab, focus on field at, and lists the open ones the first time it is a tab that picks.
 func (f *newWorktreeForm) showTab(tab, at int) tea.Cmd {
@@ -333,8 +378,14 @@ func (f *newWorktreeForm) showTab(tab, at int) tea.Cmd {
 	return cmd
 }
 
-// cycleLayout and cycleCommand choose the next layout or command, or the one before, and focus the
-// choice, as the inputs below it change with it.
+// cycleBase, cycleLayout and cycleCommand choose the next base, layout or command, or the one before, and
+// focus the choice, as what follows it changes with it.
+func (f *newWorktreeForm) cycleBase(delta int) tea.Cmd {
+	f.current().base.cycle(delta)
+	f.focus = f.baseAt()
+	return tea.Batch(f.follow(), moveFocus(f.fields(), &f.focus, 0))
+}
+
 func (f *newWorktreeForm) cycleLayout(delta int) tea.Cmd {
 	f.current().layouts.cycle(delta)
 	f.focus = f.layoutAt()
@@ -352,6 +403,8 @@ func (f *newWorktreeForm) cycleChoice(delta int) tea.Cmd {
 	switch {
 	case f.onTabs():
 		return f.showTab((f.tab+delta+len(f.tabs))%len(f.tabs), 0)
+	case f.onBase():
+		return f.cycleBase(delta)
 	case f.onLayout():
 		return f.cycleLayout(delta)
 	}
@@ -360,10 +413,13 @@ func (f *newWorktreeForm) cycleChoice(delta int) tea.Cmd {
 
 // openList opens the list of the choice that has focus.
 func (f *newWorktreeForm) openList() {
-	if f.onLayout() {
-		f.current().layouts.openList()
-	} else {
-		f.current().cmds.openList()
+	switch t := f.current(); {
+	case f.onBase():
+		t.base.openList()
+	case f.onLayout():
+		t.layouts.openList()
+	default:
+		t.cmds.openList()
 	}
 }
 
@@ -386,6 +442,12 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// While a list is open, keys and the mouse are its.
 	if isInput(msg) {
 		switch {
+		case t.base.listOpen():
+			cmd, picked := t.base.updateList(msg, f.zones)
+			if picked {
+				return f, tea.Batch(cmd, f.cycleBase(0))
+			}
+			return f, cmd
 		case t.layouts.listOpen():
 			cmd, picked := t.layouts.updateList(msg, f.zones)
 			if picked {
@@ -459,6 +521,10 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
+		if f.tab != tabPR && clickedChoice(f.zones, baseZone, msg) {
+			t.base.openList()
+			return f, f.cycleBase(0)
+		}
 		if clickedChoice(f.zones, layoutZone, msg) {
 			t.layouts.openList()
 			return f, f.cycleLayout(0)
@@ -527,7 +593,8 @@ func (f *newWorktreeForm) follow() tea.Cmd {
 		dir = rel
 	}
 	t.dir.Placeholder = dir
-	f.vars = spaces.BuiltinVars(f.space, spaces.LinkedWorktree(f.space, branch, planned), spaces.Links{PR: f.chosen(tabPR), Issue: f.chosen(tabIssue)})
+	f.vars = spaces.BuiltinVars(f.space, spaces.LinkedWorktree(f.space, branch, planned),
+		spaces.Links{PR: f.chosen(tabPR), Issue: f.chosen(tabIssue), Base: f.base()})
 	t.layouts.setVars(f.vars)
 	t.cmds.setVars(f.vars)
 	return tea.Batch(cmds...)
@@ -588,6 +655,10 @@ func (f *newWorktreeForm) render() string {
 	if f.tab == tabIssue {
 		lines = append(lines, fieldLines(th, "branch", &f.issueBranch, width)...)
 	}
+	baseAt := len(lines)
+	if f.tab != tabPR {
+		lines = append(lines, t.base.lines(f.onBase(), width)...)
+	}
 	lines = append(lines, fieldLines(th, "directory", &t.dir, width)...)
 	layoutAt := len(lines)
 	lines = append(lines, t.layouts.lines(f.onLayout(), width)...)
@@ -632,7 +703,8 @@ func (f *newWorktreeForm) render() string {
 		lines = append(lines, "")
 	}
 	f.buttons = controls[*newWorktreeForm]{}
-	if t.layouts.listOpen() || t.cmds.listOpen() {
+	if t.base.listOpen() || t.layouts.listOpen() || t.cmds.listOpen() {
+		lines = t.base.drawList(lines, baseAt, width, f.height)
 		lines = t.layouts.drawList(lines, layoutAt, width, f.height)
 		lines = t.cmds.drawList(lines, commandAt, width, f.height)
 		return boxed(append(lines, line(listHints()...)))
@@ -646,6 +718,8 @@ func (f *newWorktreeForm) render() string {
 		hints = append(hints, look.Text("  "), look.Key("left/right"), look.KeyDesc(" tab"))
 	case f.onPicker() && f.shownPicker().matched() > 1:
 		hints = append(hints, look.Text("  "), look.Key("up/down"), look.KeyDesc(" "+f.shownPicker().name()))
+	case f.onBase():
+		hints = append(hints, choiceHints("base")...)
 	case f.onLayout():
 		hints = append(hints, choiceHints("layout")...)
 	case f.onCommand():
@@ -665,11 +739,13 @@ var opensIn = map[string]string{
 // branchDoes is what creating the worktree does with branch, or, while it is not a branch's name, to
 // name one, or what else to type.
 func (f *newWorktreeForm) branchDoes(branch, or string) string {
-	switch {
+	switch base := f.base(); {
 	case branch == "" || strings.HasSuffix(branch, "/"):
 		return "Name the branch to create or check out" + or
 	case f.space.HasBranch(branch):
 		return "Checks out the existing branch " + branch
+	case base != "":
+		return "Creates " + branch + " from " + base
 	case len(f.space.Worktrees) > 0 && f.space.Worktrees[0].Branch != "":
 		return "Creates " + branch + " from " + f.space.Worktrees[0].Branch
 	}
