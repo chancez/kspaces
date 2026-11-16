@@ -92,10 +92,11 @@ func TestBuildLayout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lr.PR = 12
+	lr.Links = Links{PR: 12, Issue: 4}
 	builtins := []string{
 		"--env=KSPACES_SPACE=gr", "--env=KSPACES_ROOT=/src/gr", "--env=KSPACES_WORKTREE=/src/gr/.worktrees/fix",
 		"--env=KSPACES_BRANCH=pr/me/fix", "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr@fix", "--env=KSPACES_PR=12",
+		"--env=KSPACES_ISSUE=4",
 	}
 	withPrompt := append(slices.Clone(builtins), "'--env=KSPACES_INPUT_PROMPT=fix\nit'")
 	at := []string{"--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix"}
@@ -181,10 +182,11 @@ panes = [
 	if err != nil {
 		t.Fatal(err)
 	}
-	lr.PR = 12
+	lr.Links = Links{PR: 12}
 	env := []string{
 		"--env=KSPACES_SPACE=gr", "--env=KSPACES_ROOT=/src/gr", "--env=KSPACES_WORKTREE=/src/gr",
 		"--env=KSPACES_BRANCH=main", "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr", "--env=KSPACES_PR=12",
+		"--env=KSPACES_ISSUE=",
 	}
 	type result struct {
 		Calls [][]string

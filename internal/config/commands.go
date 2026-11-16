@@ -62,9 +62,9 @@ const OpenTab = "tab"
 var Opens = []string{OpenTab, "split", "hsplit", "vsplit", "overlay", "window"}
 
 // Builtins are the placeholders every command has, from the worktree it runs in: the space's name, its
-// root, the worktree's path, its branch, the main worktree's branch, the session, and the worktree's PR
-// number, when known.
-var Builtins = []string{"space", "root", "worktree", "branch", "base", "session", "pr"}
+// root, the worktree's path, its branch, the main worktree's branch, the session, and the numbers of the
+// worktree's PR and of the issue it was created for, when known.
+var Builtins = []string{"space", "root", "worktree", "branch", "base", "session", "pr", "issue"}
 
 var inputName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 

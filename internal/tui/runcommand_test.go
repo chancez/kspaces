@@ -199,7 +199,7 @@ func TestRunForm(t *testing.T) {
 		"@", "action", "goto_session", "gr@fix.kitty-session", "--",
 		"@", "action", "--match=id:7", "launch", "--type=tab", "--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix",
 		"--env=KSPACES_SPACE=gr", "--env=KSPACES_ROOT=/src/gr", "--env=KSPACES_WORKTREE=/src/gr/.worktrees/fix",
-		"--env=KSPACES_BRANCH=fix", "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr@fix", "--env=KSPACES_PR=",
+		"--env=KSPACES_BRANCH=fix", "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr@fix", "--env=KSPACES_PR=", "--env=KSPACES_ISSUE=",
 		"'--env=KSPACES_INPUT_PROMPT=fix it'", "--hold", "claude", "'fix it'", "--",
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
@@ -250,7 +250,7 @@ func TestRunCommandNow(t *testing.T) {
 		"@", "action", "goto_session", wt.Session + ".kitty-session", "--",
 		"@", "action", "--match=id:7", "launch", "--type=overlay", "--next-to=id:7", "--cwd=" + wt.Path, "--add-to-session=" + wt.Session,
 		"--env=KSPACES_SPACE=" + filepath.Base(root), "--env=KSPACES_ROOT=" + root, "--env=KSPACES_WORKTREE=" + wt.Path,
-		"--env=KSPACES_BRANCH=fix", "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=" + wt.Session, "--env=KSPACES_PR=",
+		"--env=KSPACES_BRANCH=fix", "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=" + wt.Session, "--env=KSPACES_PR=", "--env=KSPACES_ISSUE=",
 		"gr", "--",
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
@@ -304,7 +304,8 @@ func TestRunSeveral(t *testing.T) {
 	}
 	env := func(wt spaces.Worktree) []string {
 		return []string{"--env=KSPACES_SPACE=" + filepath.Base(root), "--env=KSPACES_ROOT=" + root, "--env=KSPACES_WORKTREE=" + wt.Path,
-			"--env=KSPACES_BRANCH=" + wt.Branch, "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=" + wt.Session, "--env=KSPACES_PR="}
+			"--env=KSPACES_BRANCH=" + wt.Branch, "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=" + wt.Session, "--env=KSPACES_PR=",
+			"--env=KSPACES_ISSUE="}
 	}
 	ran := slices.Concat(
 		[]string{"@", "action", "--match=id:7", "launch", "--type=window", "--location=split", "--next-to=id:7",

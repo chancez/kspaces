@@ -201,17 +201,17 @@ func (f *newWorktreeForm) create() tea.Cmd {
 	}
 	f.busy, f.err = true, nil
 	cfg, space := f.cfg, f.space
-	open := func(wt spaces.Worktree, pr int) error {
+	open := func(wt spaces.Worktree, links spaces.Links) error {
 		var lr *spaces.LayoutRun
 		if layout != nil {
 			v := *layout
-			v.PR = pr
+			v.Links = links
 			lr = &v
 		}
 		var r *spaces.Run
 		if run != nil {
 			v := *run
-			v.PR = pr
+			v.Links = links
 			r = &v
 		}
 		return spaces.OpenNew(cfg, space, wt, lr, r)
@@ -231,7 +231,7 @@ func (f *newWorktreeForm) create() tea.Cmd {
 			if err != nil {
 				return createdMsg{err}
 			}
-			return createdMsg{open(wt, pr.Number)}
+			return createdMsg{open(wt, spaces.Links{PR: pr.Number})}
 		}
 	}
 	branch, dir := f.plan()
@@ -240,7 +240,7 @@ func (f *newWorktreeForm) create() tea.Cmd {
 		if err != nil {
 			return createdMsg{err}
 		}
-		return createdMsg{open(wt, 0)}
+		return createdMsg{open(wt, spaces.Links{})}
 	}
 }
 
@@ -627,7 +627,7 @@ func (f *newWorktreeForm) follow() tea.Cmd {
 		dir = rel
 	}
 	t.dir.Placeholder = dir
-	f.vars = spaces.BuiltinVars(f.space, spaces.LinkedWorktree(f.space, branch, planned), f.prNumber())
+	f.vars = spaces.BuiltinVars(f.space, spaces.LinkedWorktree(f.space, branch, planned), spaces.Links{PR: f.prNumber()})
 	t.layouts.setVars(f.vars)
 	t.cmds.setVars(f.vars)
 	return tea.Batch(cmds...)

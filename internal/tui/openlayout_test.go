@@ -114,6 +114,7 @@ func envOf(root string, wt spaces.Worktree, extra ...string) []string {
 	return append([]string{
 		"--env=KSPACES_SPACE=" + filepath.Base(root), "--env=KSPACES_ROOT=" + root, "--env=KSPACES_WORKTREE=" + wt.Path,
 		"--env=KSPACES_BRANCH=" + wt.Branch, "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=" + wt.Session, "--env=KSPACES_PR=",
+		"--env=KSPACES_ISSUE=",
 	}, extra...)
 }
 

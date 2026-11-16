@@ -101,7 +101,7 @@ func OpensDefaultLayout(cfg config.Config, st kitty.State, space Space, wt Workt
 	if !ok {
 		return false
 	}
-	_, err := NewLayoutRun(l, nil, BuiltinVars(space, wt, 0))
+	_, err := NewLayoutRun(l, nil, BuiltinVars(space, wt, Links{}))
 	return err == nil
 }
 

@@ -381,7 +381,7 @@ run = ["gr"]
 	if got, want := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n"), []string{
 		"@", "action", "launch", "--type=tab", "--cwd=" + wt, "--add-to-session=gr@fix",
 		"--env=KSPACES_SPACE=gr", "--env=KSPACES_ROOT=" + root, "--env=KSPACES_WORKTREE=" + wt, "--env=KSPACES_BRANCH=pr/me/fix",
-		"--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr@fix", "--env=KSPACES_PR=",
+		"--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr@fix", "--env=KSPACES_PR=", "--env=KSPACES_ISSUE=",
 		`'--env=KSPACES_INPUT_PROMPT=fix "it" in $$$$HOME'`, `'--env=TASK=fix "it" in $$$$HOME'`,
 		"--hold", "claude", `'fix "it" in $$HOME'`, "--",
 		"@", "action", "goto_session", "gr@fix.kitty-session", "--",

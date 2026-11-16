@@ -13,8 +13,8 @@ type LayoutRun struct {
 	Layout config.Layout
 	// The inputs' values by name, as config.Layout.Values gives them.
 	Inputs map[string]string
-	// The worktree's PR, 0 when not known.
-	PR int
+	// What the worktree is for, as far as known.
+	Links Links
 }
 
 // NewLayoutRun is l to open with inputs, the defaults filled in with vars, the built-ins. A required input
@@ -92,11 +92,9 @@ func (*liveKitty) FocusWindow(id int) error               { return kitty.FocusWi
 func (*liveKitty) Action(args ...string) error            { return kitty.Action(args...) }
 
 // OpenLayout adds lr's tabs to wt's session, a worktree of space, and switches to it, see buildLayout; st
-// says which sessions have windows. lr's PR is looked up with WorktreePR when not given.
+// says which sessions have windows. lr's links are looked up when not given.
 func OpenLayout(cfg config.Config, st kitty.State, space Space, wt Worktree, lr LayoutRun) error {
-	if lr.PR == 0 {
-		lr.PR = WorktreePR(space, wt)
-	}
+	lr.Links = lr.Links.fill(space, wt)
 	_, err := buildLayout(cfg, st, space, wt, lr, &liveKitty{session: wt.Session})
 	return err
 }
@@ -132,7 +130,7 @@ func OpenShell(cfg config.Config, st kitty.State, wt Worktree) error {
 // none the first opens as OpenWorktree's first tab would, and the rest by its window. Each tab's focus
 // pane is focused, the first tab's last, so the session is left on it.
 func buildLayout(cfg config.Config, st kitty.State, space Space, wt Worktree, lr LayoutRun, k layoutKitty) (int, error) {
-	vars := commandVars(space, wt, Run{Inputs: lr.Inputs, PR: lr.PR})
+	vars := commandVars(space, wt, Run{Inputs: lr.Inputs, Links: lr.Links})
 	goTo := []string{"goto_session", SessionFile(cfg, wt.Session)}
 	anchor, open := st.Sessions[wt.Session]
 	if open {
@@ -225,12 +223,12 @@ func freshLayout(global config.Config, wt Worktree) (cfg config.Config, space Sp
 	if !ok {
 		return cfg, Space{}, Worktree{}, LayoutRun{}, false, nil
 	}
-	pr := WorktreePR(space, found)
-	lr, err = NewLayoutRun(l, nil, BuiltinVars(space, found, pr))
+	links := WorktreeLinks(space, found)
+	lr, err = NewLayoutRun(l, nil, BuiltinVars(space, found, links))
 	if err != nil {
 		return cfg, Space{}, Worktree{}, LayoutRun{}, false, err
 	}
-	lr.PR = pr
+	lr.Links = links
 	return cfg, space, found, lr, true, nil
 }
 
@@ -244,9 +242,7 @@ func OpenNew(cfg config.Config, space Space, wt Worktree, lr *LayoutRun, r *Run)
 		}
 		return RunCommand(cfg, kitty.State{}, space, wt, *r)
 	}
-	if lr.PR == 0 {
-		lr.PR = WorktreePR(space, wt)
-	}
+	lr.Links = lr.Links.fill(space, wt)
 	focus, err := buildLayout(cfg, kitty.State{}, space, wt, *lr, &liveKitty{session: wt.Session})
 	if err != nil || r == nil {
 		return err

@@ -182,7 +182,7 @@ func TestRunFormLines(t *testing.T) {
 		"@", "action", "goto_session", "gr@fix.kitty-session", "--",
 		"@", "action", "--match=id:7", "launch", "--type=tab", "--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix",
 		"--env=KSPACES_SPACE=gr", "--env=KSPACES_ROOT=/src/gr", "--env=KSPACES_WORKTREE=/src/gr/.worktrees/fix",
-		"--env=KSPACES_BRANCH=fix", "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr@fix", "--env=KSPACES_PR=",
+		"--env=KSPACES_BRANCH=fix", "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr@fix", "--env=KSPACES_PR=", "--env=KSPACES_ISSUE=",
 		"'--env=KSPACES_INPUT_PROMPT=fix\nit\nn-ow\nok'", "--hold", "claude", "'fix\nit\nn-ow\nok'", "--",
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)

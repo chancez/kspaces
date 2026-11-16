@@ -25,6 +25,7 @@ func TestRunActions(t *testing.T) {
 	env := []string{
 		"--env=KSPACES_SPACE=gr", "--env=KSPACES_ROOT=/src/gr", "--env=KSPACES_WORKTREE=/src/gr/.worktrees/fix",
 		"--env=KSPACES_BRANCH=pr/me/fix", "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr@fix", "--env=KSPACES_PR=12",
+		"--env=KSPACES_ISSUE=4",
 		`'--env=KSPACES_INPUT_PROMPT=fix it'\''s $$$$HOME'`, "--env=TASK_PR=#12",
 	}
 	argv := []string{"claude", "--name=gr", `'fix it'\''s $$HOME'`}
@@ -53,7 +54,7 @@ func TestRunActions(t *testing.T) {
 		}
 		got := map[string]result{}
 		for _, open := range config.Opens {
-			r := Run{Command: cmd, Inputs: map[string]string{"prompt": "fix it's $HOME"}, Open: open, PR: 12}
+			r := Run{Command: cmd, Inputs: map[string]string{"prompt": "fix it's $HOME"}, Open: open, Links: Links{PR: 12, Issue: 4}}
 			got[open] = result{
 				Open:   runActions(cfg, kitty.State{Sessions: map[string]int{"gr@fix": 7}}, space, wt, r),
 				Closed: runActions(cfg, kitty.State{}, space, wt, r),
@@ -65,7 +66,7 @@ func TestRunActions(t *testing.T) {
 	}
 
 	// Staying, there is no switch, and the launch keeps the focus.
-	r := Run{Command: cmd, Inputs: map[string]string{"prompt": "fix it's $HOME"}, Open: "split", PR: 12, Stay: true}
+	r := Run{Command: cmd, Inputs: map[string]string{"prompt": "fix it's $HOME"}, Open: "split", Links: Links{PR: 12, Issue: 4}, Stay: true}
 	cfg := config.Config{Launch: []string{"launch"}}
 	got := result{
 		Open:   runActions(cfg, kitty.State{Sessions: map[string]int{"gr@fix": 7}}, space, wt, r),

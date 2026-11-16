@@ -17,8 +17,8 @@ type Run struct {
 	Inputs map[string]string
 	// Where it opens in a session with windows, one of config.Opens.
 	Open string
-	// The worktree's PR, 0 when not known.
-	PR int
+	// What the worktree is for, as far as known.
+	Links Links
 	// Stay leaves the focus where it is, on the form that runs it in several worktrees, rather than
 	// switching to each session in turn: no goto_session, and the launch is --keep-focus.
 	Stay bool
@@ -32,6 +32,36 @@ func NewRun(cmd config.Command, inputs, vars map[string]string) (Run, error) {
 		return Run{}, err
 	}
 	return Run{Command: cmd, Inputs: values, Open: cmd.Open}, nil
+}
+
+// Links are what a worktree is for, by number, 0 for none or not known: the PR it checks out, and the
+// issue it was created for.
+type Links struct {
+	PR    int
+	Issue int
+}
+
+// fill fills in the links l does not know with what git config says of wt, see WorktreePR and
+// WorktreeIssue.
+func (l Links) fill(space Space, wt Worktree) Links {
+	if l.PR == 0 {
+		l.PR = WorktreePR(space, wt)
+	}
+	if l.Issue == 0 {
+		l.Issue = WorktreeIssue(space, wt)
+	}
+	return l
+}
+
+// WorktreeLinks are what git config says wt is for.
+func WorktreeLinks(space Space, wt Worktree) Links { return Links{}.fill(space, wt) }
+
+// WorktreeIssue is the issue wt's branch was created for, as CreateIssueWorktree records it, or 0.
+func WorktreeIssue(space Space, wt Worktree) int {
+	if wt.Branch == "" {
+		return 0
+	}
+	return git.BranchIssue(space.Root, wt.Branch)
 }
 
 // WorktreePR is the PR whose head wt's branch pulls from, as CreatePRWorktree sets up a PR from a fork,
@@ -57,11 +87,9 @@ func WorktreePR(space Space, wt Worktree) int {
 }
 
 // RunCommand runs r in wt, a worktree of space, and switches to its session, see runActions; st says
-// which sessions have windows. r's PR is looked up with WorktreePR when not given.
+// which sessions have windows. r's links are looked up when not given.
 func RunCommand(cfg config.Config, st kitty.State, space Space, wt Worktree, r Run) error {
-	if r.PR == 0 {
-		r.PR = WorktreePR(space, wt)
-	}
+	r.Links = r.Links.fill(space, wt)
 	for _, args := range runActions(cfg, st, space, wt, r) {
 		if err := kitty.Action(args...); err != nil {
 			return err
@@ -72,7 +100,7 @@ func RunCommand(cfg config.Config, st kitty.State, space Space, wt Worktree, r R
 
 // commandVars are the values of the placeholders of a command run in wt: the built-ins, then the inputs.
 func commandVars(space Space, wt Worktree, r Run) map[string]string {
-	vars := BuiltinVars(space, wt, r.PR)
+	vars := BuiltinVars(space, wt, r.Links)
 	for k, v := range r.Inputs {
 		vars[k] = v
 	}
@@ -80,8 +108,8 @@ func commandVars(space Space, wt Worktree, r Run) map[string]string {
 }
 
 // BuiltinVars are the values of the built-in placeholders, see config.Builtins, for wt, a worktree of
-// space, and pr, its PR, 0 when not known.
-func BuiltinVars(space Space, wt Worktree, pr int) map[string]string {
+// space, and links, what it is for.
+func BuiltinVars(space Space, wt Worktree, links Links) map[string]string {
 	vars := map[string]string{
 		"space":    space.Name,
 		"root":     space.Root,
@@ -90,12 +118,16 @@ func BuiltinVars(space Space, wt Worktree, pr int) map[string]string {
 		"session":  wt.Session,
 		"base":     "",
 		"pr":       "",
+		"issue":    "",
 	}
 	if len(space.Worktrees) > 0 {
 		vars["base"] = space.Worktrees[0].Branch
 	}
-	if pr > 0 {
-		vars["pr"] = strconv.Itoa(pr)
+	if links.PR > 0 {
+		vars["pr"] = strconv.Itoa(links.PR)
+	}
+	if links.Issue > 0 {
+		vars["issue"] = strconv.Itoa(links.Issue)
 	}
 	return vars
 }

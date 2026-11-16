@@ -59,7 +59,7 @@ func newRunForm(targets []runTarget, st kitty.State, name string, inputs map[str
 	th := look.New(true)
 	_, windows := st.Sessions[targets[0].wt.Session]
 	first := targets[0]
-	vars := spaces.BuiltinVars(first.space, first.wt, spaces.WorktreePR(first.space, first.wt))
+	vars := spaces.BuiltinVars(first.space, first.wt, spaces.WorktreeLinks(first.space, first.wt))
 	f := &runForm{th: th, targets: targets, vars: vars, open: open, windows: windows,
 		cmds: newCommandFields(th, commonCommands(targets), false, name, inputs, vars)}
 	moveFocus(f.fields(), &f.focus, 0)
@@ -200,12 +200,12 @@ func (t runTarget) run(st kitty.State, name string, values map[string]string, op
 			inputs[in.Name] = v
 		}
 	}
-	pr := spaces.WorktreePR(t.space, t.wt)
-	r, err := spaces.NewRun(cmd, inputs, spaces.BuiltinVars(t.space, t.wt, pr))
+	links := spaces.WorktreeLinks(t.space, t.wt)
+	r, err := spaces.NewRun(cmd, inputs, spaces.BuiltinVars(t.space, t.wt, links))
 	if err != nil {
 		return err
 	}
-	r.PR = pr
+	r.Links = links
 	if open != "" {
 		r.Open = open
 	}
@@ -385,7 +385,7 @@ func RunCommandNow(global config.Config, dirs []string, name string, inputs map[
 		return err
 	}
 	first := targets[0]
-	if _, err := spaces.NewRun(cmd, inputs, spaces.BuiltinVars(first.space, first.wt, spaces.WorktreePR(first.space, first.wt))); err != nil {
+	if _, err := spaces.NewRun(cmd, inputs, spaces.BuiltinVars(first.space, first.wt, spaces.WorktreeLinks(first.space, first.wt))); err != nil {
 		return err
 	}
 	return runIn(targets, name, inputs, open)

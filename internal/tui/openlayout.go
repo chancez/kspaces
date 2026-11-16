@@ -47,7 +47,7 @@ type layoutOpenedMsg struct{ err error }
 func newLayoutForm(cfg config.Config, space spaces.Space, wt spaces.Worktree, st kitty.State, name string, inputs map[string]string) *layoutForm {
 	th := look.New(true)
 	_, windows := st.Sessions[wt.Session]
-	vars := spaces.BuiltinVars(space, wt, spaces.WorktreePR(space, wt))
+	vars := spaces.BuiltinVars(space, wt, spaces.WorktreeLinks(space, wt))
 	f := &layoutForm{th: th, cfg: cfg, space: space, wt: wt, vars: vars, windows: windows,
 		layouts: newLayoutFields(th, cfg.Layouts, true, name, inputs, vars)}
 	moveFocus(f.fields(), &f.focus, 0)
@@ -288,12 +288,12 @@ func OpenLayoutNow(global config.Config, dir, name string, inputs map[string]str
 	if err != nil {
 		return err
 	}
-	pr := spaces.WorktreePR(space, wt)
-	lr, err := spaces.NewLayoutRun(l, inputs, spaces.BuiltinVars(space, wt, pr))
+	links := spaces.WorktreeLinks(space, wt)
+	lr, err := spaces.NewLayoutRun(l, inputs, spaces.BuiltinVars(space, wt, links))
 	if err != nil {
 		return err
 	}
-	lr.PR = pr
+	lr.Links = links
 	st, err := kitty.LoadState(kitty.SelfWindowID())
 	if err != nil {
 		return err

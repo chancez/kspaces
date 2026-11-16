@@ -181,7 +181,7 @@ name = "model"
 		Argv: []string{"claude", "--name=gr-pr/me/fix", `fix "it" in $HOME; rm -rf {x}`, "{literal}", "", `fix "it" in $HOME; rm -rf {x}`},
 		Env: []string{
 			"KSPACES_SPACE=gr", "KSPACES_ROOT=/src/gr", "KSPACES_WORKTREE=/src/gr/.worktrees/fix",
-			"KSPACES_BRANCH=pr/me/fix", "KSPACES_BASE=main", "KSPACES_SESSION=gr@fix", "KSPACES_PR=",
+			"KSPACES_BRANCH=pr/me/fix", "KSPACES_BASE=main", "KSPACES_SESSION=gr@fix", "KSPACES_PR=", "KSPACES_ISSUE=",
 			`KSPACES_INPUT_PROMPT=fix "it" in $HOME; rm -rf {x}`, "KSPACES_INPUT_MODEL= \n",
 			"KSPACES_PR=overridden", "TASK_PR=#",
 		},

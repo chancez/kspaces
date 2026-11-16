@@ -87,9 +87,11 @@ A command with several inputs or long ones can list them as tables of their own 
 
 `run` and the values of `env` are templates. `{NAME}` is replaced, as text within the argument, by an
 input's value or a built-in: `{space}`, `{root}`, `{worktree}` (its path), `{branch}`, `{base}` (the main
-worktree's branch), `{session}` and `{pr}`, the PR's number when the worktree was created from one or its
-branch pulls from a PR's head, else empty. Values are never split or expanded, whatever is in them: a
-value's newlines stay in its word, so `claude {prompt}` gets a prompt of several lines as one argument.
+worktree's branch), `{session}`, `{pr}`, the PR's number when the worktree was created from one or its
+branch pulls from a PR's head, else empty, and `{issue}`, the number of the issue the worktree was created
+for, kept in git config as its branch's `kspaces-issue`, else empty. Values are never split or expanded,
+whatever is in them: a value's newlines stay in its word, so `claude {prompt}` gets a prompt of several
+lines as one argument.
 `{NAME?}` is the same, except that a word of `run` with one whose value is empty or only spaces is left
 out: `["claude", "{prompt?}"]` runs `claude` alone for an empty prompt, rather than with an empty argument,
 and `"--pr={pr?}"` goes when there is no PR. `{{` and `}}` are a literal brace. Anything else in braces, a bad input or an unknown `open` is an error when the
@@ -101,8 +103,8 @@ number once one is chosen, and `{branch}` its branch once looked up. `--yes` and
 afresh fill it in the same way. A default with a literal brace writes it `{{` or `}}`.
 
 The command also gets `KSPACES_SPACE`, `KSPACES_ROOT`, `KSPACES_WORKTREE`, `KSPACES_BRANCH`, `KSPACES_BASE`,
-`KSPACES_SESSION`, `KSPACES_PR` and `KSPACES_INPUT_NAME` for each input, then `env`, which can override them.
-kitty strips spaces from either end of an environment value.
+`KSPACES_SESSION`, `KSPACES_PR`, `KSPACES_ISSUE` and `KSPACES_INPUT_NAME` for each input, then `env`, which
+can override them. kitty strips spaces from either end of an environment value.
 
 In a session with no windows the command runs as its first tab, wherever `open` says:
 
