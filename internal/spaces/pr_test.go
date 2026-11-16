@@ -65,7 +65,7 @@ func prRepos(t *testing.T) (space *gittest.Repo, pullHead string) {
 // A PR is named by its number, #N or its URL.
 func TestParsePRRef(t *testing.T) {
 	type result struct {
-		Ref PRRef
+		Ref Ref
 		OK  bool
 	}
 	var got []result
@@ -78,11 +78,11 @@ func TestParsePRRef(t *testing.T) {
 		ref, ok := ParsePRRef(s)
 		got = append(got, result{ref, ok})
 	}
-	seven := result{PRRef{Arg: "7", Number: 7}, true}
+	seven := result{Ref{Arg: "7", Number: 7}, true}
 	want := []result{
 		seven, seven, seven, seven,
-		{PRRef{Arg: "https://github.com/o/r/pull/7", Number: 7}, true},
-		{PRRef{Arg: "https://github.com/o/r/pull/7/files", Number: 7}, true},
+		{Ref{Arg: "https://github.com/o/r/pull/7", Number: 7}, true},
+		{Ref{Arg: "https://github.com/o/r/pull/7/files", Number: 7}, true},
 		{}, {}, {}, {}, {}, {}, {}, {}, {},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -101,7 +101,7 @@ func TestPRWorktree(t *testing.T) {
 	})
 	space := Space{Name: "space", Root: root}
 
-	same, err := ResolvePR(space, PRRef{Arg: "3", Number: 3})
+	same, err := ResolvePR(space, Ref{Arg: "3", Number: 3})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestPRWorktree(t *testing.T) {
 	if got, want := args(), []string{root, "pr", "view", "3", "--json", "number,title,author,isDraft,headRefName,headRepositoryOwner,isCrossRepository,url"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("gh ran as %q\nwant %q", got, want)
 	}
-	fork, err := ResolvePR(space, PRRef{Arg: "https://github.com/o/r/pull/7", Number: 7})
+	fork, err := ResolvePR(space, Ref{Arg: "https://github.com/o/r/pull/7", Number: 7})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +142,7 @@ func TestPRWorktree(t *testing.T) {
 
 	// Both branches are there now, and checked out as they are the next time.
 	var again []PR
-	for _, ref := range []PRRef{{Arg: "3", Number: 3}, {Arg: "7", Number: 7}} {
+	for _, ref := range []Ref{{Arg: "3", Number: 3}, {Arg: "7", Number: 7}} {
 		pr, err := ResolvePR(space, ref)
 		if err != nil {
 			t.Fatal(err)
@@ -155,7 +155,7 @@ func TestPRWorktree(t *testing.T) {
 	}
 	// Another PR from a fork's main finds both names taken.
 	r.Git("config", "branch.pr-7-main.merge", "refs/heads/main")
-	if _, err := ResolvePR(space, PRRef{Arg: "7", Number: 7}); err == nil || err.Error() != "the branches main and pr-7-main are taken, so PR #7 needs a branch of its own" {
+	if _, err := ResolvePR(space, Ref{Arg: "7", Number: 7}); err == nil || err.Error() != "the branches main and pr-7-main are taken, so PR #7 needs a branch of its own" {
 		t.Errorf("both names taken: %v", err)
 	}
 }

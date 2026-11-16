@@ -54,18 +54,22 @@ func mainRepo(t *testing.T) string {
 }
 
 // listPRs lists the open PRs as the PR tab does the first time it shows, and lookUpPR looks up the PR
-// chosen, as the program would run what the form asks for.
-func listPRs(f *newWorktreeForm) {
-	f.open.asked = false
-	f.Update(f.listOpen()())
+// chosen, as the program would run what the form asks for; listOpen and lookUpChosen do the same for
+// any picker.
+func listPRs(f *newWorktreeForm)                { listOpen(f, f.prs) }
+func lookUpPR(t *testing.T, f *newWorktreeForm) { t.Helper(); lookUpChosen(t, f, f.prs) }
+
+func listOpen[V, L any](f *newWorktreeForm, p *ghPicker[V, L]) {
+	p.open.asked = false
+	f.Update(p.listOpen()())
 }
 
-func lookUpPR(t *testing.T, f *newWorktreeForm) {
+func lookUpChosen[V, L any](t *testing.T, f *newWorktreeForm, p *ghPicker[V, L]) {
 	t.Helper()
-	delete(f.lookups, f.pr.Arg)
-	cmd := f.lookUp()
+	delete(p.lookups, p.chosen.Arg)
+	cmd := p.lookUp()
 	if cmd == nil {
-		t.Fatal("no PR to look up")
+		t.Fatal("nothing chosen to look up")
 	}
 	f.Update(cmd())
 }
@@ -106,7 +110,7 @@ func TestNewWorktreeFormPR(t *testing.T) {
 	typeInto(f, "#")
 	listPRs(f)
 	lookUpPR(t, f)
-	got := result{f.tab, f.branch.Value(), f.pr.Number, formScreen(f)[5:8]}
+	got := result{f.tab, f.branch.Value(), f.prs.chosen.Number, formScreen(f)[5:8]}
 	want := result{tabPR, "pr/me/", 3, []string{"  PR         number, URL or title", row("#3 Add feat  me"), row("#7 Fix from a fork  forker, draft")}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("after #:\n%+v\nwant\n%+v", got, want)
@@ -129,8 +133,8 @@ func TestNewWorktreeFormPR(t *testing.T) {
 	typeInto(f, "a")
 	f.Update(tea.KeyPressMsg{Code: tea.KeyDown})
 	lookUpPR(t, f)
-	if l, _ := f.lookup(); f.pr.Number != 7 || l.pr.Branch != "pr-7-main" {
-		t.Errorf("down chose PR %d, its branch %q", f.pr.Number, l.pr.Branch)
+	if l, _ := f.prLookup(); f.prs.chosen.Number != 7 || l.found.Branch != "pr-7-main" {
+		t.Errorf("down chose PR %d, its branch %q", f.prs.chosen.Number, l.found.Branch)
 	}
 
 	// A number no open PR has is looked up; once the field is left it shows the PR's title.
@@ -158,7 +162,7 @@ func TestNewWorktreeFormPR(t *testing.T) {
 	f.Update(keyMsg("tab"))
 	f.Update(tea.PasteMsg{Content: "https://github.com/o/r/pull/7/files"})
 	lookUpPR(t, f)
-	got = result{f.tab, f.branch.Value(), f.pr.Number, formScreen(f)[5:7]}
+	got = result{f.tab, f.branch.Value(), f.prs.chosen.Number, formScreen(f)[5:7]}
 	want = result{tabPR, "pr/me/", 7, []string{"  PR         https://github.com/o/r/pull/7/files", row("#7 Fix from a fork  forker, draft")}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("a URL pasted:\n%+v\nwant\n%+v", got, want)
@@ -186,7 +190,7 @@ func TestNewWorktreeFormClickPR(t *testing.T) {
 		OnPR   bool
 		Screen []string
 	}
-	got := result{f.pr.Number, f.prField.Value(), f.onPR(), formScreen(f)[5:7]}
+	got := result{f.prs.chosen.Number, f.prs.field.Value(), f.onPicker(), formScreen(f)[5:7]}
 	want := result{7, "#7", false, []string{"  PR         #7 Fix from a fork", "  directory  .worktrees/pr-7-main"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v\nwant %+v", got, want)
@@ -212,8 +216,8 @@ func TestNewWorktreeFormStartsOnPR(t *testing.T) {
 		}
 		listPRs(f)
 		lookUpPR(t, f)
-		l, _ := f.lookup()
-		got = append(got, result{f.prField.Value(), l.pr.Branch, errString(l.err)})
+		l, _ := f.prLookup()
+		got = append(got, result{f.prs.field.Value(), l.found.Branch, errString(l.err)})
 	}
 	want := []result{
 		{"", "feat", "<nil>"},

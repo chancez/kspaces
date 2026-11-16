@@ -11,9 +11,9 @@ import (
 	"github.com/chancez/kspaces/internal/git"
 )
 
-// PRRef is a PR as typed: its number, or its URL.
-type PRRef struct {
-	// What gh pr view is given: the number, or the URL as typed.
+// Ref is a PR or an issue as typed: its number, or its URL.
+type Ref struct {
+	// What gh is given: the number, or the URL as typed.
 	Arg    string
 	Number int
 }
@@ -23,23 +23,27 @@ type PRRef struct {
 var prURL = regexp.MustCompile(`^https?://[^/\s]+/[^/\s]+/[^/\s]+/pull/([0-9]+)(?:[/?#]\S*)?$`)
 
 // ParsePRRef says whether s names a PR: N, #N or a PR's URL.
-func ParsePRRef(s string) (PRRef, bool) {
+func ParsePRRef(s string) (Ref, bool) { return parseRef(prURL, s) }
+
+// parseRef says whether s names one of what pages matches the page of, its number the first group: N, #N
+// or its URL.
+func parseRef(pages *regexp.Regexp, s string) (Ref, bool) {
 	s = strings.TrimSpace(s)
-	if m := prURL.FindStringSubmatch(s); m != nil {
+	if m := pages.FindStringSubmatch(s); m != nil {
 		if n, err := strconv.Atoi(m[1]); err == nil && n > 0 {
-			return PRRef{Arg: s, Number: n}, true
+			return Ref{Arg: s, Number: n}, true
 		}
-		return PRRef{}, false
+		return Ref{}, false
 	}
 	digits := strings.TrimPrefix(s, "#")
 	if digits == "" || strings.Trim(digits, "0123456789") != "" {
-		return PRRef{}, false
+		return Ref{}, false
 	}
 	n, err := strconv.Atoi(digits)
 	if err != nil || n <= 0 {
-		return PRRef{}, false
+		return Ref{}, false
 	}
-	return PRRef{Arg: strconv.Itoa(n), Number: n}, true
+	return Ref{Arg: strconv.Itoa(n), Number: n}, true
 }
 
 // IsPRURL says whether s is a PR's page.
@@ -62,7 +66,7 @@ type PR struct {
 }
 
 // ResolvePR looks ref up with gh, in the space's root, and works out how to check it out, see CheckoutPR.
-func ResolvePR(space Space, ref PRRef) (PR, error) {
+func ResolvePR(space Space, ref Ref) (PR, error) {
 	got, err := gh.ViewPR(space.Root, ref.Arg)
 	if err != nil {
 		return PR{}, err

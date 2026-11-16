@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
-	"time"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -27,18 +25,8 @@ const (
 // tabNames are what the tab strip calls the tabs.
 var tabNames = [...]string{"Branch", "Pull request"}
 
-// The zones of the tab strip's tabs, and of the rows of open PRs below the PR field, by index.
-const (
-	tabZone   = "tab:%d"
-	prRowZone = "pr:%d"
-)
-
-// prRows is how many of the open PRs show below the PR field at once.
-const prRows = 5
-
-// prDebounce is how long the PR field rests on a PR no open one is before it is looked up, so typing a
-// number does not run gh for every digit.
-const prDebounce = 300 * time.Millisecond
+// tabZone is the zone of the tab strip's tabs, by index.
+const tabZone = "tab:%d"
 
 // worktreeTab is what each tab of the new worktree form has of its own, so switching tabs loses nothing:
 // where the worktree goes, and the layout and command, with their inputs.
@@ -66,23 +54,14 @@ type newWorktreeForm struct {
 	tabs  [2]worktreeTab
 	// The branch tab's branch. Typing #N or a PR's URL in it goes to the PR tab.
 	branch lineField
-	// The PR tab's field, what it is matched against: the open PRs, those it matches, by index in them,
-	// and the one of those highlighted.
-	prField lineField
-	open    openPRs
-	matches []int
-	sel     int
-	// The PR chosen, its Number 0 for none: the highlighted match, else the PR the field names. Its
-	// lookups, by gh's argument; prSeq counts the changes of the PR chosen, so only a lookup it rested on
-	// starts.
-	pr      spaces.PRRef
-	lookups map[string]prLookup
-	prSeq   int
+	// The PR tab's PR, and the choice of it follow last saw, so a new one clears the error.
+	prs  *ghPicker[gh.PRView, spaces.PR]
+	seen spaces.Ref
 	// focus is the index in fields of the field that has focus.
 	focus int
-	// typed and prTyped are the branch and PR fields as follow last saw them, so it works out what they
-	// name only when they change, not at every cursor blink.
-	typed, prTyped string
+	// typed is the branch field as follow last saw it, so it works out what it names only when it
+	// changes, not at every cursor blink.
+	typed string
 	// vars are the built-ins of the worktree the form would create now, which the inputs' defaults use.
 	vars   map[string]string
 	busy   bool
@@ -94,34 +73,6 @@ type newWorktreeForm struct {
 	buttons controls[*newWorktreeForm]
 }
 
-// openPRs are the repository's open PRs as gh lists them, once asked, until done.
-type openPRs struct {
-	views       []gh.PRView
-	err         error
-	asked, done bool
-}
-
-// prLookup is what looking a PR up found, or, until done, that it is under way.
-type prLookup struct {
-	pr   spaces.PR
-	err  error
-	done bool
-}
-
-// openPRsMsg is the list of open PRs, prDueMsg the PR field having rested on the PR chosen, change seq of
-// it, for prDebounce, and prFoundMsg the lookup of the PR gh knows as arg.
-type openPRsMsg struct {
-	views []gh.PRView
-	err   error
-}
-
-type prDueMsg struct{ seq int }
-
-type prFoundMsg struct {
-	arg string
-	prLookup
-}
-
 type createdMsg struct{ err error }
 
 // newForm is the form for a worktree in space, on the branch tab. The branch starts with the configured
@@ -130,8 +81,7 @@ func newForm(cfg config.Config, space spaces.Space) *newWorktreeForm {
 	th := look.New(true)
 	branch := newLineField(th, "")
 	branch.fill(spaces.BranchStart(cfg))
-	f := &newWorktreeForm{th: th, cfg: cfg, space: space, branch: branch, prField: newLineField(th, "number, URL or title"),
-		lookups: map[string]prLookup{}, focus: 1}
+	f := &newWorktreeForm{th: th, cfg: cfg, space: space, branch: branch, prs: newGHPicker(th, prKind, space), focus: 1}
 	for i, layout := range [...]string{cfg.LayoutFor(space.Name, true), cfg.PRLayoutFor(space.Name)} {
 		f.tabs[i] = worktreeTab{
 			dir:     newLineField(th, ""),
@@ -144,24 +94,34 @@ func newForm(cfg config.Config, space spaces.Space) *newWorktreeForm {
 	return f
 }
 
-// Init lists the open PRs when the form starts on the PR tab, and looks up the PR its field names.
+// Init lists the open ones when the form starts on a tab that picks among them, and looks up the one
+// its field names.
 func (f *newWorktreeForm) Init() tea.Cmd {
-	if f.tab != tabPR {
+	p := f.shownPicker()
+	if p == nil {
 		return textinput.Blink
 	}
-	return tea.Batch(textinput.Blink, f.listOpen(), f.lookUp())
+	return tea.Batch(textinput.Blink, p.listOpen(), p.lookUp())
 }
 
 // current is the tab shown.
 func (f *newWorktreeForm) current() *worktreeTab { return &f.tabs[f.tab] }
 
-// lookup is what looking up the PR chosen has found so far, ok false when the PR tab is not shown or has
-// none chosen.
-func (f *newWorktreeForm) lookup() (l prLookup, ok bool) {
-	if f.tab != tabPR || f.pr.Number == 0 {
-		return prLookup{}, false
+// shownPicker is the field of the tab shown that picks a PR, nil for the branch tab.
+func (f *newWorktreeForm) shownPicker() tabPicker {
+	if f.tab == tabPR {
+		return f.prs
 	}
-	return f.lookups[f.pr.Arg], true
+	return nil
+}
+
+// prLookup is what looking up the PR chosen has found so far, ok false when the PR tab is not shown or
+// has none chosen.
+func (f *newWorktreeForm) prLookup() (l lookup[spaces.PR], ok bool) {
+	if f.tab != tabPR {
+		return lookup[spaces.PR]{}, false
+	}
+	return f.prs.lookup()
 }
 
 // plan is the branch and directory the form would create now. For a PR that is its local branch, empty
@@ -169,15 +129,15 @@ func (f *newWorktreeForm) lookup() (l prLookup, ok bool) {
 func (f *newWorktreeForm) plan() (branch, dir string) {
 	branch = strings.TrimSpace(f.branch.Value())
 	if f.tab == tabPR {
-		l, _ := f.lookup()
-		branch = l.pr.Branch
+		l, _ := f.prLookup()
+		branch = l.found.Branch
 	}
 	return branch, spaces.WorktreeDir(f.cfg, f.space.Root, branch, f.current().dir.Value())
 }
 
 func (f *newWorktreeForm) create() tea.Cmd {
 	t := f.current()
-	if f.tab == tabPR && f.pr.Number == 0 {
+	if f.tab == tabPR && f.prs.chosen.Number == 0 {
 		f.err = fmt.Errorf("choose a PR to check out")
 		return nil
 	}
@@ -216,11 +176,11 @@ func (f *newWorktreeForm) create() tea.Cmd {
 		}
 		return spaces.OpenNew(cfg, space, wt, lr, r)
 	}
-	if l, ok := f.lookup(); ok {
-		ref, dir := f.pr, t.dir.Value()
+	if l, ok := f.prLookup(); ok {
+		ref, dir := f.prs.chosen, t.dir.Value()
 		return func() tea.Msg {
 			// Enter may come before the lookup, or after one that failed for a reason since fixed.
-			pr, err := l.pr, l.err
+			pr, err := l.found, l.err
 			if !l.done || err != nil {
 				pr, err = spaces.ResolvePR(space, ref)
 			}
@@ -249,8 +209,8 @@ func (f *newWorktreeForm) create() tea.Cmd {
 func (f *newWorktreeForm) fields() []field {
 	t := f.current()
 	out := []field{nil, &f.branch, &t.dir}
-	if f.tab == tabPR {
-		out[1] = &f.prField
+	if p := f.shownPicker(); p != nil {
+		out[1] = p.input()
 	}
 	if t.layouts.picks() {
 		out = append(out, nil)
@@ -282,7 +242,7 @@ func (f *newWorktreeForm) focused() field {
 // refocus gives the field focus has the cursor, and takes it from every other, the other tab's too.
 func (f *newWorktreeForm) refocus() tea.Cmd {
 	f.branch.Blur()
-	f.prField.Blur()
+	f.prs.field.Blur()
 	for i := range f.tabs {
 		t := &f.tabs[i]
 		t.dir.Blur()
@@ -298,9 +258,9 @@ func (f *newWorktreeForm) nextField() tea.Cmd { return moveFocus(f.fields(), &f.
 func (f *newWorktreeForm) prevField() tea.Cmd { return moveFocus(f.fields(), &f.focus, -1) }
 
 // onTabs, onLayout and onCommand say whether the tab strip, the choice of layout or of command has focus,
-// onPR whether the PR field has.
-func (f *newWorktreeForm) onTabs() bool { return f.focus == 0 }
-func (f *newWorktreeForm) onPR() bool   { return f.tab == tabPR && f.focus == 1 }
+// onPicker whether the field of a tab that picks a PR has.
+func (f *newWorktreeForm) onTabs() bool   { return f.focus == 0 }
+func (f *newWorktreeForm) onPicker() bool { return f.shownPicker() != nil && f.focus == 1 }
 func (f *newWorktreeForm) onLayout() bool {
 	return f.current().layouts.picks() && f.focus == f.layoutAt()
 }
@@ -311,12 +271,12 @@ func (f *newWorktreeForm) onCommand() bool {
 // onChoice says whether a choice has focus, which left and right change.
 func (f *newWorktreeForm) onChoice() bool { return f.onTabs() || f.onLayout() || f.onCommand() }
 
-// showTab shows tab, focus on field at, and lists the open PRs the first time it is the PR tab.
+// showTab shows tab, focus on field at, and lists the open ones the first time it is a tab that picks.
 func (f *newWorktreeForm) showTab(tab, at int) tea.Cmd {
 	f.tab, f.focus, f.err = tab, at, nil
 	cmd := tea.Batch(f.refocus(), f.follow())
-	if tab == tabPR {
-		return tea.Batch(cmd, f.listOpen())
+	if p := f.shownPicker(); p != nil {
+		return tea.Batch(cmd, p.listOpen())
 	}
 	return cmd
 }
@@ -355,139 +315,18 @@ func (f *newWorktreeForm) openList() {
 	}
 }
 
-// prName is how the form names PR number, title as known.
-func prName(number int, title string) string {
-	if title == "" {
-		return fmt.Sprintf("#%d", number)
-	}
-	return fmt.Sprintf("#%d %s", number, title)
+// movePick highlights the open one delta rows from the one highlighted, below the picker's field, and
+// chooses it.
+func (f *newWorktreeForm) movePick(delta int) tea.Cmd {
+	return tea.Batch(f.shownPicker().move(delta), f.follow())
 }
 
-// prDetail is who opened v, and whether it is a draft, for the open PRs below the PR field.
-func prDetail(v gh.PRView) string {
-	if v.Draft {
-		return v.Author + ", draft"
-	}
-	return v.Author
-}
-
-// viewRef is v as a PRRef.
-func viewRef(v gh.PRView) spaces.PRRef {
-	return spaces.PRRef{Arg: strconv.Itoa(v.Number), Number: v.Number}
-}
-
-// openIndex is the index in the open PRs of the PR ref names, by its number or a URL of its page, -1 when
-// it is none of them.
-func (f *newWorktreeForm) openIndex(ref spaces.PRRef) int {
-	return slices.IndexFunc(f.open.views, func(v gh.PRView) bool {
-		return v.Number == ref.Number && (ref.Arg == strconv.Itoa(ref.Number) || strings.HasPrefix(ref.Arg, v.URL))
-	})
-}
-
-// listOpen asks gh for the open PRs, the first time.
-func (f *newWorktreeForm) listOpen() tea.Cmd {
-	if f.open.asked {
-		return nil
-	}
-	f.open.asked = true
-	root := f.space.Root
-	return func() tea.Msg {
-		views, err := gh.OpenPRs(root)
-		return openPRsMsg{views, err}
-	}
-}
-
-// matchPRs matches the open PRs against the PR field, the first highlighted: those with what is typed in
-// their number, title or author, the one of its number first; for a PR's URL, the open PR it is.
-func (f *newWorktreeForm) matchPRs() {
-	text := strings.TrimSpace(f.prField.Value())
-	ref, isRef := spaces.ParsePRRef(text)
-	f.matches, f.sel = nil, 0
-	if spaces.IsPRURL(text) {
-		if i := f.openIndex(ref); i >= 0 {
-			f.matches = []int{i}
-		}
-		return
-	}
-	q := strings.ToLower(strings.TrimPrefix(text, "#"))
-	for i, v := range f.open.views {
-		switch {
-		case isRef && v.Number == ref.Number:
-			f.matches = slices.Insert(f.matches, 0, i)
-		case strings.Contains(strings.ToLower(prName(v.Number, v.Title)+" "+v.Author), q):
-			f.matches = append(f.matches, i)
-		}
-	}
-}
-
-// chosenRef is the PR the PR tab would check out now: the highlighted match, else the one the field
-// names, else none.
-func (f *newWorktreeForm) chosenRef() spaces.PRRef {
-	if len(f.matches) > 0 {
-		return viewRef(f.open.views[f.matches[f.sel]])
-	}
-	ref, _ := spaces.ParsePRRef(f.prField.Value())
-	return ref
-}
-
-// choosePR chooses ref, unless it is chosen: an open PR is looked up at once, from what gh listed, and
-// any other once the field has rested on it.
-func (f *newWorktreeForm) choosePR(ref spaces.PRRef) tea.Cmd {
-	if ref == f.pr {
-		return nil
-	}
-	f.pr, f.err = ref, nil
-	f.prSeq++
-	if ref.Number == 0 {
-		return nil
-	}
-	if f.openIndex(ref) >= 0 {
-		return f.lookUp()
-	}
-	seq := f.prSeq
-	return tea.Tick(prDebounce, func(time.Time) tea.Msg { return prDueMsg{seq} })
-}
-
-// lookUp looks up the PR chosen, unless it has been: from the open PRs when it is one, else with gh. gh
-// asks GitHub, and checking out works out what the space's branches are, so off the UI loop.
-func (f *newWorktreeForm) lookUp() tea.Cmd {
-	ref := f.pr
-	if _, asked := f.lookups[ref.Arg]; ref.Number == 0 || asked {
-		return nil
-	}
-	f.lookups[ref.Arg] = prLookup{}
-	space, i := f.space, f.openIndex(ref)
-	var view gh.PRView
-	if i >= 0 {
-		view = f.open.views[i]
-	}
-	return func() tea.Msg {
-		var pr spaces.PR
-		var err error
-		if i >= 0 {
-			pr, err = spaces.CheckoutPR(space, view)
-		} else {
-			pr, err = spaces.ResolvePR(space, ref)
-		}
-		return prFoundMsg{ref.Arg, prLookup{pr: pr, err: err, done: true}}
-	}
-}
-
-// movePR highlights the open PR delta rows from the one highlighted, and chooses it.
-func (f *newWorktreeForm) movePR(delta int) tea.Cmd {
-	f.sel = max(min(f.sel+delta, len(f.matches)-1), 0)
-	cmd := f.choosePR(f.chosenRef())
-	return tea.Batch(cmd, f.follow())
-}
-
-// confirmPR chooses the open PR of row i below the PR field, fills the field in with its number and moves
-// on to the directory, which closes the rows.
-func (f *newWorktreeForm) confirmPR(i int) tea.Cmd {
-	ref := viewRef(f.open.views[f.matches[i]])
-	f.prField.fill("#" + ref.Arg)
-	cmd := f.follow()
+// confirmPick chooses the open one of row i below the picker's field, fills the field in with its number
+// and moves on to the field below, which closes the rows.
+func (f *newWorktreeForm) confirmPick(i int) tea.Cmd {
+	cmd := f.shownPicker().confirm(i)
 	f.focus = 2
-	return tea.Batch(cmd, f.choosePR(ref), f.refocus())
+	return tea.Batch(cmd, f.follow(), f.refocus())
 }
 
 func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -509,6 +348,9 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return f, cmd
 		}
 	}
+	if cmd, ok := f.prs.update(msg); ok {
+		return f, tea.Batch(cmd, f.follow())
+	}
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		f.width, f.height = msg.Width, msg.Height
@@ -516,7 +358,7 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// after the padding and their labels, and the cursor takes a cell past the text.
 		w := max(f.width-4-labelWidth-1, 1)
 		f.branch.SetWidth(w)
-		f.prField.SetWidth(w)
+		f.prs.field.SetWidth(w)
 		for i := range f.tabs {
 			f.tabs[i].dir.SetWidth(w)
 			f.tabs[i].layouts.setWidth(w)
@@ -529,30 +371,17 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return f, tea.Quit
 		}
 		return f, nil
-	case openPRsMsg:
-		f.open.views, f.open.err, f.open.done = msg.views, msg.err, true
-		f.matchPRs()
-		cmd := f.choosePR(f.chosenRef())
-		return f, tea.Batch(cmd, f.follow())
-	case prDueMsg:
-		if msg.seq != f.prSeq {
-			return f, nil
-		}
-		return f, f.lookUp()
-	case prFoundMsg:
-		f.lookups[msg.arg] = msg.prLookup
-		return f, f.follow()
 	case tea.KeyPressMsg:
 		if keptBy(f.focused(), msg) {
 			break
 		}
-		// up and down go through the open PRs the PR field matches, rather than the fields.
-		if f.onPR() && len(f.matches) > 1 {
+		// up and down go through the open ones a picker's field matches, rather than the fields.
+		if f.onPicker() && f.shownPicker().matched() > 1 {
 			switch msg.Code {
 			case tea.KeyUp:
-				return f, f.movePR(-1)
+				return f, f.movePick(-1)
 			case tea.KeyDown:
-				return f, f.movePR(1)
+				return f, f.movePick(1)
 			}
 		}
 		if cmd, ok := runOn(f, msg, theForm.Target(formSubject{})); ok {
@@ -567,10 +396,10 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return f, f.showTab(i, 0)
 			}
 		}
-		if f.onPR() {
-			for i := range f.matches {
-				if clickedChoice(f.zones, fmt.Sprintf(prRowZone, i), msg) {
-					return f, f.confirmPR(i)
+		if f.onPicker() {
+			for i := range f.shownPicker().matched() {
+				if clickedChoice(f.zones, fmt.Sprintf(pickRowZone, i), msg) {
+					return f, f.confirmPick(i)
 				}
 			}
 		}
@@ -595,10 +424,10 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return f, tea.Batch(in.update(msg), f.follow())
 }
 
-// follow works out what the branch field names, going to the PR tab for a PR, and what the PR field
-// does, choosing the PR; makes the directory's placeholder the default for the branch the form would
-// create, so the form always shows where the worktree would go; and fills in again the inputs left at
-// their defaults, which follow it too.
+// follow works out what the branch field names, going to the PR tab for a PR, and what the pickers'
+// fields do, choosing what they name; makes the directory's placeholder the default for the branch the
+// form would create, so the form always shows where the worktree would go; and fills in again the inputs
+// left at their defaults, which follow it too.
 func (f *newWorktreeForm) follow() tea.Cmd {
 	var cmds []tea.Cmd
 	if typed := f.branch.Value(); typed != f.typed {
@@ -611,14 +440,13 @@ func (f *newWorktreeForm) follow() tea.Cmd {
 			}
 			f.branch.fill(spaces.BranchStart(f.cfg))
 			f.typed = f.branch.Value()
-			f.prField.fill(rest)
+			f.prs.field.fill(rest)
 			cmds = append(cmds, f.showTab(tabPR, 1))
 		}
 	}
-	if typed := f.prField.Value(); typed != f.prTyped {
-		f.prTyped = typed
-		f.matchPRs()
-		cmds = append(cmds, f.choosePR(f.chosenRef()))
+	cmds = append(cmds, f.prs.refollow())
+	if p := f.shownPicker(); p != nil && p.choice() != f.seen {
+		f.seen, f.err = p.choice(), nil
 	}
 	t := f.current()
 	branch, planned := f.plan()
@@ -638,7 +466,7 @@ func (f *newWorktreeForm) prNumber() int {
 	if f.tab != tabPR {
 		return 0
 	}
-	return f.pr.Number
+	return f.prs.chosen.Number
 }
 
 func (f *newWorktreeForm) View() tea.View {
@@ -673,45 +501,6 @@ func (f *newWorktreeForm) tabStrip(width int) string {
 	return th.Render(look.Plain, spans...)
 }
 
-// prLines draw the PR field and, while it has focus, the open PRs it matches below it, as many as prRows,
-// the one highlighted on the cursor's surface, or that they are being listed. Without focus the field
-// shows the PR chosen.
-func (f *newWorktreeForm) prLines(width int) []string {
-	th := f.th
-	if !f.onPR() {
-		if f.pr.Number == 0 {
-			return fieldLines(th, "PR", &f.prField, width)
-		}
-		title := ""
-		if i := f.openIndex(f.pr); i >= 0 {
-			title = f.open.views[i].Title
-		} else if l := f.lookups[f.pr.Arg]; l.done && l.err == nil {
-			title = l.pr.Title
-		}
-		return []string{th.DrawZone(fieldZone(&f.prField), look.Plain, width,
-			th.Cut(width, look.Label(fmt.Sprintf("%-*s", labelWidth, "PR")), look.Text(prName(f.pr.Number, title)))...)}
-	}
-	out := fieldLines(th, "PR", &f.prField, width)
-	indent := look.Text(strings.Repeat(" ", labelWidth))
-	if f.open.asked && !f.open.done {
-		return append(out, th.Render(look.Plain, indent, look.Muted("Listing open PRs...")))
-	}
-	top := max(min(f.sel-prRows/2, len(f.matches)-prRows), 0)
-	for i := top; i < min(top+prRows, len(f.matches)); i++ {
-		v := f.open.views[f.matches[i]]
-		surface := look.Plain
-		if i == f.sel {
-			surface = look.Cursor
-		}
-		row := th.Cut(width-labelWidth, look.Text(" "+prName(v.Number, v.Title)), look.Muted("  "+prDetail(v)))
-		out = append(out, th.Render(look.Plain, indent)+th.DrawZone(fmt.Sprintf(prRowZone, i), surface, width-labelWidth, row...))
-	}
-	if more := len(f.matches) - min(top+prRows, len(f.matches)) + top; more > 0 {
-		out = append(out, th.Render(look.Plain, indent, look.Muted(fmt.Sprintf(" %d more", more))))
-	}
-	return out
-}
-
 func (f *newWorktreeForm) render() string {
 	th, width := f.th, max(f.width-4, 20)
 	line := func(spans ...look.Span) string { return th.Render(look.Plain, spans...) }
@@ -719,8 +508,8 @@ func (f *newWorktreeForm) render() string {
 	t := f.current()
 	branch, _ := f.plan()
 	lines := []string{line(look.Heading("New worktree in " + f.space.Name)), "", f.tabStrip(width), ""}
-	if f.tab == tabPR {
-		lines = append(lines, f.prLines(width)...)
+	if p := f.shownPicker(); p != nil {
+		lines = append(lines, p.lines(th, f.onPicker(), width)...)
 	} else {
 		lines = append(lines, fieldLines(th, "branch", &f.branch, width)...)
 	}
@@ -730,30 +519,16 @@ func (f *newWorktreeForm) render() string {
 	commandAt := len(lines)
 	lines = append(append(lines, t.cmds.lines(f.onCommand(), width)...), "")
 	failed := f.err
-	switch l, ok := f.lookup(); {
-	case ok:
-		pr := fmt.Sprintf("PR #%d", f.pr.Number)
-		switch {
-		case !l.done:
-			lines = append(lines, muted("Looking up "+pr+"..."))
-		case l.err != nil:
-			lines = append(lines, muted("Could not look up "+pr))
-			if failed == nil {
-				failed = l.err
-			}
-		default:
-			lines = append(lines, muted(pr+" "+l.pr.Title), muted(prDoes(l.pr)))
-		}
-	case f.tab == tabPR && f.open.err != nil:
-		lines = append(lines, muted("Could not list the open PRs: type a PR's number or URL"))
+	switch p := f.shownPicker(); {
+	case p != nil:
+		says, err := p.status(muted)
+		lines = append(lines, says...)
 		if failed == nil {
-			failed = f.open.err
+			failed = err
 		}
-	case f.tab == tabPR && f.open.done && len(f.open.views) == 0:
-		lines = append(lines, muted("No open PRs: type a PR's number or URL"))
-	case f.tab == tabPR && f.open.done:
-		lines = append(lines, muted("No open PR matches: type a PR's number or URL"))
-	case f.tab == tabPR:
+		if l, ok := f.prLookup(); ok && l.done && l.err == nil {
+			lines = append(lines, muted(prDoes(l.found)))
+		}
 	case branch == "" || strings.HasSuffix(branch, "/"):
 		lines = append(lines, muted("Name the branch to create or check out, or # for a PR"))
 	case f.space.HasBranch(branch):
@@ -797,8 +572,8 @@ func (f *newWorktreeForm) render() string {
 	switch {
 	case f.onTabs():
 		hints = append(hints, look.Text("  "), look.Key("left/right"), look.KeyDesc(" tab"))
-	case f.onPR() && len(f.matches) > 1:
-		hints = append(hints, look.Text("  "), look.Key("up/down"), look.KeyDesc(" PR"))
+	case f.onPicker() && f.shownPicker().matched() > 1:
+		hints = append(hints, look.Text("  "), look.Key("up/down"), look.KeyDesc(" "+f.shownPicker().name()))
 	case f.onLayout():
 		hints = append(hints, choiceHints("layout")...)
 	case f.onCommand():
@@ -836,7 +611,7 @@ func (f *newWorktreeForm) startOnPR(pr string) error {
 		if _, ok := spaces.ParsePRRef(pr); !ok {
 			return fmt.Errorf("%s is not a PR's number or URL", pr)
 		}
-		f.prField.fill(pr)
+		f.prs.field.fill(pr)
 	}
 	f.tab, f.focus = tabPR, 1
 	f.refocus()
