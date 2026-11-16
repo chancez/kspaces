@@ -31,20 +31,61 @@ var tabNames = [...]string{"Branch", "Pull request", "Issue"}
 const tabZone = "tab:%d"
 
 // worktreeTab is what each tab of the new worktree form has of its own, so switching tabs loses nothing:
-// where a new branch starts from, where the worktree goes, and the layout and command, with their inputs.
+// where a new branch starts from, where the worktree goes, and what its session opens with, with its
+// inputs.
 type worktreeTab struct {
 	// The branch a new branch starts from: none for what the main worktree has checked out, or another
 	// local branch. Only on the branch and Issue tabs, with another branch to choose.
 	base choiceFields[string]
 	// Empty for the default, which spaces.WorktreeDir derives from the branch and the placeholder shows.
 	dir lineField
-	// The layout the session opens with, none for a shell tab, and its inputs. Only with layouts
+	// What the session opens with, a shell tab for none, and its inputs. Only with layouts or commands
 	// configured, the branch tab's starting on the space's worktree layout, the PR tab's on its PR layout
 	// and the Issue tab's on its issue layout.
-	layouts choiceFields[config.Layout]
-	// The command to run, none for none, and its inputs: as the first tab without a layout, else after
-	// it, where the command opens. Only with commands configured.
-	cmds choiceFields[config.Command]
+	open choiceFields[opener]
+}
+
+// opener is what a new worktree's session opens with: a layout's tabs, or a command as its one tab.
+type opener struct {
+	layout *config.Layout
+	cmd    *config.Command
+}
+
+// openZone is the zone the choice of what the session opens with is drawn in, and its label.
+const openZone = "open with"
+
+// newOpenFields are the fields that choose what a new worktree's session opens with, the one called name
+// chosen, see newChoiceFields: a shell tab, as none, then the layouts, then the commands, each listed with
+// how many tabs and panes it has, or what it runs. A layout and a command of the same name are both
+// listed; name chooses the layout.
+func newOpenFields(th *look.Theme, layouts []config.Layout, cmds []config.Command, name string) choiceFields[opener] {
+	var openers []opener
+	for i := range layouts {
+		openers = append(openers, opener{layout: &layouts[i]})
+	}
+	for i := range cmds {
+		openers = append(openers, opener{cmd: &cmds[i]})
+	}
+	return newChoiceFields(th, openZone, openers,
+		func(o opener) string {
+			if o.layout != nil {
+				return o.layout.Name
+			}
+			return o.cmd.Name
+		},
+		func(o opener) []config.Input {
+			if o.layout != nil {
+				return o.layout.Inputs
+			}
+			return o.cmd.Inputs
+		},
+		func(o opener) string {
+			if o.layout != nil {
+				return layoutDetail(*o.layout)
+			}
+			return commandDetail(*o.cmd)
+		},
+		true, shellLayout, name, nil, nil)
 }
 
 // baseZone is the zone the choice of base is drawn in.
@@ -117,10 +158,9 @@ func newForm(cfg config.Config, space spaces.Space) *newWorktreeForm {
 	bases := newBaseFields(th, space)
 	for i, layout := range [...]string{cfg.LayoutFor(space.Name, true), cfg.PRLayoutFor(space.Name), cfg.IssueLayoutFor(space.Name)} {
 		f.tabs[i] = worktreeTab{
-			base:    bases,
-			dir:     newLineField(th, ""),
-			layouts: newLayoutFields(th, cfg.Layouts, true, layout, nil, nil),
-			cmds:    newCommandFields(th, cfg.Commands, true, "", nil, nil),
+			base: bases,
+			dir:  newLineField(th, ""),
+			open: newOpenFields(th, cfg.Layouts, cfg.Commands, layout),
 		}
 	}
 	f.refocus()
@@ -187,39 +227,33 @@ func (f *newWorktreeForm) create() tea.Cmd {
 		return nil
 	}
 	var layout *spaces.LayoutRun
-	if l, ok := t.layouts.chosen(); ok {
-		lr, err := spaces.NewLayoutRun(l, t.layouts.values(), f.vars)
-		if err != nil {
-			f.err = err
-			return nil
-		}
-		layout = &lr
-	}
 	var run *spaces.Run
-	if cmd, ok := t.cmds.chosen(); ok {
-		r, err := spaces.NewRun(cmd, t.cmds.values(), f.vars)
+	if o, ok := t.open.chosen(); ok {
+		var err error
+		if o.layout != nil {
+			var lr spaces.LayoutRun
+			lr, err = spaces.NewLayoutRun(*o.layout, t.open.values(), f.vars)
+			layout = &lr
+		} else {
+			var r spaces.Run
+			r, err = spaces.NewRun(*o.cmd, t.open.values(), f.vars)
+			run = &r
+		}
 		if err != nil {
 			f.err = err
 			return nil
 		}
-		run = &r
 	}
 	f.busy, f.err = true, nil
 	cfg, space := f.cfg, f.space
 	open := func(wt spaces.Worktree, links spaces.Links) error {
-		var lr *spaces.LayoutRun
 		if layout != nil {
-			v := *layout
-			v.Links = links
-			lr = &v
+			layout.Links = links
 		}
-		var r *spaces.Run
 		if run != nil {
-			v := *run
-			v.Links = links
-			r = &v
+			run.Links = links
 		}
-		return spaces.OpenNew(cfg, space, wt, lr, r)
+		return spaces.OpenNew(cfg, space, wt, layout, run)
 	}
 	if l, ok := f.prLookup(); ok {
 		ref, dir := f.prs.chosen, t.dir.Value()
@@ -286,33 +320,21 @@ func (f *newWorktreeForm) head() []field {
 	return append(out, &t.dir)
 }
 
-// fields are the form's fields in order: head; the choice of layout, nil, when there is one, and the
-// chosen layout's inputs; then the same for the command.
+// fields are the form's fields in order: head; the choice of what the session opens with, nil, when
+// there is one, and the chosen one's inputs.
 func (f *newWorktreeForm) fields() []field {
 	t := f.current()
 	out := f.head()
-	if t.layouts.picks() {
+	if t.open.picks() {
 		out = append(out, nil)
 	}
-	out = append(out, t.layouts.fields()...)
-	if t.cmds.picks() {
-		out = append(out, nil)
-	}
-	return append(out, t.cmds.fields()...)
+	return append(out, t.open.fields()...)
 }
 
-// baseAt, layoutAt and commandAt are where in fields the choices of base, layout and command are, when
-// there are.
-func (f *newWorktreeForm) baseAt() int   { return len(f.head()) - 2 }
-func (f *newWorktreeForm) layoutAt() int { return len(f.head()) }
-func (f *newWorktreeForm) commandAt() int {
-	t := f.current()
-	at := f.layoutAt() + len(t.layouts.fields())
-	if t.layouts.picks() {
-		at++
-	}
-	return at
-}
+// baseAt and openAt are where in fields the choices of base and of what the session opens with are,
+// when there are.
+func (f *newWorktreeForm) baseAt() int { return len(f.head()) - 2 }
+func (f *newWorktreeForm) openAt() int { return len(f.head()) }
 
 // base is the branch a new branch starts from, empty for what the main worktree has checked out.
 func (f *newWorktreeForm) base() string {
@@ -338,7 +360,7 @@ func (f *newWorktreeForm) refocus() tea.Cmd {
 	for i := range f.tabs {
 		t := &f.tabs[i]
 		t.dir.Blur()
-		for _, fl := range slices.Concat(t.layouts.fields(), t.cmds.fields()) {
+		for _, fl := range t.open.fields() {
 			fl.Blur()
 		}
 	}
@@ -349,24 +371,19 @@ func (f *newWorktreeForm) refocus() tea.Cmd {
 func (f *newWorktreeForm) nextField() tea.Cmd { return moveFocus(f.fields(), &f.focus, 1) }
 func (f *newWorktreeForm) prevField() tea.Cmd { return moveFocus(f.fields(), &f.focus, -1) }
 
-// onTabs, onBase, onLayout and onCommand say whether the tab strip, the choice of base, of layout or of
-// command has focus, onPicker whether the field of a tab that picks a PR or an issue has.
+// onTabs, onBase and onOpen say whether the tab strip, the choice of base or of what the session opens
+// with has focus, onPicker whether the field of a tab that picks a PR or an issue has.
 func (f *newWorktreeForm) onTabs() bool   { return f.focus == 0 }
 func (f *newWorktreeForm) onPicker() bool { return f.shownPicker() != nil && f.focus == 1 }
 func (f *newWorktreeForm) onBase() bool {
 	return f.tab != tabPR && f.current().base.picks() && f.focus == f.baseAt()
 }
-func (f *newWorktreeForm) onLayout() bool {
-	return f.current().layouts.picks() && f.focus == f.layoutAt()
-}
-func (f *newWorktreeForm) onCommand() bool {
-	return f.current().cmds.picks() && f.focus == f.commandAt()
+func (f *newWorktreeForm) onOpen() bool {
+	return f.current().open.picks() && f.focus == f.openAt()
 }
 
 // onChoice says whether a choice has focus, which left and right change.
-func (f *newWorktreeForm) onChoice() bool {
-	return f.onTabs() || f.onBase() || f.onLayout() || f.onCommand()
-}
+func (f *newWorktreeForm) onChoice() bool { return f.onTabs() || f.onBase() || f.onOpen() }
 
 // showTab shows tab, focus on field at, and lists the open ones the first time it is a tab that picks.
 func (f *newWorktreeForm) showTab(tab, at int) tea.Cmd {
@@ -378,23 +395,17 @@ func (f *newWorktreeForm) showTab(tab, at int) tea.Cmd {
 	return cmd
 }
 
-// cycleBase, cycleLayout and cycleCommand choose the next base, layout or command, or the one before, and
-// focus the choice, as what follows it changes with it.
+// cycleBase and cycleOpen choose the next base or thing to open with, or the one before, and focus the
+// choice, as what follows it changes with it.
 func (f *newWorktreeForm) cycleBase(delta int) tea.Cmd {
 	f.current().base.cycle(delta)
 	f.focus = f.baseAt()
 	return tea.Batch(f.follow(), moveFocus(f.fields(), &f.focus, 0))
 }
 
-func (f *newWorktreeForm) cycleLayout(delta int) tea.Cmd {
-	f.current().layouts.cycle(delta)
-	f.focus = f.layoutAt()
-	return moveFocus(f.fields(), &f.focus, 0)
-}
-
-func (f *newWorktreeForm) cycleCommand(delta int) tea.Cmd {
-	f.current().cmds.cycle(delta)
-	f.focus = f.commandAt()
+func (f *newWorktreeForm) cycleOpen(delta int) tea.Cmd {
+	f.current().open.cycle(delta)
+	f.focus = f.openAt()
 	return moveFocus(f.fields(), &f.focus, 0)
 }
 
@@ -405,21 +416,16 @@ func (f *newWorktreeForm) cycleChoice(delta int) tea.Cmd {
 		return f.showTab((f.tab+delta+len(f.tabs))%len(f.tabs), 0)
 	case f.onBase():
 		return f.cycleBase(delta)
-	case f.onLayout():
-		return f.cycleLayout(delta)
 	}
-	return f.cycleCommand(delta)
+	return f.cycleOpen(delta)
 }
 
 // openList opens the list of the choice that has focus.
 func (f *newWorktreeForm) openList() {
-	switch t := f.current(); {
-	case f.onBase():
+	if t := f.current(); f.onBase() {
 		t.base.openList()
-	case f.onLayout():
-		t.layouts.openList()
-	default:
-		t.cmds.openList()
+	} else {
+		t.open.openList()
 	}
 }
 
@@ -448,16 +454,10 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return f, tea.Batch(cmd, f.cycleBase(0))
 			}
 			return f, cmd
-		case t.layouts.listOpen():
-			cmd, picked := t.layouts.updateList(msg, f.zones)
+		case t.open.listOpen():
+			cmd, picked := t.open.updateList(msg, f.zones)
 			if picked {
-				return f, tea.Batch(cmd, f.cycleLayout(0))
-			}
-			return f, cmd
-		case t.cmds.listOpen():
-			cmd, picked := t.cmds.updateList(msg, f.zones)
-			if picked {
-				return f, tea.Batch(cmd, f.cycleCommand(0))
+				return f, tea.Batch(cmd, f.cycleOpen(0))
 			}
 			return f, cmd
 		}
@@ -479,8 +479,7 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		f.issueBranch.SetWidth(w)
 		for i := range f.tabs {
 			f.tabs[i].dir.SetWidth(w)
-			f.tabs[i].layouts.setWidth(w)
-			f.tabs[i].cmds.setWidth(w)
+			f.tabs[i].open.setWidth(w)
 		}
 		return f, nil
 	case createdMsg:
@@ -525,13 +524,9 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			t.base.openList()
 			return f, f.cycleBase(0)
 		}
-		if clickedChoice(f.zones, layoutZone, msg) {
-			t.layouts.openList()
-			return f, f.cycleLayout(0)
-		}
-		if clickedChoice(f.zones, commandZone, msg) {
-			t.cmds.openList()
-			return f, f.cycleCommand(0)
+		if clickedChoice(f.zones, openZone, msg) {
+			t.open.openList()
+			return f, f.cycleOpen(0)
 		}
 		if i, ok := clickedField(f.fields(), f.zones, msg); ok {
 			f.focus = i
@@ -595,8 +590,7 @@ func (f *newWorktreeForm) follow() tea.Cmd {
 	t.dir.Placeholder = dir
 	f.vars = spaces.BuiltinVars(f.space, spaces.LinkedWorktree(f.space, branch, planned),
 		spaces.Links{PR: f.chosen(tabPR), Issue: f.chosen(tabIssue), Base: f.base()})
-	t.layouts.setVars(f.vars)
-	t.cmds.setVars(f.vars)
+	t.open.setVars(f.vars)
 	return tea.Batch(cmds...)
 }
 
@@ -660,10 +654,8 @@ func (f *newWorktreeForm) render() string {
 		lines = append(lines, t.base.lines(f.onBase(), width)...)
 	}
 	lines = append(lines, fieldLines(th, "directory", &t.dir, width)...)
-	layoutAt := len(lines)
-	lines = append(lines, t.layouts.lines(f.onLayout(), width)...)
-	commandAt := len(lines)
-	lines = append(append(lines, t.cmds.lines(f.onCommand(), width)...), "")
+	openAt := len(lines)
+	lines = append(append(lines, t.open.lines(f.onOpen(), width)...), "")
 	failed := f.err
 	switch p := f.shownPicker(); {
 	case p != nil:
@@ -681,16 +673,11 @@ func (f *newWorktreeForm) render() string {
 	default:
 		lines = append(lines, muted(f.branchDoes(branch, ", or # for a PR")))
 	}
-	l, layout := t.layouts.chosen()
-	if layout {
-		lines = append(lines, muted("Opens with the "+l.Name+" layout"))
-	}
-	if cmd, ok := t.cmds.chosen(); ok {
-		if layout {
-			lines = append(lines, muted("Then runs "+cmd.Name+" in "+opensIn[cmd.Open]))
-		} else {
-			lines = append(lines, muted("Runs "+cmd.Name+" in the first tab"))
-		}
+	switch o, ok := t.open.chosen(); {
+	case ok && o.layout != nil:
+		lines = append(lines, muted("Opens with the "+o.layout.Name+" layout"))
+	case ok:
+		lines = append(lines, muted("Runs "+o.cmd.Name+" in the first tab"))
 	}
 	lines = append(lines, "")
 	switch {
@@ -703,10 +690,9 @@ func (f *newWorktreeForm) render() string {
 		lines = append(lines, "")
 	}
 	f.buttons = controls[*newWorktreeForm]{}
-	if t.base.listOpen() || t.layouts.listOpen() || t.cmds.listOpen() {
+	if t.base.listOpen() || t.open.listOpen() {
 		lines = t.base.drawList(lines, baseAt, width, f.height)
-		lines = t.layouts.drawList(lines, layoutAt, width, f.height)
-		lines = t.cmds.drawList(lines, commandAt, width, f.height)
+		lines = t.open.drawList(lines, openAt, width, f.height)
 		return boxed(append(lines, line(listHints()...)))
 	}
 	buttons := f.buttons.draw(f, theForm.Target(formSubject{}),
@@ -720,20 +706,12 @@ func (f *newWorktreeForm) render() string {
 		hints = append(hints, look.Text("  "), look.Key("up/down"), look.KeyDesc(" "+f.shownPicker().name()))
 	case f.onBase():
 		hints = append(hints, choiceHints("base")...)
-	case f.onLayout():
-		hints = append(hints, choiceHints("layout")...)
-	case f.onCommand():
-		hints = append(hints, choiceHints("command")...)
+	case f.onOpen():
+		hints = append(hints, choiceHints("open with")...)
 	}
 	hints = append(hints, newlineHints(f.focused())...)
 	lines = append(lines, line(append(buttons, hints...)...))
 	return boxed(lines)
-}
-
-// opensIn says where a command opens in a session with windows, by its open.
-var opensIn = map[string]string{
-	"tab": "a new tab", "split": "a split", "hsplit": "a horizontal split", "vsplit": "a vertical split",
-	"overlay": "an overlay", "window": "a new OS window",
 }
 
 // branchDoes is what creating the worktree does with branch, or, while it is not a branch's name, to

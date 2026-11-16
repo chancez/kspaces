@@ -267,7 +267,7 @@ inputs = [{ name = "prompt", label = "Prompt", default = "Review PR #{pr} on {br
 	space := spaces.Space{Name: "gr", Root: root, Worktrees: []spaces.Worktree{{Path: root, Branch: "main", Session: "gr"}}}
 	f := newForm(cfg, space)
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 24})
-	prompt := func(tab int) string { return f.tabs[tab].cmds.values()["prompt"] }
+	prompt := func(tab int) string { return f.tabs[tab].open.values()["prompt"] }
 	shiftTab := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 	// Each tab chooses claude, from its choice of command, below the directory: the branch tab's, then,
 	// from the tab strip, the PR tab's, focus left on its PR field.
@@ -306,10 +306,11 @@ inputs = [{ name = "prompt", label = "Prompt", default = "Review PR #{pr} on {br
 	}
 }
 
-// With commands configured the form chooses one, none at first, and has a field for each of its inputs;
-// tab goes through them all, left and right or a click change the command. A required input left empty
-// refuses to create. Created, the worktree's first tab runs the command: kspaces sends kitty launch with
-// the KSPACES_ and the command's env, --hold and the command, each word quoted, then switches to it.
+// With commands configured the form's open with choice offers them after the shell tab, the first at
+// first, and has a field for each input of the one chosen; tab goes through them all, left and right or a
+// click change it. A required input left empty refuses to create. Created, the worktree's first tab runs
+// the command: kspaces sends kitty launch with the KSPACES_ and the command's env, --hold and the command,
+// each word quoted, then switches to it.
 func TestNewWorktreeFormCommand(t *testing.T) {
 	root := mainRepo(t)
 	dir := t.TempDir()
@@ -354,35 +355,35 @@ run = ["gr"]
 		return append(lines, "", "   Create enter    Cancel esc   tab next field"+hint, "")
 	}
 	typeInto(f, "fix")
-	if got, want := formScreen(f), screen([]string{"  command    < none >"}, ""); !reflect.DeepEqual(got, want) {
+	if got, want := formScreen(f), screen([]string{"  open with  < shell >"}, ""); !reflect.DeepEqual(got, want) {
 		t.Errorf("form:\n%q\nwant\n%q", got, want)
 	}
 
 	f.Update(keyMsg("tab"))
 	f.Update(keyMsg("tab"))
 	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	hint := "  left/right command  space list"
-	want := screen([]string{"  command    < claude >  left/right change  space list", "  Prompt     required"}, hint, "Runs claude in the first tab")
+	hint := "  left/right open with  space list"
+	want := screen([]string{"  open with  < claude >  left/right change  space list", "  Prompt     required"}, hint, "Runs claude in the first tab")
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("claude chosen:\n%q\nwant\n%q", got, want)
 	}
 	// Round through gr and none, by key and from the list, back to claude.
 	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	if got, want := formScreen(f), screen([]string{"  command    < gr >  left/right change  space list"}, hint, "Runs gr in the first tab"); !reflect.DeepEqual(got, want) {
+	if got, want := formScreen(f), screen([]string{"  open with  < gr >  left/right change  space list"}, hint, "Runs gr in the first tab"); !reflect.DeepEqual(got, want) {
 		t.Errorf("gr chosen:\n%q\nwant\n%q", got, want)
 	}
 	clickOn(t, f, "< gr >")
-	clickOn(t, f, "none")
+	clickOn(t, f, "shell")
 	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	if c, _ := f.current().cmds.chosen(); c.Name != "claude" {
-		t.Fatalf("chose %q, want claude", c.Name)
+	if o, _ := f.current().open.chosen(); o.cmd == nil || o.cmd.Name != "claude" {
+		t.Fatalf("chose %+v, want claude", o)
 	}
 
 	f.Update(keyMsg("tab"))
 	if _, cmd := f.Update(keyMsg("enter")); cmd != nil || f.busy {
 		t.Fatal("created with the prompt empty")
 	}
-	want = screen([]string{"  command    < claude >", "  Prompt     required"}, "", "Runs claude in the first tab", "", "claude needs Prompt")
+	want = screen([]string{"  open with  < claude >", "  Prompt     required"}, "", "Runs claude in the first tab", "", "claude needs Prompt")
 	want[len(want)-2] += "  shift+enter newline"
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("prompt missing:\n%q\nwant\n%q", got, want)
@@ -447,7 +448,7 @@ inputs = [{ name = "prompt", label = "Prompt", default = "Fix issue #{issue}" }]
 		Branch, Prompt string
 	}
 	now := func() result {
-		return result{f.tab, f.issues.chosen.Number, f.issueBranch.Value(), f.tabs[tabIssue].cmds.values()["prompt"]}
+		return result{f.tab, f.issues.chosen.Number, f.issueBranch.Value(), f.tabs[tabIssue].open.values()["prompt"]}
 	}
 	shiftTab := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 
@@ -488,7 +489,7 @@ inputs = [{ name = "prompt", label = "Prompt", default = "Fix issue #{issue}" }]
 	}
 	if got, want := formScreen(f), []string{"", "  New worktree in gr", "", "   Branch   Pull request   Issue", "",
 		"  issue      #12 Crash on empty input", "  branch     pr/me/40-old-one-x", "  directory  .worktrees/40-old-one-x",
-		"  command    < claude >", "  Prompt     Fix issue #12", "",
+		"  open with  < claude >", "  Prompt     Fix issue #12", "",
 		"  Issue #12 Crash on empty input", "  Creates pr/me/40-old-one-x from main", "  Runs claude in the first tab", "",
 		"   Create enter    Cancel esc   tab next field", ""}; !reflect.DeepEqual(got, want) {
 		t.Errorf("form:\n%q\nwant\n%q", got, want)
@@ -599,7 +600,7 @@ inputs = [{ name = "prompt", label = "Prompt", default = "Diff against {base}" }
 	screen := func(base string) []string {
 		return []string{"", "  New worktree in " + space.Name, "", "   Branch   Pull request   Issue", "",
 			"  branch     pr/me/stack", "  from       < " + base + " >  left/right change  space list", "  directory  .worktrees/stack",
-			"  command    < claude >", "  Prompt     Diff against " + base, "",
+			"  open with  < claude >", "  Prompt     Diff against " + base, "",
 			"  Creates pr/me/stack from " + base, "  Runs claude in the first tab", "",
 			"   Create enter    Cancel esc   tab next field  left/right base  space list", ""}
 	}

@@ -496,9 +496,9 @@ func TestOpenLayoutNow(t *testing.T) {
 	}
 }
 
-// With layouts configured the new worktree form chooses one, the space's worktree layout at first, with a
-// field for each of its inputs, before the choice of command. Created, the session opens with the layout,
-// then the command runs where it opens, by the window the layout left focused.
+// With layouts and commands configured the new worktree form's open with choice offers the shell tab, the
+// layouts, then the commands, the space's worktree layout at first, with a field for each input of the one
+// chosen. Its list says what each is. Created, the session opens with the layout chosen.
 func TestNewWorktreeFormLayout(t *testing.T) {
 	root := mainRepo(t)
 	calls := fakeKittenWindows(t, filepath.Base(root)+"@fix")
@@ -509,6 +509,7 @@ func TestNewWorktreeFormLayout(t *testing.T) {
 	f := newForm(cfg, space)
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	keys := "   Create enter    Cancel esc   tab next field"
+	choiceKeys := keys + "  left/right open with  space list"
 	screen := func(fields []string, keys string, says ...string) []string {
 		lines := append([]string{"", "  New worktree in " + space.Name, "", "   Branch   Pull request   Issue", "", "  branch     fix", "  directory  .worktrees/fix"}, fields...)
 		lines = append(lines, "", "  Creates fix from main")
@@ -518,35 +519,24 @@ func TestNewWorktreeFormLayout(t *testing.T) {
 		return append(lines, "", keys, "")
 	}
 	typeInto(f, "fix")
-	agent := []string{"  layout     < agent >", "  Prompt     required"}
-	if got, want := formScreen(f), screen(append(agent, "  command    < none >"), keys, "Opens with the agent layout"); !reflect.DeepEqual(got, want) {
+	if got, want := formScreen(f), screen([]string{"  open with  < agent >", "  Prompt     required"}, keys, "Opens with the agent layout"); !reflect.DeepEqual(got, want) {
 		t.Errorf("form:\n%q\nwant\n%q", got, want)
 	}
+	// After the layouts come the commands.
 	f.Update(keyMsg("tab"))
 	f.Update(keyMsg("tab"))
 	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	if got, want := formScreen(f), screen([]string{"  layout     < shell >  left/right change  space list", "  command    < none >"},
-		"   Create enter    Cancel esc   tab next field  left/right layout  space list"); !reflect.DeepEqual(got, want) {
-		t.Errorf("shell:\n%q\nwant\n%q", got, want)
+	if got, want := formScreen(f), screen([]string{"  open with  < claude >  left/right change  space list", "  Prompt     required"},
+		choiceKeys, "Runs claude in the first tab"); !reflect.DeepEqual(got, want) {
+		t.Errorf("claude:\n%q\nwant\n%q", got, want)
 	}
-	// With no room below, the command's list opens above it.
-	f.Update(tea.WindowSizeMsg{Width: 70, Height: 12})
-	f.Update(keyMsg("tab"))
-	f.Update(keyMsg("space"))
-	if got, want := formScreen(f), []string{"", "  New worktree in " + space.Name, "", listRule(""), listRow(true, "none"), listRow(false, "claude  claude {prompt}"), listRow(false, "review  gr"), listRule(""),
-		"  command    < none >  left/right change  space list", "", "  Creates fix from main", "",
-		"  up/down move  type filter  enter choose  esc close", ""}; !reflect.DeepEqual(got, want) {
-		t.Errorf("above:\n%q\nwant\n%q", got, want)
-	}
-	f.Update(keyMsg("esc"))
-	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
-	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	// A click opens the list, the shell first as it is a choice, and a click on one chooses it.
-	clickOn(t, f, "< shell >")
+	clickOn(t, f, "< claude >")
 	rule := "             " + strings.Repeat("\u2500", 55)
 	want := []string{"", "  New worktree in " + space.Name, "", "   Branch   Pull request   Issue", "", "  branch     fix", "  directory  .worktrees/fix",
-		"  layout     < shell >  left/right change  space list",
-		rule, "             \uf00c shell  1 tab, a shell", "               plain  1 tab, 1 pane", "               agent  1 tab, 3 panes", rule,
+		"  open with  < claude >  left/right change  space list",
+		rule, "               shell  1 tab, a shell", "               plain  1 tab, 1 pane", "               agent  1 tab, 3 panes",
+		"             \uf00c claude  claude {prompt}", "               review  gr", rule,
 		"  up/down move  type filter  enter choose  esc close", ""}
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("the list:\n%q\nwant\n%q", got, want)
@@ -554,16 +544,10 @@ func TestNewWorktreeFormLayout(t *testing.T) {
 	clickOn(t, f, "agent")
 	f.Update(keyMsg("tab"))
 	typeInto(f, "fix it")
-	f.Update(keyMsg("tab"))
-	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
-	want = screen(append(agent[:1:1], "  Prompt     fix it", "  command    < review >  left/right change  space list"),
-		"   Create enter    Cancel esc   tab next field  left/right command  space list",
-		"Opens with the agent layout", "Then runs review in a new tab")
-	if got := formScreen(f); !reflect.DeepEqual(got, want) {
-		t.Errorf("agent and review:\n%q\nwant\n%q", got, want)
+	if got, want := formScreen(f), screen([]string{"  open with  < agent >", "  Prompt     fix it"}, keys+"  shift+enter newline",
+		"Opens with the agent layout"); !reflect.DeepEqual(got, want) {
+		t.Errorf("agent:\n%q\nwant\n%q", got, want)
 	}
-	// enter creates from the choice of command, as from any field.
 	_, cmd := f.Update(keyMsg("enter"))
 	if cmd == nil {
 		t.Fatal("enter created nothing")
@@ -572,10 +556,7 @@ func TestNewWorktreeFormLayout(t *testing.T) {
 		t.Fatalf("the form stayed: %v", f.err)
 	}
 	wt := spaces.LoadSpace(root).Worktrees[1]
-	goTo := []string{"@", "action", "goto_session", wt.Session + ".kitty-session", "--"}
-	want = slices.Concat(agentCalls(root, wt), goTo, goTo,
-		[]string{"@", "action", "--match=id:11", "launch", "--type=tab", "--cwd=" + wt.Path, "--add-to-session=" + wt.Session},
-		envOf(root, wt), []string{"--hold", "gr", "--"})
+	want = append(agentCalls(root, wt), "@", "action", "goto_session", wt.Session+".kitty-session", "--")
 	if got := calls(); !reflect.DeepEqual(got, want) {
 		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
 	}
@@ -596,8 +577,8 @@ func TestNewWorktreeFormPRLayout(t *testing.T) {
 		var out [3]string
 		for i := range f.tabs {
 			out[i] = "shell"
-			if l, ok := f.tabs[i].layouts.chosen(); ok {
-				out[i] = l.Name
+			if o, ok := f.tabs[i].open.chosen(); ok {
+				out[i] = f.tabs[i].open.nameOf(o)
 			}
 		}
 		return out
@@ -614,7 +595,7 @@ func TestNewWorktreeFormPRLayout(t *testing.T) {
 	tab := f.tab
 	f.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
 	got = append(got, chosen())
-	if want := [][3]string{{"agent", "plain", "plain"}, {"shell", "plain", "plain"}, {"shell", "plain", "plain"}}; !reflect.DeepEqual(got, want) || tab != tabPR {
+	if want := [][3]string{{"agent", "plain", "plain"}, {"claude", "plain", "plain"}, {"claude", "plain", "plain"}}; !reflect.DeepEqual(got, want) || tab != tabPR {
 		t.Errorf("got %q on tab %d, want %q", got, tab, want)
 	}
 }

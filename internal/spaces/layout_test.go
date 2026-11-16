@@ -103,7 +103,6 @@ func TestBuildLayout(t *testing.T) {
 	goTo := []string{"action", "goto_session", "gr@fix.kitty-session"}
 	type result struct {
 		Calls [][]string
-		Focus int
 	}
 	for _, launcher := range [][]string{{"launch"}, {"kitten", "my_launch.py"}} {
 		cfg.Launch = launcher
@@ -129,20 +128,18 @@ func TestBuildLayout(t *testing.T) {
 			}
 		}
 		k := &fakeLayoutKitty{}
-		focus, err := buildLayout(cfg, kitty.State{}, space, wt, lr, k)
-		if err != nil {
+		if err := buildLayout(cfg, kitty.State{}, space, wt, lr, k); err != nil {
 			t.Fatal(err)
 		}
-		got := map[string]result{"closed": {k.calls, focus}}
+		got := map[string]result{"closed": {k.calls}}
 		k = &fakeLayoutKitty{}
-		focus, err = buildLayout(cfg, kitty.State{Sessions: map[string]int{"gr@fix": 7}}, space, wt, lr, k)
-		if err != nil {
+		if err := buildLayout(cfg, kitty.State{Sessions: map[string]int{"gr@fix": 7}}, space, wt, lr, k); err != nil {
 			t.Fatal(err)
 		}
-		got["open"] = result{k.calls, focus}
+		got["open"] = result{k.calls}
 		want := map[string]result{
-			"closed": {append(tabs(0, 11), goTo), 11},
-			"open":   {append([][]string{goTo}, tabs(7, 7)...), 11},
+			"closed": {append(tabs(0, 11), goTo)},
+			"open":   {append([][]string{goTo}, tabs(7, 7)...)},
 		}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("%s:\ngot  %v\nwant %v", launcher[0], got, want)
@@ -195,7 +192,7 @@ panes = [
 	var got []result
 	for _, disabled := range [][]string{nil, {"tall"}} {
 		k := &fakeLayoutKitty{disabled: disabled}
-		_, err := buildLayout(cfg, kitty.State{}, space, space.Worktrees[0], lr, k)
+		err := buildLayout(cfg, kitty.State{}, space, space.Worktrees[0], lr, k)
 		got = append(got, result{k.calls, errString(err)})
 	}
 	first := []string{"action", "launch", "--type=tab", "--cwd=/src/gr/docs", "--add-to-session=gr"}

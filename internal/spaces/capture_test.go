@@ -155,7 +155,7 @@ func TestSplitPanes(t *testing.T) {
 		cfg := config.Config{Launch: []string{"launch"}}
 		lr := LayoutRun{Layout: config.Layout{Name: "saved", Tabs: []config.LayoutTab{{Panes: panes}}}}
 		k := &fakeLayoutKitty{}
-		if _, err := buildLayout(cfg, kitty.State{}, Space{Name: "gr", Root: "/src/gr"}, Worktree{Path: "/src/gr", Session: "gr"}, lr, k); err != nil {
+		if err := buildLayout(cfg, kitty.State{}, Space{Name: "gr", Root: "/src/gr"}, Worktree{Path: "/src/gr", Session: "gr"}, lr, k); err != nil {
 			t.Fatal(err)
 		}
 		built := normal(splitKitty(t, k.calls), func(id int) int { return groups[id-11] })

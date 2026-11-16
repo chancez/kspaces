@@ -624,7 +624,7 @@ var (
 	actFormList = &interact.Action[*newWorktreeForm, formSubject]{
 		Title: "list",
 		Applies: func(f *newWorktreeForm, _ formSubject) bool {
-			return !f.busy && (f.onBase() || f.onLayout() || f.onCommand())
+			return !f.busy && (f.onBase() || f.onOpen())
 		},
 		Run: do[*newWorktreeForm, formSubject]((*newWorktreeForm).openList),
 	}

@@ -95,8 +95,7 @@ func (*liveKitty) Action(args ...string) error            { return kitty.Action(
 // says which sessions have windows. lr's links are looked up when not given.
 func OpenLayout(cfg config.Config, st kitty.State, space Space, wt Worktree, lr LayoutRun) error {
 	lr.Links = lr.Links.fill(space, wt)
-	_, err := buildLayout(cfg, st, space, wt, lr, &liveKitty{session: wt.Session})
-	return err
+	return buildLayout(cfg, st, space, wt, lr, &liveKitty{session: wt.Session})
 }
 
 // OpenShell adds one tab to wt's session, a shell in the worktree, and switches to it, as a layout of one
@@ -120,22 +119,22 @@ func OpenShell(cfg config.Config, st kitty.State, wt Worktree) error {
 	return nil
 }
 
-// buildLayout opens lr's tabs in wt's session with k, and says the window it leaves focused. Each tab is
-// a launch action of its first pane with --type=tab, set to its kitty layout, then one of each other pane
-// with --type=window: in splits the --location for its side and --bias for its size, on the window of
-// the pane it splits; in another layout --location=after, on the pane before it, so they keep their
-// order. The action runs on that window, which a kitten acts on too, and --next-to names it. Each pane has
-// its --cwd, and one running a command its --env options and --hold, as a command's tab does. In a
-// session with windows the tabs go by the window switching to it focuses, as a command's do; in one with
-// none the first opens as OpenWorktree's first tab would, and the rest by its window. Each tab's focus
-// pane is focused, the first tab's last, so the session is left on it.
-func buildLayout(cfg config.Config, st kitty.State, space Space, wt Worktree, lr LayoutRun, k layoutKitty) (int, error) {
+// buildLayout opens lr's tabs in wt's session with k. Each tab is a launch action of its first pane with
+// --type=tab, set to its kitty layout, then one of each other pane with --type=window: in splits the
+// --location for its side and --bias for its size, on the window of the pane it splits; in another layout
+// --location=after, on the pane before it, so they keep their order. The action runs on that window, which
+// a kitten acts on too, and --next-to names it. Each pane has its --cwd, and one running a command its
+// --env options and --hold, as a command's tab does. In a session with windows the tabs go by the window
+// switching to it focuses, as a command's do; in one with none the first opens as OpenWorktree's first tab
+// would, and the rest by its window. Each tab's focus pane is focused, the first tab's last, so the session
+// is left on it.
+func buildLayout(cfg config.Config, st kitty.State, space Space, wt Worktree, lr LayoutRun, k layoutKitty) error {
 	vars := commandVars(space, wt, Run{Inputs: lr.Inputs, Links: lr.Links})
 	goTo := []string{"goto_session", SessionFile(cfg, wt.Session)}
 	anchor, open := st.Sessions[wt.Session]
 	if open {
 		if err := k.Action(goTo...); err != nil {
-			return 0, err
+			return err
 		}
 	}
 	var focus []int
@@ -175,7 +174,7 @@ func buildLayout(cfg config.Config, st kitty.State, space Space, wt Worktree, lr
 			}
 			id, err := k.Launch(args)
 			if err != nil {
-				return 0, err
+				return err
 			}
 			ids[i] = id
 			if i > 0 {
@@ -185,23 +184,23 @@ func buildLayout(cfg config.Config, st kitty.State, space Space, wt Worktree, lr
 				anchor = id
 			}
 			if err := k.GotoLayout(id, layout); err != nil {
-				return 0, fmt.Errorf("tab %d: setting kitty's %s layout, which has to be in enabled_layouts: %w", t+1, layout, err)
+				return fmt.Errorf("tab %d: setting kitty's %s layout, which has to be in enabled_layouts: %w", t+1, layout, err)
 			}
 		}
 		focus = append(focus, ids[max(slices.IndexFunc(tab.Panes, func(p config.Pane) bool { return p.Focus }), 0)])
 	}
 	for _, id := range slices.Backward(focus) {
 		if err := k.FocusWindow(id); err != nil {
-			return 0, err
+			return err
 		}
 	}
 	if !open {
 		// The tabs are the session's only windows, so going to it only records the switch, see gotoSession.
 		if err := k.Action(goTo...); err != nil {
-			return 0, err
+			return err
 		}
 	}
-	return focus[0], nil
+	return nil
 }
 
 // freshLayout is the layout wt's session opens with afresh, its default, see config.LayoutFor, for a
@@ -232,20 +231,16 @@ func freshLayout(global config.Config, wt Worktree) (cfg config.Config, space Sp
 	return cfg, space, found, lr, true, nil
 }
 
-// OpenNew opens the session of wt, a worktree of space just created, so its session has no windows:
-// with lr's tabs when lr is not nil, else with one tab, then runs r in it when r is not nil, by the
-// window the layout left focused, else as its first tab. No layout is a shell, whatever the default.
+// OpenNew opens the session of wt, a worktree of space just created, so its session has no windows: with
+// lr's tabs when lr is not nil, else with r as its first tab when r is not nil, else with one tab, a shell,
+// whatever the default layout.
 func OpenNew(cfg config.Config, space Space, wt Worktree, lr *LayoutRun, r *Run) error {
-	if lr == nil {
-		if r == nil {
-			return OpenShell(cfg, kitty.State{}, wt)
-		}
+	switch {
+	case lr != nil:
+		lr.Links = lr.Links.fill(space, wt)
+		return buildLayout(cfg, kitty.State{}, space, wt, *lr, &liveKitty{session: wt.Session})
+	case r != nil:
 		return RunCommand(cfg, kitty.State{}, space, wt, *r)
 	}
-	lr.Links = lr.Links.fill(space, wt)
-	focus, err := buildLayout(cfg, kitty.State{}, space, wt, *lr, &liveKitty{session: wt.Session})
-	if err != nil || r == nil {
-		return err
-	}
-	return RunCommand(cfg, kitty.State{Sessions: map[string]int{wt.Session: focus}}, space, wt, *r)
+	return OpenShell(cfg, kitty.State{}, wt)
 }

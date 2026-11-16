@@ -78,8 +78,8 @@ func TestNewWorktreeFormClickField(t *testing.T) {
 	clickOn(t, f, "Prompt")
 	typeInto(f, "go")
 	screen := func(branch, dir, does, keys string) []string {
-		return []string{"", "  New worktree in gr", "", "   Branch   Pull request   Issue", "", branch, dir, "  layout     < agent >", "  Prompt     go",
-			"  command    < none >", "", does, "  Opens with the agent layout", "", "   Create enter    Cancel esc   tab next field" + keys, ""}
+		return []string{"", "  New worktree in gr", "", "   Branch   Pull request   Issue", "", branch, dir, "  open with  < agent >", "  Prompt     go",
+			"", does, "  Opens with the agent layout", "", "   Create enter    Cancel esc   tab next field" + keys, ""}
 	}
 	if got, want := formScreen(f), screen("  branch     fix", "  directory  here", "  Creates fix from main", "  shift+enter newline"); !reflect.DeepEqual(got, want) {
 		t.Errorf("clicked:\n%q\nwant\n%q", got, want)

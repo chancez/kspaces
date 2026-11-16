@@ -267,7 +267,7 @@ keeps its own fields, so switching loses nothing typed. Create creates from the 
 The branch tab has a branch field, which starts with `worktrees.branch_prefix/`, and a directory field,
 empty for the default: `worktrees.dir` under the space's root, named after the branch. An existing branch is
 checked out; a new one is created from what the main worktree has checked out. When the space has other
-local branches, a `from` choice below the branch, chosen as `command` below is, picks another to start
+local branches, a `from` choice below the branch, chosen as `open with` below is, picks another to start
 from, to build on another branch's feature: the main worktree's first, then the rest, the last committed
 to first. It starts on the branch of the worktree whose row the form was opened from, else the main
 worktree's. A base other than the main worktree's is recorded in git config as the branch's `kspaces-base`,
@@ -305,33 +305,30 @@ worktree from then on, for a prompt such as `Fix issue #{issue}`. git deletes it
 looked up at once; `--from-issue` and `--issue N` do the same with the Issue tab. `--base BRANCH` starts
 `from` on a local branch, as a worktree's row does with its branch.
 
-With [commands](kitty.md#running-commands) configured, the form has a `command` field below the directory,
-`none` at first, and below it a field for each input of the command chosen. `tab` and `shift+tab` go round
-all the fields. A choice like `command` is drawn `< claude >`, and while it has focus says
-`left/right change  space list` after it, and the keys row lists `left/right` and `space`: `left` and
-`right` go to the one before or after; `space` or a click opens a list below the field, or above it when
-it would run off the bottom, of every choice, the one chosen marked and selected, a layout with how many
-tabs and panes it has and a command with its command line. In the list `up`, `down`, and `j` and `k`
-before anything is typed, move; typing keeps the choices with what is typed in their names, shown on the
-list's top rule, and `backspace` takes it back; `enter` or a click chooses; `esc` or a click outside the
-list closes it as it was. A list longer than the screen has room for scrolls, with how many are out of
-view above and below. While it is open the form's keys are the list's, so `enter` there chooses and
-never submits the form, nor `esc` cancels it. Otherwise `enter` submits the form from any field, a
-choice included, as the button, `Create enter`, says. Every form with a choice, below, has these. With a
-command chosen, the new session's first tab runs it rather than a shell, and
-starts your shell once it exits. A required input left empty refuses to create.
+With [layouts](kitty.md#layouts) or [commands](kitty.md#running-commands) configured, the form has an
+`open with` field below the directory, what the new session opens with: `shell`, one tab, a shell, then
+the layouts, then the commands, and below it a field for each input of the one chosen. It is set at first
+to the space's layout for its linked worktrees, on the PR tab to its [`pr_layout`](kitty.md#layouts) and on
+the Issue tab to its `issue_layout`, else `shell`. A layout chosen opens its tabs rather than one shell
+tab; a command chosen runs as the session's first tab, which starts your shell once it exits. `tab` and
+`shift+tab` go round all the fields. A choice like `open with` is drawn `< claude >`, and while it has
+focus says `left/right change  space list` after it, and the keys row lists `left/right` and `space`:
+`left` and `right` go to the one before or after; `space` or a click opens a list below the field, or
+above it when it would run off the bottom, of every choice, the one chosen marked and selected, a layout
+with how many tabs and panes it has and a command with its command line. In the list `up`, `down`, and `j`
+and `k` before anything is typed, move; typing keeps the choices with what is typed in their names, shown
+on the list's top rule, and `backspace` takes it back; `enter` or a click chooses; `esc` or a click outside
+the list closes it as it was. A list longer than the screen has room for scrolls, with how many are out of
+view above and below. While it is open the form's keys are the list's, so `enter` there chooses and never
+submits the form, nor `esc` cancels it. Otherwise `enter` submits the form from any field, a choice
+included, as the button, `Create enter`, says. Every form with a choice, below, has these. A required
+input left empty refuses to create.
 
 An input's field takes several lines, for a prompt: `shift+enter` starts a new one, as do `alt+enter` and
 `ctrl+j`, for a terminal that sends `shift+enter` as `enter`, and `enter` still submits the form. The field
 grows to show its lines, a long one wrapped, up to six, then scrolls with the cursor, and the rows below it
 move down. `up` and `down` move between its lines, and leave it only from the first or the last. While it
 has focus the keys row lists `shift+enter newline`. Every form with an input, below, has these.
-
-With [layouts](kitty.md#layouts) configured, a `layout` field comes before `command`, set at first to the
-space's layout for its linked worktrees, on the PR tab to its [`pr_layout`](kitty.md#layouts) and on the
-Issue tab to its `issue_layout`, else `shell`, listed first as `shell  1 tab, a shell`, and below it a field
-for each of its inputs. With a layout chosen the session opens with its tabs rather than one shell tab;
-with a command too, the command then runs where its `open` says, by the pane the layout left focused.
 
 **Run** chooses a command, with the same `command` field when there is more than one, and has a field for
 each input of the one chosen. It says where the command opens: as the session's first tab when the session
