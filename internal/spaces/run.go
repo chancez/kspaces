@@ -34,21 +34,25 @@ func NewRun(cmd config.Command, inputs, vars map[string]string) (Run, error) {
 	return Run{Command: cmd, Inputs: values, Open: cmd.Open}, nil
 }
 
-// Links are what a worktree is for, by number, 0 for none or not known: the PR it checks out, and the
-// issue it was created for.
+// Links are what a worktree is for, as far as known: the PR it checks out and the issue it was created
+// for, by number, 0 for none, and the branch it was created from, empty for the main worktree's.
 type Links struct {
 	PR    int
 	Issue int
+	Base  string
 }
 
-// fill fills in the links l does not know with what git config says of wt, see WorktreePR and
-// WorktreeIssue.
+// fill fills in the links l does not know with what git config says of wt, see WorktreePR,
+// WorktreeIssue and WorktreeBase.
 func (l Links) fill(space Space, wt Worktree) Links {
 	if l.PR == 0 {
 		l.PR = WorktreePR(space, wt)
 	}
 	if l.Issue == 0 {
 		l.Issue = WorktreeIssue(space, wt)
+	}
+	if l.Base == "" {
+		l.Base = WorktreeBase(space, wt)
 	}
 	return l
 }
@@ -62,6 +66,14 @@ func WorktreeIssue(space Space, wt Worktree) int {
 		return 0
 	}
 	return git.BranchIssue(space.Root, wt.Branch)
+}
+
+// WorktreeBase is the branch wt's branch was created from, as CreateWorktreeFrom records it, or empty.
+func WorktreeBase(space Space, wt Worktree) string {
+	if wt.Branch == "" {
+		return ""
+	}
+	return git.BranchBase(space.Root, wt.Branch)
 }
 
 // WorktreePR is the PR whose head wt's branch pulls from, as CreatePRWorktree sets up a PR from a fork,
@@ -108,7 +120,7 @@ func commandVars(space Space, wt Worktree, r Run) map[string]string {
 }
 
 // BuiltinVars are the values of the built-in placeholders, see config.Builtins, for wt, a worktree of
-// space, and links, what it is for.
+// space, and links, what it is for. The base is links' or else the main worktree's branch.
 func BuiltinVars(space Space, wt Worktree, links Links) map[string]string {
 	vars := map[string]string{
 		"space":    space.Name,
@@ -116,11 +128,11 @@ func BuiltinVars(space Space, wt Worktree, links Links) map[string]string {
 		"worktree": wt.Path,
 		"branch":   wt.Branch,
 		"session":  wt.Session,
-		"base":     "",
+		"base":     links.Base,
 		"pr":       "",
 		"issue":    "",
 	}
-	if len(space.Worktrees) > 0 {
+	if links.Base == "" && len(space.Worktrees) > 0 {
 		vars["base"] = space.Worktrees[0].Branch
 	}
 	if links.PR > 0 {

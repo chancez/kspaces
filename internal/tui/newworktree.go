@@ -229,7 +229,7 @@ func (f *newWorktreeForm) create() tea.Cmd {
 					return createdMsg{err}
 				}
 			}
-			wt, err := spaces.CreateIssueWorktree(space, ref.Number, branch, dir)
+			wt, err := spaces.CreateIssueWorktree(space, ref.Number, branch, "", dir)
 			if err != nil {
 				return createdMsg{err}
 			}

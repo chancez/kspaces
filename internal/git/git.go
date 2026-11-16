@@ -68,9 +68,9 @@ func ParseWorktrees(porcelain string) []Worktree {
 }
 
 // AddWorktree adds a worktree at dir to the repository at root, on branch, and returns its path as git
-// reports it. It checks out the branch when it exists and otherwise creates it from what the main
-// worktree has checked out.
-func AddWorktree(root, branch, dir string) (string, error) {
+// reports it. It checks out the branch when it exists and otherwise creates it from base, or from what
+// the main worktree has checked out when base is empty.
+func AddWorktree(root, branch, base, dir string) (string, error) {
 	branch = strings.TrimSpace(branch)
 	switch {
 	case branch == "" || strings.HasSuffix(branch, "/"):
@@ -81,6 +81,9 @@ func AddWorktree(root, branch, dir string) (string, error) {
 	args := []string{"-C", root, "worktree", "add", dir, branch}
 	if !BranchExists(root, branch) {
 		args = []string{"-C", root, "worktree", "add", "-b", branch, dir}
+		if base != "" {
+			args = append(args, base)
+		}
 	}
 	if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
 		return "", fmt.Errorf("%s", strings.TrimSpace(string(out)))

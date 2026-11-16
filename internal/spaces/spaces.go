@@ -109,10 +109,26 @@ func WorktreeDir(cfg config.Config, root, branch, dir string) string {
 // CreateWorktree adds a worktree at dir to the space, on branch. It checks out the branch when it exists
 // and otherwise creates it from what the space's main worktree has checked out.
 func CreateWorktree(space Space, branch, dir string) (Worktree, error) {
-	branch = strings.TrimSpace(branch)
-	path, err := git.AddWorktree(space.Root, branch, dir)
+	return CreateWorktreeFrom(space, branch, "", dir)
+}
+
+// CreateWorktreeFrom is CreateWorktree creating a new branch from base, when not empty, and recording
+// base in git config as the branch's kspaces-base, so {base} is it in the worktree from then on, see
+// WorktreeBase. A base that is what the main worktree has checked out is not recorded, being the default.
+func CreateWorktreeFrom(space Space, branch, base, dir string) (Worktree, error) {
+	branch, base = strings.TrimSpace(branch), strings.TrimSpace(base)
+	if len(space.Worktrees) > 0 && base == space.Worktrees[0].Branch {
+		base = ""
+	}
+	created := base != "" && !space.HasBranch(branch)
+	path, err := git.AddWorktree(space.Root, branch, base, dir)
 	if err != nil {
 		return Worktree{}, err
+	}
+	if created {
+		if err := git.SetBranchBase(space.Root, branch, base); err != nil {
+			return Worktree{}, fmt.Errorf("recording %s as the base of %s: %w", base, branch, err)
+		}
 	}
 	return LinkedWorktree(space, branch, path), nil
 }

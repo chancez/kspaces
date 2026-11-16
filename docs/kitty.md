@@ -87,7 +87,8 @@ A command with several inputs or long ones can list them as tables of their own 
 `[[commands.inputs]]` belonging to the `[[commands]]` above it.
 
 `run` and the values of `env` are templates. `{NAME}` is replaced, as text within the argument, by an
-input's value or a built-in: `{space}`, `{root}`, `{worktree}` (its path), `{branch}`, `{base}` (the main
+input's value or a built-in: `{space}`, `{root}`, `{worktree}` (its path), `{branch}`, `{base}` (the
+branch the worktree's was created from, kept in git config as its branch's `kspaces-base`, else the main
 worktree's branch), `{session}`, `{pr}`, the PR's number when the worktree was created from one or its
 branch pulls from a PR's head, else empty, and `{issue}`, the number of the issue the worktree was created
 for, kept in git config as its branch's `kspaces-issue`, else empty. Values are never split or expanded,

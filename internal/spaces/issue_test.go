@@ -3,33 +3,44 @@ package spaces
 import (
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/gittest"
 )
 
-// A worktree created for an issue knows it from then on, as git config records it with its branch; the
-// branch deleted, a new one of its name is for no issue.
+// A worktree created for an issue, from a base, knows both from then on, as git config records them with
+// its branch, which starts at the base; one from the main worktree's branch records no base. The branch
+// deleted, a new one of its name is for no issue and has no base.
 func TestCreateIssueWorktree(t *testing.T) {
 	r := gittest.New(t)
-	r.Commit("first")
+	main := r.Commit("first")
+	r.Git("switch", "-q", "-c", "feat")
+	feat := r.Commit("feat")
+	r.Git("switch", "-q", "main")
 	space := LoadSpace(r.Dir)
-	dir := filepath.Join(r.Dir, ".worktrees", "42-fix")
-	wt, err := CreateIssueWorktree(space, 42, "pr/me/42-fix", dir)
-	if err != nil {
-		t.Fatal(err)
+	type result struct {
+		Links Links
+		Tip   string
 	}
-	got := []Links{WorktreeLinks(space, wt)}
+	var got []result
+	created := func(wt Worktree, err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, result{WorktreeLinks(space, wt), strings.TrimSpace(r.Git("rev-parse", wt.Branch))})
+	}
+	dir := filepath.Join(r.Dir, ".worktrees", "42-fix")
+	created(CreateIssueWorktree(space, 42, "pr/me/42-fix", "feat", dir))
+	created(CreateWorktreeFrom(space, "plain", "main", filepath.Join(r.Dir, ".worktrees", "plain")))
 	r.Git("worktree", "remove", dir)
 	r.Git("branch", "-q", "-D", "pr/me/42-fix")
-	again, err := CreateWorktree(space, "pr/me/42-fix", dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got = append(got, WorktreeLinks(space, again))
-	if want := []Links{{Issue: 42}, {}}; !reflect.DeepEqual(got, want) {
-		t.Errorf("got %+v, want %+v", got, want)
+	created(CreateWorktree(space, "pr/me/42-fix", dir))
+	want := []result{{Links{Issue: 42, Base: "feat"}, feat}, {Links{}, main}, {Links{}, main}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v\nwant %+v", got, want)
 	}
 }
 

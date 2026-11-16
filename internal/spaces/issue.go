@@ -48,10 +48,11 @@ func IssueBranch(cfg config.Config, number int, title string) string {
 	return BranchStart(cfg) + strings.Join(append([]string{strconv.Itoa(number)}, words...), "-")
 }
 
-// CreateIssueWorktree adds a worktree at dir to the space on branch, as CreateWorktree does, and records
-// issue, by number, as the one it is for, so {issue} is known in it from then on, see WorktreeIssue.
-func CreateIssueWorktree(space Space, issue int, branch, dir string) (Worktree, error) {
-	wt, err := CreateWorktree(space, branch, dir)
+// CreateIssueWorktree adds a worktree at dir to the space on branch, created from base as
+// CreateWorktreeFrom does, and records issue, by number, as the one it is for, so {issue} is known in it
+// from then on, see WorktreeIssue.
+func CreateIssueWorktree(space Space, issue int, branch, base, dir string) (Worktree, error) {
+	wt, err := CreateWorktreeFrom(space, branch, base, dir)
 	if err != nil {
 		return Worktree{}, err
 	}
