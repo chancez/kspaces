@@ -160,9 +160,9 @@ func (m *sidebar) setRows() {
 func (m *sidebar) rebuildRows(at cursorPos) {
 	key, entry := at.key, at.entry
 	if m.filtering {
-		m.rows = filterRows(spaces.BuildRows(m.others, m.spaces, nil, m.hidden, m.rowOrder()), m.filter.Value())
+		m.rows = filterRows(spaces.BuildRows(m.others, m.listed(), nil, m.hidden, m.rowOrder()), m.filter.Value())
 	} else {
-		m.rows = spaces.BuildRows(m.others, m.spaces, m.folded, m.hidden, m.rowOrder())
+		m.rows = spaces.BuildRows(m.others, m.listed(), m.folded, m.hidden, m.rowOrder())
 	}
 	if m.attending {
 		m.rows = spaces.AttentionRows(m.rows, m.kitty.Statuses)

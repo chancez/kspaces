@@ -334,29 +334,44 @@ func TestMoveKeysInGroup(t *testing.T) {
 	}
 }
 
-// Dragging a space past its group's spaces leaves it first or last among them, never in another group.
-func TestDragInGroup(t *testing.T) {
+// groupsConfig is groupsFixture's spaces as config.toml lists them, each with its group.
+const groupsConfig = "# Mine.\nspaces = [\n  { path = \"/src/gr\", group = \"work\" }, # work\n  # the terminal\n" +
+	"  { path = \"/src/kitty\", group = \"personal\" },\n  { path = \"/src/docs\", group = \"work\" },\n  \"/src/broken\",\n]\n"
+
+// Dragging a space onto another group's space puts it in that group, where that space is, its entry
+// rewritten with the group; onto a session in no space, first in no group, its entry a path again.
+func TestDragAcrossGroups(t *testing.T) {
 	e := newGroupsEnv(t)
-	cfg := newConfig(t, orderConfig)
+	cfg := newConfig(t, groupsConfig)
 	type state struct {
 		Screen []string
 		Config string
 	}
 	now := func() state { return state{e.spacesScreen(), cfg()} }
-	// kitty onto docs, in work: personal has kitty alone, so nothing moves.
 	e.pressOn("kitty", headerRows+e.row("docs"))
 	e.letGo(headerRows + e.row("docs"))
-	unmoved := state{groupsScreen("", workHeader, groupGr[0], groupGr[1], groupGr[2], "", groupDocs, "", homeHeader, groupKitty), orderConfig}
-	if got := now(); !reflect.DeepEqual(got, unmoved) {
-		t.Errorf("kitty onto docs:\n%#v\nwant\n%#v", got, unmoved)
+	want := state{groupsScreen("", workHeader, groupGr[0], groupGr[1], groupGr[2], "", groupKitty, "", groupDocs),
+		"# Mine.\nspaces = [\n  \"/src/broken\",\n  { path = \"/src/gr\", group = \"work\" }, # work\n  # the terminal\n" +
+			"  { path = \"/src/kitty\", group = \"work\" },\n  { path = \"/src/docs\", group = \"work\" },\n]\n"}
+	if got := now(); !reflect.DeepEqual(got, want) {
+		t.Errorf("kitty onto docs:\n%#v\nwant\n%#v", got, want)
 	}
-	// gr onto kitty, below work: gr goes last in work.
-	e.pressOn("gr", headerRows+e.row("kitty"))
-	e.letGo(headerRows + e.row("kitty"))
-	moved := state{groupsScreen("", workHeader, groupDocs, "", groupGr[0], groupGr[1], groupGr[2], "", homeHeader, groupKitty),
-		"# Mine.\nspaces = [\n  \"/src/broken\",\n  \"/src/docs\",\n  \"/src/gr\", # work\n  # the terminal\n  \"/src/kitty\",\n]\n"}
-	if got := now(); !reflect.DeepEqual(got, moved) {
-		t.Errorf("gr onto kitty:\n%#v\nwant\n%#v", got, moved)
+	e.pressOn("docs", headerRows+e.row("default"))
+	e.letGo(headerRows + e.row("default"))
+	want = state{[]string{spacesTitle, "", "  " + termIcon + "default", "", groupDocs, "", groupBroken, "", workHeader, groupGr[0], groupGr[1], groupGr[2], "", groupKitty},
+		"# Mine.\nspaces = [\n  \"/src/docs\",\n  \"/src/broken\",\n  { path = \"/src/gr\", group = \"work\" }, # work\n  # the terminal\n" +
+			"  { path = \"/src/kitty\", group = \"work\" },\n]\n"}
+	if got := now(); !reflect.DeepEqual(got, want) {
+		t.Errorf("docs onto default:\n%#v\nwant\n%#v", got, want)
+	}
+	// docs onto work's header: first in work.
+	e.pressOn("docs", headerRows+e.headerRow("work"))
+	e.letGo(headerRows + e.headerRow("work"))
+	want = state{groupsScreen("", workHeader, groupDocs, "", groupGr[0], groupGr[1], groupGr[2], "", groupKitty),
+		"# Mine.\nspaces = [\n  \"/src/broken\",\n  { path = \"/src/docs\", group = \"work\" },\n  { path = \"/src/gr\", group = \"work\" }, # work\n  # the terminal\n" +
+			"  { path = \"/src/kitty\", group = \"work\" },\n]\n"}
+	if got := now(); !reflect.DeepEqual(got, want) {
+		t.Errorf("docs onto work's header:\n%#v\nwant\n%#v", got, want)
 	}
 }
 

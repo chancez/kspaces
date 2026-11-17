@@ -69,26 +69,35 @@ func SaveSpacesOrder(order []string) error {
 	if err != nil {
 		return err
 	}
-	before, err := parse(files.paths, files.texts)
+	texts, err := orderedTexts(files.paths, files.texts, order)
 	if err != nil {
-		return fmt.Errorf("the config has an error to fix first: %w", err)
+		return err
+	}
+	return files.write(texts)
+}
+
+// orderedTexts are texts, the config files at paths, with their spaces reordered as SaveSpacesOrder says.
+func orderedTexts(paths, texts, order []string) ([]string, error) {
+	before, err := parse(paths, texts)
+	if err != nil {
+		return nil, fmt.Errorf("the config has an error to fix first: %w", err)
 	}
 	if !slices.Equal(slices.Sorted(slices.Values(before.Spaces)), slices.Sorted(slices.Values(order))) {
-		return errSpacesChanged
+		return nil, errSpacesChanged
 	}
 	// Each file's spaces in order, a root listed twice taken by the first files to list it.
-	left := make([]map[string]int, len(files.texts))
-	for i, text := range files.texts {
+	left := make([]map[string]int, len(texts))
+	for i, text := range texts {
 		p, err := decode(text)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		left[i] = map[string]int{}
 		for _, root := range p.cfg.Spaces {
 			left[i][root]++
 		}
 	}
-	own, fileOf := make([][]string, len(files.texts)), map[string]int{}
+	own, fileOf := make([][]string, len(texts)), map[string]int{}
 	for _, root := range order {
 		i := slices.IndexFunc(left, func(n map[string]int) bool { return n[root] > 0 })
 		left[i][root]--
@@ -97,19 +106,19 @@ func SaveSpacesOrder(order []string) error {
 			fileOf[root] = i
 		}
 	}
-	texts := slices.Clone(files.texts)
-	for i, text := range files.texts {
-		texts[i], err = reorderSpaces(text, own[i], func(text string) ([]string, error) {
+	out := slices.Clone(texts)
+	for i, text := range texts {
+		out[i], err = reorderSpaces(text, own[i], func(text string) ([]string, error) {
 			p, err := decode(text)
 			return p.cfg.Spaces, err
 		})
 		if err != nil {
-			return fmt.Errorf("%s: %w", files.paths[i], err)
+			return nil, fmt.Errorf("%s: %w", paths[i], err)
 		}
 	}
-	after, err := parse(files.paths, texts)
+	after, err := parse(paths, out)
 	if err != nil {
-		return fmt.Errorf("reordering the spaces would break the config, so it was left as is: %w", err)
+		return nil, fmt.Errorf("reordering the spaces would break the config, so it was left as is: %w", err)
 	}
 	group := func(roots []string) map[string][]string {
 		ans := map[string][]string{}
@@ -123,17 +132,22 @@ func SaveSpacesOrder(order []string) error {
 	for _, g := range slices.Sorted(maps.Keys(want)) {
 		for k, a := range want[g] {
 			if b := got[g][k]; a != b {
-				return fmt.Errorf("%s cannot go before %s: it is in %s, whose spaces come after %s's", filepath.Base(a), filepath.Base(b),
-					filepath.Base(files.paths[fileOf[a]]), filepath.Base(files.paths[fileOf[b]]))
+				return nil, fmt.Errorf("%s cannot go before %s: it is in %s, whose spaces come after %s's", filepath.Base(a), filepath.Base(b),
+					filepath.Base(paths[fileOf[a]]), filepath.Base(paths[fileOf[b]]))
 			}
 		}
 	}
+	return out, nil
+}
+
+// write writes texts in place of the files' texts, those that changed, each only if it is still as read.
+func (f configFiles) write(texts []string) error {
 	for i := range texts {
-		if texts[i] == files.texts[i] {
+		if texts[i] == f.texts[i] {
 			continue
 		}
-		err := EditFile(files.paths[i], func(text string) (string, error) {
-			if text != files.texts[i] {
+		err := EditFile(f.paths[i], func(text string) (string, error) {
+			if text != f.texts[i] {
 				return "", errSpacesChanged
 			}
 			return texts[i], nil
@@ -158,50 +172,12 @@ type spaceEntry struct {
 // reorderItems is text with the items of the spaces array moved, item from[j] to the place of item j.
 // Each place keeps its indentation, comma and line breaks, and takes the moved item's value and comments.
 func reorderItems(text string, from []int) (string, error) {
-	sc := scanner{s: text}
-	open, _, err := sc.spacesArray()
-	if err != nil {
-		return "", err
-	}
-	if open < 0 {
-		return "", fmt.Errorf("the config lists no spaces")
-	}
-	items, _, err := sc.items(open)
+	sc, items, entries, err := scanSpaces(text)
 	if err != nil {
 		return "", err
 	}
 	if len(items) != len(from) {
 		return "", fmt.Errorf("the spaces list has %d items, not the %d spaces it lists", len(items), len(from))
-	}
-	entries := make([]spaceEntry, len(items))
-	bound := open + 1
-	for k, it := range items {
-		e := spaceEntry{lead: -1, start: it.start, end: it.end, tail: -1}
-		if ls := lineStart(text, it.start); ls >= bound && strings.TrimSpace(text[ls:it.start]) == "" {
-			e.lead, e.leadEnd = ls, ls
-			for e.lead > bound {
-				prev := lineStart(text, e.lead-1)
-				if prev < bound || !strings.HasPrefix(strings.TrimLeft(text[prev:e.lead-1], " \t"), "#") {
-					break
-				}
-				e.lead = prev
-			}
-		}
-		after := it.end
-		if it.comma >= 0 {
-			after = it.comma + 1
-		}
-		nl := strings.IndexByte(text[after:], '\n')
-		if nl < 0 {
-			nl = len(text) - after
-		}
-		if rest := strings.TrimLeft(text[after:after+nl], " \t\r"); rest == "" || rest[0] == '#' {
-			e.tail, e.tailEnd = after, after+nl
-			bound = after + nl
-		} else {
-			bound = after
-		}
-		entries[k] = e
 	}
 	part := func(i, j int) string {
 		if i < 0 {
@@ -233,4 +209,51 @@ func reorderItems(text string, from []int) (string, error) {
 	}
 	b.WriteString(text[at:])
 	return b.String(), nil
+}
+
+// scanSpaces is the scanner of text, the items of its spaces array, and each with what moves with it.
+func scanSpaces(text string) (scanner, []arrayItem, []spaceEntry, error) {
+	sc := scanner{s: text}
+	open, _, err := sc.spacesArray()
+	if err != nil {
+		return sc, nil, nil, err
+	}
+	if open < 0 {
+		return sc, nil, nil, fmt.Errorf("the config lists no spaces")
+	}
+	items, _, err := sc.items(open)
+	if err != nil {
+		return sc, nil, nil, err
+	}
+	entries := make([]spaceEntry, len(items))
+	bound := open + 1
+	for k, it := range items {
+		e := spaceEntry{lead: -1, start: it.start, end: it.end, tail: -1}
+		if ls := lineStart(text, it.start); ls >= bound && strings.TrimSpace(text[ls:it.start]) == "" {
+			e.lead, e.leadEnd = ls, ls
+			for e.lead > bound {
+				prev := lineStart(text, e.lead-1)
+				if prev < bound || !strings.HasPrefix(strings.TrimLeft(text[prev:e.lead-1], " \t"), "#") {
+					break
+				}
+				e.lead = prev
+			}
+		}
+		after := it.end
+		if it.comma >= 0 {
+			after = it.comma + 1
+		}
+		nl := strings.IndexByte(text[after:], '\n')
+		if nl < 0 {
+			nl = len(text) - after
+		}
+		if rest := strings.TrimLeft(text[after:after+nl], " \t\r"); rest == "" || rest[0] == '#' {
+			e.tail, e.tailEnd = after, after+nl
+			bound = after + nl
+		} else {
+			bound = after
+		}
+		entries[k] = e
+	}
+	return sc, items, entries, nil
 }

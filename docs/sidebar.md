@@ -144,15 +144,20 @@ The rows show where it goes as the mouse moves, the dragged row lit, and letting
 or a right click while dragging puts it back. A press let go of on the row it was on is a click, which is
 why a row opens when the mouse is let go rather than pressed. `K` and `J` move the cursor's row up and
 down the same way. A session in no space and a missing worktree do not move, and neither does anything
-while a filter is on, nor by dragging in the [select mode](#selecting), where a drag ticks rows. A space
-moves among the spaces of its group, or of none: `K` on the first of them or `J` on the last does nothing,
-and dragging it past them leaves it first or last; groups are not reordered by moving, only by `groups`
-in config.toml. Moving a space rewrites the order of `spaces` in config.toml, or in the
+while a filter is on, nor by dragging in the [select mode](#selecting), where a drag ticks rows. `K` and
+`J` move a space among the spaces of its group, or of none, and do nothing past the first or the last of
+them. Dragging a space onto another group's space, or onto its header, first in it, moves the space into
+that group; onto a session in no space, first in no group. Groups are not reordered by moving, only by
+`groups` in config.toml. Moving a space rewrites the order of `spaces` in config.toml, or in the
 [config file](kitty.md#more-config-files) that lists it, as text, each entry with the comments on the lines
 right above it and after it on its line, through a symlinked config to its target, each group's spaces
-together as the list shows them. Moving a
-worktree keeps its space's order, by the worktrees' directories, in `$XDG_STATE_HOME/kspaces/order`.
-Either moves the order of every sidebar.
+together as the list shows them. Moving it into another group rewrites its entry too, a path becoming
+`{ path = "~/src/x", group = "work" }` and a table's group changing or going, and moves the entry, with its
+comments, to the config file that lists the most of that group's spaces, as **Add space** picks the file,
+so a space dragged into the group a `work.toml` holds goes there. A group set in a `[space.NAME]` table
+stays that table's: dragging the space out of it says to change it there. Moving a worktree keeps its
+space's order, by the worktrees' directories, in `$XDG_STATE_HOME/kspaces/order`. Either moves the order of
+every sidebar.
 
 Moving in activity or status switches to manual, starting from the order shown: the spaces are written to
 config.toml as they were shown and every space's worktrees saved as they were shown, then the move is

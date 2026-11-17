@@ -1,15 +1,18 @@
 package tui
 
 import (
+	"slices"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/spaces"
 )
 
-// Dragging a row of the spaces list moves it, as K and J do: a space among the spaces, a linked worktree
-// among its space's. A left press on a row is held until its release: let go on the row, it is a click
-// and opens the row; moved onto another row, it drags. The rows show the order the drag will leave as
-// it goes, the dragged row lit, and the release keeps it. esc or a right click puts them back.
+// Dragging a row of the spaces list moves it, as K and J do: a space among the spaces, into another group
+// on a row of it, a linked worktree among its space's. A left press on a row is held until its release:
+// let go on the row, it is a click and opens the row; moved onto another row, it drags. The rows show the
+// order the drag will leave as it goes, the dragged row lit, and the release keeps it. esc or a right
+// click puts them back.
 
 // press is a left press on a row of the spaces list, until its release.
 type press struct {
@@ -57,17 +60,24 @@ func (m *sidebar) dragTo(y int) {
 		p.drag = &a
 		m.unhover()
 	}
-	to, on, ok := m.dropAt(i)
-	if from, _ := p.drag.place(p.row); !ok || from == to {
+	group, to, on, ok := m.dropAt(i)
+	if !ok {
 		return
 	}
-	next := p.drag.move(p.row, to)
+	var next arrangement
+	if root := p.row.Space.Root; p.row.Main && group != p.drag.groups[root] {
+		next = p.drag.regroup(p.row, group, to)
+	} else if from, _ := p.drag.place(p.row); from != to {
+		next = p.drag.move(p.row, to)
+	} else {
+		return
+	}
 	// Moving past a row taller than the dragged one would leave the mouse on it, which would move the
 	// dragged one back: wait for the mouse to go further.
 	if on != "" {
 		o := m.rowOrder()
 		o.Held = next.held()
-		rows := spaces.BuildRows(m.others, m.spaces, m.folded, m.hidden, o)
+		rows := spaces.BuildRows(m.others, m.regrouped(next), m.folded, m.hidden, o)
 		if i >= 0 && i < len(rows) && dragItem(rows[i], p.row) == on {
 			return
 		}
@@ -77,53 +87,89 @@ func (m *sidebar) dragTo(y int) {
 	m.setRows()
 }
 
-// dropAt is where the dragged row goes with the mouse on row i, among its own, and what the mouse is on
-// that it moves past: a space's root or a worktree's session, empty for none. A space moves among the
-// spaces of its group only, so the mouse above their rows puts it first, and below them last.
-func (m *sidebar) dropAt(i int) (to int, on string, ok bool) {
+// listed are the spaces as the rows show them: while a drag moves a space into another group, in it.
+func (m *sidebar) listed() []spaces.Space {
+	if m.press == nil || m.press.drag == nil {
+		return m.spaces
+	}
+	return m.regrouped(*m.press.drag)
+}
+
+// regrouped are the spaces in the groups a says: m.spaces when a moves none into another, else a copy.
+func (m *sidebar) regrouped(a arrangement) []spaces.Space {
+	var out []spaces.Space
+	for i, s := range m.spaces {
+		if g, ok := a.groups[s.Root]; ok && g != s.Group {
+			if out == nil {
+				out = slices.Clone(m.spaces)
+			}
+			out[i].Group = g
+		}
+	}
+	if out == nil {
+		return m.spaces
+	}
+	return out
+}
+
+// dropAt is where the dragged row goes with the mouse on row i: for a space, the group, on a space's row
+// that space's, on a group's header that group, first in it, on a session in no space no group, first,
+// and above or below the list the first or the last group; for a worktree, its space's. Then the place
+// among its own there, and what the mouse is on that it moves past: a space's root or a worktree's
+// session, empty for none.
+func (m *sidebar) dropAt(i int) (group string, to int, on string, ok bool) {
 	p := m.press
 	if p.row.Main {
-		// The rows of the spaces of the dragged one's group, which BuildRows lists together.
-		first, last := -1, -1
-		for j, r := range m.rows {
-			if r.Space != nil && !r.Other && r.Space.Group == p.row.Space.Group {
-				if first < 0 {
-					first = j
+		var first, last *spaces.Space
+		for _, r := range m.rows {
+			if r.Space != nil && !r.Other {
+				if first == nil {
+					first = r.Space
 				}
-				last = j
+				last = r.Space
 			}
 		}
-		_, n := p.drag.place(p.row)
 		switch {
-		case i >= 0 && i < len(m.rows) && m.rows[i].Blank():
-			return 0, "", false
-		case i < first:
-			return 0, "", true
-		case i > last:
-			return n - 1, "", true
+		case first == nil:
+			return "", 0, "", false
+		case i < 0:
+			return first.Group, 0, "", true
+		case i >= len(m.rows):
+			_, n := p.drag.block(last.Group)
+			return last.Group, n, "", true
 		}
-		to, _ := p.drag.place(spaces.Row{Space: m.rows[i].Space, Main: true})
-		return to, m.rows[i].Space.Root, true
+		switch r := m.rows[i]; {
+		case r.Blank():
+			return "", 0, "", false
+		case r.Group != nil:
+			return r.Group.Name, 0, "", true
+		case r.Other || r.Space == nil:
+			return "", 0, "", true
+		default:
+			to, _ := p.drag.place(spaces.Row{Space: r.Space, Main: true})
+			return r.Space.Group, to, r.Space.Root, true
+		}
 	}
 	root := p.row.Space.Root
+	group = p.row.Space.Group
 	last := len(p.drag.linked[root]) - 1
 	if i >= 0 && i < len(m.rows) && dragItem(m.rows[i], spaces.Row{Main: true}) == root {
 		switch r := m.rows[i]; {
 		case r.Main:
-			return 0, "", true
+			return group, 0, "", true
 		case r.Missing:
-			return last, "", true
+			return group, last, "", true
 		default:
 			to, _ := p.drag.place(r)
-			return to, r.Worktree.Session, true
+			return group, to, r.Worktree.Session, true
 		}
 	}
 	for j := 0; j < len(m.rows) && j < i; j++ {
 		if dragItem(m.rows[j], spaces.Row{Main: true}) == root {
-			return last, "", true
+			return group, last, "", true
 		}
 	}
-	return 0, "", true
+	return group, 0, "", true
 }
 
 // dragItem is what r is among what dragged moves among: a space's root, or a worktree's session.

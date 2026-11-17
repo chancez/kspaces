@@ -160,6 +160,33 @@ func (a arrangement) move(r spaces.Row, to int) arrangement {
 	return out
 }
 
+// regroup is a with the space of r moved into group, at place to among its spaces, a copy.
+func (a arrangement) regroup(r spaces.Row, group string, to int) arrangement {
+	root := r.Space.Root
+	out := arrangement{others: a.others, groups: maps.Clone(a.groups), linked: a.linked}
+	out.roots = slices.DeleteFunc(slices.Clone(a.roots), func(x string) bool { return x == root })
+	out.groups[root] = group
+	start, n := out.block(group)
+	out.roots = slices.Insert(out.roots, start+min(max(to, 0), n), root)
+	return out
+}
+
+// block is where the spaces of group start in a.roots, and how many there are. A group none is in yet
+// starts where BuildRows would list it: no group first, any other last.
+func (a arrangement) block(group string) (start, n int) {
+	start = slices.IndexFunc(a.roots, func(r string) bool { return a.groups[r] == group })
+	switch {
+	case start < 0 && group == "":
+		return 0, 0
+	case start < 0:
+		return len(a.roots), 0
+	}
+	for start+n < len(a.roots) && a.groups[a.roots[start+n]] == group {
+		n++
+	}
+	return start, n
+}
+
 // moved is a copy of s with its item from at to.
 func moved[T any](s []T, from, to int) []T {
 	return slices.Insert(slices.Delete(slices.Clone(s), from, from+1), to, s[from])
@@ -174,10 +201,11 @@ func dirs(wts []spaces.Worktree) []string {
 	return ans
 }
 
-// keep makes a, the order after moving r, the manual order, in every sidebar: the spaces' in config.toml
-// and the linked worktrees' in the state directory. Moving in an automatic mode switches to manual, from
-// the order shown, so every space's worktrees are saved as they are shown. The rows show a at once, and a
-// fresh load follows for what the config now says.
+// keep makes a, the order after moving r, the manual order, in every sidebar: the spaces' in the config,
+// with the group a space was moved into, and the linked worktrees' in the state directory. Moving in an
+// automatic mode switches to manual, from the order shown, so every space's worktrees are saved as they are
+// shown. The rows show a at once, and a fresh load follows for what the config now says; what the config
+// refuses, as a group a [space.NAME] table sets, puts the rows back.
 func (m *sidebar) keep(a arrangement, r spaces.Row) tea.Cmd {
 	automatic := m.sortMode() != spaces.SortManual
 	// config.toml's order as the manual mode shows it, each group's spaces together: a move that leaves
@@ -188,13 +216,24 @@ func (m *sidebar) keep(a arrangement, r spaces.Row) tea.Cmd {
 			listed = append(listed, row.Space.Root)
 		}
 	}
-	if !slices.Equal(a.roots, listed) {
-		if err := config.SaveSpacesOrder(a.roots); err != nil {
-			m.failed = err
+	regrouped := r.Main && a.groups[r.Space.Root] != r.Space.Group
+	if regrouped || !slices.Equal(a.roots, listed) {
+		var err error
+		if regrouped {
+			err = config.MoveSpace(r.Space.Root, a.groups[r.Space.Root], a.roots)
+		} else {
+			err = config.SaveSpacesOrder(a.roots)
+		}
+		if err != nil {
+			m.failed, m.held = err, nil
+			m.setRows()
 			return nil
 		}
 		byRoot := map[string]spaces.Space{}
 		for _, s := range m.spaces {
+			if g, ok := a.groups[s.Root]; ok {
+				s.Group = g
+			}
 			byRoot[s.Root] = s
 		}
 		m.spaces = make([]spaces.Space, 0, len(a.roots))
