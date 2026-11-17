@@ -51,11 +51,12 @@ func TestAddSpaceForm(t *testing.T) {
 	if err := os.Symlink(filepath.Join(home, "repo"), filepath.Join(home, "link")); err != nil {
 		t.Fatal(err)
 	}
-	roots, err := configuredSpaces()
+	cfg, err := loadForAdd()
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := newAddSpaceForm(roots, filepath.Join(home, "repo", "sub"))
+	roots := cfg.Spaces
+	f := newAddSpaceForm(roots, nil, filepath.Join(home, "repo", "sub"), "")
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	screen := func(path, says, buttons string) []string {
 		return []string{"", "  Add a space", "", "  repository " + path, "", "  " + says, "", "   " + buttons, ""}
@@ -82,13 +83,13 @@ func TestAddSpaceForm(t *testing.T) {
 		}
 	}
 	// A space already, through a symlink in the config.
-	f = newAddSpaceForm([]string{filepath.Join(home, "link")}, "~/repo")
+	f = newAddSpaceForm([]string{filepath.Join(home, "link")}, nil, "~/repo", "")
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	if got, want := formScreen(f), screen("~/repo", "~/repo is already a space", "Add    Cancel esc"); !reflect.DeepEqual(got, want) {
 		t.Errorf("a space already:\n%q\nwant\n%q", got, want)
 	}
 
-	f = newAddSpaceForm(roots, "~/repo")
+	f = newAddSpaceForm(roots, nil, "~/repo", "")
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	_, cmd := f.Update(keyMsg("enter"))
 	if want := append(screen("~/repo", "Adds ~/repo to the spaces", "Cancel esc")[:7], "  Adding...", "", "   Cancel esc", ""); cmd == nil || !reflect.DeepEqual(formScreen(f), want) {
@@ -102,8 +103,8 @@ func TestAddSpaceForm(t *testing.T) {
 		t.Errorf("config %q, %v\nwant %q", data, err, want)
 	}
 	// A second form, as from another sidebar, refuses it now.
-	roots, _ = configuredSpaces()
-	if got := newAddSpaceForm(roots, "~/repo/sub").problem; got == nil || got.Error() != "~/repo is already a space" {
+	cfg, _ = loadForAdd()
+	if got := newAddSpaceForm(cfg.Spaces, nil, "~/repo/sub", "").problem; got == nil || got.Error() != "~/repo is already a space" {
 		t.Errorf("adding it again: %v", got)
 	}
 	if _, cmd := f.Update(keyMsg("esc")); cmd == nil || cmd() != tea.Quit() {
@@ -117,7 +118,7 @@ func TestAddSpaceWithoutAsking(t *testing.T) {
 	got := []string{}
 	for _, p := range []string{filepath.Join(home, "plain"), filepath.Join(home, "repo", "sub"), "~/repo"} {
 		msg := "added"
-		if err := AddSpace(p); err != nil {
+		if err := AddSpace(p, ""); err != nil {
 			msg = err.Error()
 		}
 		got = append(got, msg)
@@ -132,5 +133,52 @@ func TestAddSpaceWithoutAsking(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q\nwant %q", got, want)
+	}
+}
+
+// With spaces in groups the form chooses one, the group it was opened from at first, and says the file the
+// space goes in, the one listing the group's spaces, when it is not config.toml; left and right change
+// the group, none among them.
+func TestAddSpaceFormGroup(t *testing.T) {
+	home, config := addSpaceEnv(t)
+	local := filepath.Join(filepath.Dir(config), "local.toml")
+	if err := os.WriteFile(local, []byte("spaces = [{ path = \"~/w1\", group = \"work\" }]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, "w1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := loadForAdd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := newAddSpaceForm(cfg.Spaces, groupNames(cfg), "~/repo", "work")
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	screen := func(group, says, keys string) []string {
+		return []string{"", "  Add a space", "", "  repository ~/repo", "  group      " + group, "", "  " + says, "", "   Add enter    Cancel esc   tab next field" + keys, ""}
+	}
+	got := [][]string{formScreen(f)}
+	f.Update(keyMsg("tab"))
+	f.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
+	got = append(got, formScreen(f))
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	choice := "  left/right group  space list"
+	want := [][]string{
+		screen("< work >", "Adds ~/repo to the spaces, in work, in local.toml", ""),
+		screen("< none >  left/right change  space list", "Adds ~/repo to the spaces", choice),
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got\n%q\nwant\n%q", got, want)
+	}
+	_, cmd := f.Update(keyMsg("enter"))
+	if cmd == nil {
+		t.Fatal("enter added nothing")
+	}
+	if _, quit := f.Update(cmd()); quit == nil {
+		t.Fatalf("the form stayed: %v", f.err)
+	}
+	data, err := os.ReadFile(local)
+	if want := "spaces = [{ path = \"~/w1\", group = \"work\" }, { path = \"~/repo\", group = \"work\" }]\n"; err != nil || string(data) != want {
+		t.Errorf("local.toml %q, %v\nwant %q", data, err, want)
 	}
 }

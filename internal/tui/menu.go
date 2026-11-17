@@ -360,11 +360,11 @@ func (m *sidebar) trustConfig(root string) tea.Cmd {
 }
 
 // addSpace opens the form that adds a space, in a popup as newWorktree's, with the repository of the
-// window beside the sidebar filled in.
-func (m *sidebar) addSpace() tea.Cmd {
+// window beside the sidebar filled in, and group chosen, empty for none.
+func (m *sidebar) addSpace(group string) tea.Cmd {
 	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
-		if err := spaces.AskAddSpace(cfg, st); err != nil {
+		if err := spaces.AskAddSpace(cfg, st, group); err != nil {
 			return failedMsg{err}
 		}
 		return nil

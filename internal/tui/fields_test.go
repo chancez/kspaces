@@ -121,7 +121,7 @@ func TestSaveLayoutFormClickField(t *testing.T) {
 
 // A click on the add space form's path puts its cursor there.
 func TestAddSpaceFormClickField(t *testing.T) {
-	f := newAddSpaceForm(nil, "/src/gr")
+	f := newAddSpaceForm(nil, nil, "/src/gr", "")
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	clickInto(t, f, "/src/gr", 4)
 	typeInto(f, "x")

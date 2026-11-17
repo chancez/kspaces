@@ -237,7 +237,7 @@ group, and Add space.
 | Space | Trust space config | | show what the space's own config adds, and trust it, in a form; while its `.kspaces.toml` is untrusted or changed |
 | Group | Fold / Unfold group | `space` | hide or show a group's spaces, on its header |
 | Space | Select | | turn on the [select mode](#selecting) with the row ticked, a group's header too |
-| Space | Add space | `a` | add a repository to the spaces, in a form; on every row |
+| Space | Add space | `a` | add a repository to the spaces, in a form; on every row, on a group's header or its spaces' rows in that group |
 
 Each item that changes something opens a form in a popup, with buttons and keys to confirm or cancel: an
 overlay over the window beside the sidebar, or with `[sidebar] popup = "panel"` a centered panel of its own,
@@ -439,9 +439,14 @@ space PATH is in; `--yes` without asking, `--revoke` to forget it.
 **Add space**, which the plus at the right end of the SPACES title also opens, has a field for a directory,
 filled in with the repository of the window the sidebar is beside, and shows the root it adds: the top of
 the directory's work tree, `~/` for the home directory. A directory in no repository, or a repository
-already in the spaces, is refused before you confirm. Add appends the root to `spaces` in config.toml as
-text, so the file's comments and layout stay as they were, and writes through a symlinked config to its
-target. Every sidebar shows the new space at its next refresh.
+already in the spaces, is refused before you confirm. With spaces in [groups](#groups), a `group` choice
+below it puts the new space in one, `none` or the groups in the sidebar's order: from a group's header, or
+one of its spaces' rows, that group at first, else `none`. Add appends the root to `spaces` as text, so the
+file's comments and layout stay as they were, and writes through a symlinked config to its target: in a
+group as `{ path = "~/src/x", group = "work" }`, in the config file that lists the most of the group's
+spaces, whatever its name, so a `work.toml` holding the work group's spaces gets the new one, else in
+config.toml, which the form names when it is another file. Every sidebar shows the new space at its next
+refresh. `kspaces add [PATH] --group NAME` opens the form on a group.
 
 **Reply**, on a status entry, is for answering a program that waits, a blocked one above all, without
 switching to it. It shows the last lines of the entry's window's screen that fit, with their colors,

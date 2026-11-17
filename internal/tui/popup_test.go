@@ -182,7 +182,7 @@ func TestSidebarFormInPanel(t *testing.T) {
 	e := newSidebarEnv(t)
 	launched := fakeKitten(t)
 	e.m.cfg.Sidebar.Popup = config.PopupPanel
-	if msg := e.m.addSpace()(); msg != nil {
+	if msg := e.m.addSpace("")(); msg != nil {
 		t.Fatalf("adding a space said %v", msg)
 	}
 	exe, err := os.Executable()

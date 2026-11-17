@@ -45,9 +45,12 @@ func NewSpaceRoot(roots []string, path string) (string, error) {
 }
 
 // AskAddSpace opens the form that adds a space, in a popup as NewWorktree's, with the repository of the
-// window the sidebar is beside filled in.
-func AskAddSpace(cfg config.Config, st kitty.State) error {
+// window the sidebar is beside filled in, and group chosen, when not empty.
+func AskAddSpace(cfg config.Config, st kitty.State, group string) error {
 	args := []string{"add"}
+	if group != "" {
+		args = append(args, "--group", group)
+	}
 	if st.HomeDir != "" {
 		if top, err := repoRoot(st.HomeDir); err == nil {
 			args = append(args, top)

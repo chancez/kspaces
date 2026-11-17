@@ -129,11 +129,11 @@ func TestAppendSpace(t *testing.T) {
 func TestAddSpace(t *testing.T) {
 	t.Setenv("HOME", "/home/me")
 	in := "# Mine.\nspaces = [\n  \"~/a\", # first\n]\n\n[sidebar]\nwidth = 30\n"
-	got, err := AddSpace(in, "/home/me/src/b")
+	got, err := AddSpace(in, "/home/me/src/b", "")
 	if want := "# Mine.\nspaces = [\n  \"~/a\", # first\n  \"~/src/b\",\n]\n\n[sidebar]\nwidth = 30\n"; err != nil || got != want {
 		t.Errorf("got %q, %v\nwant %q", got, err, want)
 	}
-	got, err = AddSpace("", "/src/with \"quote\"")
+	got, err = AddSpace("", "/src/with \"quote\"", "")
 	if want := "spaces = [\"/src/with \\\"quote\\\"\"]\n"; err != nil || got != want {
 		t.Errorf("got %q, %v\nwant %q", got, err, want)
 	}
@@ -142,7 +142,7 @@ func TestAddSpace(t *testing.T) {
 		{in, "/home/me/a"},
 		{"spaces = [\"~/a\"]\nspace = 1\n", "/src/b"},
 	} {
-		if got, err := AddSpace(c.in, c.root); err == nil {
+		if got, err := AddSpace(c.in, c.root, ""); err == nil {
 			t.Errorf("adding %s to %q gave %q", c.root, c.in, got)
 		}
 	}
@@ -174,12 +174,12 @@ func TestAddSpaceInline(t *testing.T) {
 			want: "spaces = [{ path = \"~/a}]\", group = \"{w]\" }, \"~/c\"]\n",
 		},
 	} {
-		got, err := AddSpace(c.in, "/home/me/c")
+		got, err := AddSpace(c.in, "/home/me/c", "")
 		if err != nil || got != c.want {
 			t.Errorf("%s: %v\n%s\nwant\n%s", c.name, err, got, c.want)
 		}
 	}
-	if got, err := AddSpace("spaces = [{ path = \"~/c\", group = \"work\" }]\n", "/home/me/c"); err == nil || err.Error() != "~/c is already a space" {
+	if got, err := AddSpace("spaces = [{ path = \"~/c\", group = \"work\" }]\n", "/home/me/c", ""); err == nil || err.Error() != "~/c is already a space" {
 		t.Errorf("adding a root a table has: %q, %v", got, err)
 	}
 }
@@ -205,7 +205,7 @@ func TestSaveSpace(t *testing.T) {
 	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
-	if err := SaveSpace("/src/b"); err != nil {
+	if err := SaveSpace("/src/b", ""); err != nil {
 		t.Fatal(err)
 	}
 	type file struct {
@@ -233,16 +233,61 @@ func TestSaveSpace(t *testing.T) {
 	if got := read(); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v\nwant %+v", got, want)
 	}
-	if err := SaveSpace("/src/b"); err == nil || !strings.Contains(err.Error(), "already a space") {
+	if err := SaveSpace("/src/b", ""); err == nil || !strings.Contains(err.Error(), "already a space") {
 		t.Errorf("adding it again: %v", err)
 	}
 
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(dir, "fresh"))
-	if err := SaveSpace("/home/me/c"); err != nil {
+	if err := SaveSpace("/home/me/c", ""); err != nil {
 		t.Fatal(err)
 	}
 	if data, err := os.ReadFile(filepath.Join(dir, "fresh", "kspaces", "config.toml")); err != nil || string(data) != "spaces = [\"~/c\"]\n" {
 		t.Errorf("a new config: %q, %v", data, err)
+	}
+}
+
+// A space in a group goes in the file that lists the most of the group's spaces, whatever its name, as
+// an inline table naming the group; one in no group, or in a group no file lists a space of, goes in
+// config.toml.
+func TestSaveSpaceGroup(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("HOME", "/home/me")
+	t.Setenv("XDG_CONFIG_HOME", dir)
+	main := filepath.Join(dir, "kspaces", "config.toml")
+	local := filepath.Join(dir, "kspaces", "local.toml")
+	if err := os.MkdirAll(filepath.Dir(main), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	write := func(path, text string) {
+		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write(main, "spaces = [\n  \"~/a\",\n  { path = \"~/t1\", group = \"tools\" },\n]\n")
+	write(local, "spaces = [\n  { path = \"~/w1\", group = \"work\" },\n  { path = \"~/w2\", group = \"work\" },\n]\n")
+	for _, s := range []struct{ root, group string }{
+		{"/home/me/w3", "work"}, {"/home/me/t2", "tools"}, {"/home/me/n", ""}, {"/home/me/z", "new"},
+	} {
+		if err := SaveSpace(s.root, s.group); err != nil {
+			t.Fatalf("%s in %q: %v", s.root, s.group, err)
+		}
+	}
+	read := func(path string) string {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(data)
+	}
+	got := []string{read(main), read(local)}
+	want := []string{
+		"spaces = [\n  \"~/a\",\n  { path = \"~/t1\", group = \"tools\" },\n  { path = \"~/t2\", group = \"tools\" },\n  \"~/n\",\n" +
+			"  { path = \"~/z\", group = \"new\" },\n]\n",
+		"spaces = [\n  { path = \"~/w1\", group = \"work\" },\n  { path = \"~/w2\", group = \"work\" },\n" +
+			"  { path = \"~/w3\", group = \"work\" },\n]\n",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "---\n"), strings.Join(want, "---\n"))
 	}
 }
 

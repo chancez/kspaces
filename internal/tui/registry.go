@@ -38,8 +38,9 @@ type statusSubject struct {
 // paneSubject is the sidebar itself, for the moves through it and what acts on no entry.
 type paneSubject struct{}
 
-// spacesSubject is the spaces list as a whole, for what adds to it rather than acting on one row.
-type spacesSubject struct{}
+// spacesSubject is the spaces list as a whole, for what adds to it rather than acting on one row: from a
+// group's header or one of its spaces' rows, in that group.
+type spacesSubject struct{ group string }
 
 // menuSubject is the sidebar's open context menu.
 type menuSubject struct{}
@@ -358,9 +359,9 @@ var actShowError = &interact.Action[*sidebar, errorSubject]{
 var actAddSpace = &interact.Action[*sidebar, spacesSubject]{
 	Title:   "Add space",
 	Section: sectionSpace,
-	Run: func(m *sidebar, _ spacesSubject) tea.Cmd {
+	Run: func(m *sidebar, s spacesSubject) tea.Cmd {
 		m.remote = false
-		return m.addSpace()
+		return m.addSpace(s.group)
 	},
 }
 
@@ -886,7 +887,30 @@ var (
 		Applies: func(f *addSpaceForm, _ addSubject) bool { return !f.busy && f.problem == nil },
 		Run:     cmd[*addSpaceForm, addSubject]((*addSpaceForm).add),
 	}
-	actAddCancel = quit[*addSpaceForm, addSubject]()
+	actAddCancel    = quit[*addSpaceForm, addSubject]()
+	actAddNextField = &interact.Action[*addSpaceForm, addSubject]{
+		Title: "next field",
+		Run:   cmd[*addSpaceForm, addSubject]((*addSpaceForm).nextField),
+	}
+	actAddPrevField = &interact.Action[*addSpaceForm, addSubject]{
+		Title: "previous field",
+		Run:   cmd[*addSpaceForm, addSubject]((*addSpaceForm).prevField),
+	}
+	actAddNextGroup = &interact.Action[*addSpaceForm, addSubject]{
+		Title:   "next group",
+		Applies: func(f *addSpaceForm, _ addSubject) bool { return f.onGroup() },
+		Run:     func(f *addSpaceForm, _ addSubject) tea.Cmd { return f.cycleGroup(1) },
+	}
+	actAddPrevGroup = &interact.Action[*addSpaceForm, addSubject]{
+		Title:   "previous group",
+		Applies: func(f *addSpaceForm, _ addSubject) bool { return f.onGroup() },
+		Run:     func(f *addSpaceForm, _ addSubject) tea.Cmd { return f.cycleGroup(-1) },
+	}
+	actAddList = &interact.Action[*addSpaceForm, addSubject]{
+		Title:   "list",
+		Applies: func(f *addSpaceForm, _ addSubject) bool { return !f.busy && f.onGroup() },
+		Run:     do[*addSpaceForm, addSubject](func(f *addSpaceForm) { f.group.openList() }),
+	}
 )
 
 // The reply form's. Every other key types.
@@ -991,14 +1015,19 @@ func init() {
 	// x on a missing worktree, which has nothing to remove but its saved file.
 	entryKind.Bind(actForgetSession, "", "", "x")
 	entryKind.Bind(actCleanup, "p", "clean up worktrees", "p")
-	interact.Via(entryKind, func(entrySubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
+	interact.Via(entryKind, func(s entrySubject) (spacesSubject, bool) {
+		if s.row.Space == nil || s.row.Other {
+			return spacesSubject{}, true
+		}
+		return spacesSubject{group: s.row.Space.Group}, true
+	}, spacesKind)
 	spacesList = interact.List(entryKind)
 	spacesList.Bind(actOpenWorktree, "enter/l", "open", "enter", "l")
 
 	groupKind = interact.NewKind(func(s groupSubject) string { return s.name }, actFoldGroup, actUnfoldGroup, actSelectGroup)
 	groupKind.Bind(actFoldGroup, "space", "fold or unfold the group", "space")
 	groupKind.Bind(actUnfoldGroup, "", "", "space")
-	interact.Via(groupKind, func(groupSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
+	interact.Via(groupKind, func(s groupSubject) (spacesSubject, bool) { return spacesSubject{group: s.name}, true }, spacesKind)
 	groupHeaders = interact.List(groupKind)
 
 	statusKind = interact.NewKind(func(s statusSubject) string { return s.status.Session }, actOpenWindow, actReply)
@@ -1107,7 +1136,13 @@ func init() {
 	trustKind.Bind(actTrustQuit, "ctrl+c", "quit", "ctrl+c")
 	theTrustForm = interact.List(trustKind)
 
-	addKind = interact.NewKind(func(addSubject) string { return "Add space" }, actAdd, actAddCancel)
+	addKind = interact.NewKind(func(addSubject) string { return "Add space" },
+		actAddNextField, actAddPrevField, actAddNextGroup, actAddPrevGroup, actAddList, actAdd, actAddCancel)
+	addKind.Bind(actAddNextField, "tab", "next field", "tab", "down")
+	addKind.Bind(actAddPrevField, "shift+tab", "previous field", "shift+tab", "up")
+	addKind.Bind(actAddNextGroup, "left/right", "group", "right")
+	addKind.Bind(actAddPrevGroup, "", "", "left")
+	addKind.Bind(actAddList, "space", "list", "space")
 	addKind.Bind(actAdd, "enter", "add", "enter")
 	addKind.Bind(actAddCancel, "esc", "cancel", "esc", "ctrl+c")
 	theAddForm = interact.List(addKind)

@@ -200,16 +200,17 @@ func TestSaveLayoutFiles(t *testing.T) {
 	}
 }
 
-// A space is added to config.toml, checked with the other files, which can say it is a space already.
+// A space in no group is added to config.toml, which lists as many of those as work.toml, checked with the
+// other files, which can say it is a space already.
 func TestSaveSpaceFiles(t *testing.T) {
 	dir := configDir(t, map[string]string{
 		"config.toml": "layout = \"review\"\nspaces = [\"~/a\"]\n",
 		"work.toml":   "spaces = [\"~/b\"]\n\n[[layouts]]\nname = \"review\"\ntabs = [{ panes = [{}] }]\n",
 	})
-	if err := SaveSpace("/home/me/b"); err == nil || err.Error() != filepath.Join(dir, "config.toml")+": ~/b is already a space" {
+	if err := SaveSpace("/home/me/b", ""); err == nil || err.Error() != filepath.Join(dir, "config.toml")+": ~/b is already a space" {
 		t.Errorf("listed by work.toml: %v", err)
 	}
-	if err := SaveSpace("/home/me/c"); err != nil {
+	if err := SaveSpace("/home/me/c", ""); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := os.ReadFile(filepath.Join(dir, "config.toml"))

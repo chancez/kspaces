@@ -11,14 +11,15 @@ import (
 	"unicode/utf8"
 )
 
-// Adding a space edits config.toml as text rather than encoding the config again, so its comments and
-// layout survive: the file is often hand-written, and kept in dotfiles.
+// Adding a space edits the config as text rather than encoding the config again, so its comments and
+// layout survive: the files are often hand-written, and kept in dotfiles.
 
 // AddSpace is the config text with root, an absolute and clean path, added to the end of spaces, written
-// with ~/ for the home directory. The result is parsed back and must list the spaces it listed and then
-// root, so a mistake in the edit is an error rather than a broken config.
-func AddSpace(text, root string) (string, error) {
-	return addSpace(text, root, func(text string) (Config, []string, error) {
+// with ~/ for the home directory, in group, empty for none, see spaceValue. The result is parsed back and
+// must list the spaces it listed and then root, in group, so a mistake in the edit is an error rather than
+// a broken config.
+func AddSpace(text, root, group string) (string, error) {
+	return addSpace(text, root, group, func(text string) (Config, []string, error) {
 		cfg, err := Parse(text)
 		return cfg, cfg.Spaces, err
 	})
@@ -26,7 +27,7 @@ func AddSpace(text, root string) (string, error) {
 
 // addSpace is AddSpace with parse reading a text as the config it makes and the spaces the text itself
 // lists.
-func addSpace(text, root string, parse func(string) (Config, []string, error)) (string, error) {
+func addSpace(text, root, group string, parse func(string) (Config, []string, error)) (string, error) {
 	before, own, err := parse(text)
 	if err != nil {
 		return "", fmt.Errorf("the config has an error to fix first: %w", err)
@@ -34,33 +35,101 @@ func addSpace(text, root string, parse func(string) (Config, []string, error)) (
 	if slices.Contains(before.Spaces, root) {
 		return "", fmt.Errorf("%s is already a space", Tilde(root))
 	}
-	out, err := appendSpace(text, tomlString(Tilde(root)))
+	out, err := appendSpace(text, spaceValue(root, group))
 	if err != nil {
 		return "", err
 	}
-	_, after, err := parse(out)
+	after, listed, err := parse(out)
 	if err != nil {
 		return "", fmt.Errorf("adding %s would break the config, so it was left as is: %w", Tilde(root), err)
 	}
-	if want := append(slices.Clone(own), root); !slices.Equal(after, want) {
-		return "", fmt.Errorf("adding %s would list spaces %q, so the config was left as is", Tilde(root), after)
+	if want := append(slices.Clone(own), root); !slices.Equal(listed, want) {
+		return "", fmt.Errorf("adding %s would list spaces %q, so the config was left as is", Tilde(root), listed)
+	}
+	if g := after.Space[filepath.Base(root)].Group; g != group {
+		return "", fmt.Errorf("adding %s would put it in group %q, so the config was left as is", Tilde(root), g)
 	}
 	return out, nil
 }
 
-// SaveSpace adds root to the spaces of config.toml, see AddSpace and EditFile, checked merged with the
-// other config files. A missing config is created.
-func SaveSpace(root string) error {
-	files, err := readFiles()
+// spaceValue is the entry of spaces for root in group: its path, with ~/ for the home directory, or with
+// a group an inline table, { path = "~/src/gr", group = "work" }.
+func spaceValue(root, group string) string {
+	path := tomlString(Tilde(root))
+	if group == "" {
+		return path
+	}
+	return "{ path = " + path + ", group = " + tomlString(group) + " }"
+}
+
+// SaveSpace adds root to the spaces, in group, empty for none, see AddSpace and EditFile, in the file
+// that lists group's spaces, see groupFile, checked merged with the other config files. A missing
+// config.toml is created.
+func SaveSpace(root, group string) error {
+	files, cfg, err := readMerged()
 	if err != nil {
 		return err
 	}
-	return EditFile(files.paths[0], func(text string) (string, error) {
-		return addSpace(text, root, func(text string) (Config, []string, error) {
-			cfg, p, err := files.with(0, text)
+	i, err := groupFile(files, cfg, group, "")
+	if err != nil {
+		return err
+	}
+	return EditFile(files.paths[i], func(text string) (string, error) {
+		return addSpace(text, root, group, func(text string) (Config, []string, error) {
+			cfg, p, err := files.with(i, text)
 			return cfg, p.cfg.Spaces, err
 		})
 	})
+}
+
+// GroupFile is the path of the config file a space in group goes in, see groupFile.
+func GroupFile(group string) (string, error) {
+	files, cfg, err := readMerged()
+	if err != nil {
+		return "", err
+	}
+	i, err := groupFile(files, cfg, group, "")
+	if err != nil {
+		return "", err
+	}
+	return files.paths[i], nil
+}
+
+// readMerged reads the config files, and the config they make.
+func readMerged() (configFiles, Config, error) {
+	files, err := readFiles()
+	if err != nil {
+		return configFiles{}, Config{}, err
+	}
+	cfg, err := parse(files.paths, files.texts)
+	if err != nil {
+		return configFiles{}, Config{}, fmt.Errorf("the config has an error to fix first: %w", err)
+	}
+	return files, cfg, nil
+}
+
+// groupFile is the index in files of the file a space in group, empty for none, goes in: the one that
+// lists the most of the group's spaces, but except, the first of those, else config.toml. The files are
+// told apart by what they list, not by their names: work.toml listing the work group's spaces is where
+// another work space goes, as local.toml would be. cfg is the files merged, which says each space's group.
+func groupFile(files configFiles, cfg Config, group, except string) (int, error) {
+	best, most := 0, 0
+	for i, text := range files.texts {
+		p, err := decode(text)
+		if err != nil {
+			return 0, fmt.Errorf("%s: %w", files.paths[i], err)
+		}
+		n := 0
+		for _, root := range p.cfg.Spaces {
+			if root != except && cfg.Space[filepath.Base(root)].Group == group {
+				n++
+			}
+		}
+		if n > most {
+			best, most = i, n
+		}
+	}
+	return best, nil
 }
 
 // EditFile rewrites the config file at path, the global config or a space's, with edit. A symlinked

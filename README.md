@@ -233,7 +233,8 @@ kspaces remove PATH      close a linked worktree's session and remove the worktr
   --delete-branch        and then its branch, if merged; --force-branch even if not, losing its commits
 kspaces cleanup SPACE    remove the worktrees whose PR is merged, upstream gone or branch merged, and the
   --session SESSION      missing ones, in a form; --session, repeated, lists those sessions in place of SPACE
-kspaces add [PATH]       add the repository at PATH to the spaces, in a form; --yes without asking
+kspaces add [PATH]       add the repository at PATH to the spaces, in a form; --yes without asking,
+  --yes, --group NAME    --group in a group, in the config file that lists its spaces
 kspaces kitty install    install the files kitty needs; kspaces kitty check says if they are current
 ```
 

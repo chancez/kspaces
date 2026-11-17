@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -356,6 +357,33 @@ func TestDragInGroup(t *testing.T) {
 		"# Mine.\nspaces = [\n  \"/src/broken\",\n  \"/src/docs\",\n  \"/src/gr\", # work\n  # the terminal\n  \"/src/kitty\",\n]\n"}
 	if got := now(); !reflect.DeepEqual(got, moved) {
 		t.Errorf("gr onto kitty:\n%#v\nwant\n%#v", got, moved)
+	}
+}
+
+// Add space on a group's header, or on one of its spaces' rows, opens the form on that group; on a session
+// in no space, on none.
+func TestAddSpaceInGroup(t *testing.T) {
+	e := newGroupsEnv(t)
+	e.m.Update(tea.FocusMsg{})
+	calls := fakeKittenCalls(t)
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, at := range []int{e.headerRow("personal"), e.row("docs"), e.row("default")} {
+		e.m.cursor = at
+		if cmd := e.press("a"); cmd != nil {
+			cmd()
+		}
+	}
+	var got [][]string
+	for _, call := range calls() {
+		if i := slices.Index(call, exe); i >= 0 {
+			got = append(got, call[i+1:])
+		}
+	}
+	if want := [][]string{{"add", "--group", "personal"}, {"add", "--group", "work"}, {"add"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("launched %q\nwant %q", got, want)
 	}
 }
 
