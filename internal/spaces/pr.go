@@ -6,9 +6,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/chancez/kspaces/internal/gh"
 	"github.com/chancez/kspaces/internal/git"
+	"github.com/chancez/kspaces/internal/logs"
 )
 
 // Ref is a PR or an issue as typed: its number, or its URL.
@@ -158,12 +160,14 @@ func repoOf(url string) string {
 // branch first unless the space has it, as after a worktree that git refused.
 func CreatePRWorktree(space Space, pr PR, dir string) (Worktree, error) {
 	if !space.HasBranch(pr.Branch) {
+		start := time.Now()
 		var err error
 		if pr.Cross {
 			err = git.FetchPullHead(space.Root, pr.Remote, pr.Number, pr.Branch)
 		} else {
 			err = git.TrackRemoteBranch(space.Root, pr.Remote, pr.Branch)
 		}
+		logs.Action("fetch PR", start, err, "space", space.Name, "pr", pr.Number, "remote", pr.Remote, "branch", pr.Branch)
 		if err != nil {
 			return Worktree{}, err
 		}

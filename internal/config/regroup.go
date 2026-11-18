@@ -5,6 +5,9 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
+
+	"github.com/chancez/kspaces/internal/logs"
 )
 
 // Dragging a space into another group rewrites its entry with the group, as text, as reordering does, and
@@ -14,7 +17,8 @@ import (
 // order, as SaveSpacesOrder does: its entry is rewritten with the group, see withGroup, and goes to the
 // file of the group's spaces, see groupFile, when that is another. A group a [space.NAME] table says is
 // that table's to change, so moving the space out of it is an error saying so.
-func MoveSpace(root, group string, order []string) error {
+func MoveSpace(root, group string, order []string) (err error) {
+	defer func(start time.Time) { logs.Action("move space", start, err, "root", root, "group", group) }(time.Now())
 	files, cfg, err := readMerged()
 	if err != nil {
 		return err

@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/kitty"
+	"github.com/chancez/kspaces/internal/logs"
 )
 
 // Worktree is one checkout of a space's repository.
@@ -121,7 +123,10 @@ func CreateWorktree(space Space, branch, dir string) (Worktree, error) {
 // CreateWorktreeFrom is CreateWorktree creating a new branch from base, when not empty, and recording
 // base in git config as the branch's kspaces-base, so {base} is it in the worktree from then on, see
 // WorktreeBase. A base that is what the main worktree has checked out is not recorded, being the default.
-func CreateWorktreeFrom(space Space, branch, base, dir string) (Worktree, error) {
+func CreateWorktreeFrom(space Space, branch, base, dir string) (_ Worktree, err error) {
+	defer func(start time.Time) {
+		logs.Action("create worktree", start, err, "space", space.Name, "branch", branch, "base", base, "dir", dir)
+	}(time.Now())
 	branch, base = strings.TrimSpace(branch), strings.TrimSpace(base)
 	if len(space.Worktrees) > 0 && base == space.Worktrees[0].Branch {
 		base = ""

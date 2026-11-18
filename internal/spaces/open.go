@@ -12,6 +12,7 @@ import (
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/kitty"
+	"github.com/chancez/kspaces/internal/logs"
 )
 
 // OpenOptions are how OpenWorktree opens a session with no windows.
@@ -387,7 +388,10 @@ func CanRemove(space Space, wt Worktree) error {
 // and its saved file goes too, so it is not restored. With opts.DeleteBranch the branch goes last, with
 // git branch -d when merged and -D only with opts.ForceBranch; a branch that cannot go keeps the worktree
 // too, but one git refuses after the worktree is removed is a *BranchError.
-func RemoveWorktree(cfg config.Config, space Space, wt Worktree, opts RemoveOptions) error {
+func RemoveWorktree(cfg config.Config, space Space, wt Worktree, opts RemoveOptions) (err error) {
+	defer func(start time.Time) {
+		logs.Action("remove worktree", start, err, "space", space.Name, "dir", wt.Path, "force", opts.Force, "delete_branch", opts.DeleteBranch)
+	}(time.Now())
 	if err := CanRemove(space, wt); err != nil {
 		return err
 	}

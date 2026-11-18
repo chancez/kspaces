@@ -14,6 +14,7 @@ import (
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
+	"github.com/chancez/kspaces/internal/logs"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/status"
 	"github.com/chancez/kspaces/internal/tui/look"
@@ -209,7 +210,11 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.failed = nil
 		}
 	}
+	before := m.failed
 	_, cmd := m.update(msg)
+	if m.failed != nil && (before == nil || before.Error() != m.failed.Error()) {
+		logs.Error("sidebar", m.failed)
+	}
 	// The filter belongs to navigating: it goes when the keys stop coming, so no sidebar is left narrowed.
 	if m.filtering && !m.navigating() {
 		m.closeFilter()

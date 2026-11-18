@@ -16,6 +16,7 @@ import (
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
+	"github.com/chancez/kspaces/internal/logs"
 )
 
 // One load for all the sidebars of a kitty. kitty docks a window to one tab only, so every tab has a
@@ -184,6 +185,7 @@ func pollKey() string {
 func (p *Poller) Poll(fresh bool) Shared {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	defer logs.Took("poll", time.Now(), "leader", p.leader, "fresh", fresh)
 	if !p.leader {
 		lead, ok := p.tryLead()
 		if !ok {

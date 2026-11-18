@@ -8,7 +8,10 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
+
+	"github.com/chancez/kspaces/internal/logs"
 )
 
 // Adding a space edits the config as text rather than encoding the config again, so its comments and
@@ -65,7 +68,8 @@ func spaceValue(root, group string) string {
 // SaveSpace adds root to the spaces, in group, empty for none, see AddSpace and EditFile, in the file
 // that lists group's spaces, see groupFile, checked merged with the other config files. A missing
 // config.toml is created.
-func SaveSpace(root, group string) error {
+func SaveSpace(root, group string) (err error) {
+	defer func(start time.Time) { logs.Action("add space", start, err, "root", root, "group", group) }(time.Now())
 	files, cfg, err := readMerged()
 	if err != nil {
 		return err
