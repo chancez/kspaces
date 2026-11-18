@@ -4,6 +4,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/chancez/kspaces/internal/logs"
 )
 
 // branchKey is the git config key, kspaces-NAME, that records something kspaces knows of a local branch.
@@ -12,7 +14,7 @@ func branchKey(branch, name string) string { return "branch." + branch + ".kspac
 
 // branchValue is what branchKey(branch, name) is set to, empty for nothing.
 func branchValue(root, branch, name string) string {
-	out, err := exec.Command("git", "-C", root, "config", "--get", branchKey(branch, name)).Output()
+	out, err := logs.Query(exec.Command("git", "-C", root, "config", "--get", branchKey(branch, name)))
 	if err != nil {
 		return ""
 	}

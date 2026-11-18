@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/chancez/kspaces/internal/logs"
 	"github.com/chancez/kspaces/internal/tui"
 )
 
@@ -24,7 +25,15 @@ func Execute(ctx context.Context) int {
 	a := &app{stdout: os.Stdout, stderr: os.Stderr}
 	cmd := a.rootCommand()
 	cmd.SetArgs(os.Args[1:])
+	// Here, not in rootCommand, so tests running commands log nothing.
+	role := "sidebar"
+	if sub, _, err := cmd.Find(os.Args[1:]); err == nil && sub != cmd {
+		role = sub.Name()
+	}
+	logs.Init(role)
+	logs.Debug("start", "args", os.Args[1:])
 	if err := cmd.ExecuteContext(ctx); err != nil {
+		logs.Error("exit", err)
 		fmt.Fprintln(a.stderr, "kspaces:", err)
 		return 1
 	}

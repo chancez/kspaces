@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+
+	"github.com/chancez/kspaces/internal/logs"
 )
 
 // A window kspaces' launcher runs in a cm session is `cm attach NAME`, so what runs in it, and where, is
@@ -40,7 +42,7 @@ func cmAttached(cmdline []string) (string, bool) {
 
 // cmSessions are cm's sessions, by each of their names.
 func cmSessions() (map[string]cmSession, error) {
-	out, err := exec.Command("cm", "list", "--json").Output()
+	out, err := logs.Output(exec.Command("cm", "list", "--json"))
 	if err != nil {
 		return nil, fmt.Errorf("cm list: %w", err)
 	}

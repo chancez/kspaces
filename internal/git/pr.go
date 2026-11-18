@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/chancez/kspaces/internal/logs"
 )
 
 // gitDo runs git in the repository at root, its output as the error when it fails. A fetch that needs a
@@ -12,7 +14,7 @@ import (
 func gitDo(root string, args ...string) error {
 	cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-	if out, err := cmd.CombinedOutput(); err != nil {
+	if out, err := logs.CombinedOutput(cmd); err != nil {
 		return fmt.Errorf("%s", strings.TrimSpace(string(out)))
 	}
 	return nil
@@ -44,7 +46,7 @@ func FetchPullHead(root, remote string, number int, branch string) error {
 
 // BranchMerge is the ref the local branch pulls, its branch.NAME.merge, empty when it has none.
 func BranchMerge(root, branch string) string {
-	out, err := exec.Command("git", "-C", root, "config", "--get", "branch."+branch+".merge").Output()
+	out, err := logs.Query(exec.Command("git", "-C", root, "config", "--get", "branch."+branch+".merge"))
 	if err != nil {
 		return ""
 	}
@@ -54,7 +56,7 @@ func BranchMerge(root, branch string) string {
 // Remotes are the URLs of the repository's remotes, by name.
 func Remotes(root string) map[string]string {
 	ans := map[string]string{}
-	out, err := exec.Command("git", "-C", root, "config", "--get-regexp", `^remote\..*\.url$`).Output()
+	out, err := logs.Query(exec.Command("git", "-C", root, "config", "--get-regexp", `^remote\..*\.url$`))
 	if err != nil {
 		return ans
 	}

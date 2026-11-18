@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/chancez/kspaces/internal/logs"
 	"github.com/chancez/kspaces/internal/status"
 )
 
@@ -46,7 +47,7 @@ func kittenPath() string {
 
 func kitten(args ...string) ([]byte, error) {
 	cmd := exec.Command(kittenPath(), append([]string{"@"}, args...)...)
-	out, err := cmd.Output()
+	out, err := logs.Output(cmd)
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
 			return nil, fmt.Errorf("kitten @ %s: %s", args[0], strings.TrimSpace(string(ee.Stderr)))

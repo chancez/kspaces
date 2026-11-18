@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/chancez/kspaces/internal/logs"
 )
 
 // Worktree is one checkout of a repository.
@@ -23,7 +25,7 @@ type Worktree struct {
 // ListWorktrees lists the worktrees of the repository at root, the main one first. The error is git's
 // own message, for example when root is not a repository.
 func ListWorktrees(root string) ([]Worktree, error) {
-	out, err := exec.Command("git", "-C", root, "worktree", "list", "--porcelain").Output()
+	out, err := logs.Output(exec.Command("git", "-C", root, "worktree", "list", "--porcelain"))
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
 			err = fmt.Errorf("%s", strings.TrimSpace(string(ee.Stderr)))
@@ -85,7 +87,7 @@ func AddWorktree(root, branch, base, dir string) (string, error) {
 			args = append(args, base)
 		}
 	}
-	if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+	if out, err := logs.CombinedOutput(exec.Command("git", args...)); err != nil {
 		return "", fmt.Errorf("%s", strings.TrimSpace(string(out)))
 	}
 	// git reports worktree paths with symlinks resolved, and sessions are matched by those paths.
@@ -97,13 +99,14 @@ func AddWorktree(root, branch, base, dir string) (string, error) {
 
 // BranchExists reports whether the repository at root has a local branch named branch.
 func BranchExists(root, branch string) bool {
-	return exec.Command("git", "-C", root, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch).Run() == nil
+	_, err := logs.Query(exec.Command("git", "-C", root, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch))
+	return err == nil
 }
 
 // TopLevel is the top of the work tree dir is in, with symlinks resolved, as git reports it. The error is
 // git's own message, for example when dir is in no repository.
 func TopLevel(dir string) (string, error) {
-	out, err := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel").Output()
+	out, err := logs.Query(exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel"))
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
 			err = fmt.Errorf("%s", strings.TrimSpace(string(ee.Stderr)))
@@ -123,7 +126,7 @@ func CommonDir(dir string) (string, error) {
 // Changes is how many files git status reports in the worktree at dir: changed, staged or untracked.
 // Removing a worktree with any loses them.
 func Changes(dir string) (int, error) {
-	out, err := exec.Command("git", "-C", dir, "status", "--porcelain").Output()
+	out, err := logs.Output(exec.Command("git", "-C", dir, "status", "--porcelain"))
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
 			return 0, fmt.Errorf("%s", strings.TrimSpace(string(ee.Stderr)))
@@ -140,7 +143,7 @@ func RemoveWorktree(root, dir string, force bool) error {
 	if force {
 		args = append(args, "--force")
 	}
-	if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+	if out, err := logs.CombinedOutput(exec.Command("git", args...)); err != nil {
 		return fmt.Errorf("%s", strings.TrimSpace(string(out)))
 	}
 	return nil
@@ -207,7 +210,7 @@ func DeleteBranch(root, branch string, force bool) error {
 		flag = "-D"
 	}
 	// The hint to force is for git's own command line; the error goes to a kitty error window.
-	if out, err := exec.Command("git", "-C", root, "-c", "advice.forceDeleteBranch=false", "branch", flag, branch).CombinedOutput(); err != nil {
+	if out, err := logs.CombinedOutput(exec.Command("git", "-C", root, "-c", "advice.forceDeleteBranch=false", "branch", flag, branch)); err != nil {
 		return fmt.Errorf("%s", strings.TrimSpace(string(out)))
 	}
 	return nil
@@ -215,7 +218,9 @@ func DeleteBranch(root, branch string, force bool) error {
 
 // output runs git with args and returns what it printed, or git's own message as the error.
 func output(args ...string) (string, error) {
-	out, err := exec.Command("git", args...).Output()
+	// Most of what this asks is an answer as an exit status, as show-ref --verify gives: what fails the
+	// user sees, and the sidebar logs then.
+	out, err := logs.Query(exec.Command("git", args...))
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
 			return "", fmt.Errorf("%s", strings.TrimSpace(string(ee.Stderr)))

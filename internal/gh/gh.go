@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/chancez/kspaces/internal/git"
+	"github.com/chancez/kspaces/internal/logs"
 )
 
 // PR is the pull request of a branch, as the sidebar shows it.
@@ -234,7 +235,7 @@ func Browse(dir string, number int) error {
 func run(ctx context.Context, dir, doing string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "gh", args...)
 	cmd.Dir = dir
-	out, err := cmd.Output()
+	out, err := logs.Output(cmd)
 	var ee *exec.ExitError
 	switch {
 	case err == nil:
