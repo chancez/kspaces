@@ -2,31 +2,6 @@
 
 ## Known issues
 
-- One `kspaces sidebar` per tab, because kitty can only dock to one tab. They share one poller, so only one
-  of them runs `kitten @ ls` and `git worktree list`, but each is a process, with its own screen to draw.
-  kitty after 0.50.0 has `launch --type=os-window-dock` (bdd1e8434): one sidebar per OS window once a
-  release has it, with a version check so older kittys keep a dock per tab.
-- Three kitty bugs, fixed upstream after 0.50.0 and worked around in kspaces' bundled kitty scripts until a
-  release has the fixes:
-  - `save_as_session --match` writes `new_os_window` before a space's file depending on which OS window had
-    focus, so with several OS windows each space was restored in a window of its own. `save_sessions.py`
-    serializes with the bug fixed instead.
-  - `save_as_session --match` writes `focus_tab` as the OS window's active tab's index among all its tabs,
-    while loading counts only the tabs the file creates, so a space came back on the wrong tab.
-    `save_sessions.py` writes the index among the saved tabs, of the one focused last.
-  - Moving a tab to another OS window (`detach_tab`) drops the tab's session name, so the tab bar filter
-    shows the moved tab in every session. `kspaces_watcher.py` puts it back from the tab's windows.
-- `save_sessions.py` saves a session when one of its windows closes or takes focus, and removes its file
-  with its last window, but nothing says a window's directory changed, so a `cd` is saved only at the next
-  focus change, close or quit. kitty after 0.50.0 has an `on_cwd_change` watcher event (65da47b61):
-  save on it once a release has it.
-- On macOS kitty keeps timers in a table of 128 (glfw/cocoa_init.m), and `add_timer` returns 0 when it is
-  full, never calling back. kitty fills it itself: `call_watchers` takes a 0s timer for every window resize
-  and focus change, listened to or not, and none fire until the code that caused them returns. Restoring 9
-  spaces in one go asked for 271 and was refused 143, each a dropped watcher call; it broke saving for good
-  once. `save_sessions.py` now restores one space per timer, which was refused none, and both watchers try
-  again later when refused. Fixed upstream after 0.50.0 (cb66ed55c, one queued timer for all watcher calls);
-  the workaround stays until a release has it.
 - The default session's `startup_session` file is emptied, not removed, once it has no windows; kitty then
   starts with one shell, and kspaces opens `default` with `launch`.
 - Windows in no session are saved into `default` at quit and come back labelled `default`, including one
@@ -38,20 +13,14 @@
 One thing at a time upstream, each kept short, describing the use case only as switching between sets of
 tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/kitty/.research/drafts/`.
 
-1. `save_as_session --match`, the first two bugs above: kovidgoyal/kitty#10844, merged. The workaround in
-   `save_sessions.py` comes out once a release has it.
-2. `detach_tab` and window moves losing their session: #10851 closed, fixed by the maintainer in b261b08b7
-   instead, more broadly. `repair_session` in `kspaces_watcher.py` comes out once a release has it.
-3. Watcher events (a close reason on `on_close`, an event for a window's directory changing): asked on
-   discussion #10828; the maintainer added both in 65da47b61: `on_close` reports `reason` (window,
-   os_window, quit) and `cause`, and `on_cwd_change` reports `cwd` and `host`. Once a release has it,
-   `save_sessions.py` can tell teardown by `reason` rather than an OS window missing from
-   `boss.os_window_map`, and `cm_reap.py` can drop its `on_quit` flag.
-4. Watcher calls each taking a timer, and the macOS and Linux tables of 128: issue kovidgoyal/kitty#10853,
-   fixed by the maintainer in cb66ed55c.
-5. A dock for the whole OS window, the fix for the first known issue: issue kovidgoyal/kitty#10854,
-   implemented by the maintainer in bdd1e8434 as `launch --type=os-window-dock`. Its group's `dock` entry in
-   `kitten @ ls` has `scope: os-window`.
+1. `save_as_session --match`: kovidgoyal/kitty#10844, in 0.51.0.
+2. `detach_tab` and window moves losing their session: fixed by the maintainer in b261b08b7, in 0.51.0.
+3. Watcher events: asked on discussion #10828; `on_close` reports `reason` and `cause`, and
+   `on_cwd_change` was added (65da47b61), in 0.51.0. `save_sessions.py` uses both; the dotfiles'
+   `cm_reap.py` can drop its `on_quit` flag for `reason`.
+4. Watcher calls each taking a timer: kovidgoyal/kitty#10853, fixed in cb66ed55c, in 0.51.0.
+5. A dock for the whole OS window: kovidgoyal/kitty#10854, `launch --type=os-window-dock` in 0.51.0. The
+   sidebar is one.
 6. Toggling a dock: show and hide a dock running a given program, such as `gr` for reviews beside the
    current window, from one mapping, keeping the program running while hidden rather than restarting it.
    kitty has no such action; kspaces_toggle.py only closes and re-adds kspaces' own docks. In the interim,
@@ -67,13 +36,11 @@ tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/
    menus, the first window), not kittens or overlays kitty opens itself. kitty keeps knowing the real
    command, so it saves that in sessions, not the prefix, and calls the function again on restore;
    `ctx.user_vars` are saved, so a var naming the window's cm session can bring it back to that session.
-   Once a release has it, cm_launch.py's mappings become plain `launch` and the wrapper picks the cm
+   In 0.51.0, so cm_launch.py's mappings can become plain `launch` and the wrapper pick the cm
    session; it must skip kspaces' own windows (docks, forms, panels, by their vars or `ctx.launch_type`),
    and cm_reap.py has to find a window's session from its var, as the wrapper is not in `child.argv`.
-8. Resizing docks by dragging their inner border and with `resize_window`: kovidgoyal/kitty#10857,
-   implemented by the maintainer in 11cbfdce2. The new size is stored in the dock's spec and saved in
-   sessions. Once a release has it, kspaces' 2-second check of `[sidebar] width` must not undo a dragged
-   width: decide whether a drag or the config wins.
+8. Resizing docks by dragging their inner border and with `resize_window`: kovidgoyal/kitty#10857, in
+   0.51.0. A dragged sidebar's width is written to `[sidebar] width`.
 9. `launch --type=tab --next-to` over remote control goes by the target tab, the active one by default,
    so the tab lands in the focused OS window, while the docs say the matched window's; the `launch` action
    honors it. It put a kspaces panel's new sessions in the panel until cm_launch.py passed `--self`
@@ -81,7 +48,3 @@ tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/
    mismatch offering a docs line or letting `--next-to` choose the OS window, is
    `drafts/issue-launch-next-to-rc.md`.
 
-When a kitty release has a fix, drop its workaround behind a check of kitty's version, as older kittys
-still need it. Going back to kitty's `save_as_session --match` for the saver: since c5e6bdf1f it fails
-rather than writing an empty file when nothing matches, so the saver keeps removing a session's file itself
-when its last window is gone.

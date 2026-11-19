@@ -19,7 +19,7 @@ type glueMsg struct{ notice look.Span }
 
 // checkGlue compares the kitty files the watcher was installed with to what this kspaces would install, as
 // installing another kspaces leaves them as they were. With [kitty] auto_install it rewrites them, and kitty
-// loads them when it restarts; else it says to run the install. One sidebar per tab does this at once, which
+// loads them when it restarts; else it says to run the install. Every sidebar does this at once, which
 // install's atomic writes allow. Short, for the last line of a narrow sidebar.
 func checkGlue() tea.Msg {
 	dir := os.Getenv(glueDirEnv)

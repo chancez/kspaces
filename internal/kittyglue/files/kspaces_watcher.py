@@ -1,11 +1,12 @@
-# Keep a kspaces sidebar docked at the left of every tab that belongs to a session.
+# Keep a kspaces sidebar docked at the left of every OS window that has a tab in a session.
 #
-# kitty can only dock a window to one tab, so a sidebar that is always there is one dock per tab, each
-# running its own `kspaces sidebar`. This adds the missing ones whenever a window is created or the tab bar
-# changes, which covers new tabs, tabs loaded from a session file and tabs moved between OS windows.
+# The sidebar is an OS window dock (launch --type=os-window-dock), shown in every tab of its OS window and
+# running one `kspaces sidebar`. This adds the missing ones whenever a window is created or the tab bar
+# changes, which covers new OS windows, tabs loaded from a session file and tabs moved between OS windows.
 #
-# Only tabs in a session get one. Spaces are sessions, and the exclusion keeps the sidebar out of windows
-# that are not part of the workspace at all, such as the tab switcher's OS window.
+# Only OS windows with a tab in a session get one. Spaces are sessions, and the exclusion keeps the sidebar
+# out of OS windows that are not part of the workspace at all, such as the tab switcher's or a kspaces
+# popup's.
 #
 # kspaces_toggle.py hides and shows the sidebars by setting boss.kspaces_hidden.
 #
@@ -14,7 +15,8 @@
 # It also notes when each program status record (OSC 7501) of a window last changed state, which kitty
 # does not report, so the sidebar can show how long a program has been blocked or working.
 #
-# The sidebars' width is [sidebar] width in kspaces' config, applied to every sidebar when it changes.
+# The sidebars' width is [sidebar] width in kspaces' config, applied to every sidebar when it changes. A
+# sidebar dragged to another width keeps it: the sidebar writes the new width to the config.
 #
 # Installed by `kspaces kitty install`, which writes this file; edits to it are overwritten.
 
@@ -23,6 +25,7 @@ import os
 import time
 import tomllib
 
+from kitty.constants import version
 from kitty.fast_data_types import add_timer
 
 DOCK_VAR = 'kspaces'
@@ -33,12 +36,15 @@ GLUE_DIR = os.path.dirname(os.path.abspath(__file__))
 # kspaces' default for [sidebar] width, and how often its config is checked for a new one.
 DEFAULT_WIDTH = 28
 CONFIG_CHECK_SECONDS = 2
+# The first kitty with OS window docks.
+MIN_VERSION = (0, 51, 0)
+SUPPORTED = version >= MIN_VERSION
 
 _scheduled = False
-# A pass of add_docks that schedule could not get a timer for, left to the config check.
-_missed = False
 # The config's sidebar width, and the files it was read from with their modification times.
 _width = (DEFAULT_WIDTH, None)
+# The width last given to the sidebars, None before the first check.
+_applied = None
 
 
 # config_paths are kspaces' config files: config.toml, then every other .toml file beside it by name,
@@ -82,29 +88,30 @@ def sidebar_width():
     return width
 
 
-# resize_docks gives every sidebar the configured width. kitty has no command to resize a dock, so this
-# changes the size its group was docked with and lays the tab out again.
+def docks(tm):
+    return [g for g in tm.os_window_docks if g.dock is not None and any(DOCK_VAR in w.user_vars for w in g)]
+
+
+# resize_docks gives every sidebar width, as dragging its border does, which lays out every tab of its OS
+# window again. Only when the config's width changes, so a dragged sidebar is not put back. kspaces docks
+# are sized in columns, never in percent.
 def resize_docks(boss, width):
-    for tab in tuple(boss.all_tabs):
-        changed = False
-        for g in tab.windows.tab_docks:
-            if g.dock is not None and any(DOCK_VAR in w.user_vars for w in g) and g.dock.size_as_string != str(width):
-                g.dock = g.dock._replace(size=width, size_is_percent=False)
-                changed = True
-        if changed:
-            tab.relayout()
+    for tm in tuple(boss.all_tab_managers):
+        host = tm.os_window_docks_host
+        for g in docks(tm):
+            if host is not None and not g.dock.size_is_percent and g.dock.size != width:
+                host.resize_dock(g, width - g.dock.size)
 
 
 def check_config(boss):
     def run(timer_id):
-        global _missed
-        resize_docks(boss, sidebar_width())
+        global _applied
+        if (width := sidebar_width()) != _applied:
+            resize_docks(boss, width)
+            _applied = width
         # A config reload shows the bars again, see hide_popup_tab_bar.
         for tm in tuple(boss.all_tab_managers):
             hide_popup_tab_bar(tm)
-        if _missed:
-            _missed = False
-            add_docks(boss)
 
     add_timer(run, CONFIG_CHECK_SECONDS, True)
 
@@ -123,30 +130,18 @@ def hide_popup_tab_bar(tm):
 # Called when kitty loads this watcher, at startup and whenever kitty.conf's list of watchers changes. The
 # flag on boss keeps a config reload from starting a second check.
 def on_load(boss, data):
-    if not getattr(boss, 'kspaces_checking_config', False):
-        boss.kspaces_checking_config = True
-        check_config(boss)
+    if getattr(boss, 'kspaces_checking_config', False):
+        return
+    boss.kspaces_checking_config = True
+    if not SUPPORTED:
+        boss.show_error('kspaces', 'kspaces needs kitty {} or later, this is kitty {}.'.format(
+            '.'.join(map(str, MIN_VERSION)), '.'.join(map(str, version))))
+        return
+    check_config(boss)
 
 
-def has_dock(tab):
-    return any(DOCK_VAR in w.user_vars for g in tab.windows.tab_docks for w in g)
-
-
-def wants_dock(tab):
-    return bool(tab.created_in_session_name) and bool(tab.windows.groups) and not has_dock(tab)
-
-
-# TODO: fix in kitty. Moving a tab to another OS window, as detach_tab does, makes a new tab that takes
-# over the old one's windows (Boss._move_tab_to, Tab.take_over_from) but not its session name. The windows
-# keep theirs, so the tab is put back in their session here; until then tab_bar_filter's session:^$ shows
-# the moved tab in every session.
-def repair_session(tab):
-    names = {w.created_in_session_name for w in tab} - {''}
-    if not tab.created_in_session_name and len(names) == 1:
-        tab.created_in_session_name = names.pop()
-        tm = tab.tab_manager_ref()
-        if tm is not None:
-            tm.mark_tab_bar_dirty()
+def wants_dock(tm):
+    return not docks(tm) and any(tab.created_in_session_name and tab.windows.groups for tab in tm)
 
 
 # kspaces_path is the kspaces kitty would run: kitty's own PATH under launchd is short, so this searches as
@@ -158,42 +153,34 @@ def kspaces_path():
 
 
 def add_docks(boss):
-    for tab in tuple(boss.all_tabs):
-        repair_session(tab)
     if getattr(boss, 'kspaces_hidden', False):
         return
-    for tab in tuple(boss.all_tabs):
-        if not wants_dock(tab):
+    for tm in tuple(boss.all_tab_managers):
+        tab = tm.active_tab
+        if tab is None or tab.active_window is None or not wants_dock(tm):
             continue
         # Focusable, so a click or kspaces_focus.py can give the sidebar the keyboard, but --keep-focus so
-        # adding one does not take focus from the window being worked in. In the tab's session, as a
-        # window in no session makes tab_bar_filter's session:^$ match its tab: with another OS window
-        # focused, kitty finds the tabs to show by their windows, so every tab with a sidebar was shown.
-        # save_sessions.py leaves the docks out of saved sessions by their var.
+        # adding one does not take focus from the window being worked in. In no session: kitty moves it
+        # to whichever tab is active, and save_sessions.py leaves it out of saved sessions by its var.
         prev = tab.active_window
-        boss.call_remote_control(tab.active_window, (
-            'launch', '--type=tab-dock', '--match', f'id:{tab.id}',
+        boss.call_remote_control(prev, (
+            'launch', '--type=os-window-dock', '--match', f'id:{tab.id}',
             '--dock-edge=left', f'--dock-size={sidebar_width()}', '--keep-focus',
-            f'--var={DOCK_VAR}=1', f'--add-to-session={tab.created_in_session_name}',
-            f'--env=KSPACES_KITTY_DIR={GLUE_DIR}', kspaces_path(), 'sidebar',
+            f'--var={DOCK_VAR}=1', f'--env=KSPACES_KITTY_DIR={GLUE_DIR}', kspaces_path(), 'sidebar',
         ))
-        # --keep-focus only keeps the window that has focus. In any other tab the new dock becomes the tab's
-        # active window, and the tab takes its title.
-        if prev is not None and tab.active_window is not prev:
+        # --keep-focus only keeps the window that has focus. In an OS window without it the new dock
+        # becomes the tab's active window, and the tab takes its title.
+        if tab.active_window is not prev:
             tab.set_active_window(prev)
 
 
 # Called from the tab bar and window hooks below. They fire in the middle of creating tabs and loading
 # sessions, so launching from inside them could act on a half-built tab, and the launch itself fires them
 # again. Doing it from a timer runs it once the current change is finished, and coalesces a burst of changes
-# into one pass.
-#
-# kitty's timers are a fixed table on macOS, and add_timer returns 0, never to call back, when it is full, as
-# it can be while sessions load. Then the pass is left to the config check, which is already running, rather
-# than waiting forever for a timer that will not come.
+# into one pass. A timer kitty refuses, returning 0, leaves the pass to the next change.
 def schedule(boss):
-    global _scheduled, _missed
-    if _scheduled:
+    global _scheduled
+    if _scheduled or not SUPPORTED:
         return
     _scheduled = True
 
@@ -203,7 +190,7 @@ def schedule(boss):
         add_docks(boss)
 
     if not add_timer(run, 0, False):
-        _scheduled, _missed = False, True
+        _scheduled = False
 
 
 def on_tab_bar_dirty(boss, window, data):
@@ -221,9 +208,9 @@ def on_resize(boss, window, data):
 
 # The user variable that holds when each of a window's program status records last changed state, as JSON:
 # {"pid": KITTY_PID, "records": {"RECORD_ID": ["STATE", UNIX_TIME]}}. Kept on the window because there is
-# one sidebar per tab, each refreshing on its own every two seconds: noted here, at the change, every copy
-# reads the same time and one started later still has it. Not named kspaces*, as save_sessions.py leaves
-# windows with a var:kspaces out of saved sessions.
+# one sidebar per OS window, each refreshing on its own every two seconds: noted here, at the change, every
+# copy reads the same time and one started later still has it. Not named kspaces*, as save_sessions.py
+# leaves windows with a var:kspaces out of saved sessions.
 STATUS_AT_VAR = 'program_status_at'
 
 

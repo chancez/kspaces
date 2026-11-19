@@ -386,7 +386,8 @@ that has not changed, by its size, time and inode, is not read again: every two 
 
 ## Installing the kitty files
 
-kitty needs a watcher to dock a sidebar in every tab, and a couple of kittens. They are built into kspaces:
+kitty needs a watcher to dock a sidebar in every OS window, and a couple of kittens. They are built into
+kspaces, and need kitty 0.51.0 or later, which the watcher says when kitty starts if it is older:
 
 ```
 kspaces kitty install
@@ -455,13 +456,16 @@ Dock has a short PATH, so if kspaces is somewhere else, such as mise's shims, se
 
 ## What the files do
 
-kitty can dock a window to one tab only, so a sidebar in every tab is one `kspaces sidebar` per tab.
+The sidebar is an OS window dock: one `kspaces sidebar` per OS window, shown in every tab of it. kitty
+lists it in `kitten @ ls` in the OS window's active tab, so a sidebar's session is the active tab's.
 `kspaces_watcher.py`:
 
-- docks `kspaces sidebar` at the left of every tab that belongs to a session, with the `kspaces` user
-  variable and `--keep-focus`;
+- docks `kspaces sidebar` at the left of every OS window with a tab that belongs to a session, with the
+  `kspaces` user variable and `--keep-focus`, in no session, as kitty moves it from tab to tab;
 - sizes the docks to `[sidebar] width`, all of it the sidebar's (kitty's dock border, if any, is the
-  separator), and resizes them when it changes;
+  separator), and resizes them when it changes. Dragging a sidebar's border resizes it, and the sidebars'
+  leader writes the new width to `[sidebar] width`, in the file that sets it, once it has held for a poll,
+  so every sidebar takes it;
 - hides the tab bar of the panels kspaces opens, marked with the `kspaces_popup` user variable: kitty has
   no option for one OS window's tab bar, and `tab_bar_filter` always shows the active tab, so it sets
   kitty's own flag for it, which a config reload resets and its next check, within two seconds, sets again;
@@ -469,24 +473,25 @@ kitty can dock a window to one tab only, so a sidebar in every tab is one `kspac
   which the status list's ages come from.
 
 `kspaces_toggle.py` hides and shows every sidebar, and `kspaces_focus.py` moves the keyboard into the
-current tab's sidebar and back.
+current OS window's sidebar and back.
 
 The sidebars of one kitty share their work: the first to start leads, with a lock on a file in
 `$XDG_RUNTIME_DIR/kspaces/`, or `kspaces-UID/` in the temporary directory, named after kitty's
 `KITTY_LISTEN_ON` socket. Every two seconds the leader runs `kitten @ ls` and `git worktree list` for each
 space, and in the background `git status` and `gh` for the [rows' git state](sidebar.md#spaces), and
 writes what it found beside the lock; the others read that file when it changes, and each works out its
-own tab's session from it. When the leading sidebar's tab closes, the next sidebar to look takes the lead,
+own session from it. When the leading sidebar's OS window closes, the next sidebar to look takes the lead,
 carrying on from what the last one knew. `r` in any sidebar loads at once in that sidebar, and has the
 leader ask git and gh again.
 
 `save_sessions.py`, with `save_sessions = true`, saves each session to its own file at quit and as its
-windows close or take focus, and loads the ones that were open at startup. A space then reopens as it was
-left, and afresh once its last window has closed: its file is removed, or, for the default session, which
-is `startup_session`'s, emptied. Windows in no session are saved with the default session, at quit and on
-demand only. The files go next to kitty's `startup_session`, so point kspaces' `sessions` at that
-directory. `kspaces_save_sessions` saves them on demand. The docks, the forms kspaces opens and the picker
-carry a `kspaces*` user variable, and are never saved.
+windows close, take focus or change directory, and loads the ones that were open at startup. A space then
+reopens as it was left, and afresh once its last window has closed: its file is removed, or, for the
+default session, which is `startup_session`'s, emptied. Closing an OS window as a whole keeps its
+sessions' files. Windows in no session are saved with the default session, at quit and on demand only.
+The files go next to kitty's `startup_session`, so point kspaces' `sessions` at that directory.
+`kspaces_save_sessions` saves them on demand. The docks, the forms kspaces opens and the picker carry a
+`kspaces*` user variable, and are never saved.
 
 ## Popups: overlays and panels
 

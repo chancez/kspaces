@@ -247,21 +247,12 @@ func (sc *scanner) tables() ([]tableHeader, error) {
 			return out, nil
 		}
 		if text[i] == '[' {
-			array := strings.HasPrefix(text[i:], "[[")
-			close := "]"
-			j := i + 1
-			if array {
-				close, j = "]]", i+2
-			}
-			key, j, err := sc.key(j)
+			h, j, err := sc.header(i)
 			if err != nil {
 				return nil, err
 			}
-			if !strings.HasPrefix(text[j:], close) {
-				return nil, fmt.Errorf("line %d: expected %s after the table's name", sc.line(j), close)
-			}
-			out = append(out, tableHeader{start: i, key: key, array: array})
-			sc.i = j + len(close)
+			out = append(out, h)
+			sc.i = j
 			continue
 		}
 		_, j, err := sc.key(i)
@@ -276,4 +267,23 @@ func (sc *scanner) tables() ([]tableHeader, error) {
 			return nil, err
 		}
 	}
+}
+
+// header reads the table header that starts at i, and returns where it ends, after its closing bracket.
+func (sc *scanner) header(i int) (tableHeader, int, error) {
+	text := sc.s
+	array := strings.HasPrefix(text[i:], "[[")
+	close := "]"
+	j := i + 1
+	if array {
+		close, j = "]]", i+2
+	}
+	key, j, err := sc.key(j)
+	if err != nil {
+		return tableHeader{}, 0, err
+	}
+	if !strings.HasPrefix(text[j:], close) {
+		return tableHeader{}, 0, fmt.Errorf("line %d: expected %s after the table's name", sc.line(j), close)
+	}
+	return tableHeader{start: i, key: key, array: array}, j + len(close), nil
 }

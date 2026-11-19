@@ -66,7 +66,8 @@ mise run install    # -> ~/.local/bin/kspaces
 
 ## Setup
 
-kitty needs a watcher that docks a sidebar in every tab, which kspaces carries and installs:
+kspaces needs kitty 0.51.0 or later. kitty needs a watcher that docks a sidebar in every OS window, which
+kspaces carries and installs:
 
 ```
 kspaces kitty install    # -> ~/.config/kitty/kspaces/
@@ -164,7 +165,8 @@ pr_layout = "review"
 
 # The sidebar's width in columns, 12 to 120, and where its forms and the picker open: "overlay", over the
 # window they are for, or "panel", a centered OS window of a fixed size (macOS, Wayland with layer shell,
-# X11), which needs kspaces kitty install again. See docs/kitty.md.
+# X11), which needs kspaces kitty install again. Dragging the sidebar's border writes its new width here.
+# See docs/kitty.md.
 [sidebar]
 width = 28
 popup = "overlay"

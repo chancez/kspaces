@@ -1,4 +1,4 @@
-# Hide or show the kspaces sidebar in every tab. See kspaces_watcher.py, which adds the docks.
+# Hide or show the kspaces sidebar in every OS window. See kspaces_watcher.py, which adds the docks.
 # Installed by `kspaces kitty install`; edits to this file are overwritten.
 
 from kittens.tui.handler import result_handler

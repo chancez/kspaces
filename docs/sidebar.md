@@ -52,7 +52,7 @@ missing worktrees: its sessions are listed above the spaces as before.
 Clicking a row, or `enter` on it, switches to its session, creating it the first time, with its
 [default layout](kitty.md#layouts) if it has one, but for a missing worktree with no windows. Clicking a
 space's triangle, or `space` on its row, folds its linked worktrees into the space's row. Folded spaces are
-kept in `$XDG_STATE_HOME/kspaces/folded`, so every tab's sidebar agrees.
+kept in `$XDG_STATE_HOME/kspaces/folded`, so every OS window's sidebar agrees.
 
 Resting the mouse on a row for 2 seconds shows its worktree in detail in a popup under it, as the
 picker's preview does: its space, path, branch, changes, upstream, PR and its state, checks and review in
@@ -110,7 +110,8 @@ idle.
 The list's menu has a Groups section, each group ticked while it shows; choosing one hides it, header and
 spaces, and choosing it again shows it. Hidden groups are kept in `$XDG_STATE_HOME/kspaces/hidden`, so
 every sidebar hides them, unlike the attention filter, which is each sidebar's own: there is a sidebar in
-every tab, and hiding work for the evening should not take a click in each, nor come back with a restart.
+every OS window, and hiding work for the evening should not take a click in each, nor come back with a
+restart.
 A hidden group is out of sight, so its sessions no longer call for attention: their entries leave the
 STATUS list, `!` and `kspaces next --attention` skip them, and the attention filter, which shows only
 rows, has none of them. They are found by name, the space's or `SPACE@DIR`. The picker still lists them,
@@ -133,7 +134,7 @@ linked worktrees move within it. Spaces in [groups](#groups) are sorted within t
 keep their order. The sessions in no space stay above the spaces, ordered the same way, by
 name when manual. Activity is when one of a session's windows, docks left out, was last focused, as
 kitty's `ls` reports it. The mode is kept in `$XDG_STATE_HOME/kspaces/sort`, manual until one is chosen,
-so every tab's sidebar sorts the same way.
+so every sidebar sorts the same way.
 
 The automatic modes sort again at each refresh, and the cursor stays on its row wherever that goes. While
 the mouse is pressed on a row or a menu is open the rows stay where they are, so what is under the mouse
@@ -355,7 +356,7 @@ to the session; `shell` adds a tab as `launch` opens it, by the window switching
 or opens a session with no windows with it alone, as **Open without layout** does.
 
 **Save as layout** saves the session's tabs, as kitty has them, as a [layout](kitty.md#saving-a-layout):
-a `name` field, then `save`, `every tab` at first or `this tab`, which is the tab the sidebar is in for its
+a `name` field, then `save`, `every tab` at first or `this tab`, which is the active tab for its
 own session, else the session's most recently focused. `save to` says where: `SPACE's .kspaces.toml`, the
 space's [own config](kitty.md#per-space-config), at first, or `the global config`, config.toml. A space
 file that is not there yet is made, and a box below, `keep out of git (adds it to .git/info/exclude)`,

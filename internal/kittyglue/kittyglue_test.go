@@ -64,10 +64,10 @@ func TestConf(t *testing.T) {
 #
 # before your own mappings, and map keys to the actions below, such as: map f4 kspaces_toggle
 
-# Dock a sidebar in every tab that belongs to a session.
+# Dock a sidebar in every OS window with a tab that belongs to a session. Needs kitty 0.51.0 or later.
 watcher /cfg/kitty/kspaces/kspaces_watcher.py
 
-# Hide and show every sidebar, and move the keyboard into this tab's sidebar and back.
+# Hide and show every sidebar, and move the keyboard into this OS window's sidebar and back.
 action_alias kspaces_toggle kitten /cfg/kitty/kspaces/kspaces_toggle.py
 action_alias kspaces_focus kitten /cfg/kitty/kspaces/kspaces_focus.py
 
@@ -81,7 +81,7 @@ action_alias kspaces_recent launch --type=background --allow-remote-control kspa
 action_alias kspaces_attention_next launch --type=background --allow-remote-control kspaces next --attention
 action_alias kspaces_attention_prev launch --type=background --allow-remote-control kspaces prev --attention
 
-# Send a key to this tab's sidebar without focusing it, as in: map --mode spaces j kspaces_key j
+# Send a key to this OS window's sidebar without focusing it, as in: map --mode spaces j kspaces_key j
 action_alias kspaces_key remote_control send-key --match "var:^kspaces$ and state:parent_focused"
 `
 	for _, c := range []struct {

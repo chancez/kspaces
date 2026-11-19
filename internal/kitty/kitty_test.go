@@ -1,6 +1,7 @@
 package kitty
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 	"time"
@@ -178,6 +179,43 @@ func TestKeyboardWindow(t *testing.T) {
 	got := []int{keyboardWindow(unfocused), keyboardWindow(focused), keyboardWindow(nil)}
 	// Without a focused OS window, the one focused last stands in.
 	if want := []int{21, 10, 0}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+// The sidebar docks' widths come from `kitten @ ls`'s groups: an os-window dock listed in its active tab,
+// one width per OS window, and neither a dock of another window nor one sized as a percentage.
+func TestSidebarWidths(t *testing.T) {
+	ls := `[
+  {"is_focused": true, "tabs": [
+    {"id": 1, "is_active": true,
+     "windows": [{"id": 2, "session_name": "gr"}, {"id": 4, "user_vars": {"kspaces": "1"}}, {"id": 5}],
+     "groups": [
+       {"id": 2, "windows": [2]},
+       {"dock": {"edge": "left", "focusable": true, "scope": "os-window", "size": "34"}, "id": 4, "windows": [4]},
+       {"dock": {"edge": "bottom", "focusable": true, "scope": "tab", "size": "10"}, "id": 5, "windows": [5]}
+     ]},
+    {"id": 3, "is_active": false, "windows": [{"id": 6}], "groups": [{"id": 6, "windows": [6]}]}
+  ]},
+  {"tabs": [
+    {"id": 7, "is_active": true,
+     "windows": [{"id": 8}, {"id": 9, "user_vars": {"kspaces": "1"}}],
+     "groups": [
+       {"id": 8, "windows": [8]},
+       {"dock": {"edge": "left", "focusable": true, "scope": "os-window", "size": "30"}, "id": 9, "windows": [9]}
+     ]}
+  ]},
+  {"tabs": [
+    {"id": 10, "is_active": true,
+     "windows": [{"id": 11, "user_vars": {"kspaces": "1"}}],
+     "groups": [{"dock": {"edge": "left", "focusable": true, "scope": "os-window", "size": "25%"}, "id": 11, "windows": [11]}]}
+  ]}
+]`
+	var data []OSWindow
+	if err := json.Unmarshal([]byte(ls), &data); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := SidebarWidths(data), []int{34, 30}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
 }

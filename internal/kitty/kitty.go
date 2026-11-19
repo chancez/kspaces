@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -76,6 +77,22 @@ type Tab struct {
 	ID       int      `json:"id"`
 	IsActive bool     `json:"is_active"`
 	Windows  []Window `json:"windows"`
+	// The tab's window groups, kitty 0.51's docks among them.
+	Groups []Group `json:"groups,omitempty"`
+}
+
+// Group is a group of windows in `kitten @ ls`: a dock when Dock is set.
+type Group struct {
+	ID      int   `json:"id"`
+	Windows []int `json:"windows"`
+	Dock    *Dock `json:"dock,omitempty"`
+}
+
+// Dock is how a group is docked: its edge, and its size, columns for a left or right dock, or a
+// percentage of the OS window when it ends in %.
+type Dock struct {
+	Edge string `json:"edge"`
+	Size string `json:"size"`
 }
 
 // OSWindow is an OS window in `kitten @ ls`.
@@ -94,7 +111,8 @@ type State struct {
 	// For each session with windows, when one of them, not counting docks, was last focused: kitty's
 	// last_focused_at, in seconds. Zero when kitty gives no times.
 	Focused map[string]float64
-	// The session of the tab the sidebar runs in, empty when it belongs to none.
+	// The session of the tab the sidebar is in, empty when it belongs to none. The sidebar is an OS window
+	// dock, which kitty keeps in the active tab.
 	Current string
 	// The window focused most recently in the sidebar's tab, not counting docks. Leaving the sidebar returns
 	// focus to it. Zero when unknown.
@@ -467,6 +485,38 @@ func FindWindow(data []OSWindow, id int) (Window, bool) {
 		}
 	}
 	return Window{}, false
+}
+
+// SidebarWidths are the widths in columns of the sidebar docks in data, the groups docking a window marked
+// with dockVar, each once however many tabs list it. A dock sized as a percentage is left out, as the
+// config's width is in columns.
+func SidebarWidths(data []OSWindow) []int {
+	sidebar := map[int]bool{}
+	for _, osw := range data {
+		for _, tab := range osw.Tabs {
+			for _, w := range tab.Windows {
+				if _, ok := w.UserVars[dockVar]; ok {
+					sidebar[w.ID] = true
+				}
+			}
+		}
+	}
+	var out []int
+	seen := map[int]bool{}
+	for _, osw := range data {
+		for _, tab := range osw.Tabs {
+			for _, g := range tab.Groups {
+				if g.Dock == nil || seen[g.ID] || !slices.ContainsFunc(g.Windows, func(id int) bool { return sidebar[id] }) {
+					continue
+				}
+				seen[g.ID] = true
+				if n, err := strconv.Atoi(g.Dock.Size); err == nil {
+					out = append(out, n)
+				}
+			}
+		}
+	}
+	return out
 }
 
 // ScreenText is what window id has on its screen, its colors and styles as SGR sequences.

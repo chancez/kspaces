@@ -1,5 +1,5 @@
-# Move keyboard focus into the kspaces sidebar of the current tab, or back out of it when it has focus.
-# See kspaces_watcher.py, which adds the sidebars.
+# Move keyboard focus into the kspaces sidebar of the current OS window, or back out of it when it has
+# focus. See kspaces_watcher.py, which adds the sidebars.
 # Installed by `kspaces kitty install`; edits to this file are overwritten.
 
 from kittens.tui.handler import result_handler
@@ -21,6 +21,6 @@ def handle_result(args, answer, target_window_id, boss):
         # The normal window that was active before the sidebar took focus.
         target = tab.windows.active_main_window
     else:
-        target = next((w for g in tab.windows.tab_docks for w in g if DOCK_VAR in w.user_vars), None)
+        target = next((w for g in tab.windows.os_window_docks for w in g if DOCK_VAR in w.user_vars), None)
     if target is not None:
         boss.set_active_window(target)

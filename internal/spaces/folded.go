@@ -12,8 +12,8 @@ import (
 )
 
 // statePath is the file name in kspaces' state directory, $XDG_STATE_HOME/kspaces, where what every
-// sidebar shares is kept: there is one sidebar per tab, and a change in one should show in all of them,
-// which read it on their next refresh.
+// sidebar shares is kept: there is one sidebar per OS window, and a change in one should show in all of
+// them, which read it on their next refresh.
 func statePath(name string) (string, error) {
 	dir := os.Getenv("XDG_STATE_HOME")
 	if dir == "" {
@@ -73,7 +73,7 @@ func SaveFolded(folded map[string]bool) error {
 }
 
 // The groups left out of the sidebar, by name, a line each. Shared, as the folds are, so hiding a group
-// hides it in every tab's sidebar, and it stays hidden after a restart.
+// hides it in every sidebar, and it stays hidden after a restart.
 const hiddenFile = "hidden"
 
 // LoadHidden reads the hidden groups. A missing file hides none.

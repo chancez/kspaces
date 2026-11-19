@@ -1,5 +1,6 @@
-// Package kittyglue is what kitty needs to run kspaces: the watcher that docks a sidebar in every tab, the
-// kittens that hide and focus it, the optional session saver, and a kitty.conf to include that loads them.
+// Package kittyglue is what kitty needs to run kspaces: the watcher that docks a sidebar in every OS
+// window, the kittens that hide and focus it, the optional session saver, and a kitty.conf to include that
+// loads them.
 // The scripts are built into kspaces, so a kspaces from mise, go install, a release or a local build
 // installs the files that go with it.
 package kittyglue
@@ -92,10 +93,10 @@ func conf(cfg config.Config, dir string) string {
 	if cfg.Sidebar.Popup == config.PopupPanel {
 		pick = "launch --type=background --allow-remote-control kspaces pick --from @active-kitty-window-id"
 	}
-	fmt.Fprintf(&b, `# Dock a sidebar in every tab that belongs to a session.
+	fmt.Fprintf(&b, `# Dock a sidebar in every OS window with a tab that belongs to a session. Needs kitty 0.51.0 or later.
 watcher %s
 
-# Hide and show every sidebar, and move the keyboard into this tab's sidebar and back.
+# Hide and show every sidebar, and move the keyboard into this OS window's sidebar and back.
 action_alias kspaces_toggle kitten %s
 action_alias kspaces_focus kitten %s
 
@@ -109,7 +110,7 @@ action_alias kspaces_recent launch --type=background --allow-remote-control kspa
 action_alias kspaces_attention_next launch --type=background --allow-remote-control kspaces next --attention
 action_alias kspaces_attention_prev launch --type=background --allow-remote-control kspaces prev --attention
 
-# Send a key to this tab's sidebar without focusing it, as in: map --mode spaces j kspaces_key j
+# Send a key to this OS window's sidebar without focusing it, as in: map --mode spaces j kspaces_key j
 action_alias kspaces_key remote_control send-key --match "var:^kspaces$ and state:parent_focused"
 `, path("kspaces_watcher.py"), path("kspaces_toggle.py"), path("kspaces_focus.py"), pick)
 	return b.String()

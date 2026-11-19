@@ -19,13 +19,12 @@ import (
 	"github.com/chancez/kspaces/internal/logs"
 )
 
-// One load for all the sidebars of a kitty. kitty docks a window to one tab only, so every tab has a
-// sidebar of its own, and each loading kitty's state and every space's worktrees itself cost as many
-// `kitten @ ls` and `git worktree list` runs. Instead the sidebars of one kitty elect a leader with a lock
-// on a file: the leader loads and writes what it loaded to a file beside the lock, and the others read
-// that file when it changes. When the leader exits its lock goes with it, and the next sidebar to poll
-// takes the lead. What depends on the window a sidebar runs in, such as its tab's session, is worked out
-// by each from the shared windows with View.
+// One load for all the sidebars of a kitty. Every OS window has a sidebar of its own, and each loading
+// kitty's state and every space's worktrees itself cost as many `kitten @ ls` and `git worktree list`
+// runs. Instead the sidebars of one kitty elect a leader with a lock on a file: the leader loads and writes
+// what it loaded to a file beside the lock, and the others read that file when it changes. When the leader
+// exits its lock goes with it, and the next sidebar to poll takes the lead. What depends on the window a
+// sidebar runs in, such as its tab's session, is worked out by each from the shared windows with View.
 
 // Shared is what one load sees that is the same from every window of a kitty: all of a Snapshot but what
 // depends on the window it is seen from, which View works out. The leader writes it as JSON, so errors
@@ -120,8 +119,8 @@ func (sh Shared) View(self int) Snapshot {
 	return snap
 }
 
-// pollWait is how long a sidebar waits for the leader's first file before loading itself: every tab's
-// sidebar starts at once with kitty, and the leader takes a moment to write.
+// pollWait is how long a sidebar waits for the leader's first file before loading itself: every OS
+// window's sidebar starts at once with kitty, and the leader takes a moment to write.
 const pollWait = time.Second
 
 // Poller shares loads between the sidebars of one kitty, see Shared. It is safe to call from several
@@ -146,12 +145,17 @@ type Poller struct {
 	seen os.FileInfo
 	last Shared
 	have bool
+	// saveWidth saves a sidebar dock's dragged width as the config's, nil for none; drag follows the docks
+	// for it.
+	saveWidth func(width int) error
+	drag      dockDrag
 }
 
 // NewPoller is the poller of the kitty kspaces runs in.
 func NewPoller() *Poller {
 	p := newPoller(filepath.Join(pollDir(), pollKey()+".json"), LoadShared)
 	p.newWatcher = gitstate.NewWatcher
+	p.saveWidth = config.SaveSidebarWidth
 	return p
 }
 
@@ -235,7 +239,26 @@ func (p *Poller) lead() Shared {
 		sh.Git = p.git.Update(targets(sh))
 	}
 	p.write(sh)
+	p.followDock(sh)
 	return sh
+}
+
+// followDock saves the width a sidebar dock was dragged to, see dockDrag. Only the leader follows the
+// docks, so one process writes the config for a drag.
+func (p *Poller) followDock(sh Shared) {
+	if p.saveWidth == nil {
+		return
+	}
+	if sh.Config == nil || sh.KittyErr != "" {
+		p.drag = dockDrag{}
+		return
+	}
+	cfg := sh.Config.Sidebar.Width
+	if w := p.drag.observe(dockWidth(kitty.SidebarWidths(sh.Windows), cfg), cfg); w != 0 {
+		if err := p.saveWidth(w); err != nil {
+			logs.Error("saving the dragged sidebar width", err)
+		}
+	}
 }
 
 // targets are the worktrees of the spaces in sh.
