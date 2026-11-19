@@ -53,9 +53,11 @@ Opening a worktree:
    directory for a session in no space, such as `default`.
 
 `launch` in the config is that action, `["launch"]` by default. Every window kspaces opens in a session
-goes through it, with kspaces' options appended, so a kitten that passes them on to kitty's `launch` can
-stand in for it, such as one that runs each window in a multiplexer session. It has to take options as
-`--name=value` and treat the first argument that does not start with `-` as the start of the command.
+goes through it, with kspaces' options appended. To run every window in a multiplexer session or a
+container, use kitty's [`launch_wrapper.py`](https://sw.kovidgoyal.net/kitty/launch/#launch-wrapper),
+which wraps kspaces' windows too. Change `launch` only for what kspaces' windows alone should go
+through: a kitten that passes the options on to kitty's `launch`, taking them as `--name=value` and the
+first argument that does not start with `-` as the start of the command.
 
 kspaces itself never writes session files. The session saver below, which it can install into kitty, does.
 

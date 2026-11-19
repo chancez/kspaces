@@ -108,7 +108,9 @@ groups = ["work", "personal"]
 sessions = "~/.local/share/kitty/sessions"
 
 # The kitty action every window kspaces opens goes through, its options appended: --type, --cwd and the
-# like, then any command. A kitten that passes them on to launch can stand in for it.
+# like, then any command. To wrap every window, in a multiplexer session for one, use kitty's
+# launch_wrapper.py, which wraps kspaces' windows too; change this only for what kspaces' windows alone
+# go through, such as a kitten that passes the options on to launch.
 launch = ["launch"]
 
 # Where new worktrees go, under the space's root, and what new branch names start with. delete_branch
