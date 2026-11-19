@@ -39,40 +39,19 @@ def default_name():
     return os.path.basename(startup_path()).rpartition('.')[0]
 
 
-# What save_as_session --match writes, with two bugs fixed. It leaves out the `new_os_window` line only for
-# the first OS window it iterates (Boss.serialize_state_as_session, `is_first=i == 0`), not for the first
-# one it writes. When that window has no matching windows, the file starts with `new_os_window`, and
-# restore() opens the session in an OS window of its own instead of the current one; with a second OS window
-# open at quit, every space came back in its own. Which window comes first depends on focus. This is that
-# loop, passing is_first to the first OS window that has output.
-#
-# And its `focus_tab` is the OS window's active tab's index among all of its tabs, while loading counts only
-# the tabs the file creates: every session but the one on screen came back on the wrong tab. See
-# focus_tab_line.
-# TODO: fix both in kitty, then go back to boss.save_as_session. --match dates from e43d894dd, a week after
-# is_first (067afe35e).
+# What save_as_session --match writes, Boss.serialize_state_as_session, with the OS windows in
+# os_window_order rather than kitty's order by focus. The first OS window with matching windows is loaded
+# into the current one, the others into new ones.
 def save_matching(boss, match, path, main):
     opts, _ = parse_save_as_options_spec_args(['--use-foreground-process', f'--match={match}'])
     matched = frozenset(boss.match_windows(match))
     lines, first = [], True
     for os_window_id in os_window_order(boss, main):
-        tm = boss.os_window_map[os_window_id]
-        out = tm.serialize_state_as_session(path, matched, opts, is_first=first)
-        if out:
-            out = [line for line in out if not line.startswith('focus_tab ')] + [focus_tab_line(tm, matched)]
+        out = boss.os_window_map[os_window_id].serialize_state_as_session(path, matched, opts, is_first=first)
         first = first and not out
         lines.extend(out)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     atomic_save('\n'.join(lines).encode(), path)
-
-
-# focus_tab_line focuses, among the tabs of tm the file creates, the one with the session's most recently
-# focused window, which is the tab kitty switches to when going to the session while it is open.
-def focus_tab_line(tm, matched):
-    saved = [[w for w in tab if w in matched] for tab in tm]
-    saved = [ws for ws in saved if ws]
-    latest = max(range(len(saved)), key=lambda i: max(w.last_focused_at for w in saved[i]))
-    return f'focus_tab {latest}'
 
 
 # The OS windows in the order they are saved: kitty's, by focus, but with main last. kitty creates the OS
@@ -115,9 +94,9 @@ def save_all(boss):
 
 # Saving at quit alone left a session's file as it was at the last quit: closing a session's tabs and panes
 # and opening it again brought them all back. So a session is also saved a moment after one of its windows
-# closes or takes focus, which keeps which window is focused too. A session whose last window closed has
-# its file removed, so opening it again starts afresh. The default session's file is startup_session's, so
-# it is emptied instead.
+# closes, takes focus or changes directory, which keeps which window is focused too. A session whose last
+# window closed has its file removed, so opening it again starts afresh. The default session's file is
+# startup_session's, so it is emptied instead.
 #
 # Windows in no session are left to save_all. Saved into the default session as they changed, a window that
 # opens an OS window of its own, such as a tab switcher mapped to a key, stayed in its file after closing
@@ -125,29 +104,22 @@ def save_all(boss):
 #
 # Not while kitty quits, which closes every window after on_quit has saved them, nor for the windows of an
 # OS window closed as a whole, which kitty also closes one by one: either would remove every file. The
-# sessions keep what was saved before, as when the last of them took focus. That is decided in on_close
-# itself: kitty drops an OS window closed as a whole from os_window_map before closing its windows, while
-# closing an OS window's last tab closes the OS window only afterwards, so by the time the timer fires both
-# look the same, and that session kept a stale file.
+# sessions keep what was saved before, as when the last of them took focus. on_close says which it is.
 SAVE_DELAY = 0.5
 _quitting = False
-# Session names waiting to be saved, each True if one of its windows closed with its OS window.
+# Session names waiting to be saved, each True if one of its windows closed with its OS window or kitty.
 _pending = {}
 _timer = None
 
 
-def note_change(boss, window, closed):
+def note_change(boss, window, torn_down=False):
     global _timer
     name = window.created_in_session_name
     if _quitting or not name or not startup_path() or any(k.startswith('kspaces') for k in window.user_vars):
         return
-    torn_down = closed and window.os_window_id not in boss.os_window_map
     _pending[name] = _pending.get(name, False) or torn_down
     if _timer is None:
-        # kitty's timers are a fixed table on macOS, and add_timer returns 0, never to call back, when it is
-        # full, as it can be at startup with every watcher call taking one. Keeping 0 would wait for that
-        # timer forever; the next change tries again instead, and saves what has piled up since.
-        _timer = add_timer(lambda timer_id: save_pending(boss), SAVE_DELAY, False) or None
+        _timer = add_timer(lambda timer_id: save_pending(boss), SAVE_DELAY, False)
 
 
 def save_pending(boss):
@@ -172,19 +144,16 @@ def save_pending(boss):
 
 
 def on_close(boss, window, data):
-    note_change(boss, window, closed=True)
+    note_change(boss, window, torn_down=data.get('reason') != 'window')
 
 
 def on_focus_change(boss, window, data):
     if data.get('focused'):
-        note_change(boss, window, closed=False)
+        note_change(boss, window)
 
 
-# One session per timer, not all in one go. kitty calls watchers from a 0s timer for every window resize and
-# focus change, and loading a session resizes each window several times. None of those fire until the timer
-# that is loading returns, and on macOS kitty has room for 128, so loading every space at once filled the
-# table and kitty dropped the rest of the watcher calls. Between sessions the queued ones fire.
-RESTORE_STEP = 0.05
+def on_cwd_change(boss, window, data):
+    note_change(boss, window)
 
 
 def restore(boss):
@@ -199,16 +168,8 @@ def restore(boss):
     # Loading a session switches to it, so end up back where startup_session left off.
     if names and startup_path():
         paths.append(startup_path())
-    load_next(boss, paths)
-
-
-# load_next loads the first of paths, and the rest from a timer. With no timer to be had, it goes on loading
-# rather than leave sessions unloaded.
-def load_next(boss, paths):
-    while paths:
-        boss.goto_session(paths.pop(0))
-        if paths and add_timer(lambda timer_id: load_next(boss, paths), RESTORE_STEP, False):
-            return
+    for path in paths:
+        boss.goto_session(path)
 
 
 # Called when kitty loads this watcher, which is during startup, while startup_session is being created, and
