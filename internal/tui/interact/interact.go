@@ -50,6 +50,8 @@ func (a *Action[M, S]) applies(m M, s S) bool {
 type binding[M, S any] struct {
 	key.Binding
 	action *Action[M, S]
+	// quiet is a binding help never shows, see BindQuiet.
+	quiet bool
 }
 
 // keys are the bindings of a kind or a place.
@@ -76,7 +78,7 @@ func (ks keys[M, S]) bindings() []key.Binding {
 func (ks keys[M, S]) on(s S) []Key[M] {
 	out := make([]Key[M], len(ks))
 	for i, b := range ks {
-		out[i] = Key[M]{Binding: b.Binding, Action: bind(b.action, s)}
+		out[i] = Key[M]{Binding: b.Binding, Action: bind(b.action, s), quiet: b.quiet}
 	}
 	return out
 }
@@ -121,6 +123,7 @@ func (k *Kind[M, S]) Bind(a *Action[M, S], help, desc string, keys ...string) {
 // which keeps it from reaching what the subject carries. Menus offer a only if the kind lists it.
 func (k *Kind[M, S]) BindQuiet(a *Action[M, S], keys ...string) {
 	k.keys.bind(a, "", "", keys...)
+	k.keys[len(k.keys)-1].quiet = true
 }
 
 // Bindings are the kind's keys, for help.
@@ -207,6 +210,7 @@ func bind[M, S any](a *Action[M, S], s S) Bound[M] {
 type Key[M any] struct {
 	key.Binding
 	Action Bound[M]
+	quiet  bool
 }
 
 // Place is where subjects of kind S are found: a list you move through, or a mention inside
@@ -383,6 +387,77 @@ func Lookup[M any](m M, msg tea.KeyPressMsg, chain ...Target[M]) (Bound[M], bool
 		}
 	}
 	return Bound[M]{}, false
+}
+
+// Section is one subject's keys in help: its label, and a line for each binding that runs something,
+// with the keys that reach it and what it does.
+type Section struct {
+	Label string
+	Lines []key.Help
+}
+
+// Help is what each subject on a chain of targets takes, in the order Lookup tries them, for a list of
+// the keys there. A binding without a description goes on the line of the one before it, as k on the
+// line "j/k down/up", which shows while either runs something: "space" shows to unfold as well as to
+// fold. A line shows only the keys a subject before has not taken, as Keys does, and a subject that
+// takes none is left out.
+func Help[M any](m M, chain ...Target[M]) []Section {
+	taken := map[string]bool{}
+	var out []Section
+	for _, t := range chain {
+		for _, g := range t.groups {
+			sec := Section{Label: g.Label}
+			for i := 0; i < len(g.keys); {
+				// A line is the binding at i and those after it without a description.
+				end := i + 1
+				for end < len(g.keys) && g.keys[end].Help().Desc == "" && !g.keys[end].quiet {
+					end++
+				}
+				if line, ok := helpLine(m, taken, g.keys[i:end]); ok {
+					sec.Lines = append(sec.Lines, line)
+				}
+				i = end
+			}
+			if len(sec.Lines) > 0 {
+				out = append(out, sec)
+			}
+		}
+	}
+	return out
+}
+
+// helpLine is the line of bindings in help, ok false when none runs something with a key left, and
+// takes their keys. It shows the first binding's help while that runs something with all its keys,
+// and the keys left of those that run something otherwise.
+func helpLine[M any](m M, taken map[string]bool, line []Key[M]) (key.Help, bool) {
+	help, whole := line[0].Help(), line[0].Action.Applies(m)
+	var left []string
+	for _, k := range line {
+		if !k.Action.Applies(m) {
+			continue
+		}
+		for _, s := range k.Keys() {
+			if line[0].quiet {
+				taken[s] = true
+				continue
+			}
+			if taken[s] {
+				whole = false
+				continue
+			}
+			left = append(left, s)
+		}
+	}
+	if len(left) == 0 || help.Desc == "" {
+		return key.Help{}, false
+	}
+	for _, s := range left {
+		taken[s] = true
+	}
+	if !whole {
+		help.Key = strings.Join(left, "/")
+	}
+	return help, true
 }
 
 // Keys are the bindings that run something on a chain of targets, in the order Lookup tries

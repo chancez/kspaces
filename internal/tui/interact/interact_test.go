@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/tui/interact"
@@ -199,5 +200,36 @@ func TestBindQuiet(t *testing.T) {
 	}
 	if !reflect.DeepEqual(e.ran, []string{"read-only"}) || len(target.Groups(e)) != 0 || files.Bindings()[0].Help().Desc != "" {
 		t.Errorf("quiet key ran %q, menu %+v, help %+v; want it run, unlisted, and undescribed", e.ran, target.Groups(e), files.Bindings())
+	}
+}
+
+// Help lists each subject's keys under its label, without what a subject before takes, and a binding
+// without a description on the line of the one before it, shown while either applies.
+func TestHelp(t *testing.T) {
+	_, files := kinds()
+	target := interact.List(files).Target(file{path: "a.go", commit: commit{sha: "abc"}})
+	got := interact.Help(&env{}, target)
+	want := []interact.Section{
+		{Label: "File a.go", Lines: []key.Help{{Key: "m", Desc: "mark reviewed"}, {Key: "c", Desc: "comment"}}},
+		{Label: "Commit abc", Lines: []key.Help{{Key: "o", Desc: "open"}, {Key: "M", Desc: "mark reviewed"}, {Key: "C", Desc: "comment"}}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("help = %+v, want %+v", got, want)
+	}
+
+	folded := false
+	fold := action[commit]("fold", func(*env, commit) bool { return !folded })
+	unfold := action[commit]("unfold", func(*env, commit) bool { return folded })
+	quiet := action[commit]("quiet", nil)
+	commits := interact.NewKind(func(c commit) string { return "Commit " + c.sha }, fold, unfold)
+	commits.Bind(fold, "space", "fold or unfold", "space")
+	commits.Bind(unfold, "", "", "space")
+	commits.BindQuiet(quiet, "q")
+	target = interact.List(commits).Target(commit{sha: "abc"})
+	want = []interact.Section{{Label: "Commit abc", Lines: []key.Help{{Key: "space", Desc: "fold or unfold"}}}}
+	for _, folded = range []bool{false, true} {
+		if got := interact.Help(&env{}, target); !reflect.DeepEqual(got, want) {
+			t.Errorf("folded %v: help = %+v, want %+v", folded, got, want)
+		}
 	}
 }
