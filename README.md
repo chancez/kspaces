@@ -66,7 +66,7 @@ mise run install    # -> ~/.local/bin/kspaces
 
 ## Setup
 
-kspaces needs kitty 0.51.0 or later. kitty needs a watcher that docks a sidebar in every OS window, which
+kspaces needs kitty 0.51.0 or later. kitty needs a watcher that docks the sidebar in an OS window, which
 kspaces carries and installs:
 
 ```

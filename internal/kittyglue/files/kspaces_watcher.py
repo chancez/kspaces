@@ -1,22 +1,23 @@
-# Keep a kspaces sidebar docked at the left of every OS window that has a tab in a session.
+# Keep one kspaces sidebar docked at the left of an OS window that has a tab in a session.
 #
 # The sidebar is an OS window dock (launch --type=os-window-dock), shown in every tab of its OS window and
-# running one `kspaces sidebar`. This adds the missing ones whenever a window is created or the tab bar
-# changes, which covers new OS windows, tabs loaded from a session file and tabs moved between OS windows.
+# running one `kspaces sidebar`. There is one in all of kitty: this adds it whenever a window is created or
+# the tab bar changes and there is none, which covers kitty starting, tabs loaded from a session file and
+# the sidebar's OS window closing, and closes any beyond the first.
 #
-# Only OS windows with a tab in a session get one. Spaces are sessions, and the exclusion keeps the sidebar
-# out of OS windows that are not part of the workspace at all, such as the tab switcher's or a kspaces
-# popup's.
+# Only an OS window with a tab in a session gets it, the active one first. Spaces are sessions, and the
+# exclusion keeps the sidebar out of OS windows that are not part of the workspace at all, such as the tab
+# switcher's or a kspaces popup's.
 #
-# kspaces_toggle.py hides and shows the sidebars by setting boss.kspaces_hidden.
+# kspaces_toggle.py hides and shows the sidebar by setting boss.kspaces_hidden.
 #
 # It hides the tab bar of a kspaces popup's panel, see hide_popup_tab_bar.
 #
 # It also notes when each program status record (OSC 7501) of a window last changed state, which kitty
 # does not report, so the sidebar can show how long a program has been blocked or working.
 #
-# The sidebars' width is [sidebar] width in kspaces' config, applied to every sidebar when it changes. A
-# sidebar dragged to another width keeps it: the sidebar writes the new width to the config.
+# The sidebar's width is [sidebar] width in kspaces' config, applied when it changes. A sidebar dragged to
+# another width keeps it: the sidebar writes the new width to the config.
 #
 # Installed by `kspaces kitty install`, which writes this file; edits to it are overwritten.
 
@@ -43,7 +44,7 @@ SUPPORTED = version >= MIN_VERSION
 _scheduled = False
 # The config's sidebar width, and the files it was read from with their modification times.
 _width = (DEFAULT_WIDTH, None)
-# The width last given to the sidebars, None before the first check.
+# The width last given to the sidebar, None before the first check.
 _applied = None
 
 
@@ -92,7 +93,7 @@ def docks(tm):
     return [g for g in tm.os_window_docks if g.dock is not None and any(DOCK_VAR in w.user_vars for w in g)]
 
 
-# resize_docks gives every sidebar width, as dragging its border does, which lays out every tab of its OS
+# resize_docks gives the sidebar width, as dragging its border does, which lays out every tab of its OS
 # window again. Only when the config's width changes, so a dragged sidebar is not put back. kspaces docks
 # are sized in columns, never in percent.
 def resize_docks(boss, width):
@@ -141,7 +142,7 @@ def on_load(boss, data):
 
 
 def wants_dock(tm):
-    return not docks(tm) and any(tab.created_in_session_name and tab.windows.groups for tab in tm)
+    return any(tab.created_in_session_name and tab.windows.groups for tab in tm)
 
 
 # kspaces_path is the kspaces kitty would run: kitty's own PATH under launchd is short, so this searches as
@@ -152,10 +153,19 @@ def kspaces_path():
     return which('kspaces') or os.path.expanduser('~/.local/bin/kspaces')
 
 
-def add_docks(boss):
+# add_dock adds the sidebar when there is none, and closes all but one when there are more, as from an
+# older kspaces that docked one in every OS window.
+def add_dock(boss):
     if getattr(boss, 'kspaces_hidden', False):
         return
-    for tm in tuple(boss.all_tab_managers):
+    tms = tuple(boss.all_tab_managers)
+    existing = [w for tm in tms for g in docks(tm) for w in g if DOCK_VAR in w.user_vars]
+    for w in existing[1:]:
+        boss.mark_window_for_close(w)
+    if existing:
+        return
+    active = boss.active_tab_manager
+    for tm in sorted(tms, key=lambda tm: tm is not active):
         tab = tm.active_tab
         if tab is None or tab.active_window is None or not wants_dock(tm):
             continue
@@ -172,6 +182,7 @@ def add_docks(boss):
         # becomes the tab's active window, and the tab takes its title.
         if tab.active_window is not prev:
             tab.set_active_window(prev)
+        return
 
 
 # Called from the tab bar and window hooks below. They fire in the middle of creating tabs and loading
@@ -187,10 +198,17 @@ def schedule(boss):
     def run(timer_id):
         global _scheduled
         _scheduled = False
-        add_docks(boss)
+        add_dock(boss)
 
     if not add_timer(run, 0, False):
         _scheduled = False
+
+
+# The sidebar's OS window closing changes nothing in the others, so its own close is a trigger too, for
+# another OS window to get it.
+def on_close(boss, window, data):
+    if DOCK_VAR in window.user_vars:
+        schedule(boss)
 
 
 def on_tab_bar_dirty(boss, window, data):
@@ -207,10 +225,10 @@ def on_resize(boss, window, data):
 
 
 # The user variable that holds when each of a window's program status records last changed state, as JSON:
-# {"pid": KITTY_PID, "records": {"RECORD_ID": ["STATE", UNIX_TIME]}}. Kept on the window because there is
-# one sidebar per OS window, each refreshing on its own every two seconds: noted here, at the change, every
-# copy reads the same time and one started later still has it. Not named kspaces*, as save_sessions.py
-# leaves windows with a var:kspaces out of saved sessions.
+# {"pid": KITTY_PID, "records": {"RECORD_ID": ["STATE", UNIX_TIME]}}. Kept on the window and noted here, at
+# the change, so the sidebar, which refreshes every two seconds, reads the time it changed, and a sidebar
+# started later still has it. Not named kspaces*, as save_sessions.py leaves windows with a var:kspaces out
+# of saved sessions.
 STATUS_AT_VAR = 'program_status_at'
 
 

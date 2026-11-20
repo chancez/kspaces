@@ -52,7 +52,7 @@ missing worktrees: its sessions are listed above the spaces as before.
 Clicking a row, or `enter` on it, switches to its session, creating it the first time, with its
 [default layout](kitty.md#layouts) if it has one, but for a missing worktree with no windows. Clicking a
 space's triangle, or `space` on its row, folds its linked worktrees into the space's row. Folded spaces are
-kept in `$XDG_STATE_HOME/kspaces/folded`, so every OS window's sidebar agrees.
+kept in `$XDG_STATE_HOME/kspaces/folded`, so they stay folded across restarts.
 
 Resting the mouse on a row for 2 seconds shows its worktree in detail in a popup under it, as the
 picker's preview does: its space, path, branch, changes, upstream, PR and its state, checks and review in
@@ -109,9 +109,8 @@ idle.
 
 The list's menu has a Groups section, each group ticked while it shows; choosing one hides it, header and
 spaces, and choosing it again shows it. Hidden groups are kept in `$XDG_STATE_HOME/kspaces/hidden`, so
-every sidebar hides them, unlike the attention filter, which is each sidebar's own: there is a sidebar in
-every OS window, and hiding work for the evening should not take a click in each, nor come back with a
-restart.
+they stay hidden across restarts, unlike the attention filter: hiding work for the evening should not
+come back with a restart.
 A hidden group is out of sight, so its sessions no longer call for attention: their entries leave the
 STATUS list, `!` and `kspaces next --attention` skip them, and the attention filter, which shows only
 rows, has none of them. They are found by name, the space's or `SPACE@DIR`. The picker still lists them,

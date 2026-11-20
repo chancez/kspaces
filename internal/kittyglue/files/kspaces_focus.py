@@ -1,5 +1,5 @@
-# Move keyboard focus into the kspaces sidebar of the current OS window, or back out of it when it has
-# focus. See kspaces_watcher.py, which adds the sidebars.
+# Move keyboard focus into the kspaces sidebar, when the current OS window has it, or back out of it when
+# it has focus. See kspaces_watcher.py, which adds the sidebar.
 # Installed by `kspaces kitty install`; edits to this file are overwritten.
 
 from kittens.tui.handler import result_handler

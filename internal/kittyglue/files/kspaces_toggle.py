@@ -1,4 +1,4 @@
-# Hide or show the kspaces sidebar in every OS window. See kspaces_watcher.py, which adds the docks.
+# Hide or show the kspaces sidebar. See kspaces_watcher.py, which adds the dock.
 # Installed by `kspaces kitty install`; edits to this file are overwritten.
 
 from kittens.tui.handler import result_handler
@@ -19,6 +19,6 @@ def handle_result(args, answer, target_window_id, boss):
             if DOCK_VAR in w.user_vars:
                 boss.mark_window_for_close(w)
     else:
-        # The watcher adds the docks the next time the tab bar changes, so make it change now.
+        # The watcher adds the dock the next time the tab bar changes, so make it change now.
         for tm in boss.all_tab_managers:
             tm.mark_tab_bar_dirty()

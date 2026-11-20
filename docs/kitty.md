@@ -388,7 +388,7 @@ that has not changed, by its size, time and inode, is not read again: every two 
 
 ## Installing the kitty files
 
-kitty needs a watcher to dock a sidebar in every OS window, and a couple of kittens. They are built into
+kitty needs a watcher to dock the sidebar in an OS window, and a couple of kittens. They are built into
 kspaces, and need kitty 0.51.0 or later, which the watcher says when kitty starts if it is older:
 
 ```
@@ -458,12 +458,14 @@ Dock has a short PATH, so if kspaces is somewhere else, such as mise's shims, se
 
 ## What the files do
 
-The sidebar is an OS window dock: one `kspaces sidebar` per OS window, shown in every tab of it. kitty
-lists it in `kitten @ ls` in the OS window's active tab, so a sidebar's session is the active tab's.
-`kspaces_watcher.py`:
+The sidebar is an OS window dock: one `kspaces sidebar` in all of kitty, shown in every tab of its OS
+window. kitty lists it in `kitten @ ls` in the OS window's active tab, so the sidebar's session is the
+active tab's. `kspaces_watcher.py`:
 
-- docks `kspaces sidebar` at the left of every OS window with a tab that belongs to a session, with the
-  `kspaces` user variable and `--keep-focus`, in no session, as kitty moves it from tab to tab;
+- docks `kspaces sidebar` at the left of an OS window with a tab that belongs to a session, the active OS
+  window first, with the `kspaces` user variable and `--keep-focus`, in no session, as kitty moves it from
+  tab to tab. Other OS windows get none; when the sidebar's OS window closes, the next with a session's tab
+  gets it, and any sidebar beyond the first is closed;
 - sizes the docks to `[sidebar] width`, all of it the sidebar's (kitty's dock border, if any, is the
   separator), and resizes them when it changes. Dragging a sidebar's border resizes it, and the sidebars'
   leader writes the new width to `[sidebar] width`, in the file that sets it, once it has held for a poll,
@@ -474,8 +476,8 @@ lists it in `kitten @ ls` in the OS window's active tab, so a sidebar's session 
 - notes when each program status record changed state, in the window's `program_status_at` user variable,
   which the status list's ages come from.
 
-`kspaces_toggle.py` hides and shows every sidebar, and `kspaces_focus.py` moves the keyboard into the
-current OS window's sidebar and back.
+`kspaces_toggle.py` hides and shows the sidebar, and `kspaces_focus.py` moves the keyboard into the
+sidebar, when the current OS window has it, and back.
 
 The sidebars of one kitty share their work: the first to start leads, with a lock on a file in
 `$XDG_RUNTIME_DIR/kspaces/`, or `kspaces-UID/` in the temporary directory, named after kitty's
