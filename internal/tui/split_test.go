@@ -13,7 +13,7 @@ import (
 // height for the next sidebar.
 func TestDragSplit(t *testing.T) {
 	e := newSidebarEnv(t)
-	if got, want := e.m.layout(), (layout{spaces: 20, status: 15, statusTop: 24}); got != want {
+	if got, want := e.m.layout(), (layout{spaces: 27, status: 8, statusTop: 31}); got != want {
 		t.Fatalf("default layout = %+v, want %+v", got, want)
 	}
 	x, y := e.zone(splitZone)
@@ -22,10 +22,10 @@ func TestDragSplit(t *testing.T) {
 		y    int
 		want layout
 	}{
-		{y + 5, layout{spaces: 25, status: 10, statusTop: 29}},
+		{27, layout{spaces: 25, status: 10, statusTop: 29}},
 		{100, layout{spaces: 34, status: 1, statusTop: 38}},
 		{0, layout{spaces: 1, status: 34, statusTop: 5}},
-		{y + 5, layout{spaces: 25, status: 10, statusTop: 29}},
+		{27, layout{spaces: 25, status: 10, statusTop: 29}},
 	}
 	for _, s := range steps {
 		e.m.Update(tea.MouseMotionMsg{X: x, Y: s.y, Button: tea.MouseLeft})
@@ -33,13 +33,13 @@ func TestDragSplit(t *testing.T) {
 			t.Errorf("dragged to %d: layout = %+v, want %+v", s.y, got, s.want)
 		}
 	}
-	e.m.Update(tea.MouseReleaseMsg{X: x, Y: y + 5, Button: tea.MouseLeft})
+	e.m.Update(tea.MouseReleaseMsg{X: x, Y: 27, Button: tea.MouseLeft})
 	data, err := os.ReadFile(filepath.Join(os.Getenv("XDG_STATE_HOME"), "kspaces", "split"))
 	if err != nil || string(data) != "10\n" {
 		t.Fatalf("split file = %q, %v", data, err)
 	}
-	if e.screen()[y+5] != strings.Repeat("\u2500", 30) {
-		t.Errorf("no rule at %d:\n%q", y+5, e.screen())
+	if e.screen()[27] != strings.Repeat("\u2500", 30) {
+		t.Errorf("no rule at 27:\n%q", e.screen())
 	}
 
 	// A new sidebar opens at it, and moving without the button no longer drags.

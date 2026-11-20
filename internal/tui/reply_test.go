@@ -140,6 +140,7 @@ func keys(s string) []tea.KeyPressMsg {
 // entry's window in a popup.
 func TestReplyKey(t *testing.T) {
 	e := newSidebarEnv(t)
+	e.splitStatus(15)
 	launched := fakeKitten(t)
 	exe, err := os.Executable()
 	if err != nil {
@@ -185,6 +186,7 @@ func TestReplyKey(t *testing.T) {
 func TestStatusRightClick(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		e := newSidebarEnv(t)
+		e.splitStatus(15)
 		rule := strings.Repeat("\u2500", 30)
 		top := []string{
 			spacesTitle, "", "  \uf120  default", "", "\u25bc \uf401  gr main", here + "\uf071  dev pr/me/dev", "  \ue725  fix fix", "",

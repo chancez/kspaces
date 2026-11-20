@@ -348,7 +348,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // statusAt is where the status list starts by default, as a share of the rows below the SPACES title, so
 // it stays put as entries come and go rather than growing up from the bottom.
-const statusAt = 0.55
+const statusAt = 0.75
 
 // layout splits the height between the two lists: spaces above, status below a separator and its title.
 type layout struct {

@@ -84,6 +84,12 @@ func newSidebarEnv(t *testing.T) *sidebarEnv {
 	return e
 }
 
+// splitStatus gives the STATUS list rows, as dragging the rule there would, then draws the screen.
+func (e *sidebarEnv) splitStatus(rows int) {
+	e.m.statusRows = rows
+	e.m.render()
+}
+
 func keyMsg(s string) tea.KeyPressMsg {
 	switch s {
 	case "enter":
@@ -279,6 +285,7 @@ func TestSpacesList(t *testing.T) {
 func TestStatusGroupsOnScreen(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		e := newSidebarEnv(t)
+		e.splitStatus(15)
 		var got []string
 		for i, l := range e.screen() {
 			if l == "STATUS" {
@@ -704,6 +711,7 @@ func TestFocusFindsTheCurrentSession(t *testing.T) {
 func TestHoverPopup(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		e := newSidebarEnv(t)
+		e.splitStatus(15)
 		e.hover(fmt.Sprintf(entryZone, e.entry(20)))
 		_, top := e.zone(popupZone)
 		rule := strings.Repeat("\u2500", 30)
@@ -867,7 +875,7 @@ func TestCursorExpandsStatusEntry(t *testing.T) {
 func TestWheel(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 20})
-	e.m.render()
+	e.splitStatus(6)
 	e.m.Update(tea.MouseWheelMsg{X: 4, Y: 3, Button: tea.MouseWheelDown})
 	e.m.Update(tea.MouseWheelMsg{X: 4, Y: 18, Button: tea.MouseWheelDown})
 	if e.m.offset != 1 || e.m.statusOffset != 1 {
@@ -887,7 +895,7 @@ func TestWheel(t *testing.T) {
 func TestMoreIndicators(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 16})
-	e.m.render()
+	e.splitStatus(4)
 	l := e.m.layout()
 	spacesRows := func() []string { return e.screen()[headerRows : headerRows+l.spaces] }
 	statusRows := func() []string { return e.screen()[l.statusTop : l.statusTop+l.status] }

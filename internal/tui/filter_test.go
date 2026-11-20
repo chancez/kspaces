@@ -173,7 +173,9 @@ func TestFilterCursor(t *testing.T) {
 	want := []string{
 		spacesTitle,
 		filterPrompt + "filter",
-		"\u25b4 5 more",
+		"\u25b4 4 more",
+		"",
+		"  " + repoIcon + "kitty master",
 		"",
 		"  " + repoIcon + "docs main",
 		"\u25be 2 more",
