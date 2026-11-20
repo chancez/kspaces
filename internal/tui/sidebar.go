@@ -69,7 +69,7 @@ type sidebar struct {
 	statuses []status.Status
 	rows     []spaces.Row
 	// The context menu, nil when closed.
-	menu   *contextMenu
+	menu   *contextMenu[*sidebar]
 	cursor int
 	offset int
 	// The first status entry shown, when there are more than fit.

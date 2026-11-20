@@ -14,8 +14,8 @@ import (
 // row's entry that apply, from the registry, grouped by their sections. It is drawn over the rows below the
 // one it was opened on, or above when it would run off the bottom. Its actions are bound to the entry as it
 // was, rather than to the row's index, as a refresh can rebuild the rows while it is open.
-type contextMenu struct {
-	items []interact.Bound[*sidebar]
+type contextMenu[M any] struct {
+	items []interact.Bound[M]
 	// rules are the rules drawn above items, by the item's index, each with the section it starts: the
 	// first item's always, and one between sections. The section is empty when the menu has only one.
 	rules map[int]string
@@ -30,16 +30,16 @@ type contextMenu struct {
 }
 
 // height is how many rows the menu takes: its items, the rules above them and the one below.
-func (c *contextMenu) height() int {
+func (c *contextMenu[M]) height() int {
 	return len(c.items) + len(c.rules) + 1
 }
 
-// openMenu opens the menu of ts, drawn from screen row y.
-func (m *sidebar) openMenu(y int, ts ...interact.Target[*sidebar]) {
-	// Each section's items together, the sections in the order their first items come.
+// newMenu is the menu of what applies to m of ts, each section's items together, the sections in the
+// order their first items come; nil when nothing does.
+func newMenu[M any](m M, ts ...interact.Target[M]) *contextMenu[M] {
 	var order []string
-	by := map[string][]interact.Bound[*sidebar]{}
-	var groups []interact.Group[*sidebar]
+	by := map[string][]interact.Bound[M]{}
+	var groups []interact.Group[M]
 	for _, t := range ts {
 		groups = append(groups, t.Groups(m)...)
 	}
@@ -52,9 +52,9 @@ func (m *sidebar) openMenu(y int, ts ...interact.Target[*sidebar]) {
 		}
 	}
 	if len(order) == 0 {
-		return
+		return nil
 	}
-	menu := &contextMenu{rules: map[int]string{}}
+	menu := &contextMenu[M]{rules: map[int]string{}}
 	for _, s := range order {
 		head := s
 		if len(order) == 1 {
@@ -62,6 +62,45 @@ func (m *sidebar) openMenu(y int, ts ...interact.Target[*sidebar]) {
 		}
 		menu.rules[len(menu.items)] = head
 		menu.items = append(menu.items, by[s]...)
+	}
+	return menu
+}
+
+// lines draws the menu width cells wide, each item marked so the mouse finds it.
+func (c *contextMenu[M]) lines(th *look.Theme, width int) []string {
+	var drawn []string
+	for i, it := range c.items {
+		if head, ok := c.rules[i]; ok {
+			drawn = append(drawn, drawMenuRule(th, head, width))
+		}
+		surface := look.Plain
+		if i == c.sel {
+			surface = look.Cursor
+		}
+		// A menu of choices marks the chosen ones before the labels, a space from them.
+		lead := []look.Span{look.Text(" ")}
+		if c.chosen != nil {
+			lead = []look.Span{look.Chosen(c.chosen[i]), look.Text(" ")}
+		}
+		label := th.Cut(max(width-th.Width(lead...), 0), look.Text(it.Title))
+		drawn = append(drawn, th.DrawZone(fmt.Sprintf(menuZone, i), surface, width, append(lead, label...)...))
+	}
+	return append(drawn, drawMenuRule(th, "", width))
+}
+
+// drawMenuRule is a rule width cells long with head, a section's name, muted on it, as ruleWith draws it.
+func drawMenuRule(th *look.Theme, head string, width int) string {
+	if head == "" {
+		return th.Render(look.Plain, ruleWith(th, width)...)
+	}
+	return th.Render(look.Plain, ruleWith(th, width, look.Muted(head))...)
+}
+
+// openMenu opens the menu of ts, drawn from screen row y.
+func (m *sidebar) openMenu(y int, ts ...interact.Target[*sidebar]) {
+	menu := newMenu(m, ts...)
+	if menu == nil {
+		return
 	}
 	menu.top = y + 1
 	if menu.top+menu.height() > m.height-1 {
@@ -149,38 +188,11 @@ func (m *sidebar) drawMenu(lines []string) {
 	if m.menu == nil {
 		return
 	}
-	th, width := m.th, m.contentWidth()
-	var drawn []string
-	for i, it := range m.menu.items {
-		if head, ok := m.menu.rules[i]; ok {
-			drawn = append(drawn, m.menuRule(head, width))
-		}
-		surface := look.Plain
-		if i == m.menu.sel {
-			surface = look.Cursor
-		}
-		// A menu of choices marks the chosen ones before the labels, a space from them.
-		lead := []look.Span{look.Text(" ")}
-		if m.menu.chosen != nil {
-			lead = []look.Span{look.Chosen(m.menu.chosen[i]), look.Text(" ")}
-		}
-		label := th.Cut(max(width-th.Width(lead...), 0), look.Text(it.Title))
-		drawn = append(drawn, th.DrawZone(fmt.Sprintf(menuZone, i), surface, width, append(lead, label...)...))
-	}
-	drawn = append(drawn, m.menuRule("", width))
-	for i, l := range drawn {
+	for i, l := range m.menu.lines(m.th, m.contentWidth()) {
 		if m.menu.top+i < len(lines) {
 			lines[m.menu.top+i] = l
 		}
 	}
-}
-
-// menuRule is a rule width cells long with head, a section's name, muted on it, as ruleWith draws it.
-func (m *sidebar) menuRule(head string, width int) string {
-	if head == "" {
-		return m.th.Render(look.Plain, ruleWith(m.th, width)...)
-	}
-	return m.th.Render(look.Plain, ruleWith(m.th, width, look.Muted(head))...)
 }
 
 // toggleFold hides or shows the linked worktrees of the space at root, in every sidebar.
