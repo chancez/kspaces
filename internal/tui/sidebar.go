@@ -76,8 +76,13 @@ type sidebar struct {
 	offset int
 	// The first status entry shown, when there are more than fit.
 	statusOffset int
-	width        int
-	height       int
+	// The STATUS list's height in rows as dragging the rule left it, 0 for the default, see split.go, and
+	// whether the rule is held or under the mouse.
+	statusRows int
+	splitting  bool
+	splitHot   bool
+	width      int
+	height     int
 	// err is the last load's error, until a load works.
 	err error
 	// failed is the last action's error. It is the user's own doing, so it shows over err, and stays
@@ -135,7 +140,7 @@ type sidebar struct {
 
 func newSidebar(self int) *sidebar {
 	th := look.New(true)
-	return &sidebar{th: th, self: self, folded: map[string]bool{}, hidden: map[string]bool{}, mouse: &pixelMouse{}, filter: newFilter(th), poller: spaces.NewPoller()}
+	return &sidebar{th: th, self: self, folded: map[string]bool{}, hidden: map[string]bool{}, mouse: &pixelMouse{}, filter: newFilter(th), poller: spaces.NewPoller(), statusRows: spaces.LoadSplit()}
 }
 
 // navigating is whether keys are moving the cursor, so it and the entry under it should be drawn.
@@ -296,6 +301,12 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.click(msg)
 	case tea.MouseMotionMsg:
 		switch {
+		case msg.Button == tea.MouseLeft && m.splitting:
+			m.splitTo(msg.Y)
+		case m.splitting:
+			// The release went elsewhere, as outside the window.
+			m.endSplit()
+			return m, m.motion(msg)
 		case msg.Button == tea.MouseLeft:
 			m.dragTo(msg.Y)
 		case m.press != nil:
@@ -306,10 +317,14 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.motion(msg)
 		}
 	case tea.MouseReleaseMsg:
+		if m.splitting {
+			m.endSplit()
+			return m, nil
+		}
 		return m, m.release(msg.X, msg.Y)
 	case mouseLeftMsg:
 		m.unhover()
-		m.addHot, m.sortHot, m.attentionHot, m.pickHot, m.barHot = false, false, false, false, ""
+		m.addHot, m.sortHot, m.attentionHot, m.pickHot, m.splitHot, m.barHot = false, false, false, false, false, ""
 	case tea.KeyPressMsg:
 		if m.press != nil && m.press.drag != nil && msg.String() == "esc" {
 			m.cancelPress()
@@ -331,8 +346,8 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// statusAt is where the status list starts, as a share of the rows below the SPACES title, so it stays put
-// as entries come and go rather than growing up from the bottom.
+// statusAt is where the status list starts by default, as a share of the rows below the SPACES title, so
+// it stays put as entries come and go rather than growing up from the bottom.
 const statusAt = 0.55
 
 // layout splits the height between the two lists: spaces above, status below a separator and its title.
@@ -346,8 +361,11 @@ type layout struct {
 // layout is the height's split now: the select mode's bar takes the spaces list's last rows.
 func (m *sidebar) layout() layout {
 	avail := max(m.height-headerRows-1, 1)
-	spaces := max(int(float64(avail)*statusAt), 1)
-	status := max(avail-spaces-2, 1)
+	status := max(avail-max(int(float64(avail)*statusAt), 1)-2, 1)
+	if m.statusRows > 0 {
+		status = clampStatus(m.statusRows, avail)
+	}
+	spaces := max(avail-status-2, 1)
 	l := layout{spaces: spaces, status: status, statusTop: headerRows + spaces + 2}
 	if m.selecting {
 		l.spaces = max(spaces-m.barHeight(), 1)
@@ -454,7 +472,7 @@ func (m *sidebar) frame() string {
 	for len(lines) < l.statusTop-2 {
 		lines = append(lines, "")
 	}
-	lines = append(lines, th.Render(look.Plain, look.Rule(width, false)), th.Render(look.Plain, th.Cut(width, look.Title("STATUS"))...))
+	lines = append(lines, th.DrawZone(splitZone, look.Plain, width, look.Rule(width, m.splitting || m.splitHot)), th.Render(look.Plain, th.Cut(width, look.Title("STATUS"))...))
 	if len(m.kitty.Statuses) == 0 {
 		lines = append(lines, th.Render(look.Plain, th.Cut(width, look.Text("Nothing to report").With(look.Dim))...))
 	}

@@ -534,7 +534,8 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `esc` / `q` | give focus back to the window it came from; `esc` in the select mode leaves it |
 
 Each list scrolls on its own. A list with entries out of view says how many on its first or last row;
-clicking that row scrolls a page.
+clicking that row scrolls a page. Dragging the rule above STATUS resizes the two lists; the STATUS list
+keeps its height in every sidebar and across restarts, in `$XDG_STATE_HOME/kspaces/split`.
 
 `?` lists over the sidebar the keys that do something where the cursor is: the row's, then the list's and
 the sidebar's, each under the name of what it acts on, and in the select mode the mode's first. In the

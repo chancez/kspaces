@@ -1,0 +1,55 @@
+package tui
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	tea "charm.land/bubbletea/v2"
+)
+
+// Dragging the rule moves it as far as each list keeps a row, and letting go keeps the STATUS list's
+// height for the next sidebar.
+func TestDragSplit(t *testing.T) {
+	e := newSidebarEnv(t)
+	if got, want := e.m.layout(), (layout{spaces: 20, status: 15, statusTop: 24}); got != want {
+		t.Fatalf("default layout = %+v, want %+v", got, want)
+	}
+	x, y := e.zone(splitZone)
+	e.m.Update(tea.MouseClickMsg{X: x, Y: y, Button: tea.MouseLeft})
+	steps := []struct {
+		y    int
+		want layout
+	}{
+		{y + 5, layout{spaces: 25, status: 10, statusTop: 29}},
+		{100, layout{spaces: 34, status: 1, statusTop: 38}},
+		{0, layout{spaces: 1, status: 34, statusTop: 5}},
+		{y + 5, layout{spaces: 25, status: 10, statusTop: 29}},
+	}
+	for _, s := range steps {
+		e.m.Update(tea.MouseMotionMsg{X: x, Y: s.y, Button: tea.MouseLeft})
+		if got := e.m.layout(); got != s.want {
+			t.Errorf("dragged to %d: layout = %+v, want %+v", s.y, got, s.want)
+		}
+	}
+	e.m.Update(tea.MouseReleaseMsg{X: x, Y: y + 5, Button: tea.MouseLeft})
+	data, err := os.ReadFile(filepath.Join(os.Getenv("XDG_STATE_HOME"), "kspaces", "split"))
+	if err != nil || string(data) != "10\n" {
+		t.Fatalf("split file = %q, %v", data, err)
+	}
+	if e.screen()[y+5] != strings.Repeat("\u2500", 30) {
+		t.Errorf("no rule at %d:\n%q", y+5, e.screen())
+	}
+
+	// A new sidebar opens at it, and moving without the button no longer drags.
+	next := newSidebar(0)
+	next.Update(tea.WindowSizeMsg{Width: 30, Height: 40})
+	if got, want := next.layout(), (layout{spaces: 25, status: 10, statusTop: 29}); got != want {
+		t.Errorf("next sidebar's layout = %+v, want %+v", got, want)
+	}
+	e.m.Update(tea.MouseMotionMsg{X: x, Y: 10})
+	if got, want := e.m.layout(), (layout{spaces: 25, status: 10, statusTop: 29}); got != want {
+		t.Errorf("layout after letting go = %+v, want %+v", got, want)
+	}
+}

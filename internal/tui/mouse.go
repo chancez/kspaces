@@ -60,7 +60,8 @@ func (m *sidebar) wheel(msg tea.MouseWheelMsg) {
 // a click on a button of the mode's bar runs it. A left click on a status entry opens it. On a hover popup
 // a click is one on its entry or row rather than on what it covers. A left click on the add button does
 // what a does, on the sort button what s does, on the attention filter's button what f does, and on the
-// picker's button what P does. A right
+// picker's button what P does. A left press on the rule above STATUS holds it to resize the lists, see
+// split.go. A right
 // click opens a spaces row's menu; on the sort button, the title or the list's empty rows the list's
 // menu, its sort modes, its filter and its groups; while a row is pressed it lets go of it instead. The
 // last line's error, and its popup, take their own clicks, see clickError.
@@ -74,8 +75,16 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 	if t, ok := m.errorTarget(); ok && m.onError(msg.X, msg.Y) {
 		return m.clickError(t, msg)
 	}
+	if m.splitting {
+		m.endSplit()
+		return nil
+	}
 	switch msg.Button {
 	case tea.MouseLeft:
+		if m.inZone(splitZone, msg.X, msg.Y) && !m.inZone(popupZone, msg.X, msg.Y) {
+			m.startSplit()
+			return nil
+		}
 		if cmd, ok := m.bar.click(m, m.zones, msg); ok {
 			m.unhover()
 			return cmd
@@ -190,6 +199,7 @@ func (m *sidebar) hoveredRow() int {
 func (m *sidebar) motion(msg tea.MouseMotionMsg) tea.Cmd {
 	m.addHot, m.sortHot = m.inZone(addZone, msg.X, msg.Y), m.inZone(sortZone, msg.X, msg.Y)
 	m.attentionHot, m.pickHot = m.inZone(attentionZone, msg.X, msg.Y), m.inZone(pickZone, msg.X, msg.Y)
+	m.splitHot = m.inZone(splitZone, msg.X, msg.Y)
 	m.hoverBar(msg.X, msg.Y)
 	if (m.hovered() >= 0 || m.hoveredRow() >= 0 || m.hoverError) && m.inZone(popupZone, msg.X, msg.Y) {
 		m.hoverAt = time.Now()
