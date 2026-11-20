@@ -854,7 +854,7 @@ func TestPickWithoutLayout(t *testing.T) {
 	screen := func(query, count string, list ...string) []string {
 		return append(append([]string{"\uf002  " + query, strings.Repeat("\u2500", 50)}, list...), count)
 	}
-	if got, want := pickerScreen(m), screen("kitty", "1/11  shift+enter switch without layout", "   kitty  master", "", ""); !reflect.DeepEqual(got, want) {
+	if got, want := pickerScreen(m), screen("kitty", "1/11  shift+enter switch without layout  tab acti\u2026", "   kitty  master", "", ""); !reflect.DeepEqual(got, want) {
 		t.Errorf("kitty:\n%q\nwant\n%q", got, want)
 	}
 	for _, k := range []tea.KeyPressMsg{{Code: tea.KeyEnter, Mod: tea.ModShift}, {Code: tea.KeyEnter, Mod: tea.ModAlt}} {
@@ -879,7 +879,7 @@ func TestPickWithoutLayout(t *testing.T) {
 		m.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
 	}
 	typeInto(m, "gr  main")
-	if got, want := pickerScreen(m), screen("gr  main", "1/11", open+"gr  main", "", ""); !reflect.DeepEqual(got, want) {
+	if got, want := pickerScreen(m), screen("gr  main", "1/11  tab actions", open+"gr  main", "", ""); !reflect.DeepEqual(got, want) {
 		t.Errorf("gr:\n%q\nwant\n%q", got, want)
 	}
 	if _, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter, Mod: tea.ModShift}); m.choosing {

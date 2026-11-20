@@ -100,9 +100,13 @@ type picker struct {
 	width   int
 	height  int
 	err     error
-	// choosing is whether a choice is being switched to.
+	// choosing is whether a choice is being switched to, or a form opened.
 	choosing bool
-	screen   pickScreen
+	// The menu of the entry under the cursor, nil when closed, see pickmenu.go.
+	menu *contextMenu[*picker]
+	// zones are where the last frame drew marked spans, by id.
+	zones  map[string][]look.Zone
+	screen pickScreen
 	// getText fetches a window's screen, kitty.ScreenText but in tests.
 	getText func(window int) (string, error)
 }
@@ -146,6 +150,11 @@ func (m *picker) choose(opts spaces.OpenOptions) tea.Cmd {
 	if !ok {
 		return nil
 	}
+	return m.chooseItem(it, opts)
+}
+
+// chooseItem switches to it, as choose does.
+func (m *picker) chooseItem(it pickItem, opts spaces.OpenOptions) tea.Cmd {
 	cfg, st := *m.snap.Config, m.snap.Kitty
 	// The picker's window has focus, so there is no window of the tab to hand back to: the tab's own
 	// window gets focus again when an overlay closes, and the popup gives it back from a panel.
@@ -213,6 +222,11 @@ func (m *picker) update(msg tea.Msg) tea.Cmd {
 		}
 		return nil
 	case tea.KeyPressMsg:
+		// Keys the menu does not take do nothing while it is open.
+		if m.menu != nil {
+			cmd, _ := runOn(m, msg, thePickMenu.Target(pickMenuSubject{}))
+			return cmd
+		}
 		if cmd, ok := runOn(m, msg, thePicker.Target(pickerSubject{})); ok {
 			return cmd
 		}
@@ -260,7 +274,17 @@ func (m *picker) View() tea.View {
 	return v
 }
 
+// render is the frame, its zones kept for the mouse.
 func (m *picker) render() string {
+	out, zones := look.Scan(m.frame())
+	m.zones = zones
+	return out
+}
+
+// pickHeaderRows are the query's line and the rule under it, above the list.
+const pickHeaderRows = 2
+
+func (m *picker) frame() string {
 	th, width := m.th, max(m.width, 1)
 	lines := []string{m.input.View(), th.Render(look.Plain, look.Rule(width, false))}
 	l := m.layout()
@@ -304,9 +328,13 @@ func (m *picker) render() string {
 	for len(lines) < m.height-1 {
 		lines = append(lines, "")
 	}
+	m.drawPickMenu(lines, pickHeaderRows+m.cursor-start, m.height-1, l.listWidth)
 	spans := []look.Span{look.Muted(fmt.Sprintf("%d/%d", len(m.matches), len(m.items)))}
 	if m.opensLayout() {
 		spans = append(spans, look.Text("  "), look.Key("shift+enter"), look.KeyDesc(" switch without layout"))
+	}
+	if _, ok := m.chosen(); ok {
+		spans = append(spans, look.Text("  "), look.Key("tab"), look.KeyDesc(" actions"))
 	}
 	status := th.Render(look.Plain, th.Cut(width, spans...)...)
 	if m.err != nil {

@@ -72,6 +72,15 @@ type trustSubject struct{}
 // replySubject is the reply form.
 type replySubject struct{}
 
+// pickRowSubject is a session or worktree in the picker, as its row in the sidebar's spaces list.
+type pickRowSubject struct{ row spaces.Row }
+
+// pickStatusSubject is a status entry in the picker.
+type pickStatusSubject struct{ status status.Status }
+
+// pickMenuSubject is the picker's open menu.
+type pickMenuSubject struct{}
+
 // listSubject is a choice field's open list.
 type listSubject struct{}
 
@@ -489,6 +498,68 @@ var (
 		Run:     func(m *picker, _ pickerSubject) tea.Cmd { return m.choose(spaces.OpenOptions{NoLayout: true}) },
 	}
 	actPickQuit = quit[*picker, pickerSubject]()
+	// actPickMenu opens the menu of the entry under the cursor.
+	actPickMenu = &interact.Action[*picker, pickerSubject]{
+		Title: "actions",
+		Run:   do[*picker, pickerSubject]((*picker).openPickMenu),
+	}
+)
+
+// The picker's menu's, on its entries: opening them, as enter and shift+enter do, and the forms they open,
+// as their rows in the sidebar do.
+var (
+	actPickOpen = &interact.Action[*picker, pickRowSubject]{
+		Title:   "Open",
+		Section: sectionSession,
+		// A missing worktree only while its session has windows, as the sidebar's Open.
+		Applies: func(m *picker, s pickRowSubject) bool {
+			return !s.row.Missing || m.snap.Kitty.Windows[s.row.Worktree.Session] > 0
+		},
+		Run: func(m *picker, s pickRowSubject) tea.Cmd {
+			return m.chooseItem(pickItem{row: s.row}, spaces.OpenOptions{})
+		},
+	}
+	actPickOpenPlain = &interact.Action[*picker, pickRowSubject]{
+		Title:   "Open without layout",
+		Section: sectionSession,
+		Applies: func(m *picker, s pickRowSubject) bool {
+			return !s.row.Other && !s.row.Missing && spaces.OpensDefaultLayout(*m.snap.Config, m.snap.Kitty, *s.row.Space, *s.row.Worktree)
+		},
+		Run: func(m *picker, s pickRowSubject) tea.Cmd {
+			return m.chooseItem(pickItem{row: s.row}, spaces.OpenOptions{NoLayout: true})
+		},
+	}
+	actPickOpenStatus = &interact.Action[*picker, pickStatusSubject]{
+		Title:   "Open",
+		Section: sectionSession,
+		Run: func(m *picker, s pickStatusSubject) tea.Cmd {
+			return m.chooseItem(pickItem{status: &s.status}, spaces.OpenOptions{})
+		},
+	}
+	actPickReply = &interact.Action[*picker, pickStatusSubject]{
+		Title:   "Reply",
+		Section: sectionSession,
+		Run: func(m *picker, s pickStatusSubject) tea.Cmd {
+			return m.ask(func(snap spaces.Snapshot) error { return spaces.AskReply(*snap.Config, snap.Kitty, s.status.Window) })
+		},
+	}
+	actPickMenuDown = &interact.Action[*picker, pickMenuSubject]{
+		Title: "down",
+		Run:   do[*picker, pickMenuSubject](func(m *picker) { m.menu.sel = min(m.menu.sel+1, len(m.menu.items)-1) }),
+	}
+	actPickMenuUp = &interact.Action[*picker, pickMenuSubject]{
+		Title: "up",
+		Run:   do[*picker, pickMenuSubject](func(m *picker) { m.menu.sel = max(m.menu.sel-1, 0) }),
+	}
+	actPickMenuRun = &interact.Action[*picker, pickMenuSubject]{
+		Title: "run",
+		Run:   cmd[*picker, pickMenuSubject](func(m *picker) tea.Cmd { return m.runPickMenuItem(m.menu.sel) }),
+	}
+	actPickMenuClose = &interact.Action[*picker, pickMenuSubject]{
+		Title: "close",
+		Run:   do[*picker, pickMenuSubject](func(m *picker) { m.menu = nil }),
+	}
+	actPickMenuQuit = quit[*picker, pickMenuSubject]()
 )
 
 // The new worktree form's.
@@ -857,30 +928,36 @@ var (
 	listKind      *interact.Kind[*choiceList, listSubject]
 	sortKind      *interact.Kind[*sidebar, sortSubject]
 
-	spacesList    *interact.Place[*sidebar, entrySubject]
-	groupHeaders  *interact.Place[*sidebar, groupSubject]
-	theGroups     *interact.Place[*sidebar, groupFilterSubject]
-	statusList    *interact.Place[*sidebar, statusSubject]
-	thePane       *interact.Place[*sidebar, paneSubject]
-	theMenu       *interact.Place[*sidebar, menuSubject]
-	thePicker     *interact.Place[*picker, pickerSubject]
-	theForm       *interact.Place[*newWorktreeForm, formSubject]
-	theRemoveForm *interact.Place[*removeWorktreeForm, removeSubject]
-	theCloseForm  *interact.Place[*closeSessionForm, closeSubject]
-	theForgetForm *interact.Place[*forgetSessionForm, forgetSubject]
-	theAddForm    *interact.Place[*addSpaceForm, addSubject]
-	theCleanup    *interact.Place[*cleanupForm, cleanupSubject]
-	theRunForm    *interact.Place[*runForm, runSubject]
-	theLayoutForm *interact.Place[*layoutForm, layoutSubject]
-	theSaveForm   *interact.Place[*saveLayoutForm, saveSubject]
-	theTrustForm  *interact.Place[*trustForm, trustSubject]
-	theReplyForm  *interact.Place[*replyForm, replySubject]
-	theErrorLine  *interact.Place[*sidebar, errorSubject]
-	theShowForm   *interact.Place[*errorForm, showSubject]
-	theFilter     *interact.Place[*sidebar, filterSubject]
-	theSort       *interact.Place[*sidebar, sortSubject]
-	theChoiceList *interact.Place[*choiceList, listSubject]
-	theSelection  *interact.Place[*sidebar, selectSubject]
+	spacesList      *interact.Place[*sidebar, entrySubject]
+	groupHeaders    *interact.Place[*sidebar, groupSubject]
+	theGroups       *interact.Place[*sidebar, groupFilterSubject]
+	statusList      *interact.Place[*sidebar, statusSubject]
+	thePane         *interact.Place[*sidebar, paneSubject]
+	theMenu         *interact.Place[*sidebar, menuSubject]
+	thePicker       *interact.Place[*picker, pickerSubject]
+	pickRowKind     *interact.Kind[*picker, pickRowSubject]
+	pickStatusKind  *interact.Kind[*picker, pickStatusSubject]
+	pickMenuKind    *interact.Kind[*picker, pickMenuSubject]
+	thePickRows     *interact.Place[*picker, pickRowSubject]
+	thePickStatuses *interact.Place[*picker, pickStatusSubject]
+	thePickMenu     *interact.Place[*picker, pickMenuSubject]
+	theForm         *interact.Place[*newWorktreeForm, formSubject]
+	theRemoveForm   *interact.Place[*removeWorktreeForm, removeSubject]
+	theCloseForm    *interact.Place[*closeSessionForm, closeSubject]
+	theForgetForm   *interact.Place[*forgetSessionForm, forgetSubject]
+	theAddForm      *interact.Place[*addSpaceForm, addSubject]
+	theCleanup      *interact.Place[*cleanupForm, cleanupSubject]
+	theRunForm      *interact.Place[*runForm, runSubject]
+	theLayoutForm   *interact.Place[*layoutForm, layoutSubject]
+	theSaveForm     *interact.Place[*saveLayoutForm, saveSubject]
+	theTrustForm    *interact.Place[*trustForm, trustSubject]
+	theReplyForm    *interact.Place[*replyForm, replySubject]
+	theErrorLine    *interact.Place[*sidebar, errorSubject]
+	theShowForm     *interact.Place[*errorForm, showSubject]
+	theFilter       *interact.Place[*sidebar, filterSubject]
+	theSort         *interact.Place[*sidebar, sortSubject]
+	theChoiceList   *interact.Place[*choiceList, listSubject]
+	theSelection    *interact.Place[*sidebar, selectSubject]
 )
 
 // Kinds and places are made in init, as their actions run code that reads them.
@@ -970,14 +1047,33 @@ func init() {
 	menuKind.Bind(actMenuQuit, "ctrl+c", "quit", "ctrl+c")
 	theMenu = interact.List(menuKind)
 
-	pickerKind = interact.NewKind(func(pickerSubject) string { return "Picker" }, actPickDown, actPickUp, actPick, actPickPlain, actPickQuit)
+	pickerKind = interact.NewKind(func(pickerSubject) string { return "Picker" }, actPickDown, actPickUp, actPick, actPickPlain, actPickMenu, actPickQuit)
 	pickerKind.Bind(actPickDown, "down/up", "down/up", "down", "ctrl+n", "ctrl+j")
 	pickerKind.Bind(actPickUp, "", "", "up", "ctrl+p", "ctrl+k")
 	pickerKind.Bind(actPick, "enter", "switch", "enter")
 	// alt+enter for a terminal that sends shift+enter as enter, as a form's newline takes it.
 	pickerKind.Bind(actPickPlain, "shift+enter", "switch without layout", "shift+enter", "alt+enter")
+	pickerKind.Bind(actPickMenu, "tab", "actions", "tab")
 	pickerKind.Bind(actPickQuit, "esc", "cancel", "esc", "ctrl+c")
 	thePicker = interact.List(pickerKind)
+
+	// The same forms as the sidebar's rows, in the same order.
+	pickRowKind = interact.NewKind(func(s pickRowSubject) string { return s.row.Space.Name },
+		actPickOpen, actPickOpenPlain, onPick(rowRunCommand), onPick(rowOpenLayout), onPick(rowSaveAsLayout),
+		onPick(rowCloseSession), onPick(rowOpenPR), onPick(rowRemoveWorktree), onPick(rowForgetSession),
+		onPick(rowNewWorktree), onPick(rowNewWorktreeFromPR), onPick(rowNewWorktreeFromIssue), onPick(rowCleanup),
+		onPick(rowTrustConfig))
+	thePickRows = interact.List(pickRowKind)
+	pickStatusKind = interact.NewKind(func(s pickStatusSubject) string { return s.status.Session }, actPickOpenStatus, actPickReply)
+	thePickStatuses = interact.List(pickStatusKind)
+	pickMenuKind = interact.NewKind(func(pickMenuSubject) string { return "Menu" },
+		actPickMenuDown, actPickMenuUp, actPickMenuRun, actPickMenuClose, actPickMenuQuit)
+	pickMenuKind.Bind(actPickMenuDown, "down/up", "down/up", "down", "ctrl+n", "ctrl+j")
+	pickMenuKind.Bind(actPickMenuUp, "", "", "up", "ctrl+p", "ctrl+k")
+	pickMenuKind.Bind(actPickMenuRun, "enter", "run", "enter")
+	pickMenuKind.Bind(actPickMenuClose, "esc/tab", "close", "esc", "tab")
+	pickMenuKind.Bind(actPickMenuQuit, "ctrl+c", "quit", "ctrl+c")
+	thePickMenu = interact.List(pickMenuKind)
 
 	formKind = interact.NewKind(func(formSubject) string { return "New worktree" },
 		actSwitchField, actPrevField, actNextChoice, actPrevChoice, actFormList, actCreate, actCancel)

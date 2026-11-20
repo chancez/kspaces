@@ -543,6 +543,13 @@ line says `shift+enter switch without layout` after the count while that is what
 with. A missing worktree has the sidebar's icon for it and `gone` for its branch, and is
 not switched to without windows open.
 
+`tab` opens the menu of the entry under the cursor, below its row or above it near the bottom, over the
+preview but not over the list: a worktree's or session's has what its row's menu in the sidebar has but
+folding and selecting, such as **Open layout**, **Run** and **New worktree**; a status entry's **Open** and
+**Reply**. `up` / `down` move in it, `enter` runs the item, and `esc` or `tab` closes it, other keys doing
+nothing while it is open. An item that opens a form opens it over the window the picker is for, and closes
+the picker. The last line says `tab actions` after the count.
+
 Beside the list in a popup 90 columns or wider, and below it in a narrower one, a preview shows the
 entry under the cursor: a status entry in full, as the sidebar's opened entry; a worktree's space, path,
 branch, its changes, upstream and PR as its row shows them, its session, how many windows it has open,

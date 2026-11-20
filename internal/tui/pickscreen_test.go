@@ -157,7 +157,7 @@ func TestPickerScreenFollows(t *testing.T) {
 			}
 			out = append(out, beside(l, p))
 		}
-		return append(out, "11/11")
+		return append(out, "11/11  tab actions")
 	}
 	want := screen(strings.Repeat("\u2500", 49), "$ claude", "wants permission to run a command that is longer")
 	if got := pickerScreen(m); !reflect.DeepEqual(got, want) {

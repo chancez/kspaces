@@ -72,7 +72,7 @@ func TestPicker(t *testing.T) {
 	if !strings.Contains(lines[2], m.th.Render(look.Plain, look.Match("g"))) || !strings.Contains(lines[3], cursorBg(m.th)) {
 		t.Errorf("after gr and ctrl+n:\n%q", lines[2:4])
 	}
-	if got := pickerScreen(m)[25]; got != "4/11" {
+	if got := pickerScreen(m)[25]; got != "4/11  tab actions" {
 		t.Errorf("count line %q", got)
 	}
 
@@ -133,7 +133,7 @@ func TestPickerPreviewBeside(t *testing.T) {
 			}
 			out = append(out, beside(l, p))
 		}
-		return append(out, "11/11")
+		return append(out, "11/11  tab actions")
 	}
 
 	want := screen(
@@ -197,7 +197,7 @@ func TestPickerPreviewBelow(t *testing.T) {
 			}
 			out = append(out, p)
 		}
-		return append(out, "11/11")
+		return append(out, "11/11  tab actions")
 	}
 
 	want := screen(
@@ -239,7 +239,7 @@ func TestPickerPreviewBelow(t *testing.T) {
 		open + "default",
 		open + "gr  main",
 		blocked + "gr / dev  pr/me/dev",
-		"11/11",
+		"11/11  tab actions",
 	}
 	if got := pickerScreen(m); !reflect.DeepEqual(got, want) {
 		t.Errorf("no room:\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
