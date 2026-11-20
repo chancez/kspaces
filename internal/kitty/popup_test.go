@@ -73,7 +73,12 @@ func TestLaunchPopup(t *testing.T) {
 		{"panel refused", panel, 11, "Creating desktop panels is not supported on this platform", [][]string{panelLaunch, overlayLaunch}},
 	} {
 		calls := fakeKitten(t, "", c.refuse)
+		acted.Store(false)
 		err := LaunchPopup(c.p, c.from, "kspaces_form", "new", "/src/gr")
+		// The popup has the keyboard, so a panel closing after opening it leaves it there.
+		if !Acted() {
+			t.Errorf("%s: opened a popup, but not Acted", c.name)
+		}
 		if got := calls(); !reflect.DeepEqual(got, c.want) {
 			t.Errorf("%s: launched %q, want %q", c.name, got, c.want)
 		}

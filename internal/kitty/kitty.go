@@ -304,7 +304,8 @@ type Popup struct {
 // with the user variable v, kspaces_form or kspaces_picker, which keeps it out of saved sessions, whose
 // match leaves out var:kspaces. An overlay goes over from, or over the active window when from is zero.
 // A panel is told from in FromEnv. When kitty cannot open a panel, as on GNOME's Wayland or before kitty
-// had them, it opens as an overlay, and the error says so.
+// had them, it opens as an overlay, and the error says so. The popup takes the keyboard, which counts as
+// acting, see Acted.
 func LaunchPopup(p Popup, from int, v string, args ...string) error {
 	exe, err := os.Executable()
 	if err != nil {
@@ -313,15 +314,20 @@ func LaunchPopup(p Popup, from int, v string, args ...string) error {
 	if p.Panel && from != 0 {
 		_, perr := kitten(append(append(panelLaunch(p, from, v), exe), args...)...)
 		if perr == nil {
+			acted.Store(true)
 			return nil
 		}
 		if _, err := kitten(append(append(overlayLaunch(from, v), exe), args...)...); err != nil {
 			return err
 		}
+		acted.Store(true)
 		return &PanelRefused{perr}
 	}
-	_, err = kitten(append(append(overlayLaunch(from, v), exe), args...)...)
-	return err
+	if _, err = kitten(append(append(overlayLaunch(from, v), exe), args...)...); err != nil {
+		return err
+	}
+	acted.Store(true)
+	return nil
 }
 
 // PanelRefused is LaunchPopup's error when kitty could not open a panel, and the popup opened as an
@@ -395,11 +401,12 @@ func FocusWindow(id int) error {
 	return err
 }
 
-// acted is whether this process has run a kitty action or focused a window, either of which leaves the
-// keyboard where it wants it.
+// acted is whether this process has run a kitty action, focused a window or opened a popup, each of which
+// leaves the keyboard where it wants it.
 var acted atomic.Bool
 
-// Acted says whether this process has run an action or focused a window, see Action and FocusWindow.
+// Acted says whether this process has run an action, focused a window or opened a popup, see Action,
+// FocusWindow and LaunchPopup.
 func Acted() bool { return acted.Load() }
 
 // leaveWait is how long LeavePanel waits for kitty to move its focus, a var for tests.
