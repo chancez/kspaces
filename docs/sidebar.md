@@ -506,6 +506,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `enter` / `l` | open |
 | `space` | fold or unfold the space's worktrees, or on a group's header the group's spaces |
 | `m` | menu |
+| `?` | list the keys where the cursor is |
 | `n`, `N`, `c`, `x` | new worktree, new worktree from a PR, close session, remove worktree (forget, on a missing worktree) |
 | `p` | clean up the space's worktrees, on a space's row |
 | `R` | run a command in the worktree, with commands configured |
@@ -529,6 +530,11 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 
 Each list scrolls on its own. A list with entries out of view says how many on its first or last row;
 clicking that row scrolls a page.
+
+`?` lists over the sidebar the keys that do something where the cursor is: the row's, then the list's and
+the sidebar's, each under the name of what it acts on, and in the select mode the mode's first. In the
+menu it lists the menu's keys and its items'. `j` / `k`, `g` / `G` and the wheel scroll the list, and
+`esc`, `q`, `?` or a click close it. While the filter is open `?` is typed into it.
 
 ## The picker
 

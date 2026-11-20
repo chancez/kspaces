@@ -69,7 +69,9 @@ type sidebar struct {
 	statuses []status.Status
 	rows     []spaces.Row
 	// The context menu, nil when closed.
-	menu   *contextMenu[*sidebar]
+	menu *contextMenu[*sidebar]
+	// help is the list of keys over the sidebar, nil when closed, see keyhelp.go.
+	help   *keyHelp
 	cursor int
 	offset int
 	// The first status entry shown, when there are more than fit.
@@ -232,6 +234,11 @@ func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if m.help != nil {
+		if cmd, handled := m.updateHelp(msg); handled {
+			return m, cmd
+		}
+	}
 	if m.menu != nil {
 		if cmd, handled := m.updateMenu(msg); handled {
 			return m, cmd
@@ -469,6 +476,7 @@ func (m *sidebar) frame() string {
 		copy(lines[top:], popup)
 	}
 	m.drawMenu(lines)
+	m.drawHelp(lines)
 	status := ""
 	if err := m.lastError(); err != nil {
 		status = m.errorLine(err)

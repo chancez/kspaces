@@ -100,6 +100,9 @@ type showSubject struct{}
 // selectSubject is the select mode, while it is on: the ticked rows, and what acts on them.
 type selectSubject struct{}
 
+// helpSubject is the list of keys ? opens, see keyhelp.go.
+type helpSubject struct{}
+
 // do adapts a function that changes the model without a command.
 func do[M, S any](f func(m M)) func(M, S) tea.Cmd {
 	return func(m M, _ S) tea.Cmd { f(m); return nil }
@@ -441,6 +444,41 @@ var (
 		Run:   do[*sidebar, menuSubject](func(m *sidebar) { m.menu = nil }),
 	}
 	actMenuQuit = quit[*sidebar, menuSubject]()
+	// actMenuHelp lists the menu's keys and its items'.
+	actMenuHelp = &interact.Action[*sidebar, menuSubject]{
+		Title: "keys",
+		Run: do[*sidebar, menuSubject](func(m *sidebar) {
+			m.openHelp(append([]interact.Target[*sidebar]{m.menu.own}, m.menu.of...)...)
+		}),
+	}
+)
+
+// actHelp lists the keys where the cursor is.
+var actHelp = paneAction("keys", func(m *sidebar) tea.Cmd { m.openHelp(m.chain()...); return nil })
+
+// The list of keys': scrolling it and closing it.
+var (
+	actHelpDown = &interact.Action[*keyHelp, helpSubject]{
+		Title: "down",
+		Run:   do[*keyHelp, helpSubject](func(h *keyHelp) { h.scroll(1) }),
+	}
+	actHelpUp = &interact.Action[*keyHelp, helpSubject]{
+		Title: "up",
+		Run:   do[*keyHelp, helpSubject](func(h *keyHelp) { h.scroll(-1) }),
+	}
+	actHelpTop = &interact.Action[*keyHelp, helpSubject]{
+		Title: "top",
+		Run:   do[*keyHelp, helpSubject](func(h *keyHelp) { h.offset = 0 }),
+	}
+	actHelpBottom = &interact.Action[*keyHelp, helpSubject]{
+		Title: "bottom",
+		Run:   do[*keyHelp, helpSubject](func(h *keyHelp) { h.offset = h.last }),
+	}
+	actHelpClose = &interact.Action[*keyHelp, helpSubject]{
+		Title: "close",
+		Run:   do[*keyHelp, helpSubject](func(h *keyHelp) { h.closed = true }),
+	}
+	actHelpQuit = quit[*keyHelp, helpSubject]()
 )
 
 // A choice field's open list's. Typing filters it, so j and k move only before anything is typed.
@@ -910,6 +948,7 @@ var (
 	selectKind    *interact.Kind[*sidebar, selectSubject]
 	spacesKind    *interact.Kind[*sidebar, spacesSubject]
 	menuKind      *interact.Kind[*sidebar, menuSubject]
+	helpKind      *interact.Kind[*keyHelp, helpSubject]
 	pickerKind    *interact.Kind[*picker, pickerSubject]
 	formKind      *interact.Kind[*newWorktreeForm, formSubject]
 	removeKind    *interact.Kind[*removeWorktreeForm, removeSubject]
@@ -934,6 +973,7 @@ var (
 	statusList      *interact.Place[*sidebar, statusSubject]
 	thePane         *interact.Place[*sidebar, paneSubject]
 	theMenu         *interact.Place[*sidebar, menuSubject]
+	theHelp         *interact.Place[*keyHelp, helpSubject]
 	thePicker       *interact.Place[*picker, pickerSubject]
 	pickRowKind     *interact.Kind[*picker, pickRowSubject]
 	pickStatusKind  *interact.Kind[*picker, pickStatusSubject]
@@ -1004,7 +1044,7 @@ func init() {
 
 	paneKind = interact.NewKind(func(paneSubject) string { return "Sidebar" },
 		actDown, actUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit,
-		actAttend, actFilter, actAttention, actOpenOnly, actOpenPicker, actCycleSort, actMoveUp, actMoveDown, actSelect)
+		actAttend, actFilter, actAttention, actOpenOnly, actOpenPicker, actCycleSort, actMoveUp, actMoveDown, actSelect, actHelp)
 	paneKind.Bind(actDown, "j/k", "down/up", "j", "down")
 	paneKind.Bind(actUp, "", "", "k", "up")
 	paneKind.Bind(actTop, "g/G", "top/bottom", "g", "home")
@@ -1023,6 +1063,7 @@ func init() {
 	paneKind.Bind(actMoveUp, "K/J", "move the row up/down", "K")
 	paneKind.Bind(actMoveDown, "", "", "J")
 	paneKind.Bind(actSelect, "v", "select rows to act on", "v")
+	paneKind.Bind(actHelp, "?", "list keys", "?")
 	interact.Via(paneKind, func(paneSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	thePane = interact.List(paneKind)
 
@@ -1038,13 +1079,23 @@ func init() {
 	theSelection = interact.List(selectKind)
 
 	menuKind = interact.NewKind(func(menuSubject) string { return "Menu" },
-		actMenuDown, actMenuUp, actMenuRun, actMenuClose, actMenuQuit)
+		actMenuDown, actMenuUp, actMenuRun, actMenuClose, actMenuHelp, actMenuQuit)
 	menuKind.Bind(actMenuDown, "j/k", "down/up", "j", "down")
 	menuKind.Bind(actMenuUp, "", "", "k", "up")
 	menuKind.Bind(actMenuRun, "enter/l", "run", "enter", "l")
 	menuKind.Bind(actMenuClose, "esc/q/m", "close", "esc", "q", "m")
+	menuKind.Bind(actMenuHelp, "?", "list keys", "?")
 	menuKind.Bind(actMenuQuit, "ctrl+c", "quit", "ctrl+c")
 	theMenu = interact.List(menuKind)
+
+	helpKind = interact.NewKind(func(helpSubject) string { return "Keys" }, actHelpDown, actHelpUp, actHelpTop, actHelpBottom, actHelpClose, actHelpQuit)
+	helpKind.Bind(actHelpDown, "j/k", "scroll", "j", "down")
+	helpKind.Bind(actHelpUp, "", "", "k", "up")
+	helpKind.Bind(actHelpTop, "g/G", "top/bottom", "g", "home")
+	helpKind.Bind(actHelpBottom, "", "", "G", "end")
+	helpKind.Bind(actHelpClose, "esc/q/?", "close", "esc", "q", "?")
+	helpKind.Bind(actHelpQuit, "ctrl+c", "quit", "ctrl+c")
+	theHelp = interact.List(helpKind)
 
 	pickerKind = interact.NewKind(func(pickerSubject) string { return "Picker" }, actPickDown, actPickUp, actPick, actPickPlain, actPickMenu, actPickQuit)
 	pickerKind.Bind(actPickDown, "down/up", "down/up", "down", "ctrl+n", "ctrl+j")
