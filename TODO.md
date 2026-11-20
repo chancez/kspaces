@@ -16,8 +16,8 @@ tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/
 1. `save_as_session --match`: kovidgoyal/kitty#10844, in 0.51.0.
 2. `detach_tab` and window moves losing their session: fixed by the maintainer in b261b08b7, in 0.51.0.
 3. Watcher events: asked on discussion #10828; `on_close` reports `reason` and `cause`, and
-   `on_cwd_change` was added (65da47b61), in 0.51.0. `save_sessions.py` uses both; the dotfiles'
-   `cm_reap.py` can drop its `on_quit` flag for `reason`.
+   `on_cwd_change` was added (65da47b61), in 0.51.0. `save_sessions.py` uses both, and the dotfiles'
+   `cm_reap.py` skips closes on quit by `reason` (dotfiles d8f6a6f).
 4. Watcher calls each taking a timer: kovidgoyal/kitty#10853, fixed in cb66ed55c, in 0.51.0.
 5. A dock for the whole OS window: kovidgoyal/kitty#10854, `launch --type=os-window-dock` in 0.51.0. The
    sidebar is one.
@@ -27,18 +27,14 @@ tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/
    a kitten (in kspaces' kitty files) toggling a dock by a user var, `kitten kspaces_dock.py --var=NAME
    --edge=right --size=80 -- PROG ARGS`; upstream, a `toggle_dock` action or `launch --type=*-dock
    --toggle`, as a proposal after the dock one.
-7. One launcher for every new window: today running each window in a cm session takes a mapping per way
-   of opening one (new tab, split, OS window, each through `kitten cm_launch.py`), and kitty's own
-   new_tab, new_window, new_os_window and splits still start the plain shell. Filed as
-   kovidgoyal/kitty#10858; the maintainer implemented it in f8556bbf8 as `launch_wrapper.py` in the kitty
-   config dir: `prefix_for_launch(ctx)` returns a prefix put before the command of every window opened at
-   the user's request (launch, remote control, sessions, new_* actions, the tab bar's button, the macOS
-   menus, the first window), not kittens or overlays kitty opens itself. kitty keeps knowing the real
-   command, so it saves that in sessions, not the prefix, and calls the function again on restore;
-   `ctx.user_vars` are saved, so a var naming the window's cm session can bring it back to that session.
-   In 0.51.0, so cm_launch.py's mappings can become plain `launch` and the wrapper pick the cm
-   session; it must skip kspaces' own windows (docks, forms, panels, by their vars or `ctx.launch_type`),
-   and cm_reap.py has to find a window's session from its var, as the wrapper is not in `child.argv`.
+7. One launcher for every new window: filed as kovidgoyal/kitty#10858; the maintainer implemented it in
+   f8556bbf8 as `launch_wrapper.py` in the kitty config dir, in 0.51.0: `prefix_for_launch(ctx)` returns
+   a prefix put before the command of every window opened at the user's request (launch, remote control,
+   sessions, new_* actions, the tab bar's button, the macOS menus, the first window), not kittens or
+   overlays kitty opens itself. The dotfiles use it to run every window in a cm session (d8f6a6f), in
+   place of cm_launch.py and its mappings, and kspaces' `launch` is plain `launch` again. The window's cm
+   session is kept in its `cm_session` user var, which kitty saves in sessions, and the wrapper skips
+   kspaces' own windows by their `kspaces*` vars and docks and overlays by `ctx.launch_type`.
 8. Resizing docks by dragging their inner border and with `resize_window`: kovidgoyal/kitty#10857, in
    0.51.0. A dragged sidebar's width is written to `[sidebar] width`.
 9. `launch --type=tab --next-to` over remote control goes by the target tab, the active one by default,
@@ -47,4 +43,7 @@ tabs with sessions and `tab_bar_filter`, not kspaces. Drafts are in `~/projects/
    (dotfiles d164b2f) and kspaces left the panel before acting (22bddf5). Not filed yet; the draft, a docs
    mismatch offering a docs line or letting `--next-to` choose the OS window, is
    `drafts/issue-launch-next-to-rc.md`.
+10. `launch --hold` with a launch wrapper runs the held shell outside the wrapper, and `LaunchContext`
+    does not say the window is held: kovidgoyal/kitty#10901. Until then a cm wrapper cannot tell kspaces'
+    held commands, which it types into the session's shell (`cm-attach --in-shell`), from others.
 
