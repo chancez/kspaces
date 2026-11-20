@@ -5,7 +5,10 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"charm.land/bubbles/v2/textinput"
@@ -154,6 +157,12 @@ func (m *sidebar) poll() tea.Cmd {
 	return func() tea.Msg { return p.Poll().View(self) }
 }
 
+// relist lists kitty's windows again into the latest poll, for kitty's focus moving.
+func (m *sidebar) relist() tea.Cmd {
+	p, self := m.poller, m.self
+	return func() tea.Msg { return p.Windows().View(self) }
+}
+
 // refresh loads, for the refresh key, and has git and gh asked again.
 func (m *sidebar) refresh() tea.Cmd {
 	p, self := m.poller, m.self
@@ -249,6 +258,8 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.unhover()
 		}
 		return m, tea.Batch(m.poll(), tick())
+	case kittyFocusMsg:
+		return m, m.relist()
 	case rowHoverMsg:
 		if msg.gen == m.hoverGen && m.hoverRow != "" {
 			m.hoverShown = true
@@ -460,8 +471,15 @@ func (m *sidebar) frame() string {
 
 // RunSidebar runs the sidebar, meant for a kitty dock, until it is quit.
 func RunSidebar(ctx context.Context) error {
+	// kitty hangs up on the sidebar when its window closes, which would end it before it removes its socket.
+	ctx, cancel := signal.NotifyContext(ctx, syscall.SIGHUP)
+	defer cancel()
 	m := newSidebar(kitty.SelfWindowID())
-	if _, err := tea.NewProgram(m, tea.WithContext(ctx), tea.WithFilter(m.mouse.filter)).Run(); err != nil {
+	prog := tea.NewProgram(m, tea.WithContext(ctx), tea.WithFilter(m.mouse.filter))
+	if path := os.Getenv(focusSocketEnv); path != "" {
+		defer listenFocus(path, func() { prog.Send(kittyFocusMsg{}) })()
+	}
+	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("running the sidebar: %w", err)
 	}
 	return nil

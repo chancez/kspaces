@@ -11,6 +11,8 @@
 #
 # kspaces_toggle.py hides and shows the sidebar by setting boss.kspaces_hidden.
 #
+# It tells the sidebar when focus moves, see notify_sidebar.
+#
 # It hides the tab bar of a kspaces popup's panel, see hide_popup_tab_bar.
 #
 # It also notes when each program status record (OSC 7501) of a window last changed state, which kitty
@@ -23,6 +25,8 @@
 
 import json
 import os
+import socket
+import tempfile
 import time
 import tomllib
 
@@ -34,6 +38,12 @@ DOCK_VAR = 'kspaces'
 POPUP_VAR = 'kspaces_popup'
 # Where this file was installed. The sidebar checks the files there against the ones it would install.
 GLUE_DIR = os.path.dirname(os.path.abspath(__file__))
+# The socket the sidebar listens on for focus changes, one for each kitty, given to it in
+# KSPACES_FOCUS_SOCKET.
+FOCUS_SOCKET = os.path.join(
+    os.path.join(os.environ['XDG_RUNTIME_DIR'], 'kspaces') if os.environ.get('XDG_RUNTIME_DIR')
+    else os.path.join(tempfile.gettempdir(), f'kspaces-{os.getuid()}'),
+    f'focus-{os.getpid()}.sock')
 # kspaces' default for [sidebar] width, and how often its config is checked for a new one.
 DEFAULT_WIDTH = 28
 CONFIG_CHECK_SECONDS = 2
@@ -42,6 +52,7 @@ MIN_VERSION = (0, 51, 0)
 SUPPORTED = version >= MIN_VERSION
 
 _scheduled = False
+_notifying = False
 # The config's sidebar width, and the files it was read from with their modification times.
 _width = (DEFAULT_WIDTH, None)
 # The width last given to the sidebar, None before the first check.
@@ -176,7 +187,8 @@ def add_dock(boss):
         boss.call_remote_control(prev, (
             'launch', '--type=os-window-dock', '--match', f'id:{tab.id}',
             '--dock-edge=left', f'--dock-size={sidebar_width()}', '--keep-focus',
-            f'--var={DOCK_VAR}=1', f'--env=KSPACES_KITTY_DIR={GLUE_DIR}', kspaces_path(), 'sidebar',
+            f'--var={DOCK_VAR}=1', f'--env=KSPACES_KITTY_DIR={GLUE_DIR}', f'--env=KSPACES_FOCUS_SOCKET={FOCUS_SOCKET}',
+            kspaces_path(), 'sidebar',
         ))
         # --keep-focus only keeps the window that has focus. In an OS window without it the new dock
         # becomes the tab's active window, and the tab takes its title.
@@ -202,6 +214,34 @@ def schedule(boss):
 
     if not add_timer(run, 0, False):
         _scheduled = False
+
+
+# notify_sidebar tells the sidebar focus has moved, as to another session, so it shows that at once rather
+# than at its next poll. A datagram, sent without waiting: with no sidebar listening, or one too busy to
+# read, it is dropped. From a timer, so the burst of focus changes one switch makes is one datagram.
+def notify_sidebar():
+    global _notifying
+    if _notifying:
+        return
+    _notifying = True
+
+    def run(timer_id):
+        global _notifying
+        _notifying = False
+        try:
+            with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as s:
+                s.setblocking(False)
+                s.sendto(b'focus', FOCUS_SOCKET)
+        except OSError:
+            pass
+
+    if not add_timer(run, 0, False):
+        _notifying = False
+
+
+def on_focus_change(boss, window, data):
+    if data.get('focused'):
+        notify_sidebar()
 
 
 # The sidebar's OS window closing changes nothing in the others, so its own close is a trigger too, for

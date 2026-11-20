@@ -49,6 +49,15 @@ type sharedSpace struct {
 // LoadShared reads the config, every space's worktrees and own file, the saved sessions and kitty's
 // windows. Each read of a space's file is a stat while it has not changed, see statCache.
 func LoadShared() Shared {
+	sh := loadSpaces()
+	if sh.Config != nil {
+		sh = listWindows(sh, kitty.ListWindows)
+	}
+	return sh
+}
+
+// loadSpaces is LoadShared but kitty's windows.
+func loadSpaces() Shared {
 	cfg, err := config.Load()
 	if err != nil {
 		return Shared{Err: err.Error()}
@@ -66,8 +75,13 @@ func LoadShared() Shared {
 		sh.Spaces = append(sh.Spaces, ss)
 	}
 	sh.Saved = savedSessions(cfg.SessionsDir)
-	windows, err := kitty.ListWindows()
-	sh.Windows = windows
+	return sh
+}
+
+// listWindows is sh with kitty's windows as list says now.
+func listWindows(sh Shared, list func() ([]kitty.OSWindow, error)) Shared {
+	windows, err := list()
+	sh.Windows, sh.KittyErr = windows, ""
 	if err != nil {
 		sh.KittyErr = err.Error()
 	}
@@ -110,10 +124,18 @@ func (sh Shared) View(self int) Snapshot {
 // Poller loads for the sidebar, with what git and gh say of each worktree, and writes those to a file for
 // what does not poll itself, such as the picker, see GitStates. It is safe to call from several goroutines.
 type Poller struct {
+	// mu is held through a poll.
 	mu sync.Mutex
 	// path is the git states' file.
 	path string
+	// load is all of a poll's Shared but kitty's windows, which list lists after it, nil to keep load's.
 	load func() Shared
+	list func() ([]kitty.OSWindow, error)
+	// lastMu is held while kitty's windows are listed, for last, the latest poll with the latest windows,
+	// see Windows.
+	lastMu sync.Mutex
+	last   Shared
+	have   bool
 	// newWatcher makes the watcher of the worktrees' git states, nil for none.
 	newWatcher func() *gitstate.Watcher
 	git        *gitstate.Watcher
@@ -127,7 +149,8 @@ type Poller struct {
 
 // NewPoller is the poller of the kitty kspaces runs in.
 func NewPoller() *Poller {
-	p := newPoller(gitPath(), LoadShared)
+	p := newPoller(gitPath(), loadSpaces)
+	p.list = kitty.ListWindows
 	p.newWatcher = gitstate.NewWatcher
 	p.saveWidth = config.SaveSidebarWidth
 	return p
@@ -155,7 +178,8 @@ func gitPath() string {
 	return filepath.Join(dir, hex.EncodeToString(sum[:8])+".git.json")
 }
 
-// Poll loads, asks git and gh about what is due, and writes their states.
+// Poll loads, asks git and gh about what is due, and writes their states. kitty's windows are listed last,
+// so they are as recent as they can be.
 func (p *Poller) Poll() Shared {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -165,7 +189,31 @@ func (p *Poller) Poll() Shared {
 		sh.Git = w.Update(targets(sh))
 		p.write(sh.Git)
 	}
+	p.lastMu.Lock()
+	sh = p.listed(sh)
+	p.lastMu.Unlock()
 	p.followDock(sh)
+	return sh
+}
+
+// Windows is the latest poll with kitty's windows listed again: a `kitten @ ls` alone, for when only they
+// have changed, as when focus moves to another session. Before the first poll it polls.
+func (p *Poller) Windows() Shared {
+	p.lastMu.Lock()
+	if !p.have {
+		p.lastMu.Unlock()
+		return p.Poll()
+	}
+	defer p.lastMu.Unlock()
+	return p.listed(p.last)
+}
+
+// listed lists kitty's windows into sh, and keeps it as the latest. lastMu is held.
+func (p *Poller) listed(sh Shared) Shared {
+	if p.list != nil && sh.Config != nil {
+		sh = listWindows(sh, p.list)
+	}
+	p.last, p.have = sh, true
 	return sh
 }
 

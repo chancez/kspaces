@@ -147,3 +147,32 @@ func TestPollerGitStates(t *testing.T) {
 		t.Errorf("states for %q", got)
 	}
 }
+
+// Windows lists kitty's windows again into the latest poll without loading, and polls when there is none.
+func TestPollerWindows(t *testing.T) {
+	loads, lists := 0, 0
+	load := func() Shared {
+		loads++
+		return Shared{Config: &config.Config{}, Saved: []string{string(rune('0' + loads))}}
+	}
+	p := newPoller(filepath.Join(t.TempDir(), "kitty.git.json"), load)
+	p.list = func() ([]kitty.OSWindow, error) {
+		lists++
+		if lists == 3 {
+			return nil, errors.New("kitty is gone")
+		}
+		return []kitty.OSWindow{{Tabs: []kitty.Tab{{ID: lists}}}}, nil
+	}
+	got := []Shared{p.Windows(), p.Windows(), p.Windows(), p.Poll(), p.Windows()}
+	windows := func(tab int) []kitty.OSWindow { return []kitty.OSWindow{{Tabs: []kitty.Tab{{ID: tab}}}} }
+	want := []Shared{
+		{Config: &config.Config{}, Saved: []string{"1"}, Windows: windows(1)},
+		{Config: &config.Config{}, Saved: []string{"1"}, Windows: windows(2)},
+		{Config: &config.Config{}, Saved: []string{"1"}, KittyErr: "kitty is gone"},
+		{Config: &config.Config{}, Saved: []string{"2"}, Windows: windows(4)},
+		{Config: &config.Config{}, Saved: []string{"2"}, Windows: windows(5)},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got\n%+v\nwant\n%+v", got, want)
+	}
+}

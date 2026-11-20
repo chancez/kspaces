@@ -474,7 +474,9 @@ active tab's. `kspaces_watcher.py`:
   no option for one OS window's tab bar, and `tab_bar_filter` always shows the active tab, so it sets
   kitty's own flag for it, which a config reload resets and its next check, within two seconds, sets again;
 - notes when each program status record changed state, in the window's `program_status_at` user variable,
-  which the status list's ages come from.
+  which the status list's ages come from;
+- tells the sidebar when focus moves, with a datagram on a socket beside the git states' file, which the
+  sidebar answers with a `kitten @ ls` alone, so a switch to another session shows at once.
 
 `kspaces_toggle.py` hides and shows the sidebar, and `kspaces_focus.py` moves the keyboard into the
 sidebar, when the current OS window has it, and back.
