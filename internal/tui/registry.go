@@ -416,6 +416,9 @@ var actAttention = paneAction("attention filter", (*sidebar).toggleAttention)
 // actOpenOnly toggles the open filter, see toggleOpen.
 var actOpenOnly = paneAction("open filter", (*sidebar).toggleOpen)
 
+// actOpenPicker opens the picker in a popup, as kitty.conf's kspaces_pick mapping does.
+var actOpenPicker = paneAction("picker", (*sidebar).openPicker)
+
 // actCycleSort goes on to the next sort mode, as a left click on the sort button does.
 var actCycleSort = paneAction("sort", func(m *sidebar) tea.Cmd { m.setSort(m.sortMode().Next()); return nil })
 
@@ -1047,7 +1050,7 @@ func init() {
 
 	paneKind = interact.NewKind(func(paneSubject) string { return "Sidebar" },
 		actDown, actUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit,
-		actAttend, actFilter, actAttention, actOpenOnly, actCycleSort, actMoveUp, actMoveDown, actSelect)
+		actAttend, actFilter, actAttention, actOpenOnly, actOpenPicker, actCycleSort, actMoveUp, actMoveDown, actSelect)
 	paneKind.Bind(actDown, "j/k", "down/up", "j", "down")
 	paneKind.Bind(actUp, "", "", "k", "up")
 	paneKind.Bind(actTop, "g/G", "top/bottom", "g", "home")
@@ -1061,6 +1064,7 @@ func init() {
 	paneKind.Bind(actFilter, "/", "filter the spaces", "/")
 	paneKind.Bind(actAttention, "f", "show only what is not idle", "f")
 	paneKind.Bind(actOpenOnly, "O", "show only open sessions", "O")
+	paneKind.Bind(actOpenPicker, "P", "open the picker", "P")
 	paneKind.Bind(actCycleSort, "s", "change the sort mode", "s")
 	paneKind.Bind(actMoveUp, "K/J", "move the row up/down", "K")
 	paneKind.Bind(actMoveDown, "", "", "J")

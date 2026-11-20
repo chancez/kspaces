@@ -365,6 +365,14 @@ func AddButton(hot bool) Span {
 	return glyph(elMuted, GlyphAdd, false)
 }
 
+// PickButton is the icon button that opens the picker, drawn as AddButton is.
+func PickButton(hot bool) Span {
+	if hot {
+		return glyph(elButton, GlyphSearch, false)
+	}
+	return glyph(elMuted, GlyphSearch, false)
+}
+
 // sortGlyphs are the sort button's icons, by mode.
 var sortGlyphs = map[spaces.SortMode]Glyph{
 	spaces.SortManual:   GlyphSortManual,

@@ -32,7 +32,7 @@ const (
 	GlyphSpace
 	GlyphWorktree
 	GlyphOther
-	// GlyphSearch prompts for the picker's query.
+	// GlyphSearch prompts for the picker's query, and is the sidebar's button that opens the picker.
 	GlyphSearch
 	// GlyphMoreAbove and GlyphMoreBelow mark entries of a list scrolled out of view.
 	GlyphMoreAbove

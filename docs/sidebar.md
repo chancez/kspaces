@@ -86,7 +86,8 @@ and a folded space's row when any of its sessions has windows. With nothing open
 `Nothing is open`. It applies along with `/` and `f`, and like `f` it is each sidebar's own and not saved.
 `O` again shows the whole list.
 
-While either filter is on the funnel is lit, and the SPACES title names the filters on after it, muted:
+The search button, left of the funnel, opens the [picker](#the-picker), as `P` does; a sidebar too narrow
+for it drops it. While either filter is on the funnel is lit, and the SPACES title names the filters on after it, muted:
 `active` for `f`, `open` for `O`, or both. A sidebar too narrow for the whole summary drops it.
 
 A right click on the SPACES title or its buttons, or on an empty row of the list, opens the list's menu:
@@ -514,6 +515,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `!` | focus the window that needs you most, wherever the cursor is |
 | `t` | reply to the cursor's status entry: write to its window without switching to it |
 | `/` | filter the spaces list; see [Spaces](#spaces) |
+| `P` | open the picker; see [The picker](#the-picker) |
 | `f` | show only what is not idle, or everything again; see [Spaces](#spaces) |
 | `O` | show only open sessions, or everything again; see [Spaces](#spaces) |
 | `s` | sort the list the next way; see [Order](#order) |
@@ -529,8 +531,9 @@ clicking that row scrolls a page.
 
 ## The picker
 
-`kspaces pick`, which kitty.conf's `kspaces_pick` runs in a popup, an overlay over the window the key was
-pressed in or a 120 by 32 panel for it, as `[sidebar] popup` says, lists the status entries and then
+`kspaces pick`, which kitty.conf's `kspaces_pick` runs in a popup, as do the sidebar's `P` and the search
+button on its SPACES title, left of the funnel, an overlay over the window the key was pressed in, or
+beside the sidebar, or a 120 by 32 panel for it, as `[sidebar] popup` says, lists the status entries and then
 every session and worktree in the sidebar's order, narrowed by a fuzzy query. A space in a group is listed
 after its group's name, `work / gr` and `work / gr / dev`, so the group's name finds its entries.
 `enter` switches to the

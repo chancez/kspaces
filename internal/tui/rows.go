@@ -27,6 +27,8 @@ const (
 	sortZone = "sort"
 	// attentionZone is the button on the SPACES title that turns the attention filter on and off.
 	attentionZone = "attention"
+	// pickZone is the button on the SPACES title that opens the picker.
+	pickZone = "pick"
 )
 
 // rowSessions are the worktrees a row stands for: its own, for a folded space all of the space's, missing

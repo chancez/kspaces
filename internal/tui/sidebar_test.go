@@ -238,11 +238,11 @@ const here = "\u258e "
 
 // spacesTitle is the SPACES title with the attention filter's button, the sort button, manual, and the
 // add button in the last of the 30 columns.
-const spacesTitle = "SPACES" + "                   " + "\uf0b0 \uf0c9 \uf067"
+const spacesTitle = "SPACES" + "                 " + "\uf002 \uf0b0 \uf0c9 \uf067"
 
 // filteredTitle is spacesTitle with the filters on named after SPACES, as summary names them.
 func filteredTitle(summary string) string {
-	return "SPACES " + summary + strings.Repeat(" ", 18-len(summary)) + "\uf0b0 \uf0c9 \uf067"
+	return "SPACES " + summary + strings.Repeat(" ", 16-len(summary)) + "\uf002 \uf0b0 \uf0c9 \uf067"
 }
 
 // The spaces list: sessions in no space, then each space and its linked worktrees. A row starts with
@@ -1011,5 +1011,43 @@ func TestNewWorktreeFromRow(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("launched %q\nwant %q", got, want)
+	}
+}
+
+// P, and a click on the search button left of the funnel, open the picker over the window beside the
+// sidebar. The narrowest sidebar drops the button, P still opening the picker.
+func TestPickButton(t *testing.T) {
+	e := newSidebarEnv(t)
+	launched := fakeKitten(t)
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"@", "launch", "--type=overlay", "--var=kspaces_picker=1", "--next-to", "id:11", exe, "pick"}
+	lit := e.m.th.Render(look.Plain, look.PickButton(true))
+	e.hover(pickZone)
+	if got := e.titleRow(); !strings.Contains(got, lit) {
+		t.Errorf("button under the mouse not lit: %q", got)
+	}
+	cmd := e.click(pickZone, tea.MouseLeft)
+	if cmd == nil {
+		t.Fatal("a click on the button ran nothing")
+	}
+	if msg := cmd(); msg != nil {
+		t.Errorf("opening the picker said %v", msg)
+	}
+	if got := launched(); !reflect.DeepEqual(got, want) {
+		t.Errorf("the button launched %q, want %q", got, want)
+	}
+
+	e.m.Update(tea.WindowSizeMsg{Width: 12, Height: 40})
+	if got, want := e.screen()[0], "SPACES   "; got != want {
+		t.Errorf("narrowest title %q, want %q", got, want)
+	}
+	if msg := e.press("P")(); msg != nil {
+		t.Errorf("P said %v", msg)
+	}
+	if got := launched(); !reflect.DeepEqual(got, want) {
+		t.Errorf("P launched %q, want %q", got, want)
 	}
 }

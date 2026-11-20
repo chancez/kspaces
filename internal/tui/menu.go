@@ -359,6 +359,18 @@ func (m *sidebar) trustConfig(root string) tea.Cmd {
 	}
 }
 
+// openPicker opens the picker in a popup for the window beside the sidebar, as `kspaces pick --from` does.
+func (m *sidebar) openPicker() tea.Cmd {
+	m.remote = false
+	cfg, home := m.cfg, m.kitty.Home
+	return func() tea.Msg {
+		if err := spaces.LaunchPicker(cfg, home); err != nil {
+			return failedMsg{err}
+		}
+		return nil
+	}
+}
+
 // addSpace opens the form that adds a space, in a popup as newWorktree's, with the repository of the
 // window beside the sidebar filled in, and group chosen, empty for none.
 func (m *sidebar) addSpace(group string) tea.Cmd {

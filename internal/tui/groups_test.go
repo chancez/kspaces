@@ -84,7 +84,7 @@ func heldHeaderLine(folded bool, name string, width int) string {
 // folded or not.
 func TestGroupHeaderWidths(t *testing.T) {
 	wide := func(rows ...string) []string {
-		return append([]string{"SPACES                 \uf0b0 \uf0c9 \uf067", "", "  " + termIcon + "default", "", groupBroken, ""}, rows...)
+		return append([]string{"SPACES               \uf002 \uf0b0 \uf0c9 \uf067", "", "  " + termIcon + "default", "", groupBroken, ""}, rows...)
 	}
 	narrow := func(rows ...string) []string {
 		return append([]string{"SPACES \uf0b0 \uf0c9 \uf067", "", "  " + termIcon + "default", "", groupBroken, ""}, rows...)

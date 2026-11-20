@@ -59,7 +59,8 @@ func (m *sidebar) wheel(msg tea.MouseWheelMsg) {
 // header its group. With alt, or in the select mode, the press ticks the row instead, see select.go, and
 // a click on a button of the mode's bar runs it. A left click on a status entry opens it. On a hover popup
 // a click is one on its entry or row rather than on what it covers. A left click on the add button does
-// what a does, on the sort button what s does, and on the attention filter's button what f does. A right
+// what a does, on the sort button what s does, on the attention filter's button what f does, and on the
+// picker's button what P does. A right
 // click opens a spaces row's menu; on the sort button, the title or the list's empty rows the list's
 // menu, its sort modes, its filter and its groups; while a row is pressed it lets go of it instead. The
 // last line's error, and its popup, take their own clicks, see clickError.
@@ -90,6 +91,10 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 		if m.inZone(attentionZone, msg.X, msg.Y) {
 			m.unhover()
 			return runFirst(m, thePane.Target(paneSubject{}), actAttention)
+		}
+		if m.inZone(pickZone, msg.X, msg.Y) {
+			m.unhover()
+			return runFirst(m, thePane.Target(paneSubject{}), actOpenPicker)
 		}
 		if list, dir, ok := m.moreAt(msg.X, msg.Y); ok && !m.inZone(popupZone, msg.X, msg.Y) {
 			m.scrollPage(list, dir)
@@ -184,7 +189,7 @@ func (m *sidebar) hoveredRow() int {
 // within a popup keeps it, rather than switching to what it covers; moving anywhere else clears it.
 func (m *sidebar) motion(msg tea.MouseMotionMsg) tea.Cmd {
 	m.addHot, m.sortHot = m.inZone(addZone, msg.X, msg.Y), m.inZone(sortZone, msg.X, msg.Y)
-	m.attentionHot = m.inZone(attentionZone, msg.X, msg.Y)
+	m.attentionHot, m.pickHot = m.inZone(attentionZone, msg.X, msg.Y), m.inZone(pickZone, msg.X, msg.Y)
 	m.hoverBar(msg.X, msg.Y)
 	if (m.hovered() >= 0 || m.hoveredRow() >= 0 || m.hoverError) && m.inZone(popupZone, msg.X, msg.Y) {
 		m.hoverAt = time.Now()

@@ -115,9 +115,9 @@ type sidebar struct {
 	bar       controls[*sidebar]
 	barHints  map[string]string
 	barHot    string
-	// Whether the mouse is on the add space button, the sort button or the attention filter's button,
-	// which lights it.
-	addHot, sortHot, attentionHot bool
+	// Whether the mouse is on the add space button, the sort button, the attention filter's button or the
+	// picker's button, which lights it.
+	addHot, sortHot, attentionHot, pickHot bool
 	// zones are where the last frame drew marked spans, by id, so a click maps back to what was drawn.
 	zones map[string][]look.Zone
 	// The spaces list's filters, see filter.go: the query narrows rows while filtering, the attention
@@ -302,7 +302,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.release(msg.X, msg.Y)
 	case mouseLeftMsg:
 		m.unhover()
-		m.addHot, m.sortHot, m.attentionHot, m.barHot = false, false, false, ""
+		m.addHot, m.sortHot, m.attentionHot, m.pickHot, m.barHot = false, false, false, false, ""
 	case tea.KeyPressMsg:
 		if m.press != nil && m.press.drag != nil && msg.String() == "esc" {
 			m.cancelPress()
@@ -407,15 +407,19 @@ func (m *sidebar) render() string {
 	return out
 }
 
-// titleLine is SPACES with the filters on after it, see filterSummary, and the attention filter's button,
-// the sort button and the add space button at its right end. The funnel is lit while either filter is on.
-// The summary goes first when the line is short, whole, then the cell between the title and the buttons,
-// so the narrowest sidebar still reads SPACES; only narrower is the title cut.
+// titleLine is SPACES with the filters on after it, see filterSummary, and the picker's button, the
+// attention filter's button, the sort button and the add space button at its right end. The funnel is lit
+// while either filter is on. The summary goes first when the line is short, whole, then the picker's
+// button, which P stands in for, then the cell between the title and the buttons, so the narrowest sidebar
+// still reads SPACES; only narrower is the title cut.
 func (m *sidebar) titleLine(width int) string {
 	th := m.th
 	buttons := append(look.Mark(attentionZone, look.AttentionButton(m.attending || m.openOnly, m.attentionHot)), look.Default(" "))
 	buttons = append(append(buttons, look.Mark(sortZone, look.SortButton(m.order.Mode, m.sortHot))...), look.Default(" "))
 	buttons = append(buttons, look.Mark(addZone, look.AddButton(m.addHot))...)
+	if withPick := append(append(look.Mark(pickZone, look.PickButton(m.pickHot)), look.Default(" ")), buttons...); th.Width(look.Title("SPACES"))+1+th.Width(withPick...) <= width {
+		buttons = withPick
+	}
 	title := th.Cut(max(width-th.Width(buttons...), 0), look.Title("SPACES"))
 	if summary := m.filterSummary(); summary != "" {
 		withSummary := append(append([]look.Span{}, title...), look.Default(" "), look.Muted(summary))
