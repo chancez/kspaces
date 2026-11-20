@@ -20,6 +20,10 @@ type rowAction struct {
 	section string
 	applies func(snap spaces.Snapshot, r spaces.Row) bool
 	ask     func(snap spaces.Snapshot, r spaces.Row) error
+	// key runs it on a row, wherever the row shows, see bindRow.
+	key string
+	// desc is what help says of key.
+	desc string
 }
 
 // onEntry is a as the sidebar's spaces list offers it.
@@ -69,9 +73,11 @@ func rowPR(snap spaces.Snapshot, r spaces.Row) *gh.PR {
 
 // newWorktreeFrom opens the form that creates a worktree in the row's space, on the tab from says, a new
 // branch starting from the row's: the dock is too narrow to type a name in and read back where it goes.
-func newWorktreeFrom(from spaces.From, title string) *rowAction {
+func newWorktreeFrom(from spaces.From, title, key, desc string) *rowAction {
 	return &rowAction{
 		title:   title,
+		key:     key,
+		desc:    desc,
 		section: sectionSpace,
 		applies: newWorktreeApplies,
 		ask: func(snap spaces.Snapshot, r spaces.Row) error {
@@ -86,11 +92,13 @@ func newWorktreeFrom(from spaces.From, title string) *rowAction {
 
 // The forms a row opens, each in a popup for the tab st is seen from.
 var (
-	rowNewWorktree          = newWorktreeFrom(spaces.FromBranch, "New worktree")
-	rowNewWorktreeFromPR    = newWorktreeFrom(spaces.FromPR, "New worktree from PR")
-	rowNewWorktreeFromIssue = newWorktreeFrom(spaces.FromIssue, "New worktree from issue")
+	rowNewWorktree          = newWorktreeFrom(spaces.FromBranch, "New worktree", "n", "new worktree")
+	rowNewWorktreeFromPR    = newWorktreeFrom(spaces.FromPR, "New worktree from PR", "N", "new worktree from PR")
+	rowNewWorktreeFromIssue = newWorktreeFrom(spaces.FromIssue, "New worktree from issue", "I", "new worktree from issue")
 	rowRemoveWorktree       = &rowAction{
 		title:   "Remove worktree",
+		key:     "x",
+		desc:    "remove worktree",
 		section: sectionWorktree,
 		// Only a linked worktree: the main one is the repository itself.
 		applies: func(_ spaces.Snapshot, r spaces.Row) bool { return !r.Main && !r.Missing && r.Worktree != nil },
@@ -101,6 +109,8 @@ var (
 	// rowOpenPR opens the PR in the browser with gh, in the worktree for its repository, rather than a form.
 	rowOpenPR = &rowAction{
 		title: "Open PR",
+		key:   "b",
+		desc:  "open the PR in the browser",
 		name: func(snap spaces.Snapshot, r spaces.Row) string {
 			return fmt.Sprintf("Open PR #%d", rowPR(snap, r).Number)
 		},
@@ -114,6 +124,8 @@ var (
 	// rowRunCommand runs a command in the worktree, the first of its space's chosen.
 	rowRunCommand = &rowAction{
 		title:   "Run",
+		key:     "R",
+		desc:    "run a command",
 		section: sectionSession,
 		applies: func(snap spaces.Snapshot, r spaces.Row) bool {
 			return !r.Other && !r.Missing && r.Worktree != nil && len(r.Space.ConfigOf(*snap.Config).Commands) > 0
@@ -126,6 +138,8 @@ var (
 	// rowOpenLayout opens a layout in the worktree's session, its default layout chosen, else the first.
 	rowOpenLayout = &rowAction{
 		title:   "Open layout",
+		key:     "L",
+		desc:    "open a layout",
 		section: sectionSession,
 		applies: func(snap spaces.Snapshot, r spaces.Row) bool {
 			return !r.Other && !r.Missing && r.Worktree != nil && len(r.Space.ConfigOf(*snap.Config).Layouts) > 0
@@ -152,6 +166,8 @@ var (
 	}
 	rowCloseSession = &rowAction{
 		title:   "Close session",
+		key:     "c",
+		desc:    "close session",
 		section: sectionSession,
 		applies: func(snap spaces.Snapshot, r spaces.Row) bool {
 			return r.Worktree != nil && snap.Kitty.Windows[r.Worktree.Session] > 0
@@ -161,7 +177,10 @@ var (
 		},
 	}
 	rowForgetSession = &rowAction{
-		title:   "Forget",
+		title: "Forget",
+		// x, as a missing worktree has nothing to remove but its saved file.
+		key:     "x",
+		desc:    "forget the saved session",
 		section: sectionWorktree,
 		// A missing worktree with only its saved file left, which kitty would restore it from.
 		applies: func(snap spaces.Snapshot, r spaces.Row) bool {
@@ -173,6 +192,8 @@ var (
 	}
 	rowCleanup = &rowAction{
 		title:   "Clean up worktrees",
+		key:     "p",
+		desc:    "clean up worktrees",
 		section: sectionSpace,
 		// On the space's own row: it offers removing any of the space's linked worktrees.
 		applies: func(_ spaces.Snapshot, r spaces.Row) bool {
@@ -193,3 +214,11 @@ var (
 		},
 	}
 )
+
+// bindRow binds r's key on k to a, the action k's host made of r, so a row takes the same key in every
+// place it shows.
+func bindRow[M, S any](k *interact.Kind[M, S], a *interact.Action[M, S], r *rowAction) {
+	if r.key != "" {
+		k.Bind(a, r.key, r.desc, r.key)
+	}
+}

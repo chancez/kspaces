@@ -971,18 +971,17 @@ func init() {
 		actOpenWorktree, actOpenPlain, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actNewWorktreeFromPR, actNewWorktreeFromIssue, actFold, actUnfold, actCleanup, actTrustConfig, actSelectRow)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
-	entryKind.Bind(actNewWorktree, "n", "new worktree", "n")
-	entryKind.Bind(actNewWorktreeFromPR, "N", "new worktree from PR", "N")
-	entryKind.Bind(actNewWorktreeFromIssue, "I", "new worktree from issue", "I")
-	entryKind.Bind(actRunCommand, "R", "run a command", "R")
-	entryKind.Bind(actOpenLayout, "L", "open a layout", "L")
+	bindRow(entryKind, actNewWorktree, rowNewWorktree)
+	bindRow(entryKind, actNewWorktreeFromPR, rowNewWorktreeFromPR)
+	bindRow(entryKind, actNewWorktreeFromIssue, rowNewWorktreeFromIssue)
+	bindRow(entryKind, actRunCommand, rowRunCommand)
+	bindRow(entryKind, actOpenLayout, rowOpenLayout)
 	entryKind.Bind(actOpenPlain, "o", "open without the default layout", "o")
-	entryKind.Bind(actCloseSession, "c", "close session", "c")
-	entryKind.Bind(actOpenPR, "b", "open the PR in the browser", "b")
-	entryKind.Bind(actRemoveWorktree, "x", "remove worktree", "x")
-	// x on a missing worktree, which has nothing to remove but its saved file.
-	entryKind.Bind(actForgetSession, "", "", "x")
-	entryKind.Bind(actCleanup, "p", "clean up worktrees", "p")
+	bindRow(entryKind, actCloseSession, rowCloseSession)
+	bindRow(entryKind, actOpenPR, rowOpenPR)
+	bindRow(entryKind, actRemoveWorktree, rowRemoveWorktree)
+	bindRow(entryKind, actForgetSession, rowForgetSession)
+	bindRow(entryKind, actCleanup, rowCleanup)
 	interact.Via(entryKind, func(s entrySubject) (spacesSubject, bool) {
 		if s.row.Space == nil || s.row.Other {
 			return spacesSubject{}, true
@@ -1057,14 +1056,23 @@ func init() {
 	pickerKind.Bind(actPickQuit, "esc", "cancel", "esc", "ctrl+c")
 	thePicker = interact.List(pickerKind)
 
-	// The same forms as the sidebar's rows, in the same order.
-	pickRowKind = interact.NewKind(func(s pickRowSubject) string { return s.row.Space.Name },
-		actPickOpen, actPickOpenPlain, onPick(rowRunCommand), onPick(rowOpenLayout), onPick(rowSaveAsLayout),
-		onPick(rowCloseSession), onPick(rowOpenPR), onPick(rowRemoveWorktree), onPick(rowForgetSession),
-		onPick(rowNewWorktree), onPick(rowNewWorktreeFromPR), onPick(rowNewWorktreeFromIssue), onPick(rowCleanup),
-		onPick(rowTrustConfig))
+	// The same forms as the sidebar's rows, in the same order, on the same keys, which the menu takes as
+	// the query does not see them while it is open.
+	pickRows := []*rowAction{rowRunCommand, rowOpenLayout, rowSaveAsLayout, rowCloseSession, rowOpenPR,
+		rowRemoveWorktree, rowForgetSession, rowNewWorktree, rowNewWorktreeFromPR, rowNewWorktreeFromIssue,
+		rowCleanup, rowTrustConfig}
+	pickActs := []*interact.Action[*picker, pickRowSubject]{actPickOpen, actPickOpenPlain}
+	for _, r := range pickRows {
+		pickActs = append(pickActs, onPick(r))
+	}
+	pickRowKind = interact.NewKind(func(s pickRowSubject) string { return s.row.Space.Name }, pickActs...)
+	pickRowKind.Bind(actPickOpenPlain, "o", "open without the default layout", "o")
+	for i, r := range pickRows {
+		bindRow(pickRowKind, pickActs[2+i], r)
+	}
 	thePickRows = interact.List(pickRowKind)
 	pickStatusKind = interact.NewKind(func(s pickStatusSubject) string { return s.status.Session }, actPickOpenStatus, actPickReply)
+	pickStatusKind.Bind(actPickReply, "t", "reply", "t")
 	thePickStatuses = interact.List(pickStatusKind)
 	pickMenuKind = interact.NewKind(func(pickMenuSubject) string { return "Menu" },
 		actPickMenuDown, actPickMenuUp, actPickMenuRun, actPickMenuClose, actPickMenuQuit)
