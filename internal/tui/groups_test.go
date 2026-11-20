@@ -258,7 +258,7 @@ func TestGroupsMenu(t *testing.T) {
 
 	// Of what is not idle, only work's sessions and a window in no session have a status.
 	e.press("f")
-	nothing := []string{spacesTitle, "", "Nothing needs you"}
+	nothing := []string{filteredTitle("active"), "", "Nothing needs you"}
 	if got := e.spacesScreen(); !reflect.DeepEqual(got, nothing) {
 		t.Errorf("attention filter:\n%q\nwant\n%q", got, nothing)
 	}

@@ -16,7 +16,7 @@ import (
 // attentionScreen is the fixture's spaces list with the attention filter on: dev, blocked, under gr, and
 // docs, folded, for its working notes; default, idle, goes, as does the error of a window in no session.
 var attentionScreen = []string{
-	spacesTitle,
+	filteredTitle("active"),
 	"",
 	"\u25bc " + repoIcon + "gr main",
 	here + blocked + "dev pr/me/dev",
@@ -135,7 +135,7 @@ func TestAttentionMenu(t *testing.T) {
 	}
 
 	e.click(sortZone, tea.MouseRight)
-	if got, want := e.screen()[:11], append([]string{spacesTitle}, listMenu(true)...); !reflect.DeepEqual(got, want) {
+	if got, want := e.screen()[:11], append([]string{filteredTitle("active")}, listMenu(true)...); !reflect.DeepEqual(got, want) {
 		t.Errorf("menu on the sort button:\n%q\nwant\n%q", got, want)
 	}
 	e.click(fmt.Sprintf(menuZone, 3), tea.MouseLeft)
@@ -158,7 +158,7 @@ func TestAttentionFilterQuery(t *testing.T) {
 	e.m.Update(tea.FocusMsg{})
 	e.press("f", "/", "n", "o")
 	want := []string{
-		spacesTitle,
+		filteredTitle("active"),
 		filterPrompt + "no",
 		"  " + repoIcon + "docs main",
 		"  \uf110  notes notes",
@@ -167,7 +167,7 @@ func TestAttentionFilterQuery(t *testing.T) {
 		t.Errorf("attention filter and no:\n%q\nwant\n%q", got, want)
 	}
 	e.press("backspace", "backspace", "k")
-	want = []string{spacesTitle, filterPrompt + "k", "No matches"}
+	want = []string{filteredTitle("active"), filterPrompt + "k", "No matches"}
 	if got := e.spacesScreen(); !reflect.DeepEqual(got, want) {
 		t.Errorf("attention filter and k:\n%q\nwant\n%q", got, want)
 	}
@@ -186,7 +186,7 @@ func TestAttentionFilterNothing(t *testing.T) {
 	snap := fixture(time.Now())
 	snap.Kitty.Statuses = []status.Status{{Window: 23, Session: "default", Record: status.Record{State: "idle", App: "claude"}}}
 	e.m.Update(snap)
-	want := []string{spacesTitle, "", "Nothing needs you"}
+	want := []string{filteredTitle("active"), "", "Nothing needs you"}
 	if got := e.spacesScreen(); !reflect.DeepEqual(got, want) {
 		t.Errorf("nothing needs me:\n%q\nwant\n%q", got, want)
 	}

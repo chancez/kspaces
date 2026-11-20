@@ -3,16 +3,19 @@ package tui
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/chancez/kspaces/internal/tui/look"
 )
 
 // openScreen is the fixture's spaces list with the open filter on: default, gr and dev, which have
 // windows, and docs, folded, for its notes; fix and kitty, with none, go.
 var openScreen = []string{
-	spacesTitle,
+	filteredTitle("open"),
 	"",
 	"  \uf120  default",
 	"",
@@ -22,8 +25,8 @@ var openScreen = []string{
 	"\u25b6 \uf110  docs main",
 }
 
-// O shows only the sessions with windows, under their spaces, and O again shows the whole list. The
-// cursor stays on its row throughout.
+// O shows only the sessions with windows, under their spaces, names the filter on the title and lights
+// the funnel, and O again shows the whole list. The cursor stays on its row throughout.
 func TestOpenFilter(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.FocusMsg{})
@@ -31,6 +34,9 @@ func TestOpenFilter(t *testing.T) {
 	e.press("O")
 	if got := e.spacesScreen(); !reflect.DeepEqual(got, openScreen) {
 		t.Errorf("open filter:\n%q\nwant\n%q", got, openScreen)
+	}
+	if got, on := e.titleRow(), e.m.th.Render(look.Plain, look.AttentionButton(true, false)); !strings.Contains(got, on) {
+		t.Errorf("funnel not lit with the open filter on: %q", got)
 	}
 	if got, want := e.highlighted(), []string{here + blocked + "dev pr/me/dev"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("highlighted %q, want the cursor still on dev", got)
@@ -72,12 +78,12 @@ func TestOpenFilterNothing(t *testing.T) {
 	snap := fixture(time.Now())
 	snap.Kitty.Sessions = nil
 	e.m.Update(snap)
-	want := []string{spacesTitle, "", "Nothing is open"}
+	want := []string{filteredTitle("open"), "", "Nothing is open"}
 	if got := e.spacesScreen(); !reflect.DeepEqual(got, want) {
 		t.Errorf("nothing open:\n%q\nwant\n%q", got, want)
 	}
 	e.press("f")
-	want = []string{spacesTitle, "", "No matches"}
+	want = []string{filteredTitle("active, open"), "", "No matches"}
 	if got := e.spacesScreen(); !reflect.DeepEqual(got, want) {
 		t.Errorf("nothing open, attention filter on:\n%q\nwant\n%q", got, want)
 	}

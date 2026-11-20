@@ -407,15 +407,22 @@ func (m *sidebar) render() string {
 	return out
 }
 
-// titleLine is SPACES with the attention filter's button, the sort button and the add space button at its
-// right end. The cell between the title and the buttons goes before any of the title does, so the
-// narrowest sidebar still reads SPACES; only narrower is the title cut.
+// titleLine is SPACES with the filters on after it, see filterSummary, and the attention filter's button,
+// the sort button and the add space button at its right end. The funnel is lit while either filter is on.
+// The summary goes first when the line is short, whole, then the cell between the title and the buttons,
+// so the narrowest sidebar still reads SPACES; only narrower is the title cut.
 func (m *sidebar) titleLine(width int) string {
 	th := m.th
-	buttons := append(look.Mark(attentionZone, look.AttentionButton(m.attending, m.attentionHot)), look.Default(" "))
+	buttons := append(look.Mark(attentionZone, look.AttentionButton(m.attending || m.openOnly, m.attentionHot)), look.Default(" "))
 	buttons = append(append(buttons, look.Mark(sortZone, look.SortButton(m.order.Mode, m.sortHot))...), look.Default(" "))
 	buttons = append(buttons, look.Mark(addZone, look.AddButton(m.addHot))...)
 	title := th.Cut(max(width-th.Width(buttons...), 0), look.Title("SPACES"))
+	if summary := m.filterSummary(); summary != "" {
+		withSummary := append(append([]look.Span{}, title...), look.Default(" "), look.Muted(summary))
+		if th.Width(withSummary...)+1+th.Width(buttons...) <= width {
+			title = withSummary
+		}
+	}
 	gap := look.Default(strings.Repeat(" ", max(width-th.Width(title...)-th.Width(buttons...), 0)))
 	return th.Draw(look.Plain, width, append(append(title, gap), buttons...)...)
 }

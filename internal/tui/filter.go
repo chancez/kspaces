@@ -113,6 +113,19 @@ func (m *sidebar) toggleOpen() tea.Cmd {
 	return nil
 }
 
+// filterSummary names the filters on, for the SPACES title: active for the attention filter and open for
+// the open filter, empty for neither. The query shows on the line below, so it is left out.
+func (m *sidebar) filterSummary() string {
+	var on []string
+	if m.attending {
+		on = append(on, "active")
+	}
+	if m.openOnly {
+		on = append(on, "open")
+	}
+	return strings.Join(on, ", ")
+}
+
 // narrowed is whether a filter hides rows, so the rows shown are not the whole order to move a row in.
 func (m *sidebar) narrowed() bool {
 	return m.filtering || m.attending || m.openOnly

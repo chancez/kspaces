@@ -240,6 +240,11 @@ const here = "\u258e "
 // add button in the last of the 30 columns.
 const spacesTitle = "SPACES" + "                   " + "\uf0b0 \uf0c9 \uf067"
 
+// filteredTitle is spacesTitle with the filters on named after SPACES, as summary names them.
+func filteredTitle(summary string) string {
+	return "SPACES " + summary + strings.Repeat(" ", 18-len(summary)) + "\uf0b0 \uf0c9 \uf067"
+}
+
 // The spaces list: sessions in no space, then each space and its linked worktrees. A row starts with
 // the fold caret, or as wide a blank, then its icon: what the row is, or the most urgent state of its
 // sessions, or a cross for a broken space.

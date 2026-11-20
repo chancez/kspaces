@@ -86,6 +86,9 @@ and a folded space's row when any of its sessions has windows. With nothing open
 `Nothing is open`. It applies along with `/` and `f`, and like `f` it is each sidebar's own and not saved.
 `O` again shows the whole list.
 
+While either filter is on the funnel is lit, and the SPACES title names the filters on after it, muted:
+`active` for `f`, `open` for `O`, or both. A sidebar too narrow for the whole summary drops it.
+
 A right click on the SPACES title or its buttons, or on an empty row of the list, opens the list's menu:
 the sort modes, see [Order](#order), in a Filter section `Only what is not idle` and `Only open
 sessions`, each ticked while its filter is on, which turn them on and off, in a Rows section **Select**, see
