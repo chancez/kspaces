@@ -69,7 +69,7 @@ func (m *picker) pickTarget() (interact.Target[*picker], bool) {
 // openPickMenu opens the menu of the entry under the cursor.
 func (m *picker) openPickMenu() {
 	if t, ok := m.pickTarget(); ok {
-		m.menu = newMenu(m, t)
+		m.menu = newMenu(m, thePickMenu.Target(pickMenuSubject{}), t)
 	}
 }
 

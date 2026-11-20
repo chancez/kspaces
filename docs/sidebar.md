@@ -225,8 +225,9 @@ cancelled changes nothing, and the ticks stay for another go.
 Right-click a row or a status entry, or press `m` on it. The menu lists what applies to the row, in
 sections, each named on the rule above it: what acts on the row's session, then on its worktree, then on
 the space as a whole, the same from any of its rows. A status entry's has Open and Reply. A menu of one
-section names none. `j` / `k` and the mouse go over the items only. `esc`, a click outside it, or a click
-in another window closes it. On a hover popup, a right click is on the entry it shows. On the SPACES
+section names none. Each item shows its key at its right edge, when the sidebar leaves room for it beside
+the label, and the key runs the item from the menu as it does on the row. `j` / `k` and the mouse go over
+the items only. `esc`, a click outside it, or a click in another window closes it. On a hover popup, a right click is on the entry it shows. On the SPACES
 title, its buttons or an empty row of the list, a right click opens the list's own menu, of the sort modes,
 the attention filter and the groups; see [Spaces](#spaces). A group's header's has Fold group or Unfold
 group, and Add space.
@@ -546,8 +547,8 @@ not switched to without windows open.
 `tab` opens the menu of the entry under the cursor, below its row or above it near the bottom, over the
 preview but not over the list: a worktree's or session's has what its row's menu in the sidebar has but
 folding and selecting, such as **Open layout**, **Run** and **New worktree**; a status entry's **Open** and
-**Reply**. `up` / `down` move in it, `enter` runs the item, and `esc` or `tab` closes it, other keys doing
-nothing while it is open. An item that opens a form opens it over the window the picker is for, and closes
+**Reply**. Each item shows its key, the same as its row's in the sidebar, which runs it. `up` / `down`
+move in it, `enter` runs the item, and `esc` or `tab` closes it, other keys doing nothing while it is open. An item that opens a form opens it over the window the picker is for, and closes
 the picker. The last line says `tab actions` after the count.
 
 A left click on an entry switches to it, as `enter` does, and a right click opens its menu, as `tab` does.

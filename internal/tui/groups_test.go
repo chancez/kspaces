@@ -205,7 +205,7 @@ func TestFoldGroupClick(t *testing.T) {
 	}
 
 	e.click(fmt.Sprintf(entryZone, work), tea.MouseRight)
-	want := []string{menuRule("Group"), " Fold group", menuRule("Space"), " Select", " Add space", menuRule("")}
+	want := []string{menuRule("Group"), menuItem("Fold group", "space"), menuRule("Space"), " Select", menuItem("Add space", "a"), menuRule("")}
 	if got := e.screen()[y+1 : y+7]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}

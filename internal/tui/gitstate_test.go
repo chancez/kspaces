@@ -280,9 +280,9 @@ func TestOpenPR(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	want := []string{
-		menuRule("Session"), " Open", " Save as layout", " Close session",
-		menuRule("Worktree"), " Open PR #123", " Remove worktree",
-		menuRule("Space"), " New worktree", " New worktree from PR", " New worktree from issue", " Fold worktrees", " Select", " Add space",
+		menuRule("Session"), " Open", " Save as layout", menuItem("Close session", "c"),
+		menuRule("Worktree"), menuItem("Open PR #123", "b"), menuItem("Remove worktree", "x"),
+		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("Add space", "a"),
 		menuRule(""),
 	}
 	if got := e.screen()[y+1 : y+16]; !reflect.DeepEqual(got, want) {
@@ -292,7 +292,7 @@ func TestOpenPR(t *testing.T) {
 	kitty := e.row("kitty")
 	e.click(fmt.Sprintf(entryZone, kitty), tea.MouseRight)
 	_, y = e.zone(fmt.Sprintf(entryZone, kitty))
-	want = []string{menuRule("Session"), " Open", menuRule("Space"), " New worktree", " New worktree from PR", " New worktree from issue", " Select", " Add space", menuRule("")}
+	want = []string{menuRule("Session"), " Open", menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), " Select", menuItem("Add space", "a"), menuRule("")}
 	if got := e.screen()[y+1 : y+10]; !reflect.DeepEqual(got, want) {
 		t.Errorf("kitty's menu:\n%q\nwant\n%q", got, want)
 	}

@@ -91,9 +91,9 @@ func TestRunKey(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	want := []string{
-		menuRule("Session"), " Open", " Run", " Save as layout", " Close session",
-		menuRule("Worktree"), " Remove worktree",
-		menuRule("Space"), " New worktree", " New worktree from PR", " New worktree from issue", " Fold worktrees", " Select", " Add space",
+		menuRule("Session"), " Open", menuItem("Run", "R"), " Save as layout", menuItem("Close session", "c"),
+		menuRule("Worktree"), menuItem("Remove worktree", "x"),
+		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("Add space", "a"),
 		menuRule(""),
 	}
 	if got := e.screen()[y+1 : y+16]; !reflect.DeepEqual(got, want) {

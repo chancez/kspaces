@@ -152,9 +152,9 @@ func TestLayoutKey(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	want := []string{
-		menuRule("Session"), " Open", " Run", " Open layout", " Save as layout", " Close session",
-		menuRule("Worktree"), " Remove worktree",
-		menuRule("Space"), " New worktree", " New worktree from PR", " New worktree from issue", " Fold worktrees", " Select", " Add space",
+		menuRule("Session"), " Open", menuItem("Run", "R"), menuItem("Open layout", "L"), " Save as layout", menuItem("Close session", "c"),
+		menuRule("Worktree"), menuItem("Remove worktree", "x"),
+		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("Add space", "a"),
 		menuRule(""),
 	}
 	if got := e.screen()[y+1 : y+17]; !reflect.DeepEqual(got, want) {
@@ -719,13 +719,13 @@ func TestOpenWithoutLayoutMenu(t *testing.T) {
 		return got
 	}
 	linked := func(session ...string) []string {
-		return slices.Concat([]string{menuRule("Session"), " Open"}, session, []string{" Open layout",
-			menuRule("Worktree"), " Remove worktree",
-			menuRule("Space"), " New worktree", " New worktree from PR", " New worktree from issue", " Fold worktrees", " Select", " Add space", menuRule("")})
+		return slices.Concat([]string{menuRule("Session"), " Open"}, session, []string{menuItem("Open layout", "L"),
+			menuRule("Worktree"), menuItem("Remove worktree", "x"),
+			menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("Add space", "a"), menuRule("")})
 	}
 	main := func(session ...string) []string {
-		return slices.Concat([]string{menuRule("Session"), " Open"}, session, []string{" Open layout",
-			menuRule("Space"), " New worktree", " New worktree from PR", " New worktree from issue", " Select", " Add space", menuRule("")})
+		return slices.Concat([]string{menuRule("Session"), " Open"}, session, []string{menuItem("Open layout", "L"),
+			menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), " Select", menuItem("Add space", "a"), menuRule("")})
 	}
 	type result struct {
 		Session string
@@ -744,13 +744,13 @@ func TestOpenWithoutLayoutMenu(t *testing.T) {
 
 	load(cfg)
 	check("the default layout", []result{
-		{"gr@fix", linked(" Open without layout")},
-		{"kitty", main(" Open without layout")},
+		{"gr@fix", linked(menuItem("Open without layout", "o"))},
+		{"kitty", main(menuItem("Open without layout", "o"))},
 		// With windows open, there is no default layout to skip.
-		{"gr", []string{menuRule("Session"), " Open", " Open layout", " Save as layout", " Close session",
-			menuRule("Space"), " New worktree", " New worktree from PR", " New worktree from issue", " Fold worktrees", " Clean up worktrees", " Select", " Add space", menuRule("")}},
-		{"default", []string{menuRule("Session"), " Open", " Close session", menuRule("Space"), " Select", " Add space", menuRule("")}},
-		{"gr@gone", []string{menuRule(""), " Fold worktrees", " Select", " Add space", menuRule("")}},
+		{"gr", []string{menuRule("Session"), " Open", menuItem("Open layout", "L"), " Save as layout", menuItem("Close session", "c"),
+			menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), menuItem("Clean up worktrees", "p"), " Select", menuItem("Add space", "a"), menuRule("")}},
+		{"default", []string{menuRule("Session"), " Open", menuItem("Close session", "c"), menuRule("Space"), " Select", menuItem("Add space", "a"), menuRule("")}},
+		{"gr@gone", []string{menuRule(""), menuItem("Fold worktrees", "space"), " Select", menuItem("Add space", "a"), menuRule("")}},
 	})
 
 	// kitty's saved file restores it, and gr@fix's empty one would not.
@@ -763,7 +763,7 @@ func TestOpenWithoutLayoutMenu(t *testing.T) {
 	restores := cfg
 	restores.SessionsDir = saved
 	load(restores)
-	check("saved files", []result{{"gr@fix", linked(" Open without layout")}, {"kitty", main()}})
+	check("saved files", []result{{"gr@fix", linked(menuItem("Open without layout", "o"))}, {"kitty", main()}})
 
 	noDefault := cfg
 	noDefault.DefaultLayout = ""

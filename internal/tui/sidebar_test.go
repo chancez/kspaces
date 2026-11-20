@@ -376,6 +376,11 @@ func menuRule(head string) string {
 	return "\u2500 " + head + " " + strings.Repeat("\u2500", 30-3-len(head))
 }
 
+// menuItem is a menu's item in the 30 cell sidebar, its key at the right edge.
+func menuItem(title, key string) string {
+	return " " + title + strings.Repeat(" ", 30-2-len(title)-len(key)) + key
+}
+
 // A right click, or m, opens the row's menu below it, its items under their sections; the mouse
 // highlights an item, and a click runs it.
 func TestRightClickMenu(t *testing.T) {
@@ -384,9 +389,9 @@ func TestRightClickMenu(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, dev), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, dev))
 	want := []string{
-		menuRule("Session"), " Open", " Save as layout", " Close session",
-		menuRule("Worktree"), " Remove worktree",
-		menuRule("Space"), " New worktree", " New worktree from PR", " New worktree from issue", " Fold worktrees", " Select", " Add space",
+		menuRule("Session"), " Open", " Save as layout", menuItem("Close session", "c"),
+		menuRule("Worktree"), menuItem("Remove worktree", "x"),
+		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("Add space", "a"),
 		menuRule(""),
 	}
 	if got := e.screen()[y+1 : y+15]; !reflect.DeepEqual(got, want) {
@@ -396,7 +401,7 @@ func TestRightClickMenu(t *testing.T) {
 		t.Errorf("highlighted %q, want the first item", got)
 	}
 	e.hover(fmt.Sprintf(menuZone, 7))
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{" Fold worktrees"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{menuItem("Fold worktrees", "space")}) {
 		t.Errorf("highlighted %q after moving onto Fold worktrees", got)
 	}
 	if cmd := e.click(fmt.Sprintf(menuZone, 7), tea.MouseLeft); cmd != nil || e.m.menu != nil {
@@ -411,7 +416,7 @@ func TestRightClickMenu(t *testing.T) {
 	def := e.row("default")
 	e.click(fmt.Sprintf(entryZone, def), tea.MouseRight)
 	_, y = e.zone(fmt.Sprintf(entryZone, def))
-	want = []string{menuRule("Session"), " Open", " Close session", menuRule("Space"), " Select", " Add space", menuRule("")}
+	want = []string{menuRule("Session"), " Open", menuItem("Close session", "c"), menuRule("Space"), " Select", menuItem("Add space", "a"), menuRule("")}
 	if got := e.screen()[y+1 : y+8]; !reflect.DeepEqual(got, want) {
 		t.Errorf("default's menu:\n%q\nwant\n%q", got, want)
 	}
@@ -433,7 +438,7 @@ func TestMenuOneSection(t *testing.T) {
 	broken := len(e.m.rows) - 1
 	e.click(fmt.Sprintf(entryZone, broken), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, broken))
-	if got, want := e.screen()[y+1:y+4], []string{menuRule(""), " Add space", menuRule("")}; !reflect.DeepEqual(got, want) {
+	if got, want := e.screen()[y+1:y+4], []string{menuRule(""), menuItem("Add space", "a"), menuRule("")}; !reflect.DeepEqual(got, want) {
 		t.Errorf("the broken space's menu:\n%q\nwant\n%q", got, want)
 	}
 }
@@ -464,7 +469,7 @@ func TestMenuKeys(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.FocusMsg{})
 	e.press("m", "j", "j", "j", "j", "j", "j", "j", "j", "k")
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev", " Fold worktrees"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev", menuItem("Fold worktrees", "space")}) {
 		t.Errorf("highlighted %q", got)
 	}
 	e.press("G", "esc")
@@ -483,11 +488,11 @@ func TestMenuSkipsSections(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.FocusMsg{})
 	e.press("m", "j", "j", "j")
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev", " Remove worktree"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev", menuItem("Remove worktree", "x")}) {
 		t.Errorf("j past Session's last item: highlighted %q", got)
 	}
 	e.press("j", "k")
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev", " Remove worktree"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev", menuItem("Remove worktree", "x")}) {
 		t.Errorf("k from Space's first item: highlighted %q", got)
 	}
 	_, y := e.zone(fmt.Sprintf(menuZone, 3))
@@ -497,7 +502,7 @@ func TestMenuSkipsSections(t *testing.T) {
 	}
 	e.m.Update(tea.MouseMotionMsg{X: 3, Y: head})
 	e.m.render()
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev", " Remove worktree"}) {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev", menuItem("Remove worktree", "x")}) {
 		t.Errorf("mouse on Worktree's name: highlighted %q", got)
 	}
 	if cmd := e.clickAt(3, head, tea.MouseLeft); cmd != nil || e.m.menu == nil || e.m.menu.sel != 3 {
@@ -623,8 +628,8 @@ func TestMenuAbove(t *testing.T) {
 	e.click(fmt.Sprintf(entryZone, fix), tea.MouseRight)
 	want := []string{
 		menuRule("Session"), " Open",
-		menuRule("Worktree"), " Remove worktree",
-		menuRule("Space"), " New worktree", " New worktree from PR", " New worktree from issue", " Fold worktrees", " Select", " Add space",
+		menuRule("Worktree"), menuItem("Remove worktree", "x"),
+		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("Add space", "a"),
 		menuRule(""),
 	}
 	if got := e.screen()[y-12 : y]; !reflect.DeepEqual(got, want) {

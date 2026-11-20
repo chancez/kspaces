@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -11,11 +12,18 @@ import (
 )
 
 // contextMenu is the menu a right click, or `m`, opens on a row of the spaces list: the actions of the
-// row's entry that apply, from the registry, grouped by their sections. It is drawn over the rows below the
-// one it was opened on, or above when it would run off the bottom. Its actions are bound to the entry as it
-// was, rather than to the row's index, as a refresh can rebuild the rows while it is open.
+// row's entry that apply, from the registry, grouped by their sections, each with the key that runs it. It
+// is drawn over the rows below the one it was opened on, or above when it would run off the bottom. Its
+// actions are bound to the entry as it was, rather than to the row's index, as a refresh can rebuild the
+// rows while it is open.
 type contextMenu[M any] struct {
 	items []interact.Bound[M]
+	// keys are the keys that run items, by index, empty for an item with none.
+	keys []string
+	// own is the target of the menu's own keys, and of the targets of what its items act on, whose keys
+	// run them from the menu when own does not take them.
+	own interact.Target[M]
+	of  []interact.Target[M]
 	// rules are the rules drawn above items, by the item's index, each with the section it starts: the
 	// first item's always, and one between sections. The section is empty when the menu has only one.
 	rules map[int]string
@@ -35,8 +43,8 @@ func (c *contextMenu[M]) height() int {
 }
 
 // newMenu is the menu of what applies to m of ts, each section's items together, the sections in the
-// order their first items come; nil when nothing does.
-func newMenu[M any](m M, ts ...interact.Target[M]) *contextMenu[M] {
+// order their first items come, with own's keys; nil when nothing does.
+func newMenu[M any](m M, own interact.Target[M], ts ...interact.Target[M]) *contextMenu[M] {
 	var order []string
 	by := map[string][]interact.Bound[M]{}
 	var groups []interact.Group[M]
@@ -54,7 +62,7 @@ func newMenu[M any](m M, ts ...interact.Target[M]) *contextMenu[M] {
 	if len(order) == 0 {
 		return nil
 	}
-	menu := &contextMenu[M]{rules: map[int]string{}}
+	menu := &contextMenu[M]{rules: map[int]string{}, own: own, of: ts}
 	for _, s := range order {
 		head := s
 		if len(order) == 1 {
@@ -63,7 +71,31 @@ func newMenu[M any](m M, ts ...interact.Target[M]) *contextMenu[M] {
 		menu.rules[len(menu.items)] = head
 		menu.items = append(menu.items, by[s]...)
 	}
+	keys := interact.Keys(m, append([]interact.Target[M]{own}, ts...)...)
+	for _, it := range menu.items {
+		menu.keys = append(menu.keys, keyOf(keys, it))
+	}
 	return menu
+}
+
+// keyOf is the first of keys that runs b, empty for none.
+func keyOf[M any](keys []interact.Key[M], b interact.Bound[M]) string {
+	for _, k := range keys {
+		if k.Action.Same(b) {
+			return k.Keys()[0]
+		}
+	}
+	return ""
+}
+
+// lookup is what msg runs while the menu is open: one of its own keys, else an item's, item true for one
+// of those, which closes the menu as choosing it does.
+func (c *contextMenu[M]) lookup(m M, msg tea.KeyPressMsg) (a interact.Bound[M], item, ok bool) {
+	if a, ok := interact.Lookup(m, msg, c.own); ok {
+		return a, false, true
+	}
+	a, ok = interact.Lookup(m, msg, c.of...)
+	return a, ok, ok
 }
 
 // lines draws the menu width cells wide, each item marked so the mouse finds it.
@@ -82,8 +114,16 @@ func (c *contextMenu[M]) lines(th *look.Theme, width int) []string {
 		if c.chosen != nil {
 			lead = []look.Span{look.Chosen(c.chosen[i]), look.Text(" ")}
 		}
-		label := th.Cut(max(width-th.Width(lead...), 0), look.Text(it.Title))
-		drawn = append(drawn, th.DrawZone(fmt.Sprintf(menuZone, i), surface, width, append(lead, label...)...))
+		// The key goes at the right edge, a space in from it, while the label fits beside it: the label says
+		// more of what the item does.
+		var key []look.Span
+		if k := c.keys[i]; k != "" && th.Width(lead...)+th.Width(look.Text(it.Title))+1+th.Width(look.Key(k))+1 <= width {
+			key = []look.Span{look.Key(k), look.Text(" ")}
+		}
+		label := th.Cut(max(width-th.Width(lead...)-th.Width(key...), 0), look.Text(it.Title))
+		pad := look.Text(strings.Repeat(" ", max(width-th.Width(lead...)-th.Width(label...)-th.Width(key...), 0)))
+		spans := append(append(append(lead, label...), pad), key...)
+		drawn = append(drawn, th.DrawZone(fmt.Sprintf(menuZone, i), surface, width, spans...))
 	}
 	return append(drawn, drawMenuRule(th, "", width))
 }
@@ -98,7 +138,7 @@ func drawMenuRule(th *look.Theme, head string, width int) string {
 
 // openMenu opens the menu of ts, drawn from screen row y.
 func (m *sidebar) openMenu(y int, ts ...interact.Target[*sidebar]) {
-	menu := newMenu(m, ts...)
+	menu := newMenu(m, theMenu.Target(menuSubject{}), ts...)
 	if menu == nil {
 		return
 	}
@@ -166,9 +206,15 @@ func (m *sidebar) updateMenu(msg tea.Msg) (tea.Cmd, bool) {
 		m.menu = nil
 		return nil, false
 	case tea.KeyPressMsg:
-		// Keys the menu does not take do nothing while it is open.
-		cmd, _ := runOn(m, msg, theMenu.Target(menuSubject{}))
-		return cmd, true
+		// Keys neither the menu nor its items take do nothing while it is open.
+		a, item, ok := m.menu.lookup(m, msg)
+		if item {
+			m.menu = nil
+		}
+		if !ok {
+			return nil, true
+		}
+		return a.Run(m), true
 	}
 	return nil, false
 }

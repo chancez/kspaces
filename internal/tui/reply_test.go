@@ -152,7 +152,7 @@ func TestReplyKey(t *testing.T) {
 	e.m.render()
 	e.press("m")
 	_, y := e.zone(fmt.Sprintf(entryZone, i))
-	if got, want := e.screen()[y+1:y+5], []string{menuRule(""), " Open", " Reply", menuRule("")}; !reflect.DeepEqual(got, want) {
+	if got, want := e.screen()[y+1:y+5], []string{menuRule(""), " Open", menuItem("Reply", "t"), menuRule("")}; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	e.press("j")
@@ -191,7 +191,7 @@ func TestStatusRightClick(t *testing.T) {
 			"  \uf401  kitty master", "", "\u25b6 \uf110  docs main", "", "  \uf00d  broken", "", "", "", "", "", "", "", "", "",
 			rule, "STATUS", "Blocked 1", "\uf071  dev                   +1 5m", "   claude \u00b7 approve", "", "Failed 1", "\ue654  scratch",
 		}
-		menu := []string{rule, " Open", " Reply", rule}
+		menu := []string{rule, " Open", menuItem("Reply", "t"), rule}
 		screen := func(lines ...[]string) []string {
 			var out []string
 			for _, l := range lines {

@@ -381,7 +381,7 @@ func TestCleanupFormPaint(t *testing.T) {
 	}
 }
 
-// p on a space's row, and its menu, open the clean up form for the space; a row of no space or a space
+// p on a space's row, and in its menu, open the clean up form for the space; a row of no space or a space
 // without linked worktrees has neither.
 func TestCleanupKey(t *testing.T) {
 	e := newSidebarEnv(t)
@@ -405,14 +405,22 @@ func TestCleanupKey(t *testing.T) {
 	e.press("m")
 	_, y := e.zone(fmt.Sprintf(entryZone, e.row("gr")))
 	want := []string{
-		menuRule("Session"), " Open", " Save as layout", " Close session",
-		menuRule("Space"), " New worktree", " New worktree from PR", " New worktree from issue", " Fold worktrees", " Clean up worktrees", " Select", " Add space",
+		menuRule("Session"), " Open", " Save as layout", menuItem("Close session", "c"),
+		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), menuItem("Clean up worktrees", "p"), " Select", menuItem("Add space", "a"),
 		menuRule(""),
 	}
 	if got := e.screen()[y+1 : y+14]; !reflect.DeepEqual(got, want) {
 		t.Errorf("gr's menu:\n%q\nwant\n%q", got, want)
 	}
-	e.press("esc")
+	// The item's key runs it from the menu, which closes.
+	if cmd := e.press("p"); cmd == nil || e.m.menu != nil {
+		t.Errorf("p in the menu: cmd %v, menu still open %v", cmd != nil, e.m.menu != nil)
+	} else if msg := cmd(); msg != nil {
+		t.Errorf("p in the menu said %v", msg)
+	}
+	if got, want := launched(), []string{"@", "launch", "--type=overlay", "--var=kspaces_form=1", "--next-to", "id:11", exe, "cleanup", "/src/gr"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("p in the menu launched %q, want %q", got, want)
+	}
 	for _, session := range []string{"gr@dev", "kitty", "default"} {
 		e.m.cursor = e.row(session)
 		if cmd := e.press("p"); cmd != nil {

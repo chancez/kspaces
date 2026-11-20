@@ -224,10 +224,16 @@ func (m *picker) update(msg tea.Msg) tea.Cmd {
 	case tea.MouseClickMsg, tea.MouseWheelMsg, tea.MouseMotionMsg, tea.MouseReleaseMsg:
 		return m.mouse(msg.(tea.MouseMsg))
 	case tea.KeyPressMsg:
-		// Keys the menu does not take do nothing while it is open.
+		// Keys neither the menu nor its items take do nothing while it is open.
 		if m.menu != nil {
-			cmd, _ := runOn(m, msg, thePickMenu.Target(pickMenuSubject{}))
-			return cmd
+			a, item, ok := m.menu.lookup(m, msg)
+			if item {
+				m.menu = nil
+			}
+			if !ok {
+				return nil
+			}
+			return a.Run(m)
 		}
 		if cmd, ok := runOn(m, msg, thePicker.Target(pickerSubject{})); ok {
 			return cmd
