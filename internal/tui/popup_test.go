@@ -11,6 +11,7 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/tui/interact"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
@@ -36,6 +37,7 @@ func (f *stubForm) failed() bool   { return f.err }
 func (f *stubForm) theme() *look.Theme {
 	return look.New(true)
 }
+func (f *stubForm) keys() ([]interact.Section, bool) { return nil, false }
 
 // quits says whether cmd quits the program.
 func quits(cmd tea.Cmd) bool {

@@ -58,27 +58,29 @@ func helpBody(th *look.Theme, sections []interact.Section, width int) []string {
 	return out
 }
 
-// lines draws the help in width by height cells: a title saying how to scroll and close it, then the keys
+// lines draws the help in width by height cells: a title saying how to close it, and scroll it when it
+// needs to, then the keys
 // from offset, which it keeps in range, a line at either end saying how many more there are past it, and
 // blank lines to the bottom.
 func (h *keyHelp) lines(th *look.Theme, width, height int) []string {
+	body := helpBody(th, h.sections(), width)
+	rows := max(height-1, 0)
+	h.last = max(len(body)-rows, 0)
+	h.offset = min(h.offset, h.last)
 	title := look.Title("KEYS")
+	hints := [][]look.Span{{look.Key("?"), look.KeyDesc(" close")}}
+	if h.last > 0 {
+		hints = append([][]look.Span{{look.Key("j/k"), look.KeyDesc(" scroll  "), look.Key("?"), look.KeyDesc(" close")}}, hints...)
+	}
 	var hint []look.Span
-	for _, h := range [][]look.Span{
-		{look.Key("j/k"), look.KeyDesc(" scroll  "), look.Key("?"), look.KeyDesc(" close")},
-		{look.Key("?"), look.KeyDesc(" close")},
-	} {
-		if th.Width(title)+1+th.Width(h...) <= width {
-			hint = h
+	for _, spans := range hints {
+		if th.Width(title)+1+th.Width(spans...) <= width {
+			hint = spans
 			break
 		}
 	}
 	gap := look.Text(strings.Repeat(" ", max(width-th.Width(title)-th.Width(hint...), 0)))
 	out := []string{th.Draw(look.Plain, width, append([]look.Span{title, gap}, hint...)...)}
-	body := helpBody(th, h.sections(), width)
-	rows := max(height-1, 0)
-	h.last = max(len(body)-rows, 0)
-	h.offset = min(h.offset, h.last)
 	shown := append([]string{}, body[h.offset:min(len(body), h.offset+rows)]...)
 	if n := h.offset; n > 0 && len(shown) > 0 {
 		shown[0] = th.Render(look.Plain, th.Cut(width, look.More(true, n+1)...)...)

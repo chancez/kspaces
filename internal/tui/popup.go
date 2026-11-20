@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/chancez/kspaces/internal/kitty"
+	"github.com/chancez/kspaces/internal/tui/interact"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
@@ -21,6 +22,8 @@ type popupModel interface {
 	failed() bool
 	// theme is what it draws with, which the terminal's background makes a light or a dark one.
 	theme() *look.Theme
+	// keys are what ? lists, see keyhelp.go; ok is false while ? is typed, as into a field.
+	keys() (sections []interact.Section, ok bool)
 }
 
 func (f *addSpaceForm) theme() *look.Theme       { return f.th }
@@ -61,6 +64,54 @@ func (f *saveLayoutForm) failed() bool     { return f.err != nil }
 func (f *trustForm) failed() bool          { return f.err != nil }
 func (m *picker) failed() bool             { return m.err != nil }
 
+// A form with fields takes ? while a choice has focus, its list closed: elsewhere ? is typed.
+func (f *addSpaceForm) keys() ([]interact.Section, bool) {
+	return interact.Help(f, theAddForm.Target(addSubject{})), f.onGroup() && !f.group.listOpen()
+}
+func (f *cleanupForm) keys() ([]interact.Section, bool) {
+	return interact.Help(f, theCleanup.Target(cleanupSubject{})), true
+}
+func (f *closeSessionForm) keys() ([]interact.Section, bool) {
+	return interact.Help(f, theCloseForm.Target(closeSubject{})), true
+}
+func (f *forgetSessionForm) keys() ([]interact.Section, bool) {
+	return interact.Help(f, theForgetForm.Target(forgetSubject{})), true
+}
+func (f *newWorktreeForm) keys() ([]interact.Section, bool) {
+	t := f.current()
+	return interact.Help(f, theForm.Target(formSubject{})), f.focused() == nil && !t.base.listOpen() && !t.open.listOpen()
+}
+func (f *layoutForm) keys() ([]interact.Section, bool) {
+	return interact.Help(f, theLayoutForm.Target(layoutSubject{})), f.focused() == nil && !f.layouts.listOpen()
+}
+func (f *removeWorktreeForm) keys() ([]interact.Section, bool) {
+	return interact.Help(f, theRemoveForm.Target(removeSubject{})), true
+}
+func (f *runForm) keys() ([]interact.Section, bool) {
+	return interact.Help(f, theRunForm.Target(runSubject{})), f.focused() == nil && !f.cmds.listOpen()
+}
+func (f *saveLayoutForm) keys() ([]interact.Section, bool) {
+	on := f.focused()
+	return interact.Help(f, theSaveForm.Target(saveSubject{})), on.in == nil && (on.choice == nil || !on.choice.listOpen())
+}
+func (f *trustForm) keys() ([]interact.Section, bool) {
+	return interact.Help(f, theTrustForm.Target(trustSubject{})), true
+}
+func (f *errorForm) keys() ([]interact.Section, bool) {
+	return interact.Help(f, theShowForm.Target(showSubject{})), true
+}
+
+// The reply form is all typing.
+func (f *replyForm) keys() ([]interact.Section, bool) { return nil, false }
+
+// The picker's query takes ?, but not while its menu is open.
+func (m *picker) keys() ([]interact.Section, bool) {
+	if m.menu == nil {
+		return nil, false
+	}
+	return interact.Help(m, append([]interact.Target[*picker]{m.menu.own}, m.menu.of...)...), true
+}
+
 // popup runs a form or the picker in kitty. In an overlay that is all: the overlay closes back to the
 // window it is over. A panel is an OS window of its own, which would float on, unseen or in the way, once
 // the keyboard is elsewhere, so it quits when it loses focus, and gives the keyboard back to the window it
@@ -81,9 +132,11 @@ type popup struct {
 	self int
 	// th draws the panel's border.
 	th *look.Theme
-	// width and height are the panel's size, and rows how many rows the form drew last, boxed, which
-	// clicks are mapped back to.
+	// width and height are the panel's size, or the overlay's, and rows how many rows the form drew last,
+	// boxed, which clicks are mapped back to.
 	width, height, rows int
+	// help is the list of keys ? opens in a sheet up from the bottom, nil when closed, see keyhelp.go.
+	help *keyHelp
 }
 
 // fillsPopup is a popup that lays itself out over the whole of the size it is given, as the picker
@@ -107,6 +160,24 @@ func (p *popup) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		p.th.SetDark(bg.IsDark())
 		p.inner.theme().SetDark(bg.IsDark())
 		return p, nil
+	}
+	if size, ok := msg.(tea.WindowSizeMsg); ok {
+		p.width, p.height = size.Width, size.Height
+	}
+	if p.help != nil {
+		cmd, handled := p.help.update(msg)
+		if p.help.closed {
+			p.help = nil
+		}
+		if handled {
+			return p, cmd
+		}
+	}
+	if key, ok := msg.(tea.KeyPressMsg); ok && key.String() == "?" {
+		if _, ok := p.inner.keys(); ok {
+			p.help = &keyHelp{sections: func() []interact.Section { s, _ := p.inner.keys(); return s }}
+			return p, nil
+		}
 	}
 	if p.from != 0 {
 		switch msg.(type) {
@@ -148,7 +219,6 @@ func (p *popup) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (p *popup) inPanel(msg tea.Msg) tea.Msg {
 	_, fills := p.inner.(fillsPopup)
 	if size, ok := msg.(tea.WindowSizeMsg); ok {
-		p.width, p.height = size.Width, size.Height
 		if fills {
 			return tea.WindowSizeMsg{Width: max(size.Width-4, 1), Height: max(size.Height-2, 1)}
 		}
@@ -185,17 +255,41 @@ func (p *popup) inPanel(msg tea.Msg) tea.Msg {
 func (p *popup) View() tea.View {
 	v := p.inner.View()
 	if p.from == 0 {
+		if p.help != nil {
+			v.SetContent(strings.Join(p.sheet(strings.Split(v.Content, "\n"), p.width, p.height), "\n"))
+		}
 		return v
 	}
 	v.ReportFocus = true
 	if _, fills := p.inner.(fillsPopup); fills {
-		v.SetContent(frame(p.th, p.width, p.height, "", strings.Split(v.Content, "\n"), ""))
+		body := strings.Split(v.Content, "\n")
+		if p.help != nil {
+			body = p.sheet(body, p.width-4, p.height-2)
+		}
+		v.SetContent(frame(p.th, p.width, p.height, "", body, ""))
 		return v
 	}
 	title, body, foot := unboxed(v.Content)
 	p.rows = len(body) + 4
+	if p.help != nil {
+		body, foot = p.sheet(body, p.width-4, p.height-2), ""
+	}
 	v.SetContent(frame(p.th, p.width, p.height, title, body, foot))
 	return v
+}
+
+// sheet is lines, rows high, with the list of keys over its bottom, width cells wide under a rule: as high
+// as the list, up to half the rows, or a few more of a short popup's, the rest scrolling.
+func (p *popup) sheet(lines []string, width, rows int) []string {
+	if width < 1 || rows < 2 {
+		return lines
+	}
+	th := p.inner.theme()
+	out := make([]string, rows)
+	copy(out, lines)
+	n := min(len(helpBody(th, p.help.sections(), width))+2, max(rows/2, min(rows, 8)))
+	copy(out[rows-n:], append([]string{th.Render(look.Plain, look.Rule(width, true))}, p.help.lines(th, width, n-1)...))
+	return out
 }
 
 // unboxed takes apart what boxed drew: the heading, the lines under it and the last line, its buttons or
