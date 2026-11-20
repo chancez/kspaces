@@ -21,8 +21,9 @@ from kitty.fast_data_types import add_timer, current_focused_os_window_id, get_o
 from kitty.session import parse_save_as_options_spec_args
 from kittens.tui.handler import result_handler
 
-# Names of the sessions written by the last save, other than the default one, which startup_session already
-# loads. Read and removed at startup.
+# Names of the sessions open at the last save, other than the default one, which startup_session already
+# loads, but for the one focused at the save, which goes last, the default one too. Read and removed at
+# startup.
 OPEN_LIST = '.open-sessions'
 
 
@@ -80,6 +81,12 @@ def session_match(name, unsessioned=False):
     return f'session:^{re.escape(name)}$ and not var:kspaces'
 
 
+# focused_session is the session of the window focused most recently, kspaces' own left out, empty for none.
+def focused_session(boss):
+    windows = [w for w in boss.all_windows if w.created_in_session_name and not any(k.startswith('kspaces') for k in w.user_vars)]
+    return max(windows, key=lambda w: w.last_focused_at).created_in_session_name if windows else ''
+
+
 def save_all(boss):
     if not startup_path():
         return
@@ -88,8 +95,11 @@ def save_all(boss):
     main = main_os_window(boss, set(others))
     for name in [default] + others:
         save_matching(boss, session_match(name, unsessioned=True), session_path(name), main)
+    names = list(others)
+    if focused := focused_session(boss):
+        names = [n for n in names if n != focused] + [focused]
     with open(os.path.join(os.path.dirname(startup_path()), OPEN_LIST), 'w') as f:
-        f.write(''.join(n + '\n' for n in others))
+        f.write(''.join(n + '\n' for n in names))
 
 
 # Saving at quit alone left a session's file as it was at the last quit: closing a session's tabs and panes
@@ -164,12 +174,18 @@ def restore(boss):
         os.remove(list_path)
     except FileNotFoundError:
         return
-    paths = [session_path(name) for name in names if os.path.exists(session_path(name))]
-    # Loading a session switches to it, so end up back where startup_session left off.
-    if names and startup_path():
+    # Loading a session switches to it, so the one focused at the save, which the save put last, is loaded
+    # last, after startup_session's, the default session, which kitty loaded already. A focused default
+    # session is startup_session's itself.
+    default, focused = default_name(), names[-1] if names else ''
+    paths = [session_path(n) for n in names[:-1] if n != default]
+    if startup_path():
         paths.append(startup_path())
+    if focused and focused != default:
+        paths.append(session_path(focused))
     for path in paths:
-        boss.goto_session(path)
+        if os.path.exists(path):
+            boss.goto_session(path)
 
 
 # Called when kitty loads this watcher, which is during startup, while startup_session is being created, and

@@ -488,7 +488,8 @@ kitty's `KITTY_LISTEN_ON` socket, for the picker and the forms, and a sidebar st
 from it. `r` loads at once, and has git and gh asked again.
 
 `save_sessions.py`, with `save_sessions = true`, saves each session to its own file at quit and as its
-windows close, take focus or change directory, and loads the ones that were open at startup. A space then
+windows close, take focus or change directory, and loads the ones that were open at startup, ending on the
+session that had focus at the last save of them all, as at quit. A space then
 reopens as it was left, and afresh once its last window has closed: its file is removed, or, for the
 default session, which is `startup_session`'s, emptied. Closing an OS window as a whole keeps its
 sessions' files. Windows in no session are saved with the default session, at quit and on demand only.
