@@ -73,7 +73,7 @@ func TestSpaceFileTrust(t *testing.T) {
 }
 
 // A broken space file, once trusted, is left out with what is wrong with it, and the other spaces and
-// the global config are as they were; a sidebar sees both from the leader's load.
+// the global config are as they were; a sidebar sees both from its load.
 func TestBrokenSpaceFile(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())

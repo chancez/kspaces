@@ -3,7 +3,6 @@ package spaces
 import (
 	"errors"
 	"maps"
-	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -15,82 +14,6 @@ import (
 	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
 )
-
-// loader is a load that says which poller ran it and how many times, as its saved sessions.
-type loader struct {
-	name  string
-	calls int
-}
-
-func (l *loader) load() Shared {
-	l.calls++
-	return Shared{Config: &config.Config{SessionsDir: "/sessions"}, Saved: []string{l.name, string(rune('0' + l.calls))}}
-}
-
-// The first sidebar to poll leads: it loads and writes, and the others read what it wrote, again only
-// once it has written something new. When it goes, the next to poll takes the lead.
-func TestPollerLeadAndFollow(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "run", "kitty.json")
-	a, b, c := &loader{name: "a"}, &loader{name: "b"}, &loader{name: "c"}
-	pa, pb, pc := newPoller(path, a.load), newPoller(path, b.load), newPoller(path, c.load)
-	saved := func(p *Poller, fresh bool) []string { return p.Poll(fresh).Saved }
-
-	got := [][]string{
-		saved(pa, false), // leads, and writes a1
-		saved(pb, false), // reads a1
-		saved(pc, false),
-		saved(pb, false), // nothing new: a1 as read before
-		saved(pa, false), // writes a2
-		saved(pb, false),
-		saved(pb, true),  // loads itself, b1
-		saved(pb, false), // keeps its own until the leader writes again
-		saved(pa, false),
-		saved(pb, false),
-	}
-	pa.Close()
-	got = append(got,
-		saved(pc, false), // leads now, and writes c1
-		saved(pb, false),
-	)
-	want := [][]string{
-		{"a", "1"}, {"a", "1"}, {"a", "1"}, {"a", "1"}, {"a", "2"}, {"a", "2"}, {"b", "1"}, {"b", "1"},
-		{"a", "3"}, {"a", "3"}, {"c", "1"}, {"c", "1"},
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("polls:\n%q\nwant\n%q", got, want)
-	}
-	if got, want := []int{a.calls, b.calls, c.calls}, []int{3, 1, 1}; !reflect.DeepEqual(got, want) {
-		t.Errorf("loads by a, b, c = %v, want %v", got, want)
-	}
-}
-
-// A follower whose leader has written nothing yet waits for it, then loads itself.
-func TestPollerWithoutLeaderFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "kitty.json")
-	a, b := &loader{name: "a"}, &loader{name: "b"}
-	pa, pb := newPoller(path, a.load), newPoller(path, b.load)
-	if lead, ok := pa.tryLead(); !lead || !ok {
-		t.Fatalf("a did not take the lock: lead %v, ok %v", lead, ok)
-	}
-	pb.wait = 0
-	if got, want := pb.Poll(false).Saved, []string{"b", "1"}; !reflect.DeepEqual(got, want) {
-		t.Errorf("follower without a file got %q, want %q", got, want)
-	}
-}
-
-// Where there is no lock to take, every poller loads for itself.
-func TestPollerWithoutLock(t *testing.T) {
-	file := filepath.Join(t.TempDir(), "file")
-	if err := os.WriteFile(file, nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	a := &loader{name: "a"}
-	p := newPoller(filepath.Join(file, "kitty.json"), a.load)
-	got := [][]string{p.Poll(false).Saved, p.Poll(false).Saved}
-	if want := [][]string{{"a", "1"}, {"a", "2"}}; !reflect.DeepEqual(got, want) {
-		t.Errorf("polls %q, want %q", got, want)
-	}
-}
 
 // Each sidebar sees the shared windows from its own: the session of its tab, the window to go back to,
 // and the errors as they were.
@@ -151,12 +74,12 @@ func TestSharedView(t *testing.T) {
 	}
 }
 
-// Only the leader asks git and gh, and the others read what it found. A refresh in a follower has the
-// leader ask again, and a new leader carries on from the last one's pull requests.
+// The poller asks git and gh, writes what they said for the picker and the forms, and a refresh has them
+// asked again. A sidebar started again carries on from the last one's pull requests.
 func TestPollerGitStates(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "kitty.json")
-	// UTC, as a follower reads the times back from JSON: with the machine's zone at UTC that gives time.UTC,
-	// not time.Local, and DeepEqual tells the two apart.
+	path := filepath.Join(t.TempDir(), "run", "kitty.git.json")
+	// UTC, as the states are read back from JSON: with the machine's zone at UTC that gives time.UTC, not
+	// time.Local, and DeepEqual tells the two apart.
 	now := time.Unix(1_000_000, 0).UTC()
 	var asked []string
 	watcher := func() *gitstate.Watcher {
@@ -185,10 +108,10 @@ func TestPollerGitStates(t *testing.T) {
 		p.newWatcher = watcher
 		return p
 	}
-	pa, pb, pc := poller(), poller(), poller()
-	poll := func(p *Poller, fresh bool) []string {
+	pa, pb := poller(), poller()
+	poll := func(f func() Shared) []string {
 		asked = nil
-		p.Poll(fresh)
+		f()
 		return asked
 	}
 
@@ -196,36 +119,27 @@ func TestPollerGitStates(t *testing.T) {
 		"/src/gr":     {Status: &gitstate.Status{Changes: 2}, PR: &gh.PR{Number: 7, State: "merged"}, PRAt: now, PRBranch: "main"},
 		"/src/gr/dev": {Status: &gitstate.Status{Changes: 2}, PR: &gh.PR{Number: 7, State: "merged"}, PRAt: now, PRBranch: "dev"},
 	}
-	got := [][]string{poll(pa, false), poll(pb, false)}
-	if sh := pb.Poll(false); !reflect.DeepEqual(sh.Git, states) {
-		t.Errorf("follower's states:\n%+v\nwant\n%+v", sh.Git, states)
-	}
-	// A follower's own load keeps the states it read.
-	if sh := pb.Poll(true); !reflect.DeepEqual(sh.Git, states) {
-		t.Errorf("follower's own load lost the states: %+v", sh.Git)
+	got := [][]string{poll(pa.Poll)}
+	if written, _ := readGit(path); !reflect.DeepEqual(written, states) {
+		t.Errorf("written states:\n%+v\nwant\n%+v", written, states)
 	}
 	now = now.Add(time.Second)
-	asked = nil
-	pb.Refresh()
-	got = append(got, asked, poll(pa, false), poll(pa, false))
-	pa.Close()
+	got = append(got, poll(pa.Poll), poll(pa.Refresh))
 	now = now.Add(time.Minute)
-	got = append(got, poll(pc, false))
+	got = append(got, poll(pb.Poll))
 	want := [][]string{
 		{"status /src/gr", "status /src/gr/dev", "pr main", "pr dev"},
 		nil,
-		nil,
 		{"status /src/gr", "status /src/gr/dev", "pr main", "pr dev"},
-		nil,
 		// Statuses are read again, but the pull requests are not due.
 		{"status /src/gr", "status /src/gr/dev"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("asked:\n%q\nwant\n%q", got, want)
 	}
-	// What the sidebars see of the leader's load has gr@gone missing, and the states none for it.
+	// What the sidebar sees of the load has gr@gone missing, and the states none for it.
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	sh := pc.Poll(false)
+	sh := pb.Poll()
 	if got, want := sh.View(0).Spaces[0].Missing, []Worktree{{Session: "gr@gone"}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("missing %#v, want %#v", got, want)
 	}

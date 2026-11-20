@@ -1,7 +1,7 @@
 package spaces
 
-// A sidebar's dock can be dragged to another width in kitty 0.51. The leader saves the width it is
-// dragged to as the config's, so the next sidebars open at it, telling a drag from kitty.conf's watcher
+// A sidebar's dock can be dragged to another width in kitty 0.51. The sidebar saves the width it is
+// dragged to as the config's, so the next sidebar opens at it, telling a drag from kitty.conf's watcher
 // resizing the docks to a width just set in the config by which of the two changed first.
 
 // dockDrag follows the sidebar docks' width and the config's from one poll to the next, see observe.

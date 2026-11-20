@@ -200,7 +200,7 @@ func newRemoveForm(cfg config.Config, space spaces.Space, wt spaces.Worktree, st
 }
 
 // RunRemoveWorktree runs the remove worktree form for the worktree at path, meant for a kitty popup,
-// until the worktree is removed or the form is left. The branch's PR is what the sidebars' leader last saw;
+// until the worktree is removed or the form is left. The branch's PR is what the sidebar last saw;
 // deleteBranch ticks deleting the branch at first.
 func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string, deleteBranch bool) error {
 	space, wt, err := spaces.FindWorktree(cfg, path)
@@ -214,7 +214,7 @@ func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string, dele
 	if err != nil {
 		return err
 	}
-	pr, _ := spaces.NewPoller().Git()[wt.Path].KnownPR(wt.Branch)
+	pr, _ := spaces.GitStates()[wt.Path].KnownPR(wt.Branch)
 	f, err := newRemoveForm(cfg, space, wt, st, pr, deleteBranch)
 	if err != nil {
 		return err

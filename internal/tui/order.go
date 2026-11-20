@@ -266,7 +266,7 @@ func (m *sidebar) keep(a arrangement, r spaces.Row) tea.Cmd {
 	m.setRows()
 	m.scrollToCursor()
 	p, self := m.poller, m.self
-	return func() tea.Msg { return p.Poll(true).View(self) }
+	return func() tea.Msg { return p.Poll().View(self) }
 }
 
 // moveRow moves the cursor's row by delta among its own, as dragging it does: K and J.

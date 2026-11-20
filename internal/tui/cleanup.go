@@ -329,14 +329,14 @@ func (f *cleanupForm) render() string {
 }
 
 // RunCleanup runs the clean up form, meant for a kitty popup: for the space at root, or named root, or,
-// when sessions are given, for those. A worktree's PR is what the sidebars' leader last saw, or else
-// asked of gh now. The missing worktrees and their windows are as the sidebars see them.
+// when sessions are given, for those. A worktree's PR is what the sidebar last saw, or else asked of gh
+// now. The missing worktrees and their windows are as the sidebar sees them.
 func RunCleanup(ctx context.Context, cfg config.Config, root string, sessions []string) error {
 	snap := spaces.LoadShared().View(kitty.SelfWindowID())
 	if snap.Err != nil {
 		return snap.Err
 	}
-	known := spaces.NewPoller().Git()
+	known := spaces.GitStates()
 	pr := func(wt spaces.Worktree) *gh.PR {
 		if p, ok := known[wt.Path].KnownPR(wt.Branch); ok {
 			return p

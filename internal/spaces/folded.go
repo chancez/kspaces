@@ -11,9 +11,8 @@ import (
 	"strings"
 )
 
-// statePath is the file name in kspaces' state directory, $XDG_STATE_HOME/kspaces, where what every
-// sidebar shares is kept: there is one sidebar per OS window, and a change in one should show in all of
-// them, which read it on their next refresh.
+// statePath is the file name in kspaces' state directory, $XDG_STATE_HOME/kspaces, where what the sidebar
+// keeps across restarts is kept.
 func statePath(name string) (string, error) {
 	dir := os.Getenv("XDG_STATE_HOME")
 	if dir == "" {

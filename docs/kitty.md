@@ -382,9 +382,9 @@ file that is there but not trusted is refused until trusted, as saving would tru
 Making the file adds `/.kspaces.toml` to the repository's `info/exclude`, in its common git directory, so
 git leaves it out, unless the form's box says not to; the line is added once.
 
-The sidebars' leader reads every space's file, as it lists their worktrees, and shares what it read, so
-each sidebar sees the same and trusting or editing a file shows in all of them at the next poll. A file
-that has not changed, by its size, time and inode, is not read again: every two seconds is a stat.
+The sidebar reads every space's file as it lists their worktrees, so trusting or editing a file shows at
+the next poll. A file that has not changed, by its size, time and inode, is not read again: every two
+seconds is a stat.
 
 ## Installing the kitty files
 
@@ -466,10 +466,10 @@ active tab's. `kspaces_watcher.py`:
   window first, with the `kspaces` user variable and `--keep-focus`, in no session, as kitty moves it from
   tab to tab. Other OS windows get none; when the sidebar's OS window closes, the next with a session's tab
   gets it, and any sidebar beyond the first is closed;
-- sizes the docks to `[sidebar] width`, all of it the sidebar's (kitty's dock border, if any, is the
-  separator), and resizes them when it changes. Dragging a sidebar's border resizes it, and the sidebars'
-  leader writes the new width to `[sidebar] width`, in the file that sets it, once it has held for a poll,
-  so every sidebar takes it;
+- sizes the dock to `[sidebar] width`, all of it the sidebar's (kitty's dock border, if any, is the
+  separator), and resizes it when it changes. Dragging the sidebar's border resizes it, and the sidebar
+  writes the new width to `[sidebar] width`, in the file that sets it, once it has held for a poll, so the
+  next sidebar opens at it;
 - hides the tab bar of the panels kspaces opens, marked with the `kspaces_popup` user variable: kitty has
   no option for one OS window's tab bar, and `tab_bar_filter` always shows the active tab, so it sets
   kitty's own flag for it, which a config reload resets and its next check, within two seconds, sets again;
@@ -479,14 +479,11 @@ active tab's. `kspaces_watcher.py`:
 `kspaces_toggle.py` hides and shows the sidebar, and `kspaces_focus.py` moves the keyboard into the
 sidebar, when the current OS window has it, and back.
 
-The sidebars of one kitty share their work: the first to start leads, with a lock on a file in
-`$XDG_RUNTIME_DIR/kspaces/`, or `kspaces-UID/` in the temporary directory, named after kitty's
-`KITTY_LISTEN_ON` socket. Every two seconds the leader runs `kitten @ ls` and `git worktree list` for each
-space, and in the background `git status` and `gh` for the [rows' git state](sidebar.md#spaces), and
-writes what it found beside the lock; the others read that file when it changes, and each works out its
-own session from it. When the leading sidebar's OS window closes, the next sidebar to look takes the lead,
-carrying on from what the last one knew. `r` in any sidebar loads at once in that sidebar, and has the
-leader ask git and gh again.
+Every two seconds the sidebar runs `kitten @ ls` and `git worktree list` for each space, and in the
+background `git status` and `gh` for the [rows' git state](sidebar.md#spaces). It writes what git and gh
+said to a file in `$XDG_RUNTIME_DIR/kspaces/`, or `kspaces-UID/` in the temporary directory, named after
+kitty's `KITTY_LISTEN_ON` socket, for the picker and the forms, and a sidebar started again carries on
+from it. `r` loads at once, and has git and gh asked again.
 
 `save_sessions.py`, with `save_sessions = true`, saves each session to its own file at quit and as its
 windows close, take focus or change directory, and loads the ones that were open at startup. A space then

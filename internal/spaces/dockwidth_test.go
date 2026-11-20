@@ -75,7 +75,7 @@ func TestDockWidth(t *testing.T) {
 	}
 }
 
-// The leader saves a dragged dock's width from what it loads, and a failed save is no failed poll.
+// The poller saves a dragged dock's width from what it loads, and a failed save is no failed poll.
 func TestPollerSavesDraggedWidth(t *testing.T) {
 	dock := func(size string) []kitty.OSWindow {
 		return []kitty.OSWindow{{Tabs: []kitty.Tab{{
@@ -98,10 +98,9 @@ func TestPollerSavesDraggedWidth(t *testing.T) {
 		saved = append(saved, w)
 		return errors.New("read-only")
 	}
-	defer p.Close()
 	var polled []int
 	for range sizes {
-		polled = append(polled, kitty.SidebarWidths(p.Poll(false).Windows)...)
+		polled = append(polled, kitty.SidebarWidths(p.Poll().Windows)...)
 	}
 	if want := []int{40}; !reflect.DeepEqual(saved, want) {
 		t.Errorf("saved %v, want %v", saved, want)

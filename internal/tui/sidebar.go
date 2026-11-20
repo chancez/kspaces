@@ -122,9 +122,8 @@ type sidebar struct {
 	filter    textinput.Model
 	filtering bool
 	attending bool
-	// poller shares one load between every sidebar of the kitty.
-	poller *spaces.Poller
-	// What git and gh say of each worktree, by path, from the poller's leader.
+	poller    *spaces.Poller
+	// What git and gh say of each worktree, by path, from the poller.
 	git map[string]gitstate.State
 }
 
@@ -149,14 +148,13 @@ func (m *sidebar) cursorToCurrent() {
 	m.scrollToCursor()
 }
 
-// poll is the latest load, the one the leading sidebar shares, on the timer.
+// poll loads, on the timer.
 func (m *sidebar) poll() tea.Cmd {
 	p, self := m.poller, m.self
-	return func() tea.Msg { return p.Poll(false).View(self) }
+	return func() tea.Msg { return p.Poll().View(self) }
 }
 
-// refresh loads now, rather than waiting for the leader, for the refresh key, and has the leader ask git
-// and gh again.
+// refresh loads, for the refresh key, and has git and gh asked again.
 func (m *sidebar) refresh() tea.Cmd {
 	p, self := m.poller, m.self
 	return func() tea.Msg { return p.Refresh().View(self) }
@@ -183,7 +181,7 @@ func (m *sidebar) openWindowCmd(s status.Status) tea.Cmd {
 		if err := spaces.OpenWindow(cfg, st, s.Window, s.Session); err != nil {
 			return failedMsg{err}
 		}
-		return p.Poll(true).View(self)
+		return p.Poll().View(self)
 	}
 }
 
@@ -193,7 +191,7 @@ func (m *sidebar) openWorktreeCmd(wt spaces.Worktree, opts spaces.OpenOptions) t
 		if err := spaces.OpenWorktree(cfg, st, wt, opts); err != nil {
 			return failedMsg{err}
 		}
-		return p.Poll(true).View(self)
+		return p.Poll().View(self)
 	}
 }
 

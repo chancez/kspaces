@@ -28,7 +28,7 @@ type Target struct {
 type Watcher struct {
 	mu     sync.Mutex
 	states map[string]State
-	// When each worktree's status was last read. Not shared: reading it is cheap, so a new leader reads
+	// When each worktree's status was last read. Not saved: reading it is cheap, so a new sidebar reads
 	// every status once.
 	statusAt map[string]time.Time
 	busy     bool

@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/chancez/kspaces/internal/config"
@@ -19,16 +18,8 @@ import (
 	"github.com/chancez/kspaces/internal/logs"
 )
 
-// One load for all the sidebars of a kitty. Every OS window has a sidebar of its own, and each loading
-// kitty's state and every space's worktrees itself cost as many `kitten @ ls` and `git worktree list`
-// runs. Instead the sidebars of one kitty elect a leader with a lock on a file: the leader loads and writes
-// what it loaded to a file beside the lock, and the others read that file when it changes. When the leader
-// exits its lock goes with it, and the next sidebar to poll takes the lead. What depends on the window a
-// sidebar runs in, such as its tab's session, is worked out by each from the shared windows with View.
-
 // Shared is what one load sees that is the same from every window of a kitty: all of a Snapshot but what
-// depends on the window it is seen from, which View works out. The leader writes it as JSON, so errors
-// are kept as their text.
+// depends on the window it is seen from, which View works out. Errors are kept as their text.
 type Shared struct {
 	// Nil when the config could not be read, and Err says why.
 	Config *config.Config `json:"config,omitempty"`
@@ -39,7 +30,7 @@ type Shared struct {
 	// kitty's windows, as `kitten @ ls` lists them, and why they could not be listed.
 	Windows  []kitty.OSWindow `json:"windows,omitempty"`
 	KittyErr string           `json:"kitty_err,omitempty"`
-	// What git and gh say of each worktree, by path, which only the leader asks.
+	// What git and gh say of each worktree, by path, which only the sidebar asks.
 	Git map[string]gitstate.State `json:"git,omitempty"`
 }
 
@@ -56,10 +47,7 @@ type sharedSpace struct {
 }
 
 // LoadShared reads the config, every space's worktrees and own file, the saved sessions and kitty's
-// windows. The leader reads the space files for every sidebar, as it lists the worktrees: what trusting
-// one or editing it does shows in all of them alike at the next poll, and a follower that loads for
-// itself, as after trusting, reads them too. Each read is a stat while a file has not changed, see
-// statCache.
+// windows. Each read of a space's file is a stat while it has not changed, see statCache.
 func LoadShared() Shared {
 	cfg, err := config.Load()
 	if err != nil {
@@ -108,8 +96,8 @@ func (sh Shared) View(self int) Snapshot {
 	for _, name := range sh.Saved {
 		saved[name] = true
 	}
-	// The missing worktrees go in the spaces, which are this view's own copies: what the leader shares, and
-	// asks git about in targets, is only what git lists.
+	// The missing worktrees go in the spaces, which are this view's own copies: what the load holds, and
+	// git is asked about in targets, is only what git lists.
 	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, st.Sessions, sh.Saved), Folded: LoadFolded(), Hidden: LoadHidden(), Saved: saved, Kitty: st}
 	snap.Order = Order{Mode: LoadSort(), Worktrees: LoadOrder(), Groups: sh.Config.Groups, Focused: st.Focused, Statuses: st.Statuses}
 	if sh.KittyErr != "" {
@@ -119,33 +107,19 @@ func (sh Shared) View(self int) Snapshot {
 	return snap
 }
 
-// pollWait is how long a sidebar waits for the leader's first file before loading itself: every OS
-// window's sidebar starts at once with kitty, and the leader takes a moment to write.
-const pollWait = time.Second
-
-// Poller shares loads between the sidebars of one kitty, see Shared. It is safe to call from several
-// goroutines.
+// Poller loads for the sidebar, with what git and gh say of each worktree, and writes those to a file for
+// what does not poll itself, such as the picker, see GitStates. It is safe to call from several goroutines.
 type Poller struct {
 	mu sync.Mutex
-	// path is the shared file; the lock is path.lock.
+	// path is the git states' file.
 	path string
 	load func() Shared
-	wait time.Duration
-	// newWatcher makes the leader's watcher of the worktrees' git states, nil for none.
+	// newWatcher makes the watcher of the worktrees' git states, nil for none.
 	newWatcher func() *gitstate.Watcher
-	// lock is the open lock file, held while leader.
-	lock   *os.File
-	leader bool
-	git    *gitstate.Watcher
-	// refreshAt is when the refresh file was last touched, as the leader last saw it.
-	refreshAt time.Time
-	// written is what the leader last wrote, so an unchanged load is not written again.
+	git        *gitstate.Watcher
+	// written is what was last written, so unchanged states are not written again.
 	written []byte
-	// seen is the file last read, so a follower reads it again only when the leader has replaced it.
-	seen os.FileInfo
-	last Shared
-	have bool
-	// saveWidth saves a sidebar dock's dragged width as the config's, nil for none; drag follows the docks
+	// saveWidth saves the sidebar dock's dragged width as the config's, nil for none; drag follows the dock
 	// for it.
 	saveWidth func(width int) error
 	drag      dockDrag
@@ -153,98 +127,61 @@ type Poller struct {
 
 // NewPoller is the poller of the kitty kspaces runs in.
 func NewPoller() *Poller {
-	p := newPoller(filepath.Join(pollDir(), pollKey()+".json"), LoadShared)
+	p := newPoller(gitPath(), LoadShared)
 	p.newWatcher = gitstate.NewWatcher
 	p.saveWidth = config.SaveSidebarWidth
 	return p
 }
 
 func newPoller(path string, load func() Shared) *Poller {
-	return &Poller{path: path, load: load, wait: pollWait}
+	return &Poller{path: path, load: load}
 }
 
-// pollDir is where the shared files go: the user's runtime directory, else a directory of the user's own
-// in the temporary one.
-func pollDir() string {
-	if dir := os.Getenv("XDG_RUNTIME_DIR"); dir != "" {
-		return filepath.Join(dir, "kspaces")
+// gitPath is the git states' file of the kitty kspaces runs in, in the user's runtime directory, else a
+// directory of the user's own in the temporary one, named after the kitty's remote control socket, which
+// is what `kitten @` talks to, else its process.
+func gitPath() string {
+	dir := os.Getenv("XDG_RUNTIME_DIR")
+	if dir != "" {
+		dir = filepath.Join(dir, "kspaces")
+	} else {
+		dir = filepath.Join(os.TempDir(), fmt.Sprintf("kspaces-%d", os.Getuid()))
 	}
-	return filepath.Join(os.TempDir(), fmt.Sprintf("kspaces-%d", os.Getuid()))
-}
-
-// pollKey names the kitty the sidebars run in: its remote control socket, which is what `kitten @` talks
-// to, else its process.
-func pollKey() string {
 	key := os.Getenv("KITTY_LISTEN_ON")
 	if key == "" {
 		key = "pid:" + os.Getenv("KITTY_PID")
 	}
 	sum := sha256.Sum256([]byte(key))
-	return hex.EncodeToString(sum[:8])
+	return filepath.Join(dir, hex.EncodeToString(sum[:8])+".git.json")
 }
 
-// Poll is the latest load. The leader loads and writes it; a follower reads what the leader wrote, and
-// takes the lead when the leader has gone. fresh loads in a follower too, for what has to show a change
-// at once, such as the refresh key or a switch just made.
-func (p *Poller) Poll(fresh bool) Shared {
+// Poll loads, asks git and gh about what is due, and writes their states.
+func (p *Poller) Poll() Shared {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	defer logs.Took("poll", time.Now(), "leader", p.leader, "fresh", fresh)
-	if !p.leader {
-		lead, ok := p.tryLead()
-		if !ok {
-			// No lock to share through, so every sidebar loads for itself, as without a poller.
-			return p.load()
-		}
-		p.leader = lead
-	} else if !p.holdsLock() {
-		// The lock file was removed, by a cleaner of the temporary directory, and another may lead now.
-		p.dropLock()
-		return p.pollUnlocked(fresh)
-	}
-	if p.leader {
-		return p.lead()
-	}
-	return p.follow(fresh)
-}
-
-// pollUnlocked is Poll once the lock it held is gone.
-func (p *Poller) pollUnlocked(fresh bool) Shared {
-	lead, ok := p.tryLead()
-	if !ok {
-		return p.load()
-	}
-	if p.leader = lead; lead {
-		return p.lead()
-	}
-	return p.follow(fresh)
-}
-
-// lead loads as the leader, with the git states, and writes what it loaded for the others.
-func (p *Poller) lead() Shared {
+	defer logs.Took("poll", time.Now())
 	sh := p.load()
-	if p.newWatcher != nil {
-		if p.git == nil {
-			p.git = p.newWatcher()
-			// Carry on from the last leader, so gh is not asked about every branch again at once.
-			if prev, ok := p.read(); ok {
-				p.git.Seed(prev.Git)
-			}
-			p.refreshAt = p.refreshTime()
-		}
-		if at := p.refreshTime(); at.After(p.refreshAt) {
-			p.refreshAt = at
-			p.git.Refresh()
-		}
-		sh.Git = p.git.Update(targets(sh))
+	if w := p.watcher(); w != nil {
+		sh.Git = w.Update(targets(sh))
+		p.write(sh.Git)
 	}
-	p.write(sh)
 	p.followDock(sh)
 	return sh
 }
 
-// followDock saves the width a sidebar dock was dragged to, see dockDrag. Only the leader follows the
-// docks, so one process writes the config for a drag.
+// watcher is the git states' watcher, made at the first poll, nil for none.
+func (p *Poller) watcher() *gitstate.Watcher {
+	if p.git == nil && p.newWatcher != nil {
+		p.git = p.newWatcher()
+		// Carry on from the last sidebar, so gh is not asked about every branch again at once.
+		if prev, ok := readGit(p.path); ok {
+			p.git.Seed(prev)
+		}
+	}
+	return p.git
+}
+
+// followDock saves the width the sidebar dock was dragged to, see dockDrag.
 func (p *Poller) followDock(sh Shared) {
 	if p.saveWidth == nil {
 		return
@@ -272,103 +209,26 @@ func targets(sh Shared) []gitstate.Target {
 	return ans
 }
 
-// follow is the leader's latest file, or a load of its own when fresh or when there is no file to read in
-// time. Its own load keeps the git states it had, which only the leader asks for.
-func (p *Poller) follow(fresh bool) Shared {
-	if !fresh {
-		for deadline := time.Now().Add(p.wait); ; time.Sleep(50 * time.Millisecond) {
-			if sh, ok := p.read(); ok {
-				return sh
-			}
-			if time.Now().After(deadline) {
-				break
-			}
-		}
-	}
-	// Kept as the latest, until the leader writes a newer one.
-	sh := p.load()
-	sh.Git = p.last.Git
-	p.last, p.have = sh, true
-	return sh
-}
-
-// Refresh loads at once, and has the leader ask git and gh again too: itself, or through the refresh
-// file, whose time the leader checks at each poll.
+// Refresh loads at once, and has git and gh asked again too.
 func (p *Poller) Refresh() Shared {
 	p.mu.Lock()
-	if p.leader && p.git != nil {
-		p.git.Refresh()
-	} else {
-		now := time.Now()
-		if f, err := os.OpenFile(p.path+".refresh", os.O_CREATE|os.O_WRONLY, 0o600); err == nil {
-			f.Close()
-			os.Chtimes(p.path+".refresh", now, now)
-		}
+	if w := p.watcher(); w != nil {
+		w.Refresh()
 	}
 	p.mu.Unlock()
-	return p.Poll(true)
+	return p.Poll()
 }
 
-// refreshTime is when the refresh file was last touched, zero when it never was.
-func (p *Poller) refreshTime() time.Time {
-	fi, err := os.Stat(p.path + ".refresh")
-	if err != nil {
-		return time.Time{}
-	}
-	return fi.ModTime()
+// GitStates is the sidebar's latest git states, for what does not poll itself, such as the picker.
+func GitStates() map[string]gitstate.State {
+	states, _ := readGit(gitPath())
+	return states
 }
 
-// Git is the leader's latest git states, for what does not poll itself, such as the picker.
-func (p *Poller) Git() map[string]gitstate.State {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	sh, _ := p.read()
-	return sh.Git
-}
-
-// tryLead takes the lock if no other process holds it. ok is false when there is no lock file to take.
-func (p *Poller) tryLead() (lead, ok bool) {
-	if p.lock == nil {
-		if err := os.MkdirAll(filepath.Dir(p.path), 0o700); err != nil {
-			return false, false
-		}
-		f, err := os.OpenFile(p.path+".lock", os.O_CREATE|os.O_RDWR, 0o600)
-		if err != nil {
-			return false, false
-		}
-		p.lock = f
-	}
-	return syscall.Flock(int(p.lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) == nil, true
-}
-
-// holdsLock reports whether the lock file the leader holds is still the one at its path.
-func (p *Poller) holdsLock() bool {
-	held, err := p.lock.Stat()
-	if err != nil {
-		return false
-	}
-	there, err := os.Stat(p.path + ".lock")
-	return err == nil && os.SameFile(held, there)
-}
-
-func (p *Poller) dropLock() {
-	if p.lock != nil {
-		p.lock.Close()
-	}
-	p.lock, p.leader, p.written, p.git = nil, false, nil, nil
-}
-
-// Close gives up the lead, for another sidebar to take.
-func (p *Poller) Close() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	p.dropLock()
-}
-
-// write replaces the shared file with sh, unless it already holds it. A rename, so a reader sees all of
-// one load or all of the next.
-func (p *Poller) write(sh Shared) {
-	data, err := json.Marshal(sh)
+// write replaces the file with states, unless it already holds them. A rename, so a reader sees all of
+// one poll's or all of the next's.
+func (p *Poller) write(states map[string]gitstate.State) {
+	data, err := json.Marshal(states)
 	if err != nil {
 		return
 	}
@@ -376,6 +236,9 @@ func (p *Poller) write(sh Shared) {
 		if _, err := os.Stat(p.path); err == nil {
 			return
 		}
+	}
+	if err := os.MkdirAll(filepath.Dir(p.path), 0o700); err != nil {
+		return
 	}
 	tmp := fmt.Sprintf("%s.%d.tmp", p.path, os.Getpid())
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {
@@ -388,25 +251,14 @@ func (p *Poller) write(sh Shared) {
 	p.written = data
 }
 
-// read is the shared file, read again only when the leader has replaced it since it was last read.
-func (p *Poller) read() (Shared, bool) {
-	f, err := os.Open(p.path)
+func readGit(path string) (map[string]gitstate.State, bool) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return Shared{}, false
+		return nil, false
 	}
-	defer f.Close()
-	fi, err := f.Stat()
-	if err != nil {
-		return Shared{}, false
+	var states map[string]gitstate.State
+	if err := json.Unmarshal(data, &states); err != nil {
+		return nil, false
 	}
-	// The same file, size and time: a replaced file can get the inode of one removed before it.
-	if p.have && p.seen != nil && os.SameFile(fi, p.seen) && fi.Size() == p.seen.Size() && fi.ModTime().Equal(p.seen.ModTime()) {
-		return p.last, true
-	}
-	var sh Shared
-	if err := json.NewDecoder(f).Decode(&sh); err != nil {
-		return Shared{}, false
-	}
-	p.seen, p.last, p.have = fi, sh, true
-	return sh, true
+	return states, true
 }
