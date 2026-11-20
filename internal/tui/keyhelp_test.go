@@ -139,8 +139,8 @@ func TestPopupHelp(t *testing.T) {
 	}
 }
 
-// In the picker ? lists its keys while the query is empty, and is typed into one that is not; with the
-// menu open it lists the menu's keys and its items'.
+// In the picker ? lists its keys while the query is empty, and is typed into one that is not, where ctrl+/
+// lists them; with the menu open it lists the menu's keys and its items'.
 func TestPickerHelp(t *testing.T) {
 	m := newPicker(0)
 	p, _ := stubPopup(m, 0, true)
@@ -176,7 +176,15 @@ func TestPickerHelp(t *testing.T) {
 	if p.help != nil || m.input.Value() != "gr?" {
 		t.Errorf("? after a query: keys open %v, query %q", p.help != nil, m.input.Value())
 	}
+	// ctrl+/ lists them all the same, and ctrl+_, as a terminal without kitty's keyboard protocol sends it.
 	p.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	for _, k := range []tea.KeyPressMsg{{Code: '/', Mod: tea.ModCtrl}, {Code: '_', Mod: tea.ModCtrl}} {
+		p.Update(k)
+		if p.help == nil || m.input.Value() != "gr" {
+			t.Errorf("%s after a query: keys open %v, query %q", k, p.help != nil, m.input.Value())
+		}
+		p.Update(k)
+	}
 	p.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	p.Update(question)
 	want = []string{
@@ -196,5 +204,32 @@ func TestPickerHelp(t *testing.T) {
 	}
 	if got := sheet(); !reflect.DeepEqual(got, want) {
 		t.Errorf("the menu's keys:\n%q\nwant\n%q", got, want)
+	}
+}
+
+// While the sidebar's filter is open ? is typed into it, and ctrl+/ lists the filter's keys.
+func TestFilterHelp(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(tea.FocusMsg{})
+	e.press("/", "?")
+	if e.m.help != nil || e.m.filter.Value() != "?" {
+		t.Fatalf("? in the filter: keys open %v, filter %q", e.m.help != nil, e.m.filter.Value())
+	}
+	e.m.Update(tea.KeyPressMsg{Code: '/', Mod: tea.ModCtrl})
+	if got := e.screen()[:8]; !reflect.DeepEqual(got, []string{
+		"KEYS" + strings.Repeat(" ", 19) + "? close",
+		menuRule("Filter"),
+		" down/up down/up",
+		" enter   open",
+		" esc     clear",
+		" ctrl+/  list keys",
+		" ctrl+c  quit",
+		"",
+	}) {
+		t.Errorf("the filter's keys:\n%q", got)
+	}
+	e.press("esc")
+	if e.m.help != nil || !e.m.filtering || e.m.filter.Value() != "?" {
+		t.Errorf("esc: keys open %v, filtering %v, filter %q; want the keys closed and the filter as it was", e.m.help != nil, e.m.filtering, e.m.filter.Value())
 	}
 }

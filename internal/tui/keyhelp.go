@@ -9,9 +9,13 @@ import (
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
-// The keys ? lists: what each subject where it was pressed takes, read off the chain its keys are looked
+// The keys ? lists, or ctrl+/ where ? is typed: what each subject where it was pressed takes, read off the chain its keys are looked
 // up on, see interact.Help, so the list is of what a key would run there now. The sidebar draws it over
 // itself.
+
+// helpKeys open the list of keys where ? is typed, as into a text field, besides ? itself: ctrl+/, which
+// a terminal without kitty's keyboard protocol sends as ctrl+_.
+var helpKeys = []string{"ctrl+/", "ctrl+_"}
 
 // keyHelp is the open list of keys, scrolled offset lines down.
 type keyHelp struct {

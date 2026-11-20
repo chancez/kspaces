@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -22,8 +23,9 @@ type popupModel interface {
 	failed() bool
 	// theme is what it draws with, which the terminal's background makes a light or a dark one.
 	theme() *look.Theme
-	// keys are what ? lists, see keyhelp.go; ok is false while ? is typed, as into a field.
-	keys() (sections []interact.Section, ok bool)
+	// keys are what ? lists, see keyhelp.go, and typing whether ? is typed instead, as into a field, when
+	// only helpKeys list them.
+	keys() (sections []interact.Section, typing bool)
 }
 
 func (f *addSpaceForm) theme() *look.Theme       { return f.th }
@@ -64,56 +66,55 @@ func (f *saveLayoutForm) failed() bool     { return f.err != nil }
 func (f *trustForm) failed() bool          { return f.err != nil }
 func (m *picker) failed() bool             { return m.err != nil }
 
-// A form with fields takes ? while a choice has focus, its list closed: elsewhere ? is typed.
+// A form with fields types ? but while a choice has focus, its list closed.
 func (f *addSpaceForm) keys() ([]interact.Section, bool) {
-	return interact.Help(f, theAddForm.Target(addSubject{})), f.onGroup() && !f.group.listOpen()
+	return interact.Help(f, theAddForm.Target(addSubject{})), !f.onGroup() || f.group.listOpen()
 }
 func (f *cleanupForm) keys() ([]interact.Section, bool) {
-	return interact.Help(f, theCleanup.Target(cleanupSubject{})), true
+	return interact.Help(f, theCleanup.Target(cleanupSubject{})), false
 }
 func (f *closeSessionForm) keys() ([]interact.Section, bool) {
-	return interact.Help(f, theCloseForm.Target(closeSubject{})), true
+	return interact.Help(f, theCloseForm.Target(closeSubject{})), false
 }
 func (f *forgetSessionForm) keys() ([]interact.Section, bool) {
-	return interact.Help(f, theForgetForm.Target(forgetSubject{})), true
+	return interact.Help(f, theForgetForm.Target(forgetSubject{})), false
 }
 func (f *newWorktreeForm) keys() ([]interact.Section, bool) {
 	t := f.current()
-	return interact.Help(f, theForm.Target(formSubject{})), f.focused() == nil && !t.base.listOpen() && !t.open.listOpen()
+	return interact.Help(f, theForm.Target(formSubject{})), f.focused() != nil || t.base.listOpen() || t.open.listOpen()
 }
 func (f *layoutForm) keys() ([]interact.Section, bool) {
-	return interact.Help(f, theLayoutForm.Target(layoutSubject{})), f.focused() == nil && !f.layouts.listOpen()
+	return interact.Help(f, theLayoutForm.Target(layoutSubject{})), f.focused() != nil || f.layouts.listOpen()
 }
 func (f *removeWorktreeForm) keys() ([]interact.Section, bool) {
-	return interact.Help(f, theRemoveForm.Target(removeSubject{})), true
+	return interact.Help(f, theRemoveForm.Target(removeSubject{})), false
 }
 func (f *runForm) keys() ([]interact.Section, bool) {
-	return interact.Help(f, theRunForm.Target(runSubject{})), f.focused() == nil && !f.cmds.listOpen()
+	return interact.Help(f, theRunForm.Target(runSubject{})), f.focused() != nil || f.cmds.listOpen()
 }
 func (f *saveLayoutForm) keys() ([]interact.Section, bool) {
 	on := f.focused()
-	return interact.Help(f, theSaveForm.Target(saveSubject{})), on.in == nil && (on.choice == nil || !on.choice.listOpen())
+	return interact.Help(f, theSaveForm.Target(saveSubject{})), on.in != nil || on.choice != nil && on.choice.listOpen()
 }
 func (f *trustForm) keys() ([]interact.Section, bool) {
-	return interact.Help(f, theTrustForm.Target(trustSubject{})), true
+	return interact.Help(f, theTrustForm.Target(trustSubject{})), false
 }
 func (f *errorForm) keys() ([]interact.Section, bool) {
-	return interact.Help(f, theShowForm.Target(showSubject{})), true
+	return interact.Help(f, theShowForm.Target(showSubject{})), false
 }
 
 // The reply form is all typing.
-func (f *replyForm) keys() ([]interact.Section, bool) { return nil, false }
+func (f *replyForm) keys() ([]interact.Section, bool) {
+	return interact.Help(f, theReplyForm.Target(replySubject{})), true
+}
 
-// The picker lists its menu's keys while the menu is open, and its own while the query is empty: in one
-// typed, ? is typed too.
+// The picker lists its menu's keys while the menu is open, and its own otherwise, typing ? into the query
+// once it has something.
 func (m *picker) keys() ([]interact.Section, bool) {
-	switch {
-	case m.menu != nil:
-		return interact.Help(m, append([]interact.Target[*picker]{m.menu.own}, m.menu.of...)...), true
-	case m.input.Value() == "":
-		return interact.Help(m, thePicker.Target(pickerSubject{})), true
+	if m.menu != nil {
+		return interact.Help(m, append([]interact.Target[*picker]{m.menu.own}, m.menu.of...)...), false
 	}
-	return nil, false
+	return interact.Help(m, thePicker.Target(pickerSubject{})), m.input.Value() != ""
 }
 
 // popup runs a form or the picker in kitty. In an overlay that is all: the overlay closes back to the
@@ -177,8 +178,8 @@ func (p *popup) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return p, cmd
 		}
 	}
-	if key, ok := msg.(tea.KeyPressMsg); ok && key.String() == "?" {
-		if _, ok := p.inner.keys(); ok {
+	if key, ok := msg.(tea.KeyPressMsg); ok && (key.String() == "?" || slices.Contains(helpKeys, key.String())) {
+		if sections, typing := p.inner.keys(); len(sections) > 0 && (key.String() != "?" || !typing) {
 			p.help = &keyHelp{sections: func() []interact.Section { s, _ := p.inner.keys(); return s }}
 			return p, nil
 		}

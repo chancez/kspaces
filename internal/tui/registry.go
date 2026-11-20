@@ -423,6 +423,10 @@ var (
 		Run:   do[*sidebar, filterSubject]((*sidebar).clearFilter),
 	}
 	actFilterQuit = quit[*sidebar, filterSubject]()
+	actFilterHelp = &interact.Action[*sidebar, filterSubject]{
+		Title: "keys",
+		Run:   do[*sidebar, filterSubject](func(m *sidebar) { m.openHelp(theFilter.Target(filterSubject{})) }),
+	}
 )
 
 // The context menu's.
@@ -1063,7 +1067,7 @@ func init() {
 	paneKind.Bind(actMoveUp, "K/J", "move the row up/down", "K")
 	paneKind.Bind(actMoveDown, "", "", "J")
 	paneKind.Bind(actSelect, "v", "select rows to act on", "v")
-	paneKind.Bind(actHelp, "?", "list keys", "?")
+	paneKind.Bind(actHelp, "?", "list keys", append([]string{"?"}, helpKeys...)...)
 	interact.Via(paneKind, func(paneSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	thePane = interact.List(paneKind)
 
@@ -1084,7 +1088,7 @@ func init() {
 	menuKind.Bind(actMenuUp, "", "", "k", "up")
 	menuKind.Bind(actMenuRun, "enter/l", "run", "enter", "l")
 	menuKind.Bind(actMenuClose, "esc/q/m", "close", "esc", "q", "m")
-	menuKind.Bind(actMenuHelp, "?", "list keys", "?")
+	menuKind.Bind(actMenuHelp, "?", "list keys", append([]string{"?"}, helpKeys...)...)
 	menuKind.Bind(actMenuQuit, "ctrl+c", "quit", "ctrl+c")
 	theMenu = interact.List(menuKind)
 
@@ -1093,7 +1097,7 @@ func init() {
 	helpKind.Bind(actHelpUp, "", "", "k", "up")
 	helpKind.Bind(actHelpTop, "g/G", "top/bottom", "g", "home")
 	helpKind.Bind(actHelpBottom, "", "", "G", "end")
-	helpKind.Bind(actHelpClose, "esc/q/?", "close", "esc", "q", "?")
+	helpKind.Bind(actHelpClose, "esc/q/?", "close", append([]string{"esc", "q", "?"}, helpKeys...)...)
 	helpKind.Bind(actHelpQuit, "ctrl+c", "quit", "ctrl+c")
 	theHelp = interact.List(helpKind)
 
@@ -1255,11 +1259,12 @@ func init() {
 
 	// j and k type, as worktrees are named with them, so only arrows and the picker's ctrl keys move.
 	filterKind = interact.NewKind(func(filterSubject) string { return "Filter" },
-		actFilterDown, actFilterUp, actFilterOpen, actFilterClear, actFilterQuit)
+		actFilterDown, actFilterUp, actFilterOpen, actFilterClear, actFilterHelp, actFilterQuit)
 	filterKind.Bind(actFilterDown, "down/up", "down/up", "down", "ctrl+n", "ctrl+j")
 	filterKind.Bind(actFilterUp, "", "", "up", "ctrl+p", "ctrl+k")
 	filterKind.Bind(actFilterOpen, "enter", "open", "enter")
 	filterKind.Bind(actFilterClear, "esc", "clear", "esc")
+	filterKind.Bind(actFilterHelp, "ctrl+/", "list keys", helpKeys...)
 	filterKind.Bind(actFilterQuit, "ctrl+c", "quit", "ctrl+c")
 	theFilter = interact.List(filterKind)
 

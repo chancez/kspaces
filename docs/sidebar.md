@@ -260,9 +260,9 @@ which closes when it loses focus; [docs/kitty.md](kitty.md#popups-overlays-and-p
 A click on a text field, its label or its box, gives it focus, as `tab` and `shift+tab` do, and a click in
 its text puts the cursor there; in a one-line field too long for its box, which may be scrolled, at its end.
 `?` lists the form's keys in a sheet up from the popup's bottom, over up to half of it, while no text field
-has focus, as on a choice or in a form that only confirms; in a text field it is typed. In the picker it
-lists the picker's keys while the query is empty, and is typed into one that is not; with the menu open it
-lists the menu's keys and its items'. The sheet scrolls and closes as the
+has focus, as on a choice or in a form that only confirms; in a text field it is typed, and `ctrl+/` lists
+them. In the picker it lists the picker's keys while the query is empty, and is typed into one that is not,
+where `ctrl+/` lists them; with the menu open it lists the menu's keys and its items'. The sheet scrolls and closes as the
 sidebar's list of keys does, see [Keys](#keys).
 
 An item that fails, or a key such as `space` folding a space, says why on the sidebar's last line until
@@ -539,7 +539,8 @@ clicking that row scrolls a page.
 `?` lists over the sidebar the keys that do something where the cursor is: the row's, then the list's and
 the sidebar's, each under the name of what it acts on, and in the select mode the mode's first. In the
 menu it lists the menu's keys and its items'. `j` / `k`, `g` / `G` and the wheel scroll the list, and
-`esc`, `q`, `?` or a click close it. While the filter is open `?` is typed into it.
+`esc`, `q`, `?` or a click close it. While the filter is open `?` is typed into it, and `ctrl+/` lists the
+filter's keys.
 
 ## The picker
 
