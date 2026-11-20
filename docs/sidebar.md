@@ -81,9 +81,14 @@ what it shows. The cursor stays on its row while it shows, and goes to the first
 not. `f` or the funnel again shows the whole list. It is each sidebar's own and is not saved, nor does it
 end with navigating as the query does.
 
+`O` shows only the open sessions: the rows whose session has windows, with their spaces' rows above them,
+and a folded space's row when any of its sessions has windows. With nothing open the list says
+`Nothing is open`. It applies along with `/` and `f`, and like `f` it is each sidebar's own and not saved.
+`O` again shows the whole list.
+
 A right click on the SPACES title or its buttons, or on an empty row of the list, opens the list's menu:
-the sort modes, see [Order](#order), in a Filter section `Only what is not idle`, ticked while the
-attention filter is on, which turns it on and off, in a Rows section **Select**, see
+the sort modes, see [Order](#order), in a Filter section `Only what is not idle` and `Only open
+sessions`, each ticked while its filter is on, which turn them on and off, in a Rows section **Select**, see
 [Selecting](#selecting), and with [groups](#groups) configured a Groups section.
 
 ## Groups
@@ -507,6 +512,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `t` | reply to the cursor's status entry: write to its window without switching to it |
 | `/` | filter the spaces list; see [Spaces](#spaces) |
 | `f` | show only what is not idle, or everything again; see [Spaces](#spaces) |
+| `O` | show only open sessions, or everything again; see [Spaces](#spaces) |
 | `s` | sort the list the next way; see [Order](#order) |
 | `K` / `J` | move the cursor's space within its group, or linked worktree within its space, up / down |
 | `v` | select rows to act on; see [Selecting](#selecting) |

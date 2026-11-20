@@ -41,8 +41,8 @@ func (m *sidebar) setSort(mode spaces.SortMode) {
 }
 
 // openSortMenu opens the spaces list's menu, of the sort button, the title and the list's empty rows,
-// drawn from screen row y: the sort modes, the one chosen now marked and selected, the attention filter,
-// marked while it is on, and each group, marked while it is shown.
+// drawn from screen row y: the sort modes, the one chosen now marked and selected, the attention and open
+// filters, each marked while it is on, and each group, marked while it is shown.
 func (m *sidebar) openSortMenu(y int) {
 	targets := []interact.Target[*sidebar]{theSort.Target(sortSubject{})}
 	for _, name := range m.order.GroupNames(m.spaces) {
@@ -59,6 +59,8 @@ func (m *sidebar) openSortMenu(y int) {
 			m.menu.chosen[i], m.menu.sel = true, i
 		case it.Is(actAttentionItem):
 			m.menu.chosen[i] = m.attending
+		case it.Is(actOpenItem):
+			m.menu.chosen[i] = m.openOnly
 		case it.Is(actShowGroup):
 			m.menu.chosen[i] = !m.hidden[it.Title]
 		}

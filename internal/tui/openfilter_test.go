@@ -1,0 +1,84 @@
+package tui
+
+import (
+	"fmt"
+	"reflect"
+	"testing"
+	"time"
+
+	tea "charm.land/bubbletea/v2"
+)
+
+// openScreen is the fixture's spaces list with the open filter on: default, gr and dev, which have
+// windows, and docs, folded, for its notes; fix and kitty, with none, go.
+var openScreen = []string{
+	spacesTitle,
+	"",
+	"  \uf120  default",
+	"",
+	"\u25bc " + repoIcon + "gr main",
+	here + blocked + "dev pr/me/dev",
+	"",
+	"\u25b6 \uf110  docs main",
+}
+
+// O shows only the sessions with windows, under their spaces, and O again shows the whole list. The
+// cursor stays on its row throughout.
+func TestOpenFilter(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(tea.FocusMsg{})
+	unfiltered := e.spacesScreen()
+	e.press("O")
+	if got := e.spacesScreen(); !reflect.DeepEqual(got, openScreen) {
+		t.Errorf("open filter:\n%q\nwant\n%q", got, openScreen)
+	}
+	if got, want := e.highlighted(), []string{here + blocked + "dev pr/me/dev"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("highlighted %q, want the cursor still on dev", got)
+	}
+	e.press("O")
+	if got := e.spacesScreen(); !reflect.DeepEqual(got, unfiltered) {
+		t.Errorf("open filter off:\n%q\nwant\n%q", got, unfiltered)
+	}
+}
+
+// The list's menu's Only open sessions turns the open filter on and off, marked while it is on.
+func TestOpenMenu(t *testing.T) {
+	e := newSidebarEnv(t)
+	unfiltered := e.spacesScreen()
+	e.click(sortZone, tea.MouseRight)
+	e.click(fmt.Sprintf(menuZone, 4), tea.MouseLeft)
+	if got := e.spacesScreen(); e.m.menu != nil || !reflect.DeepEqual(got, openScreen) {
+		t.Errorf("chose the filter, menu open %v:\n%q\nwant\n%q", e.m.menu != nil, got, openScreen)
+	}
+	e.click(sortZone, tea.MouseRight)
+	want := []string{
+		menuRule("Sort"), "\uf00c Manual", "  Activity", "  Status",
+		menuRule("Filter"), "  Only what is not idle", "\uf00c Only open sessions",
+		menuRule("Rows"), "  Select", menuRule(""),
+	}
+	if got := e.screen()[1:11]; !reflect.DeepEqual(got, want) {
+		t.Errorf("menu with the filter on:\n%q\nwant\n%q", got, want)
+	}
+	e.click(fmt.Sprintf(menuZone, 4), tea.MouseLeft)
+	if got := e.spacesScreen(); !reflect.DeepEqual(got, unfiltered) {
+		t.Errorf("chose the filter again:\n%q\nwant\n%q", got, unfiltered)
+	}
+}
+
+// With no session open the list says so; with the attention filter on too, that nothing matches.
+func TestOpenFilterNothing(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.press("O")
+	snap := fixture(time.Now())
+	snap.Kitty.Sessions = nil
+	e.m.Update(snap)
+	want := []string{spacesTitle, "", "Nothing is open"}
+	if got := e.spacesScreen(); !reflect.DeepEqual(got, want) {
+		t.Errorf("nothing open:\n%q\nwant\n%q", got, want)
+	}
+	e.press("f")
+	want = []string{spacesTitle, "", "No matches"}
+	if got := e.spacesScreen(); !reflect.DeepEqual(got, want) {
+		t.Errorf("nothing open, attention filter on:\n%q\nwant\n%q", got, want)
+	}
+}

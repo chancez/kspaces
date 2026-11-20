@@ -120,11 +120,12 @@ type sidebar struct {
 	addHot, sortHot, attentionHot bool
 	// zones are where the last frame drew marked spans, by id, so a click maps back to what was drawn.
 	zones map[string][]look.Zone
-	// The spaces list's filters, see filter.go: the query narrows rows while filtering, and the attention
-	// filter while attending.
+	// The spaces list's filters, see filter.go: the query narrows rows while filtering, the attention
+	// filter while attending, and the open filter while openOnly.
 	filter    textinput.Model
 	filtering bool
 	attending bool
+	openOnly  bool
 	poller    *spaces.Poller
 	// What git and gh say of each worktree, by path, from the poller.
 	git map[string]gitstate.State

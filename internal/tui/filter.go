@@ -104,16 +104,30 @@ func (m *sidebar) toggleAttention() tea.Cmd {
 	return nil
 }
 
+// toggleOpen narrows the spaces list to the sessions with windows, see spaces.OpenRows, or shows all of
+// it again, as toggleAttention does.
+func (m *sidebar) toggleOpen() tea.Cmd {
+	m.openOnly = !m.openOnly
+	m.setRows()
+	m.scrollToCursor()
+	return nil
+}
+
 // narrowed is whether a filter hides rows, so the rows shown are not the whole order to move a row in.
 func (m *sidebar) narrowed() bool {
-	return m.filtering || m.attending
+	return m.filtering || m.attending || m.openOnly
 }
 
 // emptyText is what the spaces list says when a filter leaves it no rows: that nothing needs me when only
-// the attention filter narrows it, else that the query matches nothing.
+// the attention filter narrows it, that nothing is open when only the open filter does, else that the
+// filters match nothing.
 func (m *sidebar) emptyText() string {
-	if m.attending && m.filter.Value() == "" {
+	switch {
+	case m.filter.Value() != "":
+	case m.attending && !m.openOnly:
 		return "Nothing needs you"
+	case m.openOnly && !m.attending:
+		return "Nothing is open"
 	}
 	return "No matches"
 }
@@ -166,6 +180,9 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 	}
 	if m.attending {
 		m.rows = spaces.AttentionRows(m.rows, m.kitty.Statuses)
+	}
+	if m.openOnly {
+		m.rows = spaces.OpenRows(m.rows, m.kitty.Sessions)
 	}
 	m.pruneTicks()
 	if entry >= 0 {
