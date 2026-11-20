@@ -283,6 +283,11 @@ func panelFor(n int) panelSize {
 	return formPanel
 }
 
+// AskSuspendSession opens the form that confirms suspending sessions, in a popup sized as AskCloseSession's.
+func AskSuspendSession(cfg config.Config, st kitty.State, sessions ...string) error {
+	return launchForm(cfg, st, panelFor(len(sessions)), append([]string{"suspend"}, sessions...)...)
+}
+
 // AskForgetSession opens the form that confirms forgetting sessions, in a popup sized as AskCloseSession's.
 func AskForgetSession(cfg config.Config, st kitty.State, sessions ...string) error {
 	return launchForm(cfg, st, panelFor(len(sessions)), append([]string{"forget"}, sessions...)...)
@@ -324,10 +329,13 @@ func AskShowError(cfg config.Config, st kitty.State, text string) error {
 }
 
 // ForgetSession deletes the saved file of session, so kitty does not restore it: for a missing worktree,
-// whose directory is gone, that is all that is left of it.
+// whose directory is gone, that is all that is left of it. The keeper forgets what it kept of a kept session, see Kept.
 func ForgetSession(cfg config.Config, session string) error {
 	if cfg.SessionsDir == "" {
 		return fmt.Errorf("there is no sessions directory to forget %s from", session)
+	}
+	if err := unkeep(cfg, session); err != nil {
+		return err
 	}
 	return os.Remove(SessionFile(cfg, session))
 }
@@ -341,6 +349,11 @@ func CloseSession(session string) error {
 	if err := kitty.CloseSession(session); err != nil {
 		return err
 	}
+	return WaitClosed(session)
+}
+
+// WaitClosed waits until kitty has closed every window of session, as CloseSession and KeepSession ask.
+func WaitClosed(session string) error {
 	for deadline := time.Now().Add(closeWait); ; time.Sleep(100 * time.Millisecond) {
 		st, err := kitty.LoadState(0)
 		if err != nil {
@@ -357,13 +370,16 @@ func CloseSession(session string) error {
 
 // EndSession closes every window of session, waiting as CloseSession does, and deletes its saved file, so
 // it is not restored: all there is of a missing worktree, and what removing a worktree ends first. A
-// session with no saved file is fine.
+// session with no saved file is fine. The keeper forgets what it kept of a kept session, see Kept.
 func EndSession(cfg config.Config, session string) error {
 	if err := CloseSession(session); err != nil {
 		return err
 	}
 	if cfg.SessionsDir == "" {
 		return nil
+	}
+	if err := unkeep(cfg, session); err != nil {
+		return err
 	}
 	if err := os.Remove(SessionFile(cfg, session)); err != nil && !os.IsNotExist(err) {
 		return err

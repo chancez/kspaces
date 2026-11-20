@@ -61,6 +61,52 @@ first argument that does not start with `-` as the start of the command.
 
 kspaces itself never writes session files. The session saver below, which it can install into kitty, does.
 
+## Closing and suspending sessions
+
+With the [session saver](#what-the-files-do), closing a session keeps it to open again, and suspending it
+keeps what ran in it too. Both need `[kitty] save_sessions = true` and `sessions`; without the saver,
+closing a session closes its windows and keeps nothing.
+
+**Close session**, `kspaces close`, saves the session's file, then closes its windows. The file stays, so
+opening the session again restores its tabs and splits from it rather than its default layout; **Forget**
+deletes it. **Suspend session**, `z` in the sidebar or `kspaces suspend [SESSION...]`, is the same, and
+its row shows the suspended marker until it is opened.
+
+What runs in the windows is the keeper's. kspaces knows only kitty's side; a program the config names keeps
+the rest, such as the multiplexer session a launch wrapper runs each window in:
+
+```toml
+keeper = ["kspaces-keeper-cm"]   # config.toml only, not a space's own config
+```
+
+Without one, Close and Suspend keep the layout alone, and the windows open again with fresh programs. With
+one, opening the session again is opening it as ever: each window comes back from the file attached to
+whatever the keeper kept, which brings back what ran there as the multiplexer does. A keeper decides what
+each mode means, such as keeping a closed session's for a week and a suspended one's until it is opened or
+forgotten. Suspending frees what the session's programs held; what lived only in a program's memory, an
+unsaved buffer or a shell's variables, is gone, unless the program saves it itself.
+
+kspaces runs the keeper with a verb and a JSON request on its stdin. A keeper that fails exits non-zero,
+its stderr the error, and then kspaces closes nothing and takes back what it did.
+
+```
+KEEPER keep     {"session": S, "mode": "close" | "suspend", "windows": [W...]}   prints {"kept": [H...]}
+KEEPER forget   {"session": S, "kept": [H...]}
+```
+
+Each window W is `{"id", "cmdline", "foreground", "user_vars", "cwd"}`: its program, the command lines in
+the foreground of its terminal, its user variables, such as one a launch wrapper set naming its
+multiplexer session, and its directory, all as `kitten @ ls` has them; kspaces' own windows are left out.
+The handles H are the keeper's own: kspaces lists them with the session and gives them back to `forget`
+when the session is forgotten or its worktree removed. A keeper that keeps nothing prints `{"kept": []}`.
+
+Before running the keeper kspaces lists the session in `.kept-sessions` in the `sessions` directory, a line
+each of its mode, its name and the handles, tab-separated, and sets the `kspaces_keep` user variable on its
+windows, to the mode. The saver keeps the file of a listed session when its last window closes, and drops
+the session from the list once it has windows again. A watcher that ends a window's multiplexer session as
+the window closes should leave a window with `kspaces_keep` alone: ending it would lose what the keeper
+kept.
+
 ## Running commands
 
 Commands are what the new worktree form and a worktree's **Run** can start in a session, from config.toml
@@ -491,11 +537,12 @@ from it. `r` loads at once, and has git and gh asked again.
 windows close, take focus or change directory, and loads the ones that were open at startup, ending on the
 session that had focus at the last save of them all, as at quit. A space then
 reopens as it was left, and afresh once its last window has closed: its file is removed, or, for the
-default session, which is `startup_session`'s, emptied. Closing an OS window as a whole keeps its
+default session, which is `startup_session`'s, emptied. A session kspaces [closed or
+suspended](#closing-and-suspending-sessions) keeps its file. Closing an OS window as a whole keeps its
 sessions' files. Windows in no session are saved with the default session, at quit and on demand only.
 The files go next to kitty's `startup_session`, so point kspaces' `sessions` at that directory.
-`kspaces_save_sessions` saves them on demand. The docks, the forms kspaces opens and the picker carry a
-`kspaces*` user variable, and are never saved.
+`kspaces_save_sessions` saves them on demand, the sessions named after it or all of them. The docks, the
+forms kspaces opens and the picker carry a `kspaces*` user variable, and are never saved.
 
 ## Popups: overlays and panels
 

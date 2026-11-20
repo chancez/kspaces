@@ -227,7 +227,10 @@ kspaces run NAME [PATH...]  run a configured command in the worktrees at PATH or
 kspaces layout NAME [PATH]  open a configured layout's tabs in the worktree's session, in a form, as run
 kspaces layout save [NAME] [PATH]  save the session's tabs as a layout, choosing what each pane runs in a
   --tab                  form; --tab saves only this tab
-kspaces close [SESSION...]  close every window of the sessions, after confirming
+kspaces close [SESSION...]  close every window of the sessions, after confirming; with the session saver,
+                         keeping them to open again
+kspaces suspend [SESSION...]  stop what runs in the sessions and close them, keeping them, and with a
+                         keeper what ran in them, to resume, after confirming
 kspaces forget SESSION...   delete the saved files of sessions with no windows, after confirming
 kspaces trust [PATH]     trust the .kspaces.toml of the space PATH is in, after seeing what it adds in a
   --yes, --revoke        form; --yes without asking, --revoke to forget it

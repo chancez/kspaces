@@ -182,6 +182,7 @@ var (
 	actOpenLayout           = onEntry(rowOpenLayout)
 	actSaveAsLayout         = onEntry(rowSaveAsLayout)
 	actCloseSession         = onEntry(rowCloseSession)
+	actSuspendSession       = onEntry(rowSuspendSession)
 	actForgetSession        = onEntry(rowForgetSession)
 	actCleanup              = onEntry(rowCleanup)
 	actTrustConfig          = onEntry(rowTrustConfig)
@@ -346,6 +347,11 @@ var (
 	actSelClose = &interact.Action[*sidebar, selectSubject]{
 		Title: "Close",
 		Run:   cmd[*sidebar, selectSubject]((*sidebar).closeSelected),
+	}
+	actSelSuspend = &interact.Action[*sidebar, selectSubject]{
+		Title:   "Suspend",
+		Applies: func(m *sidebar, _ selectSubject) bool { return spaces.CanKeep(m.cfg) },
+		Run:     cmd[*sidebar, selectSubject]((*sidebar).suspendSelected),
 	}
 	actSelForget = &interact.Action[*sidebar, selectSubject]{
 		Title: "Forget",
@@ -1012,7 +1018,7 @@ func init() {
 	spacesKind.Bind(actAddSpace, "a", "add space", "a")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actOpenPlain, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actNewWorktreeFromPR, actNewWorktreeFromIssue, actFold, actUnfold, actCleanup, actTrustConfig, actSelectRow)
+		actOpenWorktree, actOpenPlain, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actSuspendSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actNewWorktreeFromPR, actNewWorktreeFromIssue, actFold, actUnfold, actCleanup, actTrustConfig, actSelectRow)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	bindRow(entryKind, actNewWorktree, rowNewWorktree)
@@ -1022,9 +1028,12 @@ func init() {
 	bindRow(entryKind, actOpenLayout, rowOpenLayout)
 	entryKind.Bind(actOpenPlain, "o", "open without the default layout", "o")
 	bindRow(entryKind, actCloseSession, rowCloseSession)
+	bindRow(entryKind, actSuspendSession, rowSuspendSession)
 	bindRow(entryKind, actOpenPR, rowOpenPR)
 	bindRow(entryKind, actRemoveWorktree, rowRemoveWorktree)
 	bindRow(entryKind, actForgetSession, rowForgetSession)
+	// F too, as x removes a linked worktree before forgetting its closed or suspended session.
+	entryKind.Bind(actForgetSession, "F", "forget the saved session", "F")
 	bindRow(entryKind, actCleanup, rowCleanup)
 	interact.Via(entryKind, func(s entrySubject) (spacesSubject, bool) {
 		if s.row.Space == nil || s.row.Other {
@@ -1072,11 +1081,12 @@ func init() {
 	thePane = interact.List(paneKind)
 
 	selectKind = interact.NewKind(func(selectSubject) string { return "Select" },
-		actTick, actTickAll, actSelRemove, actSelClose, actSelForget, actSelRun, actEndSelect)
+		actTick, actTickAll, actSelRemove, actSelClose, actSelSuspend, actSelForget, actSelRun, actEndSelect)
 	selectKind.Bind(actTick, "space", "tick the row", "space")
 	selectKind.Bind(actTickAll, "A", "tick every row", "A")
 	selectKind.Bind(actSelRemove, "x", "remove the ticked worktrees", "x")
 	selectKind.Bind(actSelClose, "c", "close the ticked sessions", "c")
+	selectKind.Bind(actSelSuspend, "z", "suspend the ticked sessions", "z")
 	selectKind.Bind(actSelForget, "F", "forget the ticked sessions' saved files", "F")
 	selectKind.Bind(actSelRun, "R", "run a command in the ticked worktrees", "R")
 	selectKind.Bind(actEndSelect, "esc", "leave the select mode", "esc")
@@ -1113,8 +1123,8 @@ func init() {
 
 	// The same forms as the sidebar's rows, in the same order, on the same keys, which the menu takes as
 	// the query does not see them while it is open.
-	pickRows := []*rowAction{rowRunCommand, rowOpenLayout, rowSaveAsLayout, rowCloseSession, rowOpenPR,
-		rowRemoveWorktree, rowForgetSession, rowNewWorktree, rowNewWorktreeFromPR, rowNewWorktreeFromIssue,
+	pickRows := []*rowAction{rowRunCommand, rowOpenLayout, rowSaveAsLayout, rowCloseSession, rowSuspendSession,
+		rowOpenPR, rowRemoveWorktree, rowForgetSession, rowNewWorktree, rowNewWorktreeFromPR, rowNewWorktreeFromIssue,
 		rowCleanup, rowTrustConfig}
 	pickActs := []*interact.Action[*picker, pickRowSubject]{actPickOpen, actPickOpenPlain}
 	for _, r := range pickRows {

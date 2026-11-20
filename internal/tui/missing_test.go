@@ -177,7 +177,7 @@ func TestForgetSessionForm(t *testing.T) {
 		"",
 		"  Forget session gr@saved",
 		"",
-		"  Deletes its saved file, so kitty does not restore it. Its worktree directory is gone.",
+		"  Deletes its saved file, and what was kept to resume it, so kitty does not restore it. Its worktree directory is gone.",
 		"  " + config.Tilde(filepath.Join(dir, "gr@saved.kitty-session")),
 		"",
 		"   Delete y    Cancel n",
@@ -237,7 +237,7 @@ func TestForgetSessionsForm(t *testing.T) {
 	}
 	file := func(name string) string { return config.Tilde(filepath.Join(dir, name+".kitty-session")) }
 	one := &forgetSessionForm{th: look.New(true), cfg: cfg, sessions: []string{"gr@dev"}, gone: []bool{false}}
-	if got, want := screen(one)[3], "  Deletes its saved file, so kitty does not restore it."; got != want {
+	if got, want := screen(one)[3], "  Deletes its saved file, and what was kept to resume it, so kitty does not restore it."; got != want {
 		t.Errorf("closed session: %q, want %q", got, want)
 	}
 	f := &forgetSessionForm{th: look.New(true), cfg: cfg, sessions: []string{"gr@dev", "gr@saved", "gr@none"}, gone: []bool{false, true, true}}
@@ -245,7 +245,7 @@ func TestForgetSessionsForm(t *testing.T) {
 		"",
 		"  Forget 3 sessions",
 		"",
-		"  Deletes their saved files, so kitty does not restore them.",
+		"  Deletes their saved files, and what was kept to resume them, so kitty does not restore them.",
 		"",
 		"  gr@dev    " + file("gr@dev"),
 		"  gr@saved  " + file("gr@saved") + "; worktree directory gone",

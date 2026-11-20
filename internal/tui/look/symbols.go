@@ -27,6 +27,8 @@ const (
 	GlyphBroken
 	// GlyphGone marks a missing worktree: a session whose worktree directory is gone.
 	GlyphGone
+	// GlyphSuspended marks a suspended session: its windows closed, what ran in them kept to resume.
+	GlyphSuspended
 	// GlyphSpace, GlyphWorktree and GlyphOther head the rows of a space, a linked worktree and a session in
 	// no space.
 	GlyphSpace
@@ -100,6 +102,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphCurrentEdge:      "|",
 		GlyphBroken:           "x",
 		GlyphGone:             "x",
+		GlyphSuspended:        "z",
 		GlyphSpace:            "#",
 		GlyphWorktree:         "-",
 		GlyphOther:            "$",
@@ -148,6 +151,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphCurrentEdge:      "\u258e", // left one quarter block
 		GlyphBroken:           "\u2717",
 		GlyphGone:             "\u2715", // multiplication x
+		GlyphSuspended:        "\u2016", // double vertical line
 		GlyphSpace:            "\u25a0", // black square
 		GlyphWorktree:         "\u2514", // box drawings up and right
 		GlyphOther:            "\u25aa", // black small square
@@ -199,6 +203,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphCurrentEdge: "\u258e",
 		GlyphBroken:      "\uf00d", // times
 		GlyphGone:        "\uf127", // chain-broken
+		GlyphSuspended:   "\uf04c", // pause
 		GlyphSpace:       "\uf401", // repo
 		GlyphWorktree:    "\ue725", // git-branch
 		GlyphOther:       "\uf120", // terminal

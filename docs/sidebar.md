@@ -8,7 +8,9 @@ is the separator. The cursor's bar shows while keys move it.
 Each row starts with a fold triangle for a space with linked worktrees, then an icon: a repository for a
 space, a branch for a linked worktree, a terminal for a session in no space, or a cross for a space whose
 worktrees could not be listed. The most urgent status of the row's sessions replaces the icon. The icon is
-green when the session has windows open; the row is faint when it has none. The sidebar's own session's
+green when the session has windows open; the row is faint when it has none, its icon a pause sign (`z` in
+ASCII, a double bar in Unicode) once the session is [suspended](kitty.md#closing-and-suspending-sessions).
+The sidebar's own session's
 row is marked at its left edge, where a caret goes, by a thin bar in the accent (`|` in ASCII), or by its
 caret in the accent on a space's row, and its name is bold: a bar across the row would read as the
 cursor's.
@@ -194,8 +196,9 @@ cursor where it was, and the cursor is the box drawn lit, reversed, as that is w
 
 A bar at the bottom of the spaces list, above the STATUS rule, is titled by a rule with how many rows are
 ticked set into it, `8 selected`, or the number alone in a narrow sidebar. Under it is a row for each
-action on the ticked rows, as a menu's items: **Remove** `x`, **Close** `c`, **Forget** `F`, with commands
-configured **Run** `R`, and last **Cancel** `esc`. Each row has the action's name on the left, then how
+action on the ticked rows, as a menu's items: **Remove** `x`, **Close** `c`, with the session saver
+**Suspend** `z`, **Forget** `F`, with commands configured **Run** `R`, and last **Cancel** `esc`. Each row
+has the action's name on the left, then how
 many of the ticked rows it applies to and its key, each in a column of its own, so the rows line up; an
 action that applies to none of them is muted, with `-` for its count, and stays in its row. A click
 anywhere on a row runs it, and the row under the mouse is lit, but a muted one, which does nothing. The
@@ -209,6 +212,7 @@ the keys, rather than wrap a row; the keys work whether shown or not.
   missing ones to close and forget, and a main worktree or a session in no space listed as refused, so it
   says why it leaves them.
 - **Close** opens one form listing the ticked sessions with windows open, and closes them all.
+- **Suspend** does the same, suspending them.
 - **Forget** opens one form listing the saved files of the ticked sessions with no windows open, missing
   worktrees and closed ones, and deletes them.
 - **Run** opens the Run form for the ticked worktrees, but missing ones, with the first one's first
@@ -239,11 +243,12 @@ group, and Add space.
 | Session | Run | `R` | run a configured command in the worktree's session, in a form; with `[[commands]]` configured |
 | Session | Open layout | `L` | add a configured layout's tabs, or one shell tab, to the worktree's session, in a form; with `[[layouts]]` configured |
 | Session | Save as layout | | save the session's tabs as a layout in config.toml, in a form; on a worktree's session with windows open |
-| Session | Close session | `c` | close every window of the session, on a session with windows open |
+| Session | Close session | `c` | close every window of the session, on a session with windows open; with the session saver, keeping it to open again |
+| Session | Suspend session | `z` | stop what runs in the session's windows and close them, keeping them to resume, on a session with windows open; with the session saver |
 | Session | Reply | `t` | write to the window of a status entry without switching to it, in a form; on a status entry |
 | Worktree | Open PR #N | `b` | open the branch's PR in the browser with `gh browse N`, on a worktree whose row shows a PR |
 | Worktree | Remove worktree | `x` | close the session and remove a linked worktree |
-| Worktree | Forget | `x` | delete the saved session file of a missing worktree with no windows open |
+| Worktree | Forget | `F`, `x` | delete the saved session file of a session with no windows open, and what the keeper kept of it; `x` on a missing worktree |
 | Space | New worktree | `n` | create a worktree in the space, in a form; on a linked worktree's row, a new branch starts from its branch |
 | Space | New worktree from PR | `N` | the same form on its Pull request tab, to check out one of the space's open PRs |
 | Space | New worktree from issue | `I` | the same form on its Issue tab, to create a branch for one of the space's open issues, from the row's branch as New worktree |
@@ -389,10 +394,12 @@ in, its name filled in, with `--tab` for this tab at first: the one kspaces runs
 session's.
 
 **Close session** closes every window the way closing them by hand does, so whatever kitty.conf runs when a
-window closes still runs. `kspaces close SESSION...` with several sessions lists each with its windows and
-closes them all; one with no windows is an error, and `--yes` closes them without asking. It, Remove
-worktree, Clean up worktrees, Forget and Trust space config confirm with `y` or `enter`, and cancel with `n`
-or `esc`.
+window closes still runs; with the session saver it saves the session first and keeps it to open again, as
+[Closing and suspending sessions](kitty.md#closing-and-suspending-sessions) says. `kspaces close SESSION...`
+with several sessions lists each with its windows and closes them all; one with no windows is an error,
+and `--yes` closes them without asking. **Suspend session** and `kspaces suspend SESSION...` are the same
+form, suspending. They, Remove worktree, Clean up worktrees, Forget and Trust space config confirm with `y`
+or `enter`, and cancel with `n` or `esc`.
 
 **Remove worktree** shows the directory, the session's windows and the files that are not committed, which
 are lost. It closes the session, waits for its windows to go, deletes the session's saved file and runs
@@ -445,10 +452,11 @@ its worktree is ticked; one whose PR is merged, as after a squash, says so and l
 worktree whose branch would lose commits starts unticked, so only branches that lose nothing go unless you
 tick it.
 
-**Forget** shows the saved session file of a missing worktree with no windows open, and Delete deletes it,
-so kitty does not restore the session. `kspaces forget SESSION...` does the same for any sessions with no
-windows open, several in one form that lists each one's file and says the directory is gone only of a
-missing worktree's; one with windows open is refused, and `--yes` deletes without asking.
+**Forget** shows the saved session file of a session with no windows open, a missing worktree's or a closed
+or suspended one's, and Delete deletes it, so kitty does not restore the session, and has the keeper forget
+what it kept of a kept session. `kspaces forget SESSION...` does the same for any sessions with no windows open,
+several in one form that lists each one's file and says the directory is gone only of a missing
+worktree's; one with windows open is refused, and `--yes` deletes without asking.
 
 **Trust space config** shows the space's `.kspaces.toml` and what it would add, as
 [Per-space config](kitty.md#per-space-config) says: each command and the line it runs, each layout and
@@ -512,7 +520,8 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `space` | fold or unfold the space's worktrees, or on a group's header the group's spaces |
 | `m` | menu |
 | `?` | list the keys where the cursor is |
-| `n`, `N`, `c`, `x` | new worktree, new worktree from a PR, close session, remove worktree (forget, on a missing worktree) |
+| `n`, `N`, `c`, `z`, `x` | new worktree, new worktree from a PR, close session, suspend session, remove worktree (forget, on a missing worktree) |
+| `F` | forget a session's saved file, on a session with no windows open |
 | `p` | clean up the space's worktrees, on a space's row |
 | `R` | run a command in the worktree, with commands configured |
 | `L` | open a layout in the worktree's session, with layouts configured |
@@ -529,7 +538,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `K` / `J` | move the cursor's space within its group, or linked worktree within its space, up / down |
 | `v` | select rows to act on; see [Selecting](#selecting) |
 | `space`, `A` | in the select mode, tick the cursor's row, every row shown |
-| `x`, `c`, `F`, `R` | in the select mode, remove, close, forget, run in what is ticked |
+| `x`, `c`, `z`, `F`, `R` | in the select mode, remove, close, suspend, forget, run in what is ticked |
 | `r` | refresh, which also happens every two seconds |
 | `esc` / `q` | give focus back to the window it came from; `esc` in the select mode leaves it |
 

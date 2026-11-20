@@ -71,12 +71,37 @@ func (a *app) closeCommand() *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
 		Use:   "close [SESSION...]",
-		Short: "Close every window of the sessions, the current one by default, after confirming in a form",
+		Short: "Close every window of the sessions, the current one by default, after confirming in a form; with the session saver, opening one again brings its windows back",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return tui.RunCloseSession(cmd.Context(), args, yes)
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+			return tui.RunCloseSession(cmd.Context(), cfg, args, yes, false)
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "close without asking")
+	return cmd
+}
+
+func (a *app) suspendCommand() *cobra.Command {
+	var yes bool
+	cmd := &cobra.Command{
+		Use:   "suspend [SESSION...]",
+		Short: "Stop what runs in the sessions, the current one by default, and close their windows, keeping them to resume, after confirming in a form",
+		Long: "Stop what runs in the sessions, the current one by default, and close their windows, after confirming in a form.\n\n" +
+			"The session saver keeps each session's file, and the configured keeper keeps what runs in its windows, " +
+			"such as their multiplexer sessions, until the session is opened again or forgotten. " +
+			"Opening it again brings them back. Needs [kitty] save_sessions.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+			return tui.RunCloseSession(cmd.Context(), cfg, args, yes, true)
+		},
+	}
+	cmd.Flags().BoolVar(&yes, "yes", false, "suspend without asking")
 	return cmd
 }
 

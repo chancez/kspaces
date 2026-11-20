@@ -394,6 +394,33 @@ func CloseSession(session string) error {
 	return err
 }
 
+// KeepVar marks the windows of a session kspaces closes to open again later, its value the way it keeps
+// the session, see spaces.KeepSession. The session saver leaves the file of a session whose windows close
+// with it, and a watcher that ends each window's multiplexer session as it closes can leave that too. As it
+// starts with kspaces, the marked windows are no longer saved, nor counted as the session's own.
+const KeepVar = "kspaces_keep"
+
+// SetSessionVar sets the user variable key to value on every window of session, or unsets it when value
+// is empty.
+func SetSessionVar(session, key, value string) error {
+	if value != "" {
+		key += "=" + value
+	}
+	_, err := kitten("set-user-vars", "--match", "session:^"+regexp.QuoteMeta(session)+"$", key)
+	return err
+}
+
+// SaveSessions saves sessions to their files now, with the session saver's kspaces_save_sessions action.
+// kitty runs it before answering.
+func SaveSessions(sessions ...string) error {
+	quoted := make([]string, len(sessions))
+	for i, s := range sessions {
+		quoted[i] = "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+	}
+	_, err := kitten("action", "kspaces_save_sessions", strings.Join(quoted, " "))
+	return err
+}
+
 // FocusWindow focuses the window id.
 func FocusWindow(id int) error {
 	acted.Store(true)

@@ -26,6 +26,11 @@ from kittens.tui.handler import result_handler
 # startup.
 OPEN_LIST = '.open-sessions'
 
+# Sessions kspaces closed to open again later, a line each of tab-separated fields: how it keeps them, the
+# session, and what the keeper kept of it. kspaces writes it; this keeps the file of a listed session whose last window
+# closed, and drops a session from it once it has windows again.
+KEPT_LIST = '.kept-sessions'
+
 
 def startup_path():
     path = get_options().startup_session
@@ -38,6 +43,33 @@ def session_path(name):
 
 def default_name():
     return os.path.basename(startup_path()).rpartition('.')[0]
+
+
+def kept_path():
+    return os.path.join(os.path.dirname(startup_path()), KEPT_LIST)
+
+
+def kept_lines():
+    try:
+        with open(kept_path()) as f:
+            return [line for line in f if len(line.split('\t')) >= 2]
+    except FileNotFoundError:
+        return []
+
+
+def kept_names():
+    return {line.split('\t')[1].rstrip('\n') for line in kept_lines()}
+
+
+def unkeep(name):
+    lines = [line for line in kept_lines() if line.split('\t')[1].rstrip('\n') != name]
+    if lines:
+        atomic_save(''.join(lines).encode(), kept_path())
+    else:
+        try:
+            os.remove(kept_path())
+        except FileNotFoundError:
+            pass
 
 
 # What save_as_session --match writes, Boss.serialize_state_as_session, with the OS windows in
@@ -105,8 +137,9 @@ def save_all(boss):
 # Saving at quit alone left a session's file as it was at the last quit: closing a session's tabs and panes
 # and opening it again brought them all back. So a session is also saved a moment after one of its windows
 # closes, takes focus or changes directory, which keeps which window is focused too. A session whose last
-# window closed has its file removed, so opening it again starts afresh. The default session's file is
-# startup_session's, so it is emptied instead.
+# window closed has its file removed, so opening it again starts afresh, unless kspaces kept it to open again,
+# which leaves the file as kspaces had it saved. The default session's file is startup_session's, so it is
+# emptied instead.
 #
 # Windows in no session are left to save_all. Saved into the default session as they changed, a window that
 # opens an OS window of its own, such as a tab switcher mapped to a key, stayed in its file after closing
@@ -138,11 +171,18 @@ def save_pending(boss):
     if _quitting or not boss.os_window_map:
         return
     main = main_os_window(boss, set(boss.all_loaded_session_names) - {default_name()})
+    kept = kept_names()
     for name, torn_down in pending.items():
         if torn_down:
             continue
         match = session_match(name)
-        if any(True for _ in boss.match_windows(match)):
+        has_windows = any(True for _ in boss.match_windows(match))
+        if name in kept:
+            # kspaces marks the windows it closes, which the match leaves out.
+            if not has_windows:
+                continue
+            unkeep(name)
+        if has_windows:
             save_matching(boss, match, session_path(name), main)
         elif name == default_name():
             atomic_save(b'', session_path(name))
@@ -212,6 +252,12 @@ def main(args):
     return ''
 
 
+# The kspaces_save_sessions action saves the sessions named after it, or every session.
 @result_handler(no_ui=True)
 def handle_result(args, answer, target_window_id, boss):
+    if len(args) > 1:
+        main = main_os_window(boss, set(boss.all_loaded_session_names) - {default_name()})
+        for name in args[1:]:
+            save_matching(boss, session_match(name), session_path(name), main)
+        return
     save_all(boss)

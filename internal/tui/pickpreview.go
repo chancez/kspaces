@@ -128,6 +128,8 @@ func worktreeFields(th *look.Theme, snap spaces.Snapshot, r spaces.Row, width in
 	switch {
 	case snap.Config.SessionsDir == "":
 		lines = append(lines, field("saved", look.Muted("no sessions directory")))
+	case snap.Suspended[wt.Session]:
+		lines = append(lines, field("saved", look.Text("suspended")))
 	case snap.Saved[wt.Session]:
 		lines = append(lines, field("saved", look.Text("yes")))
 	default:

@@ -57,7 +57,7 @@ func TestSharedView(t *testing.T) {
 		return Snapshot{
 			Config: &cfg, Spaces: spaces,
 			Others: []Space{{Name: "notes", Worktrees: []Worktree{{Session: "notes"}}}},
-			Folded: map[string]bool{}, Hidden: map[string]bool{}, Saved: map[string]bool{"gr": true, "notes": true, "gr@gone": true}, Kitty: st,
+			Folded: map[string]bool{}, Hidden: map[string]bool{}, Saved: map[string]bool{"gr": true, "notes": true, "gr@gone": true}, Suspended: map[string]bool{}, Kitty: st,
 			// Nothing saved: manual, with kitty's times, and config.toml's groups.
 			Order: Order{Mode: SortManual, Worktrees: map[string][]string{}, Groups: []string{"work", "home"}, Focused: st.Focused},
 		}

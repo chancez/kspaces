@@ -176,15 +176,29 @@ var (
 			return spaces.AskCloseSession(*snap.Config, snap.Kitty, r.Worktree.Session)
 		},
 	}
+	rowSuspendSession = &rowAction{
+		title:   "Suspend session",
+		key:     "z",
+		desc:    "suspend session",
+		section: sectionSession,
+		// Suspending keeps the session's file, which only the session saver writes.
+		applies: func(snap spaces.Snapshot, r spaces.Row) bool {
+			return r.Worktree != nil && snap.Kitty.Windows[r.Worktree.Session] > 0 && spaces.CanKeep(*snap.Config)
+		},
+		ask: func(snap spaces.Snapshot, r spaces.Row) error {
+			return spaces.AskSuspendSession(*snap.Config, snap.Kitty, r.Worktree.Session)
+		},
+	}
 	rowForgetSession = &rowAction{
 		title: "Forget",
 		// x, as a missing worktree has nothing to remove but its saved file.
 		key:     "x",
 		desc:    "forget the saved session",
 		section: sectionWorktree,
-		// A missing worktree with only its saved file left, which kitty would restore it from.
+		// A session with only its saved file left, which kitty would restore it from: a missing worktree's,
+		// or a closed or suspended one's.
 		applies: func(snap spaces.Snapshot, r spaces.Row) bool {
-			return r.Missing && snap.Kitty.Windows[r.Worktree.Session] == 0 && snap.Saved[r.Worktree.Session]
+			return r.Worktree != nil && snap.Kitty.Windows[r.Worktree.Session] == 0 && snap.Saved[r.Worktree.Session]
 		},
 		ask: func(snap spaces.Snapshot, r spaces.Row) error {
 			return spaces.AskForgetSession(*snap.Config, snap.Kitty, r.Worktree.Session)

@@ -27,6 +27,8 @@ type Shared struct {
 	Spaces []sharedSpace  `json:"spaces,omitempty"`
 	// Sessions with a file in the sessions directory.
 	Saved []string `json:"saved,omitempty"`
+	// Saved sessions kept with KeepSuspended.
+	Suspended []string `json:"suspended,omitempty"`
 	// kitty's windows, as `kitten @ ls` lists them, and why they could not be listed.
 	Windows  []kitty.OSWindow `json:"windows,omitempty"`
 	KittyErr string           `json:"kitty_err,omitempty"`
@@ -75,6 +77,7 @@ func loadSpaces() Shared {
 		sh.Spaces = append(sh.Spaces, ss)
 	}
 	sh.Saved = savedSessions(cfg.SessionsDir)
+	sh.Suspended = suspendedSessions(cfg.SessionsDir)
 	return sh
 }
 
@@ -110,9 +113,13 @@ func (sh Shared) View(self int) Snapshot {
 	for _, name := range sh.Saved {
 		saved[name] = true
 	}
+	suspended := make(map[string]bool, len(sh.Suspended))
+	for _, name := range sh.Suspended {
+		suspended[name] = true
+	}
 	// The missing worktrees go in the spaces, which are this view's own copies: what the load holds, and
 	// git is asked about in targets, is only what git lists.
-	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, st.Sessions, sh.Saved), Folded: LoadFolded(), Hidden: LoadHidden(), Saved: saved, Kitty: st}
+	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, st.Sessions, sh.Saved), Folded: LoadFolded(), Hidden: LoadHidden(), Saved: saved, Suspended: suspended, Kitty: st}
 	snap.Order = Order{Mode: LoadSort(), Worktrees: LoadOrder(), Groups: sh.Config.Groups, Focused: st.Focused, Statuses: st.Statuses}
 	if sh.KittyErr != "" {
 		snap.Err = errors.New(sh.KittyErr)

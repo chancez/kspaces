@@ -62,6 +62,9 @@ func GoneMarker(open bool) []Span {
 	return marker(elMuted, GlyphGone)
 }
 
+// SuspendedMarker marks a suspended session, muted as the rest of its row, which has no windows.
+func SuspendedMarker() []Span { return marker(elMuted, GlyphSuspended) }
+
 // Caret heads a space with linked worktrees: pointing down while they are shown, right when folded.
 func Caret(folded bool) []Span {
 	g := GlyphOpen

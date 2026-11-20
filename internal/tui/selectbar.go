@@ -181,6 +181,24 @@ func (m *sidebar) closeSelected() tea.Cmd {
 		})
 }
 
+// suspendSelected opens the suspend session form with the ticked sessions that have windows. Done once one
+// of them has none.
+func (m *sidebar) suspendSelected() tea.Cmd {
+	sessions := sessionsOf(m.toClose())
+	if len(sessions) == 0 {
+		return m.refuse(noneToClose)
+	}
+	return m.launch(func(cfg config.Config, st kitty.State) error { return spaces.AskSuspendSession(cfg, st, sessions...) },
+		func(m *sidebar) bool {
+			for _, s := range sessions {
+				if m.kitty.Windows[s] == 0 {
+					return true
+				}
+			}
+			return false
+		})
+}
+
 // forgetSelected opens the forget session form with the ticked sessions that have only a saved file. Done
 // once one of the files is gone.
 func (m *sidebar) forgetSelected() tea.Cmd {
@@ -233,14 +251,18 @@ type barAction struct {
 	none   string
 }
 
-// barActions are the bar's buttons for what is ticked now, Run only with commands configured.
+// barActions are the bar's buttons for what is ticked now, Suspend only with the session saver and Run only
+// with commands configured.
 func (m *sidebar) barActions() []barAction {
 	remove, closing, forget := len(m.toRemove()), len(m.toClose()), len(m.toForget())
 	out := []barAction{
 		{actSelRemove, "Remove", remove, "Removes " + plural(remove, "worktree") + ", asking first", noneToRemove},
 		{actSelClose, "Close", closing, "Closes " + plural(closing, "session") + ", asking first", noneToClose},
-		{actSelForget, "Forget", forget, "Deletes " + plural(forget, "saved file") + ", asking first", noneToForget},
 	}
+	if spaces.CanKeep(m.cfg) {
+		out = append(out, barAction{actSelSuspend, "Suspend", closing, "Suspends " + plural(closing, "session") + ", asking first", noneToClose})
+	}
+	out = append(out, barAction{actSelForget, "Forget", forget, "Deletes " + plural(forget, "saved file") + ", asking first", noneToForget})
 	if m.runs() {
 		run := len(m.toRun())
 		out = append(out, barAction{actSelRun, "Run", run, "Runs a command in " + plural(run, "worktree"), noneToRun})

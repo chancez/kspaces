@@ -180,7 +180,9 @@ type Snapshot struct {
 	Order Order
 	// Sessions with a file in the sessions directory, to be restored from.
 	Saved map[string]bool
-	Kitty kitty.State
+	// Saved sessions that were suspended, see KeepSuspended.
+	Suspended map[string]bool
+	Kitty     kitty.State
 	// What git and gh say of each worktree, by path, as far as the leading sidebar knows.
 	Git map[string]gitstate.State
 	Err error

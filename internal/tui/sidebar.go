@@ -64,7 +64,9 @@ type sidebar struct {
 	held  map[string]int
 	// Sessions with a saved file, see spaces.Snapshot.
 	saved map[string]bool
-	kitty kitty.State
+	// Saved sessions that were suspended, see spaces.Snapshot.
+	suspended map[string]bool
+	kitty     kitty.State
 	// kitty's statuses, hidden groups' too, which kitty.Statuses leaves out, see spaces.Shown.
 	statuses []status.Status
 	rows     []spaces.Row
@@ -286,7 +288,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Config != nil {
 			// Where the cursor is goes by the rows and entries it was drawn on, before they change.
 			at := m.cursorAt()
-			m.cfg, m.spaces, m.others, m.folded, m.saved, m.kitty = *msg.Config, msg.Spaces, msg.Others, msg.Folded, msg.Saved, msg.Kitty
+			m.cfg, m.spaces, m.others, m.folded, m.saved, m.suspended, m.kitty = *msg.Config, msg.Spaces, msg.Others, msg.Folded, msg.Saved, msg.Suspended, msg.Kitty
 			m.hidden, m.statuses = msg.Hidden, msg.Kitty.Statuses
 			m.kitty.Statuses = spaces.Shown(m.cfg, m.hidden, m.statuses)
 			m.order = msg.Order
@@ -413,7 +415,7 @@ func (m *sidebar) leave() tea.Cmd {
 
 // view is what the sidebar knows as a snapshot, for what reads one, as the row actions do.
 func (m *sidebar) view() spaces.Snapshot {
-	return spaces.Snapshot{Config: &m.cfg, Git: m.git, Kitty: m.kitty, Saved: m.saved}
+	return spaces.Snapshot{Config: &m.cfg, Git: m.git, Kitty: m.kitty, Saved: m.saved, Suspended: m.suspended}
 }
 
 func (m *sidebar) isOpen(wt *spaces.Worktree) bool {

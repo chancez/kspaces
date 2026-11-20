@@ -48,10 +48,14 @@ type Config struct {
 	// Where kitty session files are saved, named SESSION.kitty-session. A worktree whose session has no
 	// windows but has a file here is restored from it rather than opened with Launch. Empty to always use
 	// Launch.
-	SessionsDir string    `toml:"sessions"`
-	Worktrees   Worktrees `toml:"worktrees"`
-	Sidebar     Sidebar   `toml:"sidebar"`
-	Kitty       Kitty     `toml:"kitty"`
+	SessionsDir string `toml:"sessions"`
+	// The program that keeps what runs in a session's windows when kspaces closes or suspends the session,
+	// such as a multiplexer's sessions, so opening the session again brings them back; see the keeper
+	// protocol in docs/kitty.md. Empty keeps the session's layout alone.
+	Keeper    []string  `toml:"keeper"`
+	Worktrees Worktrees `toml:"worktrees"`
+	Sidebar   Sidebar   `toml:"sidebar"`
+	Kitty     Kitty     `toml:"kitty"`
 	// Commands to run in a worktree, see Command.
 	Commands []Command `toml:"commands"`
 	// Layouts to open in a session, see Layout.

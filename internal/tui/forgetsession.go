@@ -97,7 +97,7 @@ func (f *forgetSessionForm) render() string {
 	file := func(s string) look.Span { return look.Muted(config.Tilde(spaces.SessionFile(f.cfg, s))) }
 	if len(f.sessions) == 1 {
 		lines = []string{line(look.Heading("Forget session " + f.sessions[0])), ""}
-		says := "Deletes its saved file, so kitty does not restore it."
+		says := "Deletes its saved file, and what was kept to resume it, so kitty does not restore it."
 		if f.gone[0] {
 			says += " Its worktree directory is gone."
 		}
@@ -105,7 +105,7 @@ func (f *forgetSessionForm) render() string {
 		lines = append(lines, line(th.Cut(width, file(f.sessions[0]))...), "")
 	} else {
 		lines = []string{line(look.Heading(fmt.Sprintf("Forget %d sessions", len(f.sessions)))), ""}
-		text("Deletes their saved files, so kitty does not restore them.")
+		text("Deletes their saved files, and what was kept to resume them, so kitty does not restore them.")
 		lines = append(lines, "")
 		names := 0
 		for _, s := range f.sessions {
