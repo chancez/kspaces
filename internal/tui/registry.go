@@ -1,8 +1,6 @@
 package tui
 
 import (
-	"fmt"
-
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/spaces"
@@ -114,11 +112,6 @@ func foldable(m *sidebar, s entrySubject) bool {
 	return !m.filtering && !s.row.Other && s.row.Space.HasLinked()
 }
 
-// newWorktreeApplies is whether a worktree can be created in an entry's space: one configured and read.
-func newWorktreeApplies(_ *sidebar, s entrySubject) bool {
-	return !s.row.Other && !s.row.Missing && s.row.Space.Err == nil
-}
-
 // The context menu's sections. A menu draws them in the order their first actions come in the kinds'
 // lists: the session first, as opening it is what a row is mostly for; then what acts on the row's own
 // worktree; then what is the same from any row of the space, and the list's own last.
@@ -168,133 +161,18 @@ var (
 		Applies: func(m *sidebar, s entrySubject) bool { return foldable(m, s) && m.folded[s.row.Space.Root] },
 		Run:     func(m *sidebar, s entrySubject) tea.Cmd { m.toggleFold(s.row.Space.Root); return nil },
 	}
-	actNewWorktree = &interact.Action[*sidebar, entrySubject]{
-		Title:   "New worktree",
-		Section: sectionSpace,
-		Applies: newWorktreeApplies,
-		Run: func(m *sidebar, s entrySubject) tea.Cmd {
-			m.remote = false
-			return m.newWorktree(s.row.Space.Root, spaces.FromBranch, rowBranch(s))
-		},
-	}
-	actNewWorktreeFromPR = &interact.Action[*sidebar, entrySubject]{
-		Title:   "New worktree from PR",
-		Section: sectionSpace,
-		Applies: newWorktreeApplies,
-		Run: func(m *sidebar, s entrySubject) tea.Cmd {
-			m.remote = false
-			return m.newWorktree(s.row.Space.Root, spaces.FromPR, "")
-		},
-	}
-	actNewWorktreeFromIssue = &interact.Action[*sidebar, entrySubject]{
-		Title:   "New worktree from issue",
-		Section: sectionSpace,
-		Applies: newWorktreeApplies,
-		Run: func(m *sidebar, s entrySubject) tea.Cmd {
-			m.remote = false
-			return m.newWorktree(s.row.Space.Root, spaces.FromIssue, rowBranch(s))
-		},
-	}
-	actRemoveWorktree = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Remove worktree",
-		Section: sectionWorktree,
-		// Only a linked worktree: the main one is the repository itself.
-		Applies: func(_ *sidebar, s entrySubject) bool { return !s.row.Main && !s.row.Missing && s.row.Worktree != nil },
-		Run: func(m *sidebar, s entrySubject) tea.Cmd {
-			m.remote = false
-			return m.removeWorktree(s.row.Worktree.Path)
-		},
-	}
-	actOpenPR = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Open PR",
-		Name:    func(m *sidebar, s entrySubject) string { return fmt.Sprintf("Open PR #%d", m.rowPR(s.row).Number) },
-		Section: sectionWorktree,
-		// Not on a missing worktree: its directory, where gh would run, is gone.
-		Applies: func(m *sidebar, s entrySubject) bool { return !s.row.Missing && m.rowPR(s.row) != nil },
-		Run: func(m *sidebar, s entrySubject) tea.Cmd {
-			m.remote = false
-			return openPR(s.row.Worktree.Path, m.rowPR(s.row).Number)
-		},
-	}
-	actRunCommand = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Run",
-		Section: sectionSession,
-		Applies: func(m *sidebar, s entrySubject) bool {
-			return !s.row.Other && !s.row.Missing && s.row.Worktree != nil && len(s.row.Space.ConfigOf(m.cfg).Commands) > 0
-		},
-		Run: func(m *sidebar, s entrySubject) tea.Cmd {
-			m.remote = false
-			return m.runCommand(s.row)
-		},
-	}
-	actOpenLayout = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Open layout",
-		Section: sectionSession,
-		Applies: func(m *sidebar, s entrySubject) bool {
-			return !s.row.Other && !s.row.Missing && s.row.Worktree != nil && len(s.row.Space.ConfigOf(m.cfg).Layouts) > 0
-		},
-		Run: func(m *sidebar, s entrySubject) tea.Cmd {
-			m.remote = false
-			return m.openLayout(s.row)
-		},
-	}
-	actSaveAsLayout = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Save as layout",
-		Section: sectionSession,
-		// A worktree's session with windows to save, whose cwds are templates of the worktree's.
-		Applies: func(m *sidebar, s entrySubject) bool {
-			return !s.row.Other && !s.row.Missing && s.row.Worktree != nil && m.kitty.Windows[s.row.Worktree.Session] > 0
-		},
-		Run: func(m *sidebar, s entrySubject) tea.Cmd {
-			m.remote = false
-			return m.saveLayout(s.row.Worktree.Path)
-		},
-	}
-	actCloseSession = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Close session",
-		Section: sectionSession,
-		Applies: func(m *sidebar, s entrySubject) bool {
-			return s.row.Worktree != nil && m.kitty.Windows[s.row.Worktree.Session] > 0
-		},
-		Run: func(m *sidebar, s entrySubject) tea.Cmd {
-			m.remote = false
-			return m.closeSession(s.row.Worktree.Session)
-		},
-	}
-	actForgetSession = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Forget",
-		Section: sectionWorktree,
-		// A missing worktree with only its saved file left, which kitty would restore it from.
-		Applies: func(m *sidebar, s entrySubject) bool {
-			return s.row.Missing && m.kitty.Windows[s.row.Worktree.Session] == 0 && m.saved[s.row.Worktree.Session]
-		},
-		Run: func(m *sidebar, s entrySubject) tea.Cmd {
-			m.remote = false
-			return m.forgetSession(s.row.Worktree.Session)
-		},
-	}
-	actCleanup = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Clean up worktrees",
-		Section: sectionSpace,
-		// On the space's own row: it offers removing any of the space's linked worktrees.
-		Applies: func(_ *sidebar, s entrySubject) bool {
-			return s.row.Main && !s.row.Other && s.row.Space.Err == nil && len(s.row.Space.Worktrees) > 1
-		},
-		Run: func(m *sidebar, s entrySubject) tea.Cmd {
-			m.remote = false
-			return m.cleanup(s.row.Space.Root)
-		},
-	}
-	actTrustConfig = &interact.Action[*sidebar, entrySubject]{
-		Title:   "Trust space config",
-		Section: sectionSpace,
-		// Its file is there, but not trusted as it is: never, or not since it changed.
-		Applies: func(_ *sidebar, s entrySubject) bool { return !s.row.Other && s.row.Space.Untrusted },
-		Run: func(m *sidebar, s entrySubject) tea.Cmd {
-			m.remote = false
-			return m.trustConfig(s.row.Space.Root)
-		},
-	}
+	actNewWorktree          = onEntry(rowNewWorktree)
+	actNewWorktreeFromPR    = onEntry(rowNewWorktreeFromPR)
+	actNewWorktreeFromIssue = onEntry(rowNewWorktreeFromIssue)
+	actRemoveWorktree       = onEntry(rowRemoveWorktree)
+	actOpenPR               = onEntry(rowOpenPR)
+	actRunCommand           = onEntry(rowRunCommand)
+	actOpenLayout           = onEntry(rowOpenLayout)
+	actSaveAsLayout         = onEntry(rowSaveAsLayout)
+	actCloseSession         = onEntry(rowCloseSession)
+	actForgetSession        = onEntry(rowForgetSession)
+	actCleanup              = onEntry(rowCleanup)
+	actTrustConfig          = onEntry(rowTrustConfig)
 	// actSelectRow turns the select mode on with the row ticked.
 	actSelectRow = &interact.Action[*sidebar, entrySubject]{
 		Title:   "Select",

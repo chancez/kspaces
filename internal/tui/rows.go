@@ -211,7 +211,7 @@ func (m *sidebar) rowPopup() ([]string, int) {
 		return nil, 0
 	}
 	th, width := m.th, m.contentWidth()
-	snap := spaces.Snapshot{Config: &m.cfg, Git: m.git, Kitty: m.kitty, Saved: m.saved}
+	snap := m.view()
 	var popup []string
 	for _, l := range worktreeFields(th, snap, m.rows[i], width) {
 		popup = append(popup, th.DrawZone(popupZone, look.Plain, width, th.Cut(width, l...)...))

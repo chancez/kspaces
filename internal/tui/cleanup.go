@@ -369,14 +369,3 @@ func RunCleanup(ctx context.Context, cfg config.Config, root string, sessions []
 	}
 	return nil
 }
-
-// cleanup opens the clean up form for the space at root, in a popup as newWorktree's.
-func (m *sidebar) cleanup(root string) tea.Cmd {
-	cfg, st := m.cfg, m.kitty
-	return func() tea.Msg {
-		if err := spaces.AskCleanup(cfg, st, root); err != nil {
-			return failedMsg{err}
-		}
-		return nil
-	}
-}

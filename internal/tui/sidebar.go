@@ -386,6 +386,11 @@ func (m *sidebar) leave() tea.Cmd {
 	}
 }
 
+// view is what the sidebar knows as a snapshot, for what reads one, as the row actions do.
+func (m *sidebar) view() spaces.Snapshot {
+	return spaces.Snapshot{Config: &m.cfg, Git: m.git, Kitty: m.kitty, Saved: m.saved}
+}
+
 func (m *sidebar) isOpen(wt *spaces.Worktree) bool {
 	_, ok := m.kitty.Sessions[wt.Session]
 	return ok
