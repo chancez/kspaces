@@ -221,6 +221,8 @@ func (m *picker) update(msg tea.Msg) tea.Cmd {
 			m.filter()
 		}
 		return nil
+	case tea.MouseClickMsg, tea.MouseWheelMsg, tea.MouseMotionMsg, tea.MouseReleaseMsg:
+		return m.mouse(msg.(tea.MouseMsg))
 	case tea.KeyPressMsg:
 		// Keys the menu does not take do nothing while it is open.
 		if m.menu != nil {
@@ -242,13 +244,15 @@ func (m *picker) update(msg tea.Msg) tea.Cmd {
 	return cmd
 }
 
-// renderMatch draws an item with the characters the query matched highlighted, and its detail muted.
+// renderMatch draws an item with the characters the query matched highlighted, and its detail muted,
+// marked so the mouse finds it.
 func (m *picker) renderMatch(i int, width int) string {
 	th, match := m.th, m.matches[i]
 	it := m.items[match.Index]
+	zone := fmt.Sprintf(entryZone, i)
 	if i == m.cursor {
 		text := th.Cut(max(width-th.Width(it.icon...), 0), look.Text(it.text))
-		return th.Draw(look.Cursor, width, append(append([]look.Span{}, it.icon...), text...)...)
+		return th.DrawZone(zone, look.Cursor, width, append(append([]look.Span{}, it.icon...), text...)...)
 	}
 	matched := map[int]bool{}
 	for _, b := range match.MatchedIndexes {
@@ -265,12 +269,14 @@ func (m *picker) renderMatch(i int, width int) string {
 			spans = append(spans, look.Text(string(r)))
 		}
 	}
-	return th.Draw(look.Plain, width, spans...)
+	return th.DrawZone(zone, look.Plain, width, spans...)
 }
 
 func (m *picker) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
+	// All motion, not only while a button is down, so the menu lights the item under the mouse.
+	v.MouseMode = tea.MouseModeAllMotion
 	return v
 }
 

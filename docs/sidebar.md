@@ -550,6 +550,10 @@ folding and selecting, such as **Open layout**, **Run** and **New worktree**; a 
 nothing while it is open. An item that opens a form opens it over the window the picker is for, and closes
 the picker. The last line says `tab actions` after the count.
 
+A left click on an entry switches to it, as `enter` does, and a right click opens its menu, as `tab` does.
+The wheel moves the cursor. While the menu is open the mouse lights the item under it, a left click runs
+it, and a click elsewhere closes it, a right click on another entry opening that entry's.
+
 Beside the list in a popup 90 columns or wider, and below it in a narrower one, a preview shows the
 entry under the cursor: a status entry in full, as the sidebar's opened entry; a worktree's space, path,
 branch, its changes, upstream and PR as its row shows them, its session, how many windows it has open,

@@ -142,8 +142,9 @@ func (p *popup) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return p, cmd
 }
 
-// inPanel is msg as the popup in a panel's border sees it: the size inside the border for one that fills
-// it, and a click where boxed drew what the frame shows there.
+// inPanel is msg as the popup in a panel's border sees it: for one that fills it the size inside the
+// border, and the mouse from inside it, past the border and its padding; else a click where boxed drew
+// what the frame shows there.
 func (p *popup) inPanel(msg tea.Msg) tea.Msg {
 	_, fills := p.inner.(fillsPopup)
 	if size, ok := msg.(tea.WindowSizeMsg); ok {
@@ -155,7 +156,7 @@ func (p *popup) inPanel(msg tea.Msg) tea.Msg {
 		return size
 	}
 	if fills {
-		return msg
+		return shiftMouse(msg, -2, -1)
 	}
 	// The frame's row y is boxed's y+1, but for its foot, on the row above the bottom border.
 	y := func(y int) int {
@@ -263,4 +264,23 @@ func runPopup(ctx context.Context, m popupModel) error {
 		return err
 	}
 	return p.leave()
+}
+
+// shiftMouse is msg moved by dx, dy when it is the mouse's, else msg.
+func shiftMouse(msg tea.Msg, dx, dy int) tea.Msg {
+	switch m := msg.(type) {
+	case tea.MouseClickMsg:
+		m.X, m.Y = m.X+dx, m.Y+dy
+		return m
+	case tea.MouseReleaseMsg:
+		m.X, m.Y = m.X+dx, m.Y+dy
+		return m
+	case tea.MouseMotionMsg:
+		m.X, m.Y = m.X+dx, m.Y+dy
+		return m
+	case tea.MouseWheelMsg:
+		m.X, m.Y = m.X+dx, m.Y+dy
+		return m
+	}
+	return msg
 }
