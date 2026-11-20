@@ -66,6 +66,21 @@ func AttentionRows(rows []Row, statuses []status.Status) []Row {
 			stirring[s.Session] = true
 		}
 	}
+	return sessionRows(rows, func(session string) bool { return stirring[session] })
+}
+
+// OpenRows keeps the rows whose session has windows, open being kitty.State.Sessions, with their spaces'
+// rows for context, as AttentionRows does.
+func OpenRows(rows []Row, open map[string]int) []Row {
+	return sessionRows(rows, func(session string) bool {
+		_, ok := open[session]
+		return ok
+	})
+}
+
+// sessionRows keeps the rows whose session keep says to, a folded space's row or a folded group's header
+// when any of the sessions it stands for is kept.
+func sessionRows(rows []Row, keep func(session string) bool) []Row {
 	return Narrow(rows, func(head Row) bool {
 		var sessions []Worktree
 		switch {
@@ -78,6 +93,6 @@ func AttentionRows(rows []Row, statuses []status.Status) []Row {
 		case head.Worktree != nil:
 			sessions = []Worktree{*head.Worktree}
 		}
-		return slices.ContainsFunc(sessions, func(wt Worktree) bool { return stirring[wt.Session] })
-	}, func(r Row) bool { return stirring[r.Worktree.Session] })
+		return slices.ContainsFunc(sessions, func(wt Worktree) bool { return keep(wt.Session) })
+	}, func(r Row) bool { return keep(r.Worktree.Session) })
 }

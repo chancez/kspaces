@@ -48,3 +48,37 @@ func TestAttentionRows(t *testing.T) {
 		t.Fatalf("got %q, want none", rowNames(got))
 	}
 }
+
+func TestOpenRows(t *testing.T) {
+	others := []Space{
+		{Name: "default", Worktrees: []Worktree{{Session: "default"}}},
+		{Name: "scratch", Worktrees: []Worktree{{Session: "scratch"}}},
+	}
+	spaces := []Space{
+		{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Session: "gr"}, {Session: "gr@dev"}, {Session: "gr@fix"}}},
+		{Name: "kitty", Root: "/src/kitty", Worktrees: []Worktree{{Session: "kitty"}}},
+		{Name: "docs", Root: "/src/docs", Worktrees: []Worktree{{Session: "docs"}, {Session: "docs@notes"}}},
+		{Name: "web", Root: "/src/web", Worktrees: []Worktree{{Session: "web"}, {Session: "web@ui"}}},
+		{Name: "api", Root: "/src/api", Worktrees: []Worktree{{Session: "api"}},
+			Missing: []Worktree{{Session: "api@old"}}},
+		{Name: "lost", Root: "/src/lost"},
+	}
+	open := map[string]int{
+		"scratch": 1,
+		// Only a linked worktree open: the space's row shows above it.
+		"gr@fix": 2,
+		"kitty":  3,
+		// Hidden in a folded space, so the space's row shows.
+		"docs@notes": 4,
+		"api@old":    5,
+	}
+	folded := map[string]bool{"/src/docs": true, "/src/web": true}
+	got := rowNames(OpenRows(BuildRows(others, spaces, folded, nil, Order{}), open))
+	want := []string{"scratch", "", "gr", "gr@fix", "", "kitty", "", "docs (folded)", "", "api", "api@old"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q\nwant %q", got, want)
+	}
+	if got := OpenRows(BuildRows(others, spaces, folded, nil, Order{}), nil); got != nil {
+		t.Fatalf("got %q, want none", rowNames(got))
+	}
+}
