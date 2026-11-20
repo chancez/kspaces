@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
@@ -135,5 +136,65 @@ func TestPopupHelp(t *testing.T) {
 	}
 	if _, cmd := p.Update(tea.KeyPressMsg{Code: tea.KeyEscape}); p.help != nil || quits(cmd) {
 		t.Errorf("esc: keys open %v, quit %v; want the keys closed and the form open", p.help != nil, quits(cmd))
+	}
+}
+
+// In the picker ? lists its keys while the query is empty, and is typed into one that is not; with the
+// menu open it lists the menu's keys and its items'.
+func TestPickerHelp(t *testing.T) {
+	m := newPicker(0)
+	p, _ := stubPopup(m, 0, true)
+	p.Update(tea.WindowSizeMsg{Width: 60, Height: 26})
+	p.Update(fixture(time.Now()))
+	question := tea.KeyPressMsg{Code: '?', Text: "?"}
+	// sheet is the screen from the rule above the keys' title.
+	sheet := func() []string {
+		screen := panelScreen(p)
+		for i, l := range screen {
+			if strings.HasPrefix(l, "KEYS") {
+				return screen[i-1:]
+			}
+		}
+		return nil
+	}
+	p.Update(question)
+	want := []string{
+		strings.Repeat("─", 60),
+		"KEYS" + strings.Repeat(" ", 49) + "? close",
+		"─ Picker " + strings.Repeat("─", 51),
+		" down/up down/up",
+		" enter   switch",
+		" tab     actions",
+		" esc     cancel",
+	}
+	if got := sheet(); !reflect.DeepEqual(got, want) {
+		t.Errorf("the picker's keys:\n%q\nwant\n%q", got, want)
+	}
+	p.Update(question)
+	typeInto(p, "gr")
+	p.Update(question)
+	if p.help != nil || m.input.Value() != "gr?" {
+		t.Errorf("? after a query: keys open %v, query %q", p.help != nil, m.input.Value())
+	}
+	p.Update(tea.KeyPressMsg{Code: tea.KeyBackspace})
+	p.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	p.Update(question)
+	want = []string{
+		strings.Repeat("─", 60),
+		"KEYS" + strings.Repeat(" ", 49) + "? close",
+		"─ Menu " + strings.Repeat("─", 53),
+		" down/up down/up",
+		" enter   run",
+		" esc/tab close",
+		" ctrl+c  quit",
+		"─ gr " + strings.Repeat("─", 55),
+		" c       close session",
+		" n       new worktree",
+		" N       new worktree from PR",
+		" I       new worktree from issue",
+		" p       clean up worktrees",
+	}
+	if got := sheet(); !reflect.DeepEqual(got, want) {
+		t.Errorf("the menu's keys:\n%q\nwant\n%q", got, want)
 	}
 }

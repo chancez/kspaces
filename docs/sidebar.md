@@ -261,7 +261,8 @@ A click on a text field, its label or its box, gives it focus, as `tab` and `shi
 its text puts the cursor there; in a one-line field too long for its box, which may be scrolled, at its end.
 `?` lists the form's keys in a sheet up from the popup's bottom, over up to half of it, while no text field
 has focus, as on a choice or in a form that only confirms; in a text field it is typed. In the picker it
-does so while the menu is open, listing the menu's keys and its items'. The sheet scrolls and closes as the
+lists the picker's keys while the query is empty, and is typed into one that is not; with the menu open it
+lists the menu's keys and its items'. The sheet scrolls and closes as the
 sidebar's list of keys does, see [Keys](#keys).
 
 An item that fails, or a key such as `space` folding a space, says why on the sidebar's last line until

@@ -104,12 +104,16 @@ func (f *errorForm) keys() ([]interact.Section, bool) {
 // The reply form is all typing.
 func (f *replyForm) keys() ([]interact.Section, bool) { return nil, false }
 
-// The picker's query takes ?, but not while its menu is open.
+// The picker lists its menu's keys while the menu is open, and its own while the query is empty: in one
+// typed, ? is typed too.
 func (m *picker) keys() ([]interact.Section, bool) {
-	if m.menu == nil {
-		return nil, false
+	switch {
+	case m.menu != nil:
+		return interact.Help(m, append([]interact.Target[*picker]{m.menu.own}, m.menu.of...)...), true
+	case m.input.Value() == "":
+		return interact.Help(m, thePicker.Target(pickerSubject{})), true
 	}
-	return interact.Help(m, append([]interact.Target[*picker]{m.menu.own}, m.menu.of...)...), true
+	return nil, false
 }
 
 // popup runs a form or the picker in kitty. In an overlay that is all: the overlay closes back to the
