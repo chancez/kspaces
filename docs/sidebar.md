@@ -80,18 +80,18 @@ rows above them, and a folded space's row when any of its sessions has one. The 
 down-pointing triangle in Unicode and `Y` in ASCII, is lit in the attention color while the filter is on,
 and with nothing to show the list says `Nothing needs you`. It applies along with `/`, so a query narrows
 what it shows. The cursor stays on its row while it shows, and goes to the first row shown when it does
-not. `f` or the funnel again shows the whole list. It is each sidebar's own and is not saved, nor does it
-end with navigating as the query does.
+not. `f` or the funnel again shows the whole list. It is kept in `$XDG_STATE_HOME/kspaces/state.json`, so
+it stays on across restarts, and does not end with navigating as the query does.
 
 `O` shows only the open sessions: the rows whose session has windows, with their spaces' rows above them,
 and a folded space's row when any of its sessions has windows. With nothing open the list says
-`Nothing is open`. It applies along with `/` and `f`, and like `f` it is each sidebar's own and not saved.
+`Nothing is open`. It applies along with `/` and `f`, and is kept as `f` is.
 `O` again shows the whole list.
 
 `Z` hides the [suspended](kitty.md#closing-and-suspending-sessions) sessions: their rows go, a space's
 row staying above the rows of it that show, and a folded space's row goes only when all of its sessions
 are suspended. With everything suspended the list says `Everything is suspended`. It applies along with
-`/`, `f` and `O`, and like them it is each sidebar's own and not saved. `Z` again shows the whole list.
+`/`, `f` and `O`, and is kept as they are. `Z` again shows the whole list.
 
 The search button, left of the funnel, opens the [picker](#the-picker), as `P` does; a sidebar too narrow
 for it drops it. While any filter is on the funnel is lit, and the SPACES title names the filters on after it, muted:

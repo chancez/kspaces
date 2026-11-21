@@ -12,3 +12,13 @@ func LoadSplit() int {
 func SaveSplit(rows int) error {
 	return state.Update(func(s *state.State) { s.Sidebar.StatusRows = rows })
 }
+
+// LoadFilters reads the spaces list's filters on when the sidebar last changed them.
+func LoadFilters() state.Filters {
+	return state.Load().Sidebar.Filters
+}
+
+// SaveFilters saves the spaces list's filters on.
+func SaveFilters(f state.Filters) error {
+	return state.Update(func(s *state.State) { s.Sidebar.Filters = f })
+}

@@ -38,6 +38,18 @@ type Sidebar struct {
 	Order map[string][]string `json:"order,omitempty"`
 	// StatusRows is the STATUS list's height as dragging the rule left it, 0 for the default.
 	StatusRows int `json:"statusRows,omitempty"`
+	// Filters are the spaces list's filters on.
+	Filters Filters `json:"filters"`
+}
+
+// Filters are the spaces list's filters that can be on: the query is not kept.
+type Filters struct {
+	// Attention keeps the sessions whose programs are not idle.
+	Attention bool `json:"attention,omitempty"`
+	// Open keeps the sessions with windows.
+	Open bool `json:"open,omitempty"`
+	// Awake hides the suspended sessions.
+	Awake bool `json:"awake,omitempty"`
 }
 
 // Dir is kspaces' state directory, $XDG_STATE_HOME/kspaces, else ~/.local/state/kspaces.

@@ -9,6 +9,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/state"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
@@ -86,5 +88,24 @@ func TestOpenFilterNothing(t *testing.T) {
 	want = []string{filteredTitle("active, open"), "", "No matches"}
 	if got := e.spacesScreen(); !reflect.DeepEqual(got, want) {
 		t.Errorf("nothing open, attention filter on:\n%q\nwant\n%q", got, want)
+	}
+}
+
+// The filters on are saved as they change, and a new sidebar, as after a restart, starts with them.
+func TestFiltersSaved(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.press("O", "Z")
+	if got, want := spaces.LoadFilters(), (state.Filters{Open: true, Awake: true}); got != want {
+		t.Fatalf("saved %+v, want %+v", got, want)
+	}
+	again := &sidebarEnv{t: t, m: newSidebar(0)}
+	again.m.Update(tea.WindowSizeMsg{Width: 30, Height: 40})
+	again.m.Update(fixture(time.Now()))
+	if got, want := again.spacesScreen(), e.spacesScreen(); !reflect.DeepEqual(got, want) {
+		t.Errorf("new sidebar:\n%q\nwant\n%q", got, want)
+	}
+	e.press("O", "Z")
+	if got := spaces.LoadFilters(); got != (state.Filters{}) {
+		t.Errorf("saved %+v after turning them off", got)
 	}
 }

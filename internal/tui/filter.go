@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/state"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
@@ -96,11 +97,10 @@ func (m *sidebar) clearFilter() {
 
 // toggleAttention narrows the spaces list to the sessions whose programs are not idle, see
 // spaces.AttentionRows, or shows all of it again, the cursor on the row it was on when that shows. It
-// applies along with the text filter, and unlike the folds it is this sidebar's alone and not saved.
+// applies along with the text filter, and is saved, as the folds are, so a new sidebar starts with it.
 func (m *sidebar) toggleAttention() tea.Cmd {
 	m.attending = !m.attending
-	m.setRows()
-	m.scrollToCursor()
+	m.filtersChanged()
 	return nil
 }
 
@@ -108,8 +108,7 @@ func (m *sidebar) toggleAttention() tea.Cmd {
 // it again, as toggleAttention does.
 func (m *sidebar) toggleOpen() tea.Cmd {
 	m.openOnly = !m.openOnly
-	m.setRows()
-	m.scrollToCursor()
+	m.filtersChanged()
 	return nil
 }
 
@@ -117,9 +116,17 @@ func (m *sidebar) toggleOpen() tea.Cmd {
 // again, as toggleAttention does.
 func (m *sidebar) toggleAwake() tea.Cmd {
 	m.awakeOnly = !m.awakeOnly
+	m.filtersChanged()
+	return nil
+}
+
+// filtersChanged saves the filters on and shows the rows they keep.
+func (m *sidebar) filtersChanged() {
+	if err := spaces.SaveFilters(state.Filters{Attention: m.attending, Open: m.openOnly, Awake: m.awakeOnly}); err != nil {
+		m.failed = err
+	}
 	m.setRows()
 	m.scrollToCursor()
-	return nil
 }
 
 // filterSummary names the filters on, for the SPACES title: active for the attention filter, open for the

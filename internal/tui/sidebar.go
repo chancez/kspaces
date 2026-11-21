@@ -133,6 +133,7 @@ type sidebar struct {
 	zones map[string][]look.Zone
 	// The spaces list's filters, see filter.go: the query narrows rows while filtering, the attention
 	// filter while attending, the open filter while openOnly, and the suspended filter while awakeOnly.
+	// All but the query are saved, see filtersChanged.
 	filter    textinput.Model
 	filtering bool
 	attending bool
@@ -145,7 +146,20 @@ type sidebar struct {
 
 func newSidebar(self int) *sidebar {
 	th := look.New(true)
-	return &sidebar{th: th, self: self, folded: map[string]bool{}, hidden: map[string]bool{}, mouse: &pixelMouse{}, filter: newFilter(th), poller: spaces.NewPoller(), statusRows: spaces.LoadSplit()}
+	filters := spaces.LoadFilters()
+	return &sidebar{
+		th:         th,
+		self:       self,
+		folded:     map[string]bool{},
+		hidden:     map[string]bool{},
+		mouse:      &pixelMouse{},
+		filter:     newFilter(th),
+		poller:     spaces.NewPoller(),
+		statusRows: spaces.LoadSplit(),
+		attending:  filters.Attention,
+		openOnly:   filters.Open,
+		awakeOnly:  filters.Awake,
+	}
 }
 
 // navigating is whether keys are moving the cursor, so it and the entry under it should be drawn.
