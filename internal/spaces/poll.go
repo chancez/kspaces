@@ -150,9 +150,9 @@ type Poller struct {
 	git        *gitstate.Watcher
 	// written is what was last written, so unchanged states are not written again.
 	written []byte
-	// saveWidth saves the sidebar dock's dragged width as the config's, nil for none; drag follows the dock
-	// for it.
-	saveWidth func(width int) error
+	// saveWidth saves the width the sidebar's dock was dragged to from the config's width cfg, nil for
+	// none; drag follows the dock for it.
+	saveWidth func(width, cfg int) error
 	drag      dockDrag
 }
 
@@ -161,7 +161,7 @@ func NewPoller() *Poller {
 	p := newPoller(gitPath(), loadSpaces)
 	p.list = kitty.ListWindows
 	p.newWatcher = gitstate.NewWatcher
-	p.saveWidth = config.SaveSidebarWidth
+	p.saveWidth = saveDockWidth
 	return p
 }
 
@@ -248,8 +248,9 @@ func (p *Poller) followDock(sh Shared) {
 		return
 	}
 	cfg := sh.Config.Sidebar.Width
-	if w := p.drag.observe(dockWidth(kitty.SidebarWidths(sh.Windows), cfg), cfg); w != 0 {
-		if err := p.saveWidth(w); err != nil {
+	width := SidebarWidth(cfg, state.Load().Sidebar)
+	if w := p.drag.observe(dockWidth(kitty.SidebarWidths(sh.Windows), width), width); w != 0 {
+		if err := p.saveWidth(w, cfg); err != nil {
 			logs.Error("saving the dragged sidebar width", err)
 		}
 	}

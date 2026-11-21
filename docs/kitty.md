@@ -523,8 +523,8 @@ active tab's. `kspaces_watcher.py`:
   gets it, and any sidebar beyond the first is closed;
 - sizes the dock to `[sidebar] width`, all of it the sidebar's (kitty's dock border, if any, is the
   separator), and resizes it when it changes. Dragging the sidebar's border resizes it, and the sidebar
-  writes the new width to `[sidebar] width`, in the file that sets it, once it has held for a poll, so the
-  next sidebar opens at it;
+  keeps the new width in `$XDG_STATE_HOME/kspaces/state.json` once it has held for a poll, so the next
+  sidebar opens at it. It stands in for `[sidebar] width` until that is changed;
 - hides the tab bar of the panels kspaces opens, marked with the `kspaces_popup` user variable: kitty has
   no option for one OS window's tab bar, and `tab_bar_filter` always shows the active tab, so it sets
   kitty's own flag for it, which a config reload resets and its next check, within two seconds, sets again;

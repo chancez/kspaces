@@ -1,8 +1,28 @@
 package spaces
 
+import (
+	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/state"
+)
+
 // A sidebar's dock can be dragged to another width in kitty 0.51. The sidebar saves the width it is
-// dragged to as the config's, so the next sidebar opens at it, telling a drag from kitty.conf's watcher
+// dragged to in state.json, so the next sidebar opens at it, telling a drag from kitty.conf's watcher
 // resizing the docks to a width just set in the config by which of the two changed first.
+
+// SidebarWidth is the sidebar's width for the config's width cfg: the one the dock was dragged to, see
+// state.Sidebar.Width, while cfg is the one it was dragged from and it is a width the config allows, else
+// cfg.
+func SidebarWidth(cfg int, s state.Sidebar) int {
+	if s.Width != 0 && s.WidthOver == cfg && s.Width >= config.MinSidebarWidth && s.Width <= config.MaxSidebarWidth {
+		return s.Width
+	}
+	return cfg
+}
+
+// saveDockWidth saves width as the one the dock was dragged to from the config's width cfg.
+func saveDockWidth(width, cfg int) error {
+	return state.Update(func(s *state.State) { s.Sidebar.Width, s.Sidebar.WidthOver = width, cfg })
+}
 
 // dockDrag follows the sidebar docks' width and the config's from one poll to the next, see observe.
 type dockDrag struct {

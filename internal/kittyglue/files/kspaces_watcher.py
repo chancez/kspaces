@@ -44,8 +44,10 @@ FOCUS_SOCKET = os.path.join(
     os.path.join(os.environ['XDG_RUNTIME_DIR'], 'kspaces') if os.environ.get('XDG_RUNTIME_DIR')
     else os.path.join(tempfile.gettempdir(), f'kspaces-{os.getuid()}'),
     f'focus-{os.getpid()}.sock')
-# kspaces' default for [sidebar] width, and how often its config is checked for a new one.
+# kspaces' default for [sidebar] width, the widths it allows, and how often its config is checked for a new
+# one.
 DEFAULT_WIDTH = 28
+MIN_WIDTH, MAX_WIDTH = 12, 120
 CONFIG_CHECK_SECONDS = 2
 # The first kitty with OS window docks.
 MIN_VERSION = (0, 51, 0)
@@ -55,6 +57,9 @@ _scheduled = False
 _notifying = False
 # The config's sidebar width, and the files it was read from with their modification times.
 _width = (DEFAULT_WIDTH, None)
+# The width the dock was dragged to and the config's width it was dragged from, from kspaces' state, and the
+# state file's modification time.
+_dragged = (None, None, None)
 # The width last given to the sidebar, None before the first check.
 _applied = None
 
@@ -71,10 +76,37 @@ def config_paths():
     return [os.path.join(d, n) for n in ['config.toml'] + names]
 
 
-# sidebar_width is [sidebar] width from kspaces' config, from the file that sets it, read again only when
+# sidebar_width is the width the sidebar's dock was dragged to, kept in kspaces' state.json, while the
+# config's width is still the one it was dragged from, so a width set in the config since wins; else the
+# config's.
+def sidebar_width():
+    global _dragged
+    cfg = config_width()
+    base = os.environ.get('XDG_STATE_HOME') or os.path.expanduser('~/.local/state')
+    path = os.path.join(base, 'kspaces', 'state.json')
+    try:
+        mtime = os.stat(path).st_mtime
+    except OSError:
+        mtime = None
+    if mtime != _dragged[2]:
+        width = over = None
+        try:
+            with open(path, 'rb') as f:
+                sidebar = json.load(f).get('sidebar', {})
+            width, over = sidebar.get('width'), sidebar.get('widthOver')
+        except (OSError, ValueError, AttributeError):
+            pass
+        _dragged = (width, over, mtime)
+    width, over, _ = _dragged
+    if isinstance(width, int) and MIN_WIDTH <= width <= MAX_WIDTH and over == cfg:
+        return width
+    return cfg
+
+
+# config_width is [sidebar] width from kspaces' config, from the file that sets it, read again only when
 # the files change. kspaces checks the config itself and shows what is wrong with it in the sidebar, so
 # here a value it would reject just keeps the width there was.
-def sidebar_width():
+def config_width():
     global _width
     stamps = []
     for path in config_paths():
@@ -92,7 +124,7 @@ def sidebar_width():
             if isinstance(sidebar, dict) and 'width' in sidebar:
                 width = sidebar['width']
                 break
-        if not (isinstance(width, int) and 12 <= width <= 120):
+        if not (isinstance(width, int) and MIN_WIDTH <= width <= MAX_WIDTH):
             width = _width[0]
     except (OSError, ValueError):
         width = _width[0]
@@ -105,7 +137,7 @@ def docks(tm):
 
 
 # resize_docks gives the sidebar width, as dragging its border does, which lays out every tab of its OS
-# window again. Only when the config's width changes, so a dragged sidebar is not put back. kspaces docks
+# window again. Only when sidebar_width changes, so a dragged sidebar is not put back. kspaces docks
 # are sized in columns, never in percent.
 def resize_docks(boss, width):
     for tm in tuple(boss.all_tab_managers):

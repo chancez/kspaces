@@ -38,6 +38,11 @@ type Sidebar struct {
 	Order map[string][]string `json:"order,omitempty"`
 	// StatusRows is the STATUS list's height as dragging the rule left it, 0 for the default.
 	StatusRows int `json:"statusRows,omitempty"`
+	// Width is the width in columns the sidebar's dock was dragged to, 0 for none. It is the sidebar's
+	// width while the config's [sidebar] width is still WidthOver, the one it was dragged from, so a width
+	// set in the config since wins. kspaces_watcher.py reads both.
+	Width     int `json:"width,omitempty"`
+	WidthOver int `json:"widthOver,omitempty"`
 	// Filters are the spaces list's filters on.
 	Filters Filters `json:"filters"`
 }
