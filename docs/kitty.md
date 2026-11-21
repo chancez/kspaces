@@ -414,7 +414,7 @@ A file with an error is left out, and only for its space: the space's row says `
 
 A repository can bring a `.kspaces.toml` with a clone, a pull or a branch checked out, and its commands
 run, so a file is used only once trusted, and only with the content trusted: kspaces keeps the sha256 of
-each file's trusted content, by its path, in `$XDG_STATE_HOME/kspaces/trust`. Until then, and again
+each file's trusted content, by its path, in `$XDG_STATE_HOME/kspaces/state.json`. Until then, and again
 whenever the file changes, it is left out and the space's row has a lock and `untrusted config` where its
 git state goes. **Trust space config**, in the menu of the space's rows, and `kspaces trust [PATH]`, for the
 space PATH is in, or the current directory's, open a form showing what the file adds: each command and the

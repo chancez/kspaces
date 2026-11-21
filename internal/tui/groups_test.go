@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/state"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
@@ -42,14 +42,9 @@ func newGroupsEnv(t *testing.T) *sidebarEnv {
 	return e
 }
 
-// stateFile is what the state file name says.
-func stateFile(t *testing.T, name string) string {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join(os.Getenv("XDG_STATE_HOME"), "kspaces", name))
-	if err != nil && !os.IsNotExist(err) {
-		t.Fatal(err)
-	}
-	return string(data)
+// savedHidden are the hidden groups saved.
+func savedHidden() []string {
+	return state.Load().Sidebar.Hidden
 }
 
 // The rows of groupsFixture, by what they show.
@@ -164,16 +159,16 @@ func TestFoldGroupKey(t *testing.T) {
 	e.press("space")
 	type state struct {
 		Screen, Cursor []string
-		Folded         string
+		Folded         []string
 	}
 	got := state{e.spacesScreen(), e.highlighted(), e.folded()}
-	want := state{groupsScreen("", workFolded, "", homeHeader, groupKitty), []string{workFolded}, "/src/docs\ngroup:work\n"}
+	want := state{groupsScreen("", workFolded, "", homeHeader, groupKitty), []string{workFolded}, []string{"/src/docs", "group:work"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("folded:\n%#v\nwant\n%#v", got, want)
 	}
 	e.press("space")
 	got = state{e.spacesScreen(), e.highlighted(), e.folded()}
-	want = state{groupsScreen("", workHeader, groupGr[0], groupGr[1], groupGr[2], "", groupDocs, "", homeHeader, groupKitty), []string{workHeader}, "/src/docs\n"}
+	want = state{groupsScreen("", workHeader, groupGr[0], groupGr[1], groupGr[2], "", groupDocs, "", homeHeader, groupKitty), []string{workHeader}, []string{"/src/docs"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("unfolded:\n%#v\nwant\n%#v", got, want)
 	}
@@ -191,15 +186,15 @@ func TestFoldGroupClick(t *testing.T) {
 		on     string
 		click  func()
 		screen []string
-		saved  string
+		saved  []string
 	}{
-		{"icon", func() { e.click(fmt.Sprintf(caretZone, work), tea.MouseLeft) }, folded, "/src/docs\ngroup:work\n"},
-		{"name", func() { e.clickAt(x+3, y, tea.MouseLeft) }, unfolded, "/src/docs\n"},
-		{"leading rule", func() { e.clickAt(x, y, tea.MouseLeft) }, folded, "/src/docs\ngroup:work\n"},
-		{"trailing rule", func() { e.clickAt(x+20, y, tea.MouseLeft) }, unfolded, "/src/docs\n"},
+		{"icon", func() { e.click(fmt.Sprintf(caretZone, work), tea.MouseLeft) }, folded, []string{"/src/docs", "group:work"}},
+		{"name", func() { e.clickAt(x+3, y, tea.MouseLeft) }, unfolded, []string{"/src/docs"}},
+		{"leading rule", func() { e.clickAt(x, y, tea.MouseLeft) }, folded, []string{"/src/docs", "group:work"}},
+		{"trailing rule", func() { e.clickAt(x+20, y, tea.MouseLeft) }, unfolded, []string{"/src/docs"}},
 	} {
 		c.click()
-		if got := e.spacesScreen(); !reflect.DeepEqual(got, c.screen) || e.folded() != c.saved {
+		if got := e.spacesScreen(); !reflect.DeepEqual(got, c.screen) || !reflect.DeepEqual(e.folded(), c.saved) {
 			t.Errorf("%s clicked, folded %q:\n%q\nwant\n%q", c.on, e.folded(), got, c.screen)
 		}
 	}
@@ -236,17 +231,17 @@ func TestGroupsMenu(t *testing.T) {
 	type state struct {
 		Screen  []string
 		Windows []int
-		Hidden  string
+		Hidden  []string
 	}
 	now := func() state {
 		var windows []int
 		for _, s := range e.m.kitty.Statuses {
 			windows = append(windows, s.Window)
 		}
-		return state{e.spacesScreen(), windows, stateFile(t, "hidden")}
+		return state{e.spacesScreen(), windows, savedHidden()}
 	}
 	e.click(fmt.Sprintf(menuZone, 7), tea.MouseLeft)
-	hidden := state{groupsScreen("", homeHeader, groupKitty), []int{21, 23}, "work\n"}
+	hidden := state{groupsScreen("", homeHeader, groupKitty), []int{21, 23}, []string{"work"}}
 	if got := now(); e.m.menu != nil || !reflect.DeepEqual(got, hidden) {
 		t.Errorf("work hidden, menu open %v:\n%#v\nwant\n%#v", e.m.menu != nil, got, hidden)
 	}
@@ -274,7 +269,7 @@ func TestGroupsMenu(t *testing.T) {
 
 	e.click(sortZone, tea.MouseRight)
 	e.click(fmt.Sprintf(menuZone, 7), tea.MouseLeft)
-	shown := state{groupsScreen("", workHeader, groupGr[0], groupGr[1], groupGr[2], "", groupDocs, "", homeHeader, groupKitty), []int{20, 21, 22, 23}, ""}
+	shown := state{groupsScreen("", workHeader, groupGr[0], groupGr[1], groupGr[2], "", groupDocs, "", homeHeader, groupKitty), []int{20, 21, 22, 23}, nil}
 	if got := now(); !reflect.DeepEqual(got, shown) {
 		t.Errorf("work shown:\n%#v\nwant\n%#v", got, shown)
 	}

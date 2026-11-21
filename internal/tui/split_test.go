@@ -1,12 +1,11 @@
 package tui
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/chancez/kspaces/internal/state"
 )
 
 // Dragging the rule moves it as far as each list keeps a row, and letting go keeps the STATUS list's
@@ -34,9 +33,8 @@ func TestDragSplit(t *testing.T) {
 		}
 	}
 	e.m.Update(tea.MouseReleaseMsg{X: x, Y: 27, Button: tea.MouseLeft})
-	data, err := os.ReadFile(filepath.Join(os.Getenv("XDG_STATE_HOME"), "kspaces", "split"))
-	if err != nil || string(data) != "10\n" {
-		t.Fatalf("split file = %q, %v", data, err)
+	if got := state.Load().Sidebar.StatusRows; got != 10 {
+		t.Fatalf("saved status rows = %d, want 10", got)
 	}
 	if e.screen()[27] != strings.Repeat("\u2500", 30) {
 		t.Errorf("no rule at 27:\n%q", e.screen())

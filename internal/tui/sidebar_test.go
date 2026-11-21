@@ -19,6 +19,7 @@ import (
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/state"
 	"github.com/chancez/kspaces/internal/status"
 	"github.com/chancez/kspaces/internal/tui/interact"
 	"github.com/chancez/kspaces/internal/tui/look"
@@ -221,13 +222,9 @@ func (e *sidebarEnv) has(line string) bool {
 	return false
 }
 
-func (e *sidebarEnv) folded() string {
-	e.t.Helper()
-	data, err := os.ReadFile(filepath.Join(os.Getenv("XDG_STATE_HOME"), "kspaces", "folded"))
-	if err != nil && !os.IsNotExist(err) {
-		e.t.Fatal(err)
-	}
-	return string(data)
+// folded are the folded spaces and groups saved.
+func (e *sidebarEnv) folded() []string {
+	return state.Load().Sidebar.Folded
 }
 
 // Row icons, each with the two spaces a marker takes.
@@ -339,14 +336,14 @@ func TestFoldCaretClick(t *testing.T) {
 	if !e.has("\u25b6 "+blocked+"gr main") || e.has(here+blocked+"dev pr/me/dev") {
 		t.Errorf("gr is not folded:\n%s", strings.Join(e.screen(), "\n"))
 	}
-	if got, want := e.folded(), "/src/docs\n/src/gr\n"; got != want && got != "/src/gr\n/src/docs\n" {
+	if got, want := e.folded(), []string{"/src/docs", "/src/gr"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("folded file = %q, want %q", got, want)
 	}
 	e.click(fmt.Sprintf(caretZone, e.row("gr")), tea.MouseLeft)
 	if !e.has("\u25bc "+repoIcon+"gr main") || !e.has("  "+branchIcon+"fix fix") {
 		t.Errorf("gr is not unfolded:\n%s", strings.Join(e.screen(), "\n"))
 	}
-	if got := e.folded(); got != "/src/docs\n" {
+	if got := e.folded(); !reflect.DeepEqual(got, []string{"/src/docs"}) {
 		t.Errorf("folded file = %q", got)
 	}
 
@@ -370,7 +367,7 @@ func TestFoldKey(t *testing.T) {
 		t.Errorf("space on gr@dev: cursor on %q", got)
 	}
 	e.press("space", "j", "j", "j", "space")
-	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + repoIcon + "kitty master"}) || e.folded() != "/src/docs\n" {
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"  " + repoIcon + "kitty master"}) || !reflect.DeepEqual(e.folded(), []string{"/src/docs"}) {
 		t.Errorf("space on kitty: cursor on %q, folded %q", got, e.folded())
 	}
 }

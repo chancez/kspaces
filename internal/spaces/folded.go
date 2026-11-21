@@ -1,110 +1,55 @@
 package spaces
 
 import (
-	"bufio"
-	"bytes"
-	"fmt"
 	"maps"
-	"os"
-	"path/filepath"
 	"slices"
-	"strings"
+
+	"github.com/chancez/kspaces/internal/state"
 )
 
-// statePath is the file name in kspaces' state directory, $XDG_STATE_HOME/kspaces, where what the sidebar
-// keeps across restarts is kept.
-func statePath(name string) (string, error) {
-	dir := os.Getenv("XDG_STATE_HOME")
-	if dir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("finding the home directory: %w", err)
-		}
-		dir = filepath.Join(home, ".local", "state")
-	}
-	return filepath.Join(dir, "kspaces", name), nil
-}
-
-// readState is the state file name, nil when it is missing or unreadable.
-func readState(name string) []byte {
-	path, err := statePath(name)
-	if err != nil {
-		return nil
-	}
-	data, _ := os.ReadFile(path)
-	return data
-}
-
-// writeState replaces the state file name with data, so a sidebar reading it never sees half of it.
-func writeState(name string, data []byte) error {
-	path, err := statePath(name)
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
-}
-
-// The spaces whose linked worktrees are hidden in the sidebar, by root, and the groups whose spaces are,
-// by GroupKey, a line each.
-const foldedFile = "folded"
-
-// GroupKey is how the folded file names the group called name. A root is a path, absolute once ~/ is
+// GroupKey is how the folded spaces name the group called name. A root is a path, absolute once ~/ is
 // expanded, as kitty opens sessions in it from anywhere, so it never starts with group:.
 func GroupKey(name string) string {
 	return "group:" + name
 }
 
-// LoadFolded reads the folded spaces and groups. A missing file folds none.
+// LoadFolded reads the spaces whose linked worktrees are hidden in the sidebar, by root, and the groups
+// whose spaces are, by GroupKey. None are folded when none are saved.
 func LoadFolded() map[string]bool {
-	return readLines(foldedFile)
+	return toSet(state.Load().Sidebar.Folded)
 }
 
-// SaveFolded writes the folded spaces and groups.
+// SaveFolded saves the folded spaces and groups.
 func SaveFolded(folded map[string]bool) error {
-	return writeLines(foldedFile, folded)
+	return state.Update(func(s *state.State) { s.Sidebar.Folded = fromSet(folded) })
 }
 
-// The groups left out of the sidebar, by name, a line each. Shared, as the folds are, so hiding a group
-// hides it in every sidebar, and it stays hidden after a restart.
-const hiddenFile = "hidden"
-
-// LoadHidden reads the hidden groups. A missing file hides none.
+// LoadHidden reads the groups left out of the sidebar, by name. Kept with the folds, so a hidden group
+// stays hidden after a restart.
 func LoadHidden() map[string]bool {
-	return readLines(hiddenFile)
+	return toSet(state.Load().Sidebar.Hidden)
 }
 
-// SaveHidden writes the hidden groups.
+// SaveHidden saves the hidden groups.
 func SaveHidden(hidden map[string]bool) error {
-	return writeLines(hiddenFile, hidden)
+	return state.Update(func(s *state.State) { s.Sidebar.Hidden = fromSet(hidden) })
 }
 
-// readLines is the set of lines of the state file name.
-func readLines(name string) map[string]bool {
+func toSet(names []string) map[string]bool {
 	ans := map[string]bool{}
-	sc := bufio.NewScanner(bytes.NewReader(readState(name)))
-	for sc.Scan() {
-		if line := strings.TrimSpace(sc.Text()); line != "" {
-			ans[line] = true
-		}
+	for _, n := range names {
+		ans[n] = true
 	}
 	return ans
 }
 
-// writeLines replaces the state file name with the lines set in lines, sorted, so it reads the same
-// whatever order the map has.
-func writeLines(name string, lines map[string]bool) error {
-	var b strings.Builder
-	for _, line := range slices.Sorted(maps.Keys(lines)) {
-		if lines[line] {
-			b.WriteString(line + "\n")
+// fromSet is the names set in set, sorted, so the file reads the same whatever order the map has.
+func fromSet(set map[string]bool) []string {
+	var ans []string
+	for _, n := range slices.Sorted(maps.Keys(set)) {
+		if set[n] {
+			ans = append(ans, n)
 		}
 	}
-	return writeState(name, []byte(b.String()))
+	return ans
 }

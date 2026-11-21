@@ -16,6 +16,7 @@ import (
 	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/logs"
+	"github.com/chancez/kspaces/internal/state"
 )
 
 // Shared is what one load sees that is the same from every window of a kitty: all of a Snapshot but what
@@ -119,8 +120,9 @@ func (sh Shared) View(self int) Snapshot {
 	}
 	// The missing worktrees go in the spaces, which are this view's own copies: what the load holds, and
 	// git is asked about in targets, is only what git lists.
-	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, st.Sessions, sh.Saved), Folded: LoadFolded(), Hidden: LoadHidden(), Saved: saved, Suspended: suspended, Kitty: st}
-	snap.Order = Order{Mode: LoadSort(), Worktrees: LoadOrder(), Groups: sh.Config.Groups, Focused: st.Focused, Statuses: st.Statuses}
+	kept := state.Load().Sidebar
+	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, st.Sessions, sh.Saved), Folded: toSet(kept.Folded), Hidden: toSet(kept.Hidden), Saved: saved, Suspended: suspended, Kitty: st}
+	snap.Order = Order{Mode: sortMode(kept.Sort), Worktrees: worktreeOrder(kept.Order), Groups: sh.Config.Groups, Focused: st.Focused, Statuses: st.Statuses}
 	if sh.KittyErr != "" {
 		snap.Err = errors.New(sh.KittyErr)
 	}

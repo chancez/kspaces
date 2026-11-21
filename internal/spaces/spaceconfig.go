@@ -6,10 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -17,6 +15,7 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/git"
+	"github.com/chancez/kspaces/internal/state"
 )
 
 // A space's .kspaces.toml is a repository's own file, often committed, so a clone, a pull or a branch
@@ -147,28 +146,9 @@ func readSpaceFile(path string) (spaceFile, error) {
 	})
 }
 
-// The space files trusted, a line each: the sha256 of the content trusted, two spaces and the file's
-// absolute path, as sha256sum writes them.
-const trustFile = "trust"
-
-var trusts statCache[map[string]string]
-
-// loadTrust is the trusted hashes by path.
+// loadTrust is the sha256 of the content trusted of each space file, by path.
 func loadTrust() map[string]string {
-	path, err := statePath(trustFile)
-	if err != nil {
-		return nil
-	}
-	ans, _ := trusts.get(path, func(data []byte) map[string]string {
-		ans := map[string]string{}
-		for line := range strings.Lines(string(data)) {
-			if sum, file, ok := strings.Cut(strings.TrimSuffix(line, "\n"), "  "); ok {
-				ans[file] = sum
-			}
-		}
-		return ans
-	})
-	return ans
+	return state.Load().Trust
 }
 
 func contentSum(data []byte) string {
@@ -193,16 +173,12 @@ func Revoke(path string) error {
 }
 
 func editTrust(edit func(map[string]string)) error {
-	t := maps.Clone(loadTrust())
-	if t == nil {
-		t = map[string]string{}
-	}
-	edit(t)
-	var b strings.Builder
-	for _, path := range slices.Sorted(maps.Keys(t)) {
-		fmt.Fprintf(&b, "%s  %s\n", t[path], path)
-	}
-	return writeState(trustFile, []byte(b.String()))
+	return state.Update(func(s *state.State) {
+		if s.Trust == nil {
+			s.Trust = map[string]string{}
+		}
+		edit(s.Trust)
+	})
 }
 
 // ErrUntrusted is why a layout is not saved to a space's file that is not trusted: what it has would be

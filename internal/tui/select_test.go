@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/chancez/kspaces/internal/state"
 	"github.com/chancez/kspaces/internal/tui/cells"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
@@ -163,7 +164,7 @@ func TestSelectPaint(t *testing.T) {
 	if got, want := e.spacesScreen(), selectScreen(unticked, partly, ticked, ticked, ticked, unticked); !reflect.DeepEqual(got, want) {
 		t.Errorf("painted down:\n%q\nwant\n%q", got, want)
 	}
-	if got := stateFile(t, "order"); got != "" {
+	if got := state.Load().Sidebar.Order; got != nil {
 		t.Errorf("painting moved rows: %q", got)
 	}
 	e.pressAt(kitty, 0)

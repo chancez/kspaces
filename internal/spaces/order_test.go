@@ -2,11 +2,11 @@ package spaces
 
 import (
 	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/state"
 	"github.com/chancez/kspaces/internal/status"
 )
 
@@ -77,8 +77,7 @@ func TestOrderModes(t *testing.T) {
 // The sort mode and the worktrees' order are saved in the state directory, which every sidebar's View
 // reads.
 func TestOrderState(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", dir)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	cfg := config.Config{}
 	view := func() Order {
 		o := Shared{Config: &cfg}.View(0).Order
@@ -96,25 +95,25 @@ func TestOrderState(t *testing.T) {
 	if got, want := view(), (Order{Mode: SortStatus, Worktrees: map[string][]string{"/src/gr": {"c", "a"}}}); !reflect.DeepEqual(got, want) {
 		t.Fatalf("saved: %#v, want %#v", got, want)
 	}
-	files := map[string]string{}
-	for _, name := range []string{"sort", "order"} {
-		data, err := os.ReadFile(filepath.Join(dir, "kspaces", name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		files[name] = string(data)
+	if got, want := state.Load().Sidebar, (state.Sidebar{Sort: "status", Order: map[string][]string{"/src/gr": {"c", "a"}}}); !reflect.DeepEqual(got, want) {
+		t.Fatalf("state %#v, want %#v", got, want)
 	}
-	if want := map[string]string{"sort": "status\n", "order": "{\n  \"/src/gr\": [\n    \"c\",\n    \"a\"\n  ]\n}\n"}; !reflect.DeepEqual(files, want) {
-		t.Fatalf("files %q, want %q", files, want)
+	// A mode no kspaces wrote reads as manual, and a broken file as nothing saved.
+	if err := state.Update(func(s *state.State) { s.Sidebar.Sort = "sideways" }); err != nil {
+		t.Fatal(err)
 	}
-	// What no kspaces wrote reads as nothing saved.
-	for name, junk := range map[string]string{"sort": "sideways\n", "order": "[1]"} {
-		if err := os.WriteFile(filepath.Join(dir, "kspaces", name), []byte(junk), 0o600); err != nil {
-			t.Fatal(err)
-		}
+	if got, want := view(), (Order{Mode: SortManual, Worktrees: map[string][]string{"/src/gr": {"c", "a"}}}); !reflect.DeepEqual(got, want) {
+		t.Fatalf("unknown mode: %#v, want %#v", got, want)
+	}
+	path, err := state.Path()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("[1]"), 0o600); err != nil {
+		t.Fatal(err)
 	}
 	if got, want := view(), (Order{Mode: SortManual, Worktrees: map[string][]string{}}); !reflect.DeepEqual(got, want) {
-		t.Fatalf("broken files: %#v, want %#v", got, want)
+		t.Fatalf("broken file: %#v, want %#v", got, want)
 	}
 	// The modes go round.
 	if got := []SortMode{SortManual.Next(), SortActivity.Next(), SortStatus.Next(), SortMode("").Next()}; !reflect.DeepEqual(got, []SortMode{SortActivity, SortStatus, SortManual, SortActivity}) {

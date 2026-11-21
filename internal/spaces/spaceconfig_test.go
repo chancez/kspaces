@@ -10,13 +10,13 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/gittest"
+	"github.com/chancez/kspaces/internal/state"
 )
 
 // A space file is used only once trusted, and only for the content trusted: a change makes it untrusted
 // again until trusted anew, and revoking forgets it. The trust file has a line per file trusted.
 func TestSpaceFileTrust(t *testing.T) {
-	state := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", state)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	r := gittest.New(t)
 	r.Commit("first")
 	cfg, err := config.Parse(fmt.Sprintf("spaces = [%q]\n", r.Dir))
@@ -49,12 +49,8 @@ func TestSpaceFileTrust(t *testing.T) {
 	merged := cfg
 	merged.Commands = []config.Command{{Name: "test", Run: []string{"make", "test"}, Open: "tab"}}
 	check("trusted", space(&merged, false))
-	trust, err := os.ReadFile(filepath.Join(state, "kspaces", "trust"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := contentSum(data) + "  " + file + "\n"; string(trust) != want {
-		t.Errorf("trust file %q, want %q", trust, want)
+	if got, want := state.Load().Trust, map[string]string{file: contentSum(data)}; !reflect.DeepEqual(got, want) {
+		t.Errorf("trusted %q, want %q", got, want)
 	}
 	write("[[commands]]\nname = \"test\"\nrun = [\"make\", \"test\", \"-j\"]\n")
 	check("changed", space(nil, true))
@@ -67,8 +63,8 @@ func TestSpaceFileTrust(t *testing.T) {
 		t.Fatal(err)
 	}
 	check("revoked", space(nil, true))
-	if trust, err := os.ReadFile(filepath.Join(state, "kspaces", "trust")); err != nil || string(trust) != "" {
-		t.Errorf("trust file after revoking %q, %v", trust, err)
+	if got := state.Load().Trust; got != nil {
+		t.Errorf("trusted after revoking %q", got)
 	}
 }
 

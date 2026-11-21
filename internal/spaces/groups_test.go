@@ -1,12 +1,11 @@
 package spaces
 
 import (
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/state"
 	"github.com/chancez/kspaces/internal/status"
 )
 
@@ -158,31 +157,23 @@ func TestShownStatuses(t *testing.T) {
 	}
 }
 
-// The hidden groups and the folds, groups' among the spaces', are saved a line each, in order, and read
-// back.
+// The hidden groups and the folds, groups' among the spaces', are saved in order, and read back.
 func TestGroupState(t *testing.T) {
-	dir := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", dir)
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	if err := SaveHidden(map[string]bool{"work": true, "art": true, "play": false}); err != nil {
 		t.Fatal(err)
 	}
 	if err := SaveFolded(map[string]bool{"/src/gr": true, GroupKey("work"): true, "/src/kitty": false}); err != nil {
 		t.Fatal(err)
 	}
-	type state struct {
-		Hidden, Folded         string
+	type saved struct {
+		Hidden, Folded         []string
 		LoadHidden, LoadFolded map[string]bool
 	}
-	read := func(name string) string {
-		data, err := os.ReadFile(filepath.Join(dir, "kspaces", name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		return string(data)
-	}
-	got := state{read("hidden"), read("folded"), LoadHidden(), LoadFolded()}
-	want := state{
-		Hidden: "art\nwork\n", Folded: "/src/gr\ngroup:work\n",
+	kept := state.Load().Sidebar
+	got := saved{kept.Hidden, kept.Folded, LoadHidden(), LoadFolded()}
+	want := saved{
+		Hidden: []string{"art", "work"}, Folded: []string{"/src/gr", "group:work"},
 		LoadHidden: map[string]bool{"art": true, "work": true},
 		LoadFolded: map[string]bool{"/src/gr": true, "group:work": true},
 	}

@@ -54,7 +54,7 @@ missing worktrees: its sessions are listed above the spaces as before.
 Clicking a row, or `enter` on it, switches to its session, creating it the first time, with its
 [default layout](kitty.md#layouts) if it has one, but for a missing worktree with no windows. Clicking a
 space's triangle, or `space` on its row, folds its linked worktrees into the space's row. Folded spaces are
-kept in `$XDG_STATE_HOME/kspaces/folded`, so they stay folded across restarts.
+kept in `$XDG_STATE_HOME/kspaces/state.json`, so they stay folded across restarts.
 
 Resting the mouse on a row for 2 seconds shows its worktree in detail in a popup under it, as the
 picker's preview does: its space, path, branch, changes, upstream, PR and its state, checks and review in
@@ -117,14 +117,14 @@ icon. While filtering, which ignores folds, there is no icon. Within a group the
 Clicking anywhere on a header, its rule, its name or its icon, or `space` on it, folds the group's spaces
 into it, as a
 space folds its worktrees; its menu has **Fold group** and **Unfold group**. Folded groups are kept with
-the folded spaces, in `$XDG_STATE_HOME/kspaces/folded`, as `group:NAME`, which no space's root is. A
+the folded spaces, in `$XDG_STATE_HOME/kspaces/state.json`, as `group:NAME`, which no space's root is. A
 folded group's header stands for its spaces' sessions, as a folded space does for its worktrees: it is
 marked as the sidebar's own session's row while that session is in it, and the attention filter shows it
 when any of them is not
 idle.
 
 The list's menu has a Groups section, each group ticked while it shows; choosing one hides it, header and
-spaces, and choosing it again shows it. Hidden groups are kept in `$XDG_STATE_HOME/kspaces/hidden`, so
+spaces, and choosing it again shows it. Hidden groups are kept in `$XDG_STATE_HOME/kspaces/state.json`, so
 they stay hidden across restarts, unlike the attention filter: hiding work for the evening should not
 come back with a restart.
 A hidden group is out of sight, so its sessions no longer call for attention: their entries leave the
@@ -148,7 +148,7 @@ In every mode a space's main worktree stays its own row, first, and its missing 
 linked worktrees move within it. Spaces in [groups](#groups) are sorted within their group, and the groups
 keep their order. The sessions in no space stay above the spaces, ordered the same way, by
 name when manual. Activity is when one of a session's windows, docks left out, was last focused, as
-kitty's `ls` reports it. The mode is kept in `$XDG_STATE_HOME/kspaces/sort`, manual until one is chosen,
+kitty's `ls` reports it. The mode is kept in `$XDG_STATE_HOME/kspaces/state.json`, manual until one is chosen,
 so every sidebar sorts the same way.
 
 The automatic modes sort again at each refresh, and the cursor stays on its row wherever that goes. While
@@ -172,7 +172,7 @@ together as the list shows them. Moving it into another group rewrites its entry
 comments, to the config file that lists the most of that group's spaces, as **Add space** picks the file,
 so a space dragged into the group a `work.toml` holds goes there. A group set in a `[space.NAME]` table
 stays that table's: dragging the space out of it says to change it there. Moving a worktree keeps its
-space's order, by the worktrees' directories, in `$XDG_STATE_HOME/kspaces/order`. Either moves the order of
+space's order, by the worktrees' directories, in `$XDG_STATE_HOME/kspaces/state.json`. Either moves the order of
 every sidebar.
 
 Moving in activity or status switches to manual, starting from the order shown: the spaces are written to
@@ -565,7 +565,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 
 Each list scrolls on its own. A list with entries out of view says how many on its first or last row;
 clicking that row scrolls a page. Dragging the rule above STATUS resizes the two lists; the STATUS list
-keeps its height in every sidebar and across restarts, in `$XDG_STATE_HOME/kspaces/split`.
+keeps its height in every sidebar and across restarts, in `$XDG_STATE_HOME/kspaces/state.json`.
 
 `?` lists over the sidebar the keys that do something where the cursor is: the row's, then the list's and
 the sidebar's, each under the name of what it acts on, and in the select mode the mode's first. In the

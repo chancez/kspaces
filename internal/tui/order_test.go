@@ -12,6 +12,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/state"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
@@ -36,14 +37,9 @@ func newOrderEnv(t *testing.T) *sidebarEnv {
 	return e
 }
 
-// savedSort is what the sort file says.
-func savedSort(t *testing.T) string {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join(os.Getenv("XDG_STATE_HOME"), "kspaces", "sort"))
-	if err != nil && !os.IsNotExist(err) {
-		t.Fatal(err)
-	}
-	return string(data)
+// savedSort is the sort mode saved.
+func savedSort() string {
+	return state.Load().Sidebar.Sort
 }
 
 // The spaces list in each sort mode, its button on the title showing the mode.
@@ -121,15 +117,15 @@ func TestSortButton(t *testing.T) {
 		screen []string
 		saved  string
 	}{
-		{"click", func() { e.click(sortZone, tea.MouseLeft) }, activityScreen, "activity\n"},
-		{"s", func() { e.press("s") }, statusScreen, "status\n"},
-		{"click", func() { e.click(sortZone, tea.MouseLeft) }, manualScreen, "manual\n"},
+		{"click", func() { e.click(sortZone, tea.MouseLeft) }, activityScreen, "activity"},
+		{"s", func() { e.press("s") }, statusScreen, "status"},
+		{"click", func() { e.click(sortZone, tea.MouseLeft) }, manualScreen, "manual"},
 	} {
 		step.cycle()
 		if got := e.spacesScreen(); !reflect.DeepEqual(got, step.screen) {
 			t.Errorf("after a %s:\n%q\nwant\n%q", step.name, got, step.screen)
 		}
-		if got := savedSort(t); got != step.saved {
+		if got := savedSort(); got != step.saved {
 			t.Errorf("after a %s saved %q, want %q", step.name, got, step.saved)
 		}
 		if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev"}) {
@@ -168,7 +164,7 @@ func TestSortMenu(t *testing.T) {
 	if got := e.spacesScreen(); e.m.menu != nil || !reflect.DeepEqual(got, statusScreen) {
 		t.Errorf("Status chose, menu open %v:\n%q\nwant\n%q", e.m.menu != nil, got, statusScreen)
 	}
-	if got := savedSort(t); got != "status\n" {
+	if got := savedSort(); got != "status" {
 		t.Errorf("saved %q", got)
 	}
 	e.click(sortZone, tea.MouseRight)
@@ -206,14 +202,9 @@ func newConfig(t *testing.T, text string) func() string {
 	}
 }
 
-// savedOrder is what the worktrees' order file says.
-func savedOrder(t *testing.T) string {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join(os.Getenv("XDG_STATE_HOME"), "kspaces", "order"))
-	if err != nil && !os.IsNotExist(err) {
-		t.Fatal(err)
-	}
-	return string(data)
+// savedOrder is the worktrees' order saved.
+func savedOrder() map[string][]string {
+	return state.Load().Sidebar.Order
 }
 
 // K and J move the cursor's row up and down, sent from another window too: a linked worktree within its
@@ -223,12 +214,13 @@ func TestMoveKeys(t *testing.T) {
 	e := newOrderEnv(t)
 	cfg := newConfig(t, orderConfig)
 	type state struct {
-		Screen              []string
-		Cursor              []string
-		Config, Order, Sort string
+		Screen       []string
+		Cursor       []string
+		Config, Sort string
+		Order        map[string][]string
 	}
 	now := func() state {
-		return state{e.spacesScreen(), e.highlighted(), cfg(), savedOrder(t), savedSort(t)}
+		return state{Screen: e.spacesScreen(), Cursor: e.highlighted(), Config: cfg(), Order: savedOrder(), Sort: savedSort()}
 	}
 	gr := []string{"\u25bc " + repoIcon + "gr main", here + blocked + "dev pr/me/dev", "  " + branchIcon + "fix fix"}
 	dev, fix := gr[1], gr[2]
@@ -241,7 +233,7 @@ func TestMoveKeys(t *testing.T) {
 	e.press("J")
 	want := state{
 		Screen: screen(spacesTitle, "", gr[0], fix, dev, "", kitty, "", docs, "", broken),
-		Cursor: []string{dev}, Config: orderConfig, Order: "{\n  \"/src/gr\": [\n    \"fix\",\n    \"dev\"\n  ]\n}\n",
+		Cursor: []string{dev}, Config: orderConfig, Order: map[string][]string{"/src/gr": {"fix", "dev"}},
 	}
 	if got := now(); !reflect.DeepEqual(got, want) {
 		t.Errorf("J on dev:\n%#v\nwant\n%#v", got, want)
@@ -265,7 +257,7 @@ func TestMoveKeys(t *testing.T) {
 	want = state{
 		Screen: screen(spacesTitle, "", gr[0], dev, fix, "", kitty, "", docs, "", broken),
 		Cursor: []string{dev}, Config: orderConfig,
-		Order: "{\n  \"/src/docs\": [\n    \"notes\"\n  ],\n  \"/src/gr\": [\n    \"dev\",\n    \"fix\"\n  ]\n}\n", Sort: "manual\n",
+		Order: map[string][]string{"/src/docs": {"notes"}, "/src/gr": {"dev", "fix"}}, Sort: "manual",
 	}
 	if got := now(); !reflect.DeepEqual(got, want) {
 		t.Errorf("K in activity:\n%#v\nwant\n%#v", got, want)
@@ -379,22 +371,23 @@ func TestDragWorktree(t *testing.T) {
 	cfg := newConfig(t, orderConfig)
 	head, dev, fix := "\u25bc "+repoIcon+"gr main", here+blocked+"dev pr/me/dev", "  "+branchIcon+"fix fix"
 	type state struct {
-		Rows, Lit     []string
-		Config, Order string
+		Rows, Lit []string
+		Config    string
+		Order     map[string][]string
 	}
-	now := func() state { return state{e.spacesScreen()[4:7], e.highlighted(), cfg(), savedOrder(t)} }
+	now := func() state { return state{e.spacesScreen()[4:7], e.highlighted(), cfg(), savedOrder()} }
 
 	for _, cancel := range []func(){
 		func() { e.press("esc") },
 		func() { e.m.Update(tea.MouseClickMsg{X: 4, Y: 6, Button: tea.MouseRight}) },
 	} {
 		e.pressOn("gr@dev", 6, 12)
-		if got, want := now(), (state{[]string{head, fix, dev}, []string{dev}, orderConfig, ""}); !reflect.DeepEqual(got, want) {
+		if got, want := now(), (state{[]string{head, fix, dev}, []string{dev}, orderConfig, nil}); !reflect.DeepEqual(got, want) {
 			t.Errorf("dragging dev past the space:\n%#v\nwant\n%#v", got, want)
 		}
 		cancel()
 		e.letGo(12)
-		if got, want := now(), (state{[]string{head, dev, fix}, nil, orderConfig, ""}); !reflect.DeepEqual(got, want) {
+		if got, want := now(), (state{[]string{head, dev, fix}, nil, orderConfig, nil}); !reflect.DeepEqual(got, want) {
 			t.Errorf("cancelled:\n%#v\nwant\n%#v", got, want)
 		}
 		if e.m.menu != nil {
@@ -404,7 +397,7 @@ func TestDragWorktree(t *testing.T) {
 
 	e.pressOn("gr@dev", 6)
 	e.letGo(6)
-	if got, want := now(), (state{[]string{head, fix, dev}, nil, orderConfig, "{\n  \"/src/gr\": [\n    \"fix\",\n    \"dev\"\n  ]\n}\n"}); !reflect.DeepEqual(got, want) {
+	if got, want := now(), (state{[]string{head, fix, dev}, nil, orderConfig, map[string][]string{"/src/gr": {"fix", "dev"}}}); !reflect.DeepEqual(got, want) {
 		t.Errorf("dropped:\n%#v\nwant\n%#v", got, want)
 	}
 	// Let go on the row it was pressed on, it is a click, which opens it.
@@ -434,14 +427,18 @@ func TestDragSwitchesToManual(t *testing.T) {
 	if got := e.spacesScreen(); !reflect.DeepEqual(got, want) {
 		t.Errorf("dropped:\n%q\nwant\n%q", got, want)
 	}
-	files := []string{cfg(), savedOrder(t), savedSort(t)}
-	wantFiles := []string{
+	type saved struct {
+		Config, Sort string
+		Order        map[string][]string
+	}
+	files := saved{cfg(), savedSort(), savedOrder()}
+	wantFiles := saved{
 		"# Mine.\nspaces = [\n  \"/src/gr\", # work\n  \"/src/docs\",\n  # the terminal\n  \"/src/kitty\",\n  \"/src/broken\",\n]\n",
-		"{\n  \"/src/docs\": [\n    \"notes\"\n  ],\n  \"/src/gr\": [\n    \"fix\",\n    \"dev\"\n  ]\n}\n",
-		"manual\n",
+		"manual",
+		map[string][]string{"/src/docs": {"notes"}, "/src/gr": {"fix", "dev"}},
 	}
 	if !reflect.DeepEqual(files, wantFiles) {
-		t.Errorf("saved %q\nwant %q", files, wantFiles)
+		t.Errorf("saved %#v\nwant %#v", files, wantFiles)
 	}
 }
 

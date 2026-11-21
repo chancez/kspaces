@@ -2,11 +2,10 @@ package spaces
 
 import (
 	"cmp"
-	"encoding/json"
 	"path/filepath"
 	"slices"
-	"strings"
 
+	"github.com/chancez/kspaces/internal/state"
 	"github.com/chancez/kspaces/internal/status"
 )
 
@@ -34,45 +33,40 @@ func (s SortMode) Next() SortMode {
 	return SortModes[(max(slices.Index(SortModes, s), 0)+1)%len(SortModes)]
 }
 
-// The sort mode, and each space's manual order of its linked worktrees, are shared by the sidebars as
-// the folded spaces are.
-const (
-	sortFile  = "sort"
-	orderFile = "order"
-)
-
 // LoadSort reads the sort mode, manual when none is saved.
 func LoadSort() SortMode {
-	if s := SortMode(strings.TrimSpace(string(readState(sortFile)))); slices.Contains(SortModes, s) {
-		return s
+	return sortMode(state.Load().Sidebar.Sort)
+}
+
+// sortMode is the mode saved as s, manual for none or one unknown.
+func sortMode(s string) SortMode {
+	if m := SortMode(s); slices.Contains(SortModes, m) {
+		return m
 	}
 	return SortManual
 }
 
 // SaveSort saves the sort mode.
 func SaveSort(s SortMode) error {
-	return writeState(sortFile, []byte(string(s)+"\n"))
+	return state.Update(func(st *state.State) { st.Sidebar.Sort = string(s) })
 }
 
-// LoadOrder reads the manual order of each space's linked worktrees: by root, their directory names. A
-// missing or broken file orders none.
+// LoadOrder reads the manual order of each space's linked worktrees: by root, their directory names.
 func LoadOrder() map[string][]string {
-	ans := map[string][]string{}
-	if data := readState(orderFile); len(data) > 0 {
-		if err := json.Unmarshal(data, &ans); err != nil {
-			return map[string][]string{}
-		}
+	return worktreeOrder(state.Load().Sidebar.Order)
+}
+
+// worktreeOrder is the saved order o, empty for none.
+func worktreeOrder(o map[string][]string) map[string][]string {
+	if o == nil {
+		return map[string][]string{}
 	}
-	return ans
+	return o
 }
 
 // SaveOrder saves the manual order of each space's linked worktrees, see LoadOrder.
 func SaveOrder(order map[string][]string) error {
-	data, err := json.MarshalIndent(order, "", "  ")
-	if err != nil {
-		return err
-	}
-	return writeState(orderFile, append(data, '\n'))
+	return state.Update(func(s *state.State) { s.Sidebar.Order = order })
 }
 
 // Order is how BuildRows orders its rows.

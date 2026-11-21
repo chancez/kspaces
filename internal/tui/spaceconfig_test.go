@@ -1,10 +1,11 @@
 package tui
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/state"
 )
 
 // spaceFileFixture is gitFixture with gr's own config untrusted and kitty's broken.
@@ -162,7 +164,7 @@ func TestSpaceConfigMenus(t *testing.T) {
 
 // trustEnv is the trust form for gr's file text, with a global config that has review, which the file's
 // layout runs, and plain, which it replaces.
-func trustEnv(t *testing.T, text string) (*trustForm, string) {
+func trustEnv(t *testing.T, text string) *trustForm {
 	t.Helper()
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	global, err := config.Parse(`spaces = ["/src/gr"]
@@ -181,7 +183,7 @@ tabs = [{ panes = [{}] }]
 	space := spaces.Space{Name: "gr", Root: "/src/gr", Untrusted: true}
 	f := newTrustForm(global, space, []byte(text))
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 30})
-	return f, filepath.Join(os.Getenv("XDG_STATE_HOME"), "kspaces", "trust")
+	return f
 }
 
 // The trust form shows what the file adds: each command and what it runs, each layout and what each of
@@ -210,7 +212,7 @@ tabs = [{ panes = [{ command = "test" }, { command = "review", split = "right" }
 name = "plain"
 tabs = [{ panes = [{ command = "test" }] }]
 `
-	f, trustFile := trustEnv(t, text)
+	f := trustEnv(t, text)
 	want := []string{
 		"", "  Trust gr's config", "",
 		"  /src/gr/.kspaces.toml", "",
@@ -243,18 +245,15 @@ tabs = [{ panes = [{ command = "test" }] }]
 	if _, quit := f.Update(cmd()); quit == nil || f.err != nil {
 		t.Fatalf("the form stayed: %v", f.err)
 	}
-	data, err := os.ReadFile(trustFile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !spaces.Trusted("/src/gr/.kspaces.toml", []byte(text)) || !strings.HasSuffix(string(data), "  /src/gr/.kspaces.toml\n") {
-		t.Errorf("trust file %q", data)
+	sum := sha256.Sum256([]byte(text))
+	if got, want := state.Load().Trust, map[string]string{"/src/gr/.kspaces.toml": hex.EncodeToString(sum[:])}; !spaces.Trusted("/src/gr/.kspaces.toml", []byte(text)) || !reflect.DeepEqual(got, want) {
+		t.Errorf("trusted %q, want %q", got, want)
 	}
 }
 
 // A file with an error says so, and cannot be trusted until fixed.
 func TestTrustFormBroken(t *testing.T) {
-	f, _ := trustEnv(t, "[[layouts]]\nname = \"x\"\ntabs = [{ panes = [{ command = \"nope\" }] }]\n")
+	f := trustEnv(t, "[[layouts]]\nname = \"x\"\ntabs = [{ panes = [{ command = \"nope\" }] }]\n")
 	want := []string{
 		"", "  Trust gr's config", "",
 		"  /src/gr/.kspaces.toml", "",
