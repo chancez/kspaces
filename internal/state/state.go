@@ -24,6 +24,14 @@ type State struct {
 	Sidebar Sidebar `json:"sidebar"`
 	// Trust is the sha256 of the content trusted of each space file, by the file's absolute path.
 	Trust map[string]string `json:"trust,omitempty"`
+	// NewWorktree is what the new worktree form keeps of the worktree last created with it.
+	NewWorktree NewWorktree `json:"newWorktree"`
+}
+
+// NewWorktree is what the new worktree form keeps.
+type NewWorktree struct {
+	// InBackground is whether its open in background box was ticked.
+	InBackground bool `json:"inBackground,omitempty"`
 }
 
 // Sidebar is what the sidebar keeps.

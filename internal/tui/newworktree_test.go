@@ -418,8 +418,10 @@ run = ["gr"]
 }
 
 // The open in background box is the last field, round from the tab strip; space ticks it, as a click
-// does. Ticked, the worktree's session opens with --keep-focus and no switch to it.
+// does. Ticked, the worktree's session opens with --keep-focus and no switch to it, and the next form
+// starts with it ticked.
 func TestNewWorktreeFormBackground(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	root := mainRepo(t)
 	dir := t.TempDir()
 	log := filepath.Join(dir, "calls")
@@ -473,6 +475,9 @@ func TestNewWorktreeFormBackground(t *testing.T) {
 		"@", "action", "launch", "--type=tab", "--cwd=" + wt, "--add-to-session=gr@fix", "--keep-focus", "--",
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
+	}
+	if next := newForm(cfg, space); !next.background {
+		t.Error("the next form starts with the box clear")
 	}
 }
 

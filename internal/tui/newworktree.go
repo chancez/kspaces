@@ -12,7 +12,9 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/gh"
+	"github.com/chancez/kspaces/internal/logs"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/state"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
@@ -159,7 +161,8 @@ func newForm(cfg config.Config, space spaces.Space) *newWorktreeForm {
 	issueBranch := newLineField(th, "")
 	issueBranch.fill(start)
 	f := &newWorktreeForm{th: th, cfg: cfg, space: space, branch: branch, prs: newGHPicker(th, prKind, space),
-		issues: newGHPicker(th, issueKind, space), issueBranch: issueBranch, issueFilled: start, focus: 1}
+		issues: newGHPicker(th, issueKind, space), issueBranch: issueBranch, issueFilled: start, focus: 1,
+		background: state.Load().NewWorktree.InBackground}
 	bases := newBaseFields(th, space)
 	for i, layout := range [...]string{cfg.LayoutFor(space.Name, true), cfg.PRLayoutFor(space.Name), cfg.IssueLayoutFor(space.Name)} {
 		f.tabs[i] = worktreeTab{
@@ -251,6 +254,10 @@ func (f *newWorktreeForm) create() tea.Cmd {
 	}
 	f.busy, f.err = true, nil
 	cfg, space, background := f.cfg, f.space, f.background
+	// The box stays as it was for the next worktree.
+	if err := state.Update(func(s *state.State) { s.NewWorktree.InBackground = background }); err != nil {
+		logs.Error("saving the open in background box", err)
+	}
 	open := func(wt spaces.Worktree, links spaces.Links) error {
 		if layout != nil {
 			layout.Links = links
