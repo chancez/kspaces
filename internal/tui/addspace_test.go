@@ -182,3 +182,39 @@ func TestAddSpaceFormGroup(t *testing.T) {
 		t.Errorf("local.toml %q, %v\nwant %q", data, err, want)
 	}
 }
+
+// h and l change a choice, as left and right do, and type in a text field.
+func TestAddSpaceFormGroupHL(t *testing.T) {
+	home, config := addSpaceEnv(t)
+	local := filepath.Join(filepath.Dir(config), "local.toml")
+	if err := os.WriteFile(local, []byte("spaces = [{ path = \"~/w1\", group = \"work\" }]\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(home, "w1"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := loadForAdd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := newAddSpaceForm(cfg.Spaces, groupNames(cfg), "~/repo", "work")
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	f.Update(keyMsg("h"))
+	f.Update(keyMsg("l"))
+	got := [][]string{formScreen(f)[3:5]}
+	f.Update(keyMsg("backspace"))
+	f.Update(keyMsg("backspace"))
+	f.Update(keyMsg("tab"))
+	f.Update(keyMsg("h"))
+	got = append(got, formScreen(f)[3:5])
+	f.Update(keyMsg("l"))
+	got = append(got, formScreen(f)[3:5])
+	want := [][]string{
+		{"  repository ~/repohl", "  group      < work >"},
+		{"  repository ~/repo", "  group      < none >  left/right change  space list"},
+		{"  repository ~/repo", "  group      < work >  left/right change  space list"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got\n%q\nwant\n%q", got, want)
+	}
+}

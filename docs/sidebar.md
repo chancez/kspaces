@@ -344,7 +344,7 @@ the Issue tab to its `issue_layout`, else `shell`. A layout chosen opens its tab
 tab; a command chosen runs as the session's first tab, which starts your shell once it exits. `tab` and
 `shift+tab` go round all the fields. A choice like `open with` is drawn `< claude >`, and while it has
 focus says `left/right change  space list` after it, and the keys row lists `left/right` and `space`:
-`left` and `right` go to the one before or after; `space` or a click opens a list below the field, or
+`left` and `right`, or `h` and `l`, go to the one before or after; `space` or a click opens a list below the field, or
 above it when it would run off the bottom, of every choice, the one chosen marked and selected, a layout
 with how many tabs and panes it has and a command with its command line. In the list `up`, `down`, and `j`
 and `k` before anything is typed, move; typing keeps the choices with what is typed in their names, shown
