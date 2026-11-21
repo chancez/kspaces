@@ -88,13 +88,18 @@ and a folded space's row when any of its sessions has windows. With nothing open
 `Nothing is open`. It applies along with `/` and `f`, and like `f` it is each sidebar's own and not saved.
 `O` again shows the whole list.
 
+`Z` hides the [suspended](kitty.md#closing-and-suspending-sessions) sessions: their rows go, a space's
+row staying above the rows of it that show, and a folded space's row goes only when all of its sessions
+are suspended. With everything suspended the list says `Everything is suspended`. It applies along with
+`/`, `f` and `O`, and like them it is each sidebar's own and not saved. `Z` again shows the whole list.
+
 The search button, left of the funnel, opens the [picker](#the-picker), as `P` does; a sidebar too narrow
-for it drops it. While either filter is on the funnel is lit, and the SPACES title names the filters on after it, muted:
-`active` for `f`, `open` for `O`, or both. A sidebar too narrow for the whole summary drops it.
+for it drops it. While any filter is on the funnel is lit, and the SPACES title names the filters on after it, muted:
+`active` for `f`, `open` for `O`, `awake` for `Z`, joined by commas. A sidebar too narrow for the whole summary drops it.
 
 A right click on the SPACES title or its buttons, or on an empty row of the list, opens the list's menu:
-the sort modes, see [Order](#order), in a Filter section `Only what is not idle` and `Only open
-sessions`, each ticked while its filter is on, which turn them on and off, in a Rows section **Select**, see
+the sort modes, see [Order](#order), in a Filter section `Only what is not idle`, `Only open
+sessions` and `Hide suspended sessions`, each ticked while its filter is on, which turn them on and off, in a Rows section **Select**, see
 [Selecting](#selecting), and with [groups](#groups) configured a Groups section.
 
 ## Groups
@@ -534,6 +539,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `P` | open the picker; see [The picker](#the-picker) |
 | `f` | show only what is not idle, or everything again; see [Spaces](#spaces) |
 | `O` | show only open sessions, or everything again; see [Spaces](#spaces) |
+| `Z` | hide suspended sessions, or show everything again; see [Spaces](#spaces) |
 | `s` | sort the list the next way; see [Order](#order) |
 | `K` / `J` | move the cursor's space within its group, or linked worktree within its space, up / down |
 | `v` | select rows to act on; see [Selecting](#selecting) |

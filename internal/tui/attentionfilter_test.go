@@ -115,7 +115,7 @@ func listMenu(attending bool) []string {
 	}
 	return []string{
 		menuRule("Sort"), "\uf00c Manual", "  Activity", "  Status",
-		menuRule("Filter"), mark + "Only what is not idle", "  Only open sessions",
+		menuRule("Filter"), mark + "Only what is not idle", "  Only open sessions", "  Hide suspended sessions",
 		menuRule("Rows"), "  Select", menuRule(""),
 	}
 }
@@ -126,7 +126,7 @@ func TestAttentionMenu(t *testing.T) {
 	e := newSidebarEnv(t)
 	unfiltered := e.spacesScreen()
 	e.clickAt(3, 0, tea.MouseRight)
-	if got, want := e.screen()[:11], append([]string{spacesTitle}, listMenu(false)...); !reflect.DeepEqual(got, want) {
+	if got, want := e.screen()[:12], append([]string{spacesTitle}, listMenu(false)...); !reflect.DeepEqual(got, want) {
 		t.Errorf("menu on the title:\n%q\nwant\n%q", got, want)
 	}
 	e.click(fmt.Sprintf(menuZone, 3), tea.MouseLeft)
@@ -135,7 +135,7 @@ func TestAttentionMenu(t *testing.T) {
 	}
 
 	e.click(sortZone, tea.MouseRight)
-	if got, want := e.screen()[:11], append([]string{filteredTitle("active")}, listMenu(true)...); !reflect.DeepEqual(got, want) {
+	if got, want := e.screen()[:12], append([]string{filteredTitle("active")}, listMenu(true)...); !reflect.DeepEqual(got, want) {
 		t.Errorf("menu on the sort button:\n%q\nwant\n%q", got, want)
 	}
 	e.click(fmt.Sprintf(menuZone, 3), tea.MouseLeft)
@@ -146,7 +146,7 @@ func TestAttentionMenu(t *testing.T) {
 	// Row 3 is the blank between default and gr; the menu opens below it.
 	e.clickAt(3, 3, tea.MouseRight)
 	want := append(append([]string{}, unfiltered[:4]...), listMenu(false)...)
-	if got := e.screen()[:14]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[:15]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu on an empty row:\n%q\nwant\n%q", got, want)
 	}
 }

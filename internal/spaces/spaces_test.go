@@ -60,8 +60,9 @@ branch refs/heads/main
 	}
 }
 
-// rowNames shows rows as their worktree's session, with "" for the blank rows between spaces and a
-// group's header as [NAME].
+// rowNames shows rows as their worktree's session, with "" for the blank rows between spaces, a group's
+// header as [NAME], and a space's row with no worktree, as one whose worktrees could not be listed, as
+// its name.
 func rowNames(rows []Row) []string {
 	var ans []string
 	for _, r := range rows {
@@ -72,6 +73,8 @@ func rowNames(rows []Row) []string {
 			ans = append(ans, "["+r.Group.Name+"]")
 		case r.Space == nil:
 			ans = append(ans, "")
+		case r.Worktree == nil:
+			ans = append(ans, r.Space.Name)
 		case r.Folded:
 			ans = append(ans, r.Worktree.Session+" (folded)")
 		default:

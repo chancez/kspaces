@@ -130,11 +130,12 @@ type sidebar struct {
 	// zones are where the last frame drew marked spans, by id, so a click maps back to what was drawn.
 	zones map[string][]look.Zone
 	// The spaces list's filters, see filter.go: the query narrows rows while filtering, the attention
-	// filter while attending, and the open filter while openOnly.
+	// filter while attending, the open filter while openOnly, and the suspended filter while awakeOnly.
 	filter    textinput.Model
 	filtering bool
 	attending bool
 	openOnly  bool
+	awakeOnly bool
 	poller    *spaces.Poller
 	// What git and gh say of each worktree, by path, from the poller.
 	git map[string]gitstate.State
@@ -446,7 +447,7 @@ func (m *sidebar) render() string {
 // still reads SPACES; only narrower is the title cut.
 func (m *sidebar) titleLine(width int) string {
 	th := m.th
-	buttons := append(look.Mark(attentionZone, look.AttentionButton(m.attending || m.openOnly, m.attentionHot)), look.Default(" "))
+	buttons := append(look.Mark(attentionZone, look.AttentionButton(m.attending || m.openOnly || m.awakeOnly, m.attentionHot)), look.Default(" "))
 	buttons = append(append(buttons, look.Mark(sortZone, look.SortButton(m.order.Mode, m.sortHot))...), look.Default(" "))
 	buttons = append(buttons, look.Mark(addZone, look.AddButton(m.addHot))...)
 	if withPick := append(append(look.Mark(pickZone, look.PickButton(m.pickHot)), look.Default(" ")), buttons...); th.Width(look.Title("SPACES"))+1+th.Width(withPick...) <= width {

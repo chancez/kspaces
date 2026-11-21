@@ -66,21 +66,30 @@ func AttentionRows(rows []Row, statuses []status.Status) []Row {
 			stirring[s.Session] = true
 		}
 	}
-	return sessionRows(rows, func(session string) bool { return stirring[session] })
+	return sessionRows(rows, false, func(session string) bool { return stirring[session] })
 }
 
 // OpenRows keeps the rows whose session has windows, open being kitty.State.Sessions, with their spaces'
 // rows for context, as AttentionRows does.
 func OpenRows(rows []Row, open map[string]int) []Row {
-	return sessionRows(rows, func(session string) bool {
+	return sessionRows(rows, false, func(session string) bool {
 		_, ok := open[session]
 		return ok
 	})
 }
 
+// AwakeRows drops the rows whose session is suspended, suspended being Snapshot.Suspended, keeping their
+// spaces' rows for context when any other row of theirs is kept, as AttentionRows does. A folded space's
+// row or a folded group's header goes only when every session it stands for is suspended, and a space
+// with no sessions, as one whose worktrees could not be listed, stays, as nothing of it is suspended.
+func AwakeRows(rows []Row, suspended map[string]bool) []Row {
+	return sessionRows(rows, true, func(session string) bool { return !suspended[session] })
+}
+
 // sessionRows keeps the rows whose session keep says to, a folded space's row or a folded group's header
-// when any of the sessions it stands for is kept.
-func sessionRows(rows []Row, keep func(session string) bool) []Row {
+// when any of the sessions it stands for is kept, and a space's row that stands for no session when bare
+// says so.
+func sessionRows(rows []Row, bare bool, keep func(session string) bool) []Row {
 	return Narrow(rows, func(head Row) bool {
 		var sessions []Worktree
 		switch {
@@ -92,6 +101,9 @@ func sessionRows(rows []Row, keep func(session string) bool) []Row {
 			sessions = slices.Concat(head.Space.Worktrees, head.Space.Missing)
 		case head.Worktree != nil:
 			sessions = []Worktree{*head.Worktree}
+		}
+		if len(sessions) == 0 {
+			return bare
 		}
 		return slices.ContainsFunc(sessions, func(wt Worktree) bool { return keep(wt.Session) })
 	}, func(r Row) bool { return keep(r.Worktree.Session) })

@@ -155,10 +155,10 @@ func TestSortMenu(t *testing.T) {
 	e.click(sortZone, tea.MouseRight)
 	want := []string{
 		menuRule("Sort"), "\uf00c Manual", "  Activity", "  Status",
-		menuRule("Filter"), "  Only what is not idle", "  Only open sessions",
+		menuRule("Filter"), "  Only what is not idle", "  Only open sessions", "  Hide suspended sessions",
 		menuRule("Rows"), "  Select", menuRule(""),
 	}
-	if got := e.screen()[1:11]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[1:12]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"\uf00c Manual"}) {
@@ -174,10 +174,10 @@ func TestSortMenu(t *testing.T) {
 	e.click(sortZone, tea.MouseRight)
 	want = []string{
 		menuRule("Sort"), "  Manual", "  Activity", "\uf00c Status",
-		menuRule("Filter"), "  Only what is not idle", "  Only open sessions",
+		menuRule("Filter"), "  Only what is not idle", "  Only open sessions", "  Hide suspended sessions",
 		menuRule("Rows"), "  Select", menuRule(""),
 	}
-	if got := e.screen()[1:11]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[1:12]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu again:\n%q\nwant\n%q", got, want)
 	}
 }

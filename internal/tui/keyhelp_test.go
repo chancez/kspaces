@@ -36,7 +36,7 @@ func TestSidebarHelp(t *testing.T) {
 		" I       new worktree from",
 		"         issue",
 		" c       close session",
-		"\u25be 21 more",
+		"\u25be 23 more",
 		"",
 	})
 	e.press("j", "j")
@@ -50,15 +50,15 @@ func TestSidebarHelp(t *testing.T) {
 		" c       close session",
 		" x       remove worktree",
 		menuRule("Spaces"),
-		"\u25be 19 more",
+		"\u25be 21 more",
 		"",
 	})
 	e.press("G")
 	check("at the bottom", []string{
-		title, "\u25b4 21 more",
-		" f       show only what is not",
-		"         idle",
+		title, "\u25b4 23 more",
 		" O       show only open",
+		"         sessions",
+		" Z       hide suspended",
 		"         sessions",
 		" P       open the picker",
 		" s       change the sort mode",

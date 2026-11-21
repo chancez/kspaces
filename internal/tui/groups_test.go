@@ -223,14 +223,14 @@ func TestGroupsMenu(t *testing.T) {
 	menu := func(work, personal bool) []string {
 		return []string{
 			menuRule("Sort"), "\uf00c Manual", "  Activity", "  Status",
-			menuRule("Filter"), "  Only what is not idle", "  Only open sessions",
+			menuRule("Filter"), "  Only what is not idle", "  Only open sessions", "  Hide suspended sessions",
 			menuRule("Rows"), "  Select",
 			menuRule("Groups"), mark(work) + " work", mark(personal) + " personal",
 			menuRule(""),
 		}
 	}
 	e.click(sortZone, tea.MouseRight)
-	if got := e.screen()[1:14]; !reflect.DeepEqual(got, menu(true, true)) {
+	if got := e.screen()[1:15]; !reflect.DeepEqual(got, menu(true, true)) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, menu(true, true))
 	}
 	type state struct {
@@ -245,13 +245,13 @@ func TestGroupsMenu(t *testing.T) {
 		}
 		return state{e.spacesScreen(), windows, stateFile(t, "hidden")}
 	}
-	e.click(fmt.Sprintf(menuZone, 6), tea.MouseLeft)
+	e.click(fmt.Sprintf(menuZone, 7), tea.MouseLeft)
 	hidden := state{groupsScreen("", homeHeader, groupKitty), []int{21, 23}, "work\n"}
 	if got := now(); e.m.menu != nil || !reflect.DeepEqual(got, hidden) {
 		t.Errorf("work hidden, menu open %v:\n%#v\nwant\n%#v", e.m.menu != nil, got, hidden)
 	}
 	e.click(sortZone, tea.MouseRight)
-	if got := e.screen()[1:14]; !reflect.DeepEqual(got, menu(false, true)) {
+	if got := e.screen()[1:15]; !reflect.DeepEqual(got, menu(false, true)) {
 		t.Errorf("menu with work hidden:\n%q\nwant\n%q", got, menu(false, true))
 	}
 	e.press("esc")
@@ -273,7 +273,7 @@ func TestGroupsMenu(t *testing.T) {
 	}
 
 	e.click(sortZone, tea.MouseRight)
-	e.click(fmt.Sprintf(menuZone, 6), tea.MouseLeft)
+	e.click(fmt.Sprintf(menuZone, 7), tea.MouseLeft)
 	shown := state{groupsScreen("", workHeader, groupGr[0], groupGr[1], groupGr[2], "", groupDocs, "", homeHeader, groupKitty), []int{20, 21, 22, 23}, ""}
 	if got := now(); !reflect.DeepEqual(got, shown) {
 		t.Errorf("work shown:\n%#v\nwant\n%#v", got, shown)

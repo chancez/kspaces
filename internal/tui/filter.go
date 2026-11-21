@@ -113,8 +113,18 @@ func (m *sidebar) toggleOpen() tea.Cmd {
 	return nil
 }
 
-// filterSummary names the filters on, for the SPACES title: active for the attention filter and open for
-// the open filter, empty for neither. The query shows on the line below, so it is left out.
+// toggleAwake hides the suspended sessions from the spaces list, see spaces.AwakeRows, or shows all of it
+// again, as toggleAttention does.
+func (m *sidebar) toggleAwake() tea.Cmd {
+	m.awakeOnly = !m.awakeOnly
+	m.setRows()
+	m.scrollToCursor()
+	return nil
+}
+
+// filterSummary names the filters on, for the SPACES title: active for the attention filter, open for the
+// open filter and awake for the suspended filter, empty for none. The query shows on the line below, so it
+// is left out.
 func (m *sidebar) filterSummary() string {
 	var on []string
 	if m.attending {
@@ -123,24 +133,29 @@ func (m *sidebar) filterSummary() string {
 	if m.openOnly {
 		on = append(on, "open")
 	}
+	if m.awakeOnly {
+		on = append(on, "awake")
+	}
 	return strings.Join(on, ", ")
 }
 
 // narrowed is whether a filter hides rows, so the rows shown are not the whole order to move a row in.
 func (m *sidebar) narrowed() bool {
-	return m.filtering || m.attending || m.openOnly
+	return m.filtering || m.attending || m.openOnly || m.awakeOnly
 }
 
 // emptyText is what the spaces list says when a filter leaves it no rows: that nothing needs me when only
-// the attention filter narrows it, that nothing is open when only the open filter does, else that the
-// filters match nothing.
+// the attention filter narrows it, that nothing is open when only the open filter does, that everything
+// is suspended when only the suspended filter does, else that the filters match nothing.
 func (m *sidebar) emptyText() string {
 	switch {
 	case m.filter.Value() != "":
-	case m.attending && !m.openOnly:
+	case m.attending && !m.openOnly && !m.awakeOnly:
 		return "Nothing needs you"
-	case m.openOnly && !m.attending:
+	case m.openOnly && !m.attending && !m.awakeOnly:
 		return "Nothing is open"
+	case m.awakeOnly && !m.attending && !m.openOnly:
+		return "Everything is suspended"
 	}
 	return "No matches"
 }
@@ -196,6 +211,9 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 	}
 	if m.openOnly {
 		m.rows = spaces.OpenRows(m.rows, m.kitty.Sessions)
+	}
+	if m.awakeOnly {
+		m.rows = spaces.AwakeRows(m.rows, m.suspended)
 	}
 	m.pruneTicks()
 	if entry >= 0 {

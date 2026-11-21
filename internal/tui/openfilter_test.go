@@ -59,10 +59,10 @@ func TestOpenMenu(t *testing.T) {
 	e.click(sortZone, tea.MouseRight)
 	want := []string{
 		menuRule("Sort"), "\uf00c Manual", "  Activity", "  Status",
-		menuRule("Filter"), "  Only what is not idle", "\uf00c Only open sessions",
+		menuRule("Filter"), "  Only what is not idle", "\uf00c Only open sessions", "  Hide suspended sessions",
 		menuRule("Rows"), "  Select", menuRule(""),
 	}
-	if got := e.screen()[1:11]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[1:12]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu with the filter on:\n%q\nwant\n%q", got, want)
 	}
 	e.click(fmt.Sprintf(menuZone, 4), tea.MouseLeft)

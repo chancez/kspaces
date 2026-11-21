@@ -82,3 +82,43 @@ func TestOpenRows(t *testing.T) {
 		t.Fatalf("got %q, want none", rowNames(got))
 	}
 }
+
+func TestAwakeRows(t *testing.T) {
+	others := []Space{
+		{Name: "default", Worktrees: []Worktree{{Session: "default"}}},
+		{Name: "scratch", Worktrees: []Worktree{{Session: "scratch"}}},
+	}
+	spaces := []Space{
+		{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Session: "gr"}, {Session: "gr@dev"}, {Session: "gr@fix"}}},
+		{Name: "kitty", Root: "/src/kitty", Worktrees: []Worktree{{Session: "kitty"}}},
+		{Name: "docs", Root: "/src/docs", Worktrees: []Worktree{{Session: "docs"}, {Session: "docs@notes"}}},
+		{Name: "web", Root: "/src/web", Worktrees: []Worktree{{Session: "web"}, {Session: "web@ui"}}},
+		{Name: "api", Root: "/src/api", Worktrees: []Worktree{{Session: "api"}},
+			Missing: []Worktree{{Session: "api@old"}}},
+		{Name: "lost", Root: "/src/lost"},
+	}
+	suspended := map[string]bool{
+		"scratch": true,
+		// The space's own session suspended: its row shows above the linked worktrees that are not.
+		"gr":     true,
+		"gr@dev": true,
+		// A space with only suspended sessions goes.
+		"kitty": true,
+		// A folded space with one session not suspended shows.
+		"docs@notes": true,
+		// A folded space with every session suspended goes.
+		"web":     true,
+		"web@ui":  true,
+		"api@old": true,
+	}
+	folded := map[string]bool{"/src/docs": true, "/src/web": true}
+	got := rowNames(AwakeRows(BuildRows(others, spaces, folded, nil, Order{}), suspended))
+	want := []string{"default", "", "gr", "gr@fix", "", "docs (folded)", "", "api", "", "lost"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %q\nwant %q", got, want)
+	}
+	all := BuildRows(others, spaces, folded, nil, Order{})
+	if got := AwakeRows(all, nil); !reflect.DeepEqual(rowNames(got), rowNames(all)) {
+		t.Fatalf("got %q\nwant %q", rowNames(got), rowNames(all))
+	}
+}

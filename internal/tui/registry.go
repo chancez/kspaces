@@ -307,6 +307,9 @@ var actAttention = paneAction("attention filter", (*sidebar).toggleAttention)
 // actOpenOnly toggles the open filter, see toggleOpen.
 var actOpenOnly = paneAction("open filter", (*sidebar).toggleOpen)
 
+// actAwakeOnly toggles the suspended filter, see toggleAwake.
+var actAwakeOnly = paneAction("suspended filter", (*sidebar).toggleAwake)
+
 // actOpenPicker opens the picker in a popup, as kitty.conf's kspaces_pick mapping does.
 var actOpenPicker = paneAction("picker", (*sidebar).openPicker)
 
@@ -392,6 +395,13 @@ var actOpenItem = &interact.Action[*sidebar, sortSubject]{
 	Title:   "Only open sessions",
 	Section: "Filter",
 	Run:     func(m *sidebar, _ sortSubject) tea.Cmd { return m.toggleOpen() },
+}
+
+// actAwakeItem is the suspended filter in the spaces list's menu, beside the open filter.
+var actAwakeItem = &interact.Action[*sidebar, sortSubject]{
+	Title:   "Hide suspended sessions",
+	Section: "Filter",
+	Run:     func(m *sidebar, _ sortSubject) tea.Cmd { return m.toggleAwake() },
 }
 
 // actSelectList turns the select mode on from the spaces list's menu, with nothing ticked.
@@ -1057,7 +1067,7 @@ func init() {
 
 	paneKind = interact.NewKind(func(paneSubject) string { return "Sidebar" },
 		actDown, actUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit,
-		actAttend, actFilter, actAttention, actOpenOnly, actOpenPicker, actCycleSort, actMoveUp, actMoveDown, actSelect, actHelp)
+		actAttend, actFilter, actAttention, actOpenOnly, actAwakeOnly, actOpenPicker, actCycleSort, actMoveUp, actMoveDown, actSelect, actHelp)
 	paneKind.Bind(actDown, "j/k", "down/up", "j", "down")
 	paneKind.Bind(actUp, "", "", "k", "up")
 	paneKind.Bind(actTop, "g/G", "top/bottom", "g", "home")
@@ -1071,6 +1081,7 @@ func init() {
 	paneKind.Bind(actFilter, "/", "filter the spaces", "/")
 	paneKind.Bind(actAttention, "f", "show only what is not idle", "f")
 	paneKind.Bind(actOpenOnly, "O", "show only open sessions", "O")
+	paneKind.Bind(actAwakeOnly, "Z", "hide suspended sessions", "Z")
 	paneKind.Bind(actOpenPicker, "P", "open the picker", "P")
 	paneKind.Bind(actCycleSort, "s", "change the sort mode", "s")
 	paneKind.Bind(actMoveUp, "K/J", "move the row up/down", "K")
@@ -1280,7 +1291,7 @@ func init() {
 
 	sortKind = interact.NewKind(func(sortSubject) string { return "Sort" },
 		sortActions[spaces.SortManual], sortActions[spaces.SortActivity], sortActions[spaces.SortStatus],
-		actAttentionItem, actOpenItem, actSelectList)
+		actAttentionItem, actOpenItem, actAwakeItem, actSelectList)
 	theSort = interact.List(sortKind)
 	groupShowKind = interact.NewKind(func(groupFilterSubject) string { return "Groups" }, actShowGroup)
 	theGroups = interact.List(groupShowKind)
