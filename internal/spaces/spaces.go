@@ -153,32 +153,34 @@ func LinkedWorktree(space Space, branch, path string) Worktree {
 // Find is the space given by root or name, or, with an empty query, the space of the session of the
 // window that has the keyboard, its file read as cfg's, see ReadSpace.
 func Find(cfg config.Config, query string) (Space, error) {
-	var current string
 	if query == "" {
 		st, err := kitty.LoadState(kitty.FocusedWindow)
 		if err != nil {
 			return Space{}, err
 		}
-		current = st.Current
+		s, _, err := Current(cfg, st)
+		return s, err
 	}
 	abs, _ := filepath.Abs(query)
 	for _, root := range cfg.Spaces {
-		s := LoadSpace(root)
-		switch {
-		case query != "" && (root == abs || s.Name == query):
+		if s := LoadSpace(root); root == abs || s.Name == query {
 			s.readConfig(cfg)
 			return s, s.Err
-		case query == "":
-			for _, wt := range s.Worktrees {
-				if wt.Session == current {
-					s.readConfig(cfg)
-					return s, nil
-				}
+		}
+	}
+	return Space{}, fmt.Errorf("%s is not a configured space", query)
+}
+
+// Current is the space and worktree of st's current session, the space's file read as cfg's.
+func Current(cfg config.Config, st kitty.State) (Space, Worktree, error) {
+	for _, root := range cfg.Spaces {
+		s := LoadSpace(root)
+		for _, wt := range s.Worktrees {
+			if st.Current != "" && wt.Session == st.Current {
+				s.readConfig(cfg)
+				return s, wt, nil
 			}
 		}
 	}
-	if query == "" {
-		return Space{}, fmt.Errorf("the current window is not in a space")
-	}
-	return Space{}, fmt.Errorf("%s is not a configured space", query)
+	return Space{}, Worktree{}, fmt.Errorf("the current window is not in a space")
 }

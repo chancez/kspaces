@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui"
 )
@@ -13,11 +14,21 @@ import (
 func (a *app) removeCommand() *cobra.Command {
 	var yes, force, deleteBranch, forceBranch bool
 	var forcePaths, deletePaths, forceBranchPaths, forgetSessions []string
+	var window int
 	cmd := &cobra.Command{
 		Use:   "remove [PATH...]",
 		Short: "Close the session of the linked worktree at PATH and remove the worktree, after confirming in a form",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch {
+			case window != 0 && len(args) > 0:
+				return fmt.Errorf("--from removes the window's worktree; give no PATH")
+			case window != 0:
+				return a.popupForWorktree(window, func(cfg config.Config, st kitty.State, s spaces.Space, wt spaces.Worktree) error {
+					if wt.Path == s.Worktrees[0].Path {
+						return fmt.Errorf("%s is the main worktree of %s, which cannot be removed", config.Tilde(wt.Path), s.Name)
+					}
+					return spaces.AskRemoveWorktree(cfg, st, wt.Path)
+				})
 			case len(forgetSessions) > 0 && !yes:
 				return fmt.Errorf("--forget-session needs --yes")
 			case len(args) == 0 && len(forgetSessions) == 0:
@@ -44,6 +55,9 @@ func (a *app) removeCommand() *cobra.Command {
 	cmd.Flags().StringArrayVar(&deletePaths, "delete-branch-path", nil, "with --yes, delete the branch of the worktree at this path, as --delete-branch does; repeatable")
 	cmd.Flags().BoolVar(&forceBranch, "force-branch", false, "with --yes and --delete-branch, delete the branches even with commits not merged, losing them")
 	cmd.Flags().StringArrayVar(&forceBranchPaths, "force-branch-path", nil, "with --yes, delete the branch of the worktree at this path even with commits not merged, as --force-branch does; repeatable")
+	fromFlag(cmd, &window, "the worktree of its session")
+	cmd.MarkFlagsMutuallyExclusive("from", "yes")
+	cmd.MarkFlagsMutuallyExclusive("from", "delete-branch")
 	return cmd
 }
 
@@ -69,10 +83,14 @@ func removeOptions(paths []string, force, deleteBranch, forceBranch bool, forceP
 
 func (a *app) closeCommand() *cobra.Command {
 	var yes bool
+	var window int
 	cmd := &cobra.Command{
 		Use:   "close [SESSION...]",
 		Short: "Close every window of the sessions, the current one by default, after confirming in a form; with the session saver, opening one again brings its windows back",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if window != 0 {
+				return a.popupForSession(window, args, spaces.AskCloseSession)
+			}
 			cfg, err := config.Load()
 			if err != nil {
 				return err
@@ -81,11 +99,14 @@ func (a *app) closeCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "close without asking")
+	fromFlag(cmd, &window, "its session by default")
+	cmd.MarkFlagsMutuallyExclusive("from", "yes")
 	return cmd
 }
 
 func (a *app) suspendCommand() *cobra.Command {
 	var yes bool
+	var window int
 	cmd := &cobra.Command{
 		Use:   "suspend [SESSION...]",
 		Short: "Stop what runs in the sessions, the current one by default, and close their windows, keeping them to resume, after confirming in a form",
@@ -94,6 +115,9 @@ func (a *app) suspendCommand() *cobra.Command {
 			"such as their multiplexer sessions, until the session is opened again or forgotten. " +
 			"Opening it again brings them back. Needs [kitty] save_sessions.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if window != 0 {
+				return a.popupForSession(window, args, spaces.AskSuspendSession)
+			}
 			cfg, err := config.Load()
 			if err != nil {
 				return err
@@ -102,6 +126,8 @@ func (a *app) suspendCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "suspend without asking")
+	fromFlag(cmd, &window, "its session by default")
+	cmd.MarkFlagsMutuallyExclusive("from", "yes")
 	return cmd
 }
 
