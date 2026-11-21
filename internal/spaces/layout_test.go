@@ -147,6 +147,44 @@ func TestBuildLayout(t *testing.T) {
 	}
 }
 
+// Staying, a layout's launches keep the focus, and nothing focuses a window or switches to the session.
+func TestBuildLayoutStays(t *testing.T) {
+	cfg, err := config.Parse(`
+[[layouts]]
+name = "two"
+[[layouts.tabs]]
+panes = [{}, { split = "right", focus = true }]
+[[layouts.tabs]]
+panes = [{}]
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	space := Space{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Branch: "main", Session: "gr"}}}
+	wt := Worktree{Path: "/src/gr/.worktrees/fix", Branch: "pr/me/fix", Session: "gr@fix"}
+	l, _ := cfg.Layout("two")
+	lr, err := NewLayoutRun(l, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lr.Stay = true
+	k := &fakeLayoutKitty{}
+	if err := buildLayout(cfg, kitty.State{}, space, wt, lr, k); err != nil {
+		t.Fatal(err)
+	}
+	at := []string{"--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix", "--keep-focus"}
+	want := [][]string{
+		slices.Concat([]string{"action", "launch", "--type=tab"}, at),
+		{"goto-layout", "--match=window_id:11", "splits"},
+		slices.Concat([]string{"action", "--match=id:11", "launch", "--type=window", "--location=vsplit", "--next-to=id:11", "--bias=50"}, at),
+		slices.Concat([]string{"action", "--match=id:11", "launch", "--type=tab"}, at),
+		{"goto-layout", "--match=window_id:13", "splits"},
+	}
+	if !reflect.DeepEqual(k.calls, want) {
+		t.Errorf("got  %q\nwant %q", k.calls, want)
+	}
+}
+
 // matchOf is the --match option of an action on window id, none for 0.
 func matchOf(id int) []string {
 	if id == 0 {

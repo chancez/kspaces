@@ -669,6 +669,11 @@ var (
 		},
 		Run: do[*newWorktreeForm, formSubject]((*newWorktreeForm).openList),
 	}
+	actFormBackground = &interact.Action[*newWorktreeForm, formSubject]{
+		Title:   "open in background",
+		Applies: func(f *newWorktreeForm, _ formSubject) bool { return !f.busy && f.onBackground() },
+		Run:     do[*newWorktreeForm, formSubject]((*newWorktreeForm).toggleBackground),
+	}
 	actCreate = &interact.Action[*newWorktreeForm, formSubject]{
 		Title:   "create",
 		Applies: func(f *newWorktreeForm, _ formSubject) bool { return !f.busy },
@@ -1182,12 +1187,13 @@ func init() {
 	thePickMenu = interact.List(pickMenuKind)
 
 	formKind = interact.NewKind(func(formSubject) string { return "New worktree" },
-		actSwitchField, actPrevField, actNextChoice, actPrevChoice, actFormList, actCreate, actCancel)
+		actSwitchField, actPrevField, actNextChoice, actPrevChoice, actFormList, actFormBackground, actCreate, actCancel)
 	formKind.Bind(actSwitchField, "tab", "next field", "tab", "down")
 	formKind.Bind(actPrevField, "shift+tab", "previous field", "shift+tab", "up")
 	formKind.Bind(actNextChoice, "left/right", "choose", "right")
 	formKind.Bind(actPrevChoice, "", "", "left")
 	formKind.Bind(actFormList, "space", "list", "space")
+	formKind.Bind(actFormBackground, "space", "tick", "space")
 	formKind.Bind(actCreate, "enter", "create", "enter")
 	formKind.BindQuiet(actWaitForCreate, "enter")
 	formKind.Bind(actCancel, "esc", "cancel", "esc", "ctrl+c")

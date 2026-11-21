@@ -45,7 +45,7 @@ func TestFormInPanel(t *testing.T) {
 	} {
 		p := newWorktreePanel(t)
 		p.th.SetGlyphs(c.glyphs)
-		row := func(s string) string { return c.v + " " + s + strings.Repeat(" ", 86-len(s)) + " " + c.v }
+		row := func(s string) string { return c.v + " " + s + strings.Repeat(" ", 86-ansi.StringWidth(s)) + " " + c.v }
 		want := []string{
 			c.topLeft + c.h + " New worktree in gr " + strings.Repeat(c.h, 67) + c.topRight,
 			row(""),
@@ -53,6 +53,7 @@ func TestFormInPanel(t *testing.T) {
 			row(""),
 			row("branch     pr/me/"),
 			row("directory  .worktrees"),
+			row(backgroundRow[2:]),
 			row(""),
 			row("Name the branch to create or check out, or # for a PR"),
 		}

@@ -54,6 +54,9 @@ type opener struct {
 // openZone is the zone the choice of what the session opens with is drawn in, and its label.
 const openZone = "open with"
 
+// backgroundZone is the zone the open in background box is drawn in.
+const backgroundZone = "background"
+
 // newOpenFields are the fields that choose what a new worktree's session opens with, the one called name
 // chosen, see newChoiceFields: a shell tab, as none, then the layouts, then the commands, each listed with
 // how many tabs and panes it has, or what it runs. A layout and a command of the same name are both
@@ -132,11 +135,13 @@ type newWorktreeForm struct {
 	// changes, not at every cursor blink.
 	typed string
 	// vars are the built-ins of the worktree the form would create now, which the inputs' defaults use.
-	vars   map[string]string
-	busy   bool
-	err    error
-	width  int
-	height int
+	vars map[string]string
+	// background opens the new session without switching to it, see spaces.OpenNew.
+	background bool
+	busy       bool
+	err        error
+	width      int
+	height     int
 	// zones and buttons are where the last frame drew its buttons, and what each runs, for a click.
 	zones   map[string][]look.Zone
 	buttons controls[*newWorktreeForm]
@@ -245,7 +250,7 @@ func (f *newWorktreeForm) create() tea.Cmd {
 		}
 	}
 	f.busy, f.err = true, nil
-	cfg, space := f.cfg, f.space
+	cfg, space, background := f.cfg, f.space, f.background
 	open := func(wt spaces.Worktree, links spaces.Links) error {
 		if layout != nil {
 			layout.Links = links
@@ -253,7 +258,7 @@ func (f *newWorktreeForm) create() tea.Cmd {
 		if run != nil {
 			run.Links = links
 		}
-		return spaces.OpenNew(cfg, space, wt, layout, run)
+		return spaces.OpenNew(cfg, space, wt, layout, run, background)
 	}
 	if l, ok := f.prLookup(); ok {
 		ref, dir := f.prs.chosen, t.dir.Value()
@@ -321,14 +326,14 @@ func (f *newWorktreeForm) head() []field {
 }
 
 // fields are the form's fields in order: head; the choice of what the session opens with, nil, when
-// there is one, and the chosen one's inputs.
+// there is one, and the chosen one's inputs; the open in background box, nil.
 func (f *newWorktreeForm) fields() []field {
 	t := f.current()
 	out := f.head()
 	if t.open.picks() {
 		out = append(out, nil)
 	}
-	return append(out, t.open.fields()...)
+	return append(append(out, t.open.fields()...), nil)
 }
 
 // baseAt and openAt are where in fields the choices of base and of what the session opens with are,
@@ -381,6 +386,12 @@ func (f *newWorktreeForm) onBase() bool {
 func (f *newWorktreeForm) onOpen() bool {
 	return f.current().open.picks() && f.focus == f.openAt()
 }
+
+// onBackground says whether the open in background box has focus, the last of fields.
+func (f *newWorktreeForm) onBackground() bool { return f.focus == len(f.fields())-1 }
+
+// toggleBackground ticks or clears the open in background box.
+func (f *newWorktreeForm) toggleBackground() { f.background = !f.background }
 
 // onChoice says whether a choice has focus, which left and right change.
 func (f *newWorktreeForm) onChoice() bool { return f.onTabs() || f.onBase() || f.onOpen() }
@@ -528,6 +539,11 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			t.open.openList()
 			return f, f.cycleOpen(0)
 		}
+		if clickedChoice(f.zones, backgroundZone, msg) {
+			f.toggleBackground()
+			f.focus = len(f.fields()) - 1
+			return f, moveFocus(f.fields(), &f.focus, 0)
+		}
 		if i, ok := clickedField(f.fields(), f.zones, msg); ok {
 			f.focus = i
 			return f, moveFocus(f.fields(), &f.focus, 0)
@@ -655,7 +671,8 @@ func (f *newWorktreeForm) render() string {
 	}
 	lines = append(lines, fieldLines(th, "directory", &t.dir, width)...)
 	openAt := len(lines)
-	lines = append(append(lines, t.open.lines(f.onOpen(), width)...), "")
+	lines = append(lines, t.open.lines(f.onOpen(), width)...)
+	lines = append(lines, f.backgroundLine(width), "")
 	failed := f.err
 	switch p := f.shownPicker(); {
 	case p != nil:
@@ -678,6 +695,9 @@ func (f *newWorktreeForm) render() string {
 		lines = append(lines, muted("Opens with the "+o.layout.Name+" layout"))
 	case ok:
 		lines = append(lines, muted("Runs "+o.cmd.Name+" in the first tab"))
+	}
+	if f.background {
+		lines = append(lines, muted("Stays here, without switching to the new session"))
 	}
 	lines = append(lines, "")
 	switch {
@@ -708,10 +728,22 @@ func (f *newWorktreeForm) render() string {
 		hints = append(hints, choiceHints("base")...)
 	case f.onOpen():
 		hints = append(hints, choiceHints("open with")...)
+	case f.onBackground():
+		hints = append(hints, look.Text("  "), look.Key("space"), look.KeyDesc(" tick"))
 	}
 	hints = append(hints, newlineHints(f.focused())...)
 	lines = append(lines, line(append(buttons, hints...)...))
 	return boxed(lines)
+}
+
+// backgroundLine draws the open in background box after its label, its keys while it has focus.
+func (f *newWorktreeForm) backgroundLine(width int) string {
+	th := f.th
+	spans := look.Mark(backgroundZone, append(look.BoxOf(f.background, f.busy), look.Text("Open in the background"))...)
+	if room := width - labelWidth - th.Width(spans...); f.onBackground() && room > 0 {
+		spans = append(spans, th.Cut(room, look.Muted("  space tick"))...)
+	}
+	return th.DrawCut(look.Plain, labelWidth-1, look.Label("background")) + " " + th.Render(look.Plain, spans...)
 }
 
 // branchDoes is what creating the worktree does with branch, or, while it is not a branch's name, to

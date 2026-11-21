@@ -512,7 +512,7 @@ func TestNewWorktreeFormLayout(t *testing.T) {
 	choiceKeys := keys + "  left/right open with  space list"
 	screen := func(fields []string, keys string, says ...string) []string {
 		lines := append([]string{"", "  New worktree in " + space.Name, "", "   Branch   Pull request   Issue", "", "  branch     fix", "  directory  .worktrees/fix"}, fields...)
-		lines = append(lines, "", "  Creates fix from main")
+		lines = append(lines, backgroundRow, "", "  Creates fix from main")
 		for _, s := range says {
 			lines = append(lines, "  "+s)
 		}

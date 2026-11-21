@@ -64,6 +64,9 @@ const (
 	old40   = `{"author":{"login":"me"},"number":40,"title":"Old one","url":"https://github.com/o/r/issues/40"}`
 )
 
+// backgroundRow is the new worktree form's open in background box, unticked and without focus.
+const backgroundRow = "  background \u2610 Open in the background"
+
 // mainRepo is a repository with a commit on main.
 func mainRepo(t *testing.T) string {
 	t.Helper()
@@ -109,7 +112,7 @@ func TestNewWorktreeFormPR(t *testing.T) {
 	row := func(s string) string { return "              " + s }
 	screen := func(pr []string, dir string, says ...string) []string {
 		lines := append([]string{"", "  New worktree in gr", "", "   Branch   Pull request   Issue", ""}, pr...)
-		lines = append(lines, "  directory  "+dir, "")
+		lines = append(lines, "  directory  "+dir, backgroundRow, "")
 		for _, s := range says {
 			if s != "" {
 				s = "  " + s
@@ -170,8 +173,8 @@ func TestNewWorktreeFormPR(t *testing.T) {
 	f.Update(keyMsg("ctrl+u"))
 	typeInto(f, "404")
 	lookUpPR(t, f)
-	if got, want := formScreen(f)[5:12], []string{"  PR         404", "  directory  .worktrees", "", "  Could not look up PR #404", "",
-		"  GraphQL: Could not resolve to a PullRequest with the number of", "  404. (repository.pullRequest)"}; !reflect.DeepEqual(got, want) {
+	if got, want := formScreen(f)[5:12], []string{"  PR         404", "  directory  .worktrees", backgroundRow, "", "  Could not look up PR #404", "",
+		"  GraphQL: Could not resolve to a PullRequest with the number of"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("a PR gh cannot find:\n%q\nwant\n%q", got, want)
 	}
 
@@ -345,7 +348,7 @@ run = ["gr"]
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	screen := func(fields []string, hint string, says ...string) []string {
 		lines := append([]string{"", "  New worktree in gr", "", "   Branch   Pull request   Issue", "", "  branch     pr/me/fix", "  directory  .worktrees/fix"}, fields...)
-		lines = append(lines, "", "  Creates pr/me/fix from main")
+		lines = append(lines, backgroundRow, "", "  Creates pr/me/fix from main")
 		for _, s := range says {
 			if s != "" {
 				s = "  " + s
@@ -409,6 +412,65 @@ run = ["gr"]
 		`'--env=KSPACES_INPUT_PROMPT=fix "it" in $$$$HOME'`, `'--env=TASK=fix "it" in $$$$HOME'`,
 		"--hold", "claude", `'fix "it" in $$HOME'`, "--",
 		"@", "action", "goto_session", "gr@fix.kitty-session", "--",
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
+	}
+}
+
+// The open in background box is the last field, round from the tab strip; space ticks it, as a click
+// does. Ticked, the worktree's session opens with --keep-focus and no switch to it.
+func TestNewWorktreeFormBackground(t *testing.T) {
+	root := mainRepo(t)
+	dir := t.TempDir()
+	log := filepath.Join(dir, "calls")
+	script := "#!/bin/sh\n{ for a; do printf '%s\\n' \"$a\"; done; echo --; } >> " + log + "\n"
+	if err := os.WriteFile(filepath.Join(dir, "kitten"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("KITTY_INSTALLATION_DIR", "")
+	space := spaces.Space{Name: "gr", Root: root, Worktrees: []spaces.Worktree{{Path: root, Branch: "main", Session: "gr"}}}
+	cfg, err := config.Parse("[worktrees]\nbranch_prefix = \"pr/me\"\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := newForm(cfg, space)
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	typeInto(f, "fix")
+	shiftTab := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
+	f.Update(shiftTab)
+	f.Update(shiftTab)
+	f.Update(keyMsg("space"))
+	type result struct {
+		Row        string
+		Background bool
+	}
+	got := []result{{formScreen(f)[7], f.background}}
+	clickOn(t, f, "Open in the background")
+	got = append(got, result{formScreen(f)[7], f.background})
+	clickOn(t, f, "Open in the background")
+	want := []result{
+		{"  background \u2611 Open in the background  space tick", true},
+		{"  background \u2610 Open in the background  space tick", false},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got  %+v\nwant %+v", got, want)
+	}
+
+	_, cmd := f.Update(keyMsg("enter"))
+	if cmd == nil {
+		t.Fatal("enter created nothing")
+	}
+	if _, quit := f.Update(cmd()); quit == nil || f.err != nil {
+		t.Fatalf("the form stayed: %v", f.err)
+	}
+	data, err := os.ReadFile(log)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt := filepath.Join(root, ".worktrees", "fix")
+	if got, want := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n"), []string{
+		"@", "action", "launch", "--type=tab", "--cwd=" + wt, "--add-to-session=gr@fix", "--keep-focus", "--",
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
 	}
@@ -489,7 +551,7 @@ inputs = [{ name = "prompt", label = "Prompt", default = "Fix issue #{issue}" }]
 	}
 	if got, want := formScreen(f), []string{"", "  New worktree in gr", "", "   Branch   Pull request   Issue", "",
 		"  issue      #12 Crash on empty input", "  branch     pr/me/40-old-one-x", "  directory  .worktrees/40-old-one-x",
-		"  open with  < claude >", "  Prompt     Fix issue #12", "",
+		"  open with  < claude >", "  Prompt     Fix issue #12", backgroundRow, "",
 		"  Issue #12 Crash on empty input", "  Creates pr/me/40-old-one-x from main", "  Runs claude in the first tab", "",
 		"   Create enter    Cancel esc   tab next field", ""}; !reflect.DeepEqual(got, want) {
 		t.Errorf("form:\n%q\nwant\n%q", got, want)
@@ -600,7 +662,7 @@ inputs = [{ name = "prompt", label = "Prompt", default = "Diff against {base}" }
 	screen := func(base string) []string {
 		return []string{"", "  New worktree in " + space.Name, "", "   Branch   Pull request   Issue", "",
 			"  branch     pr/me/stack", "  from       < " + base + " >  left/right change  space list", "  directory  .worktrees/stack",
-			"  open with  < claude >", "  Prompt     Diff against " + base, "",
+			"  open with  < claude >", "  Prompt     Diff against " + base, backgroundRow, "",
 			"  Creates pr/me/stack from " + base, "  Runs claude in the first tab", "",
 			"   Create enter    Cancel esc   tab next field  left/right base  space list", ""}
 	}

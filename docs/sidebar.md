@@ -355,6 +355,11 @@ submits the form, nor `esc` cancels it. Otherwise `enter` submits the form from 
 included, as the button, `Create enter`, says. Every form with a choice, below, has these. A required
 input left empty refuses to create.
 
+The last field, `background`, is a box: `space` or a click ticks it. Ticked, the form creates the
+worktree and opens its session, its layout or command started, without switching to it: focus stays on
+the window the form was opened from, so a prompt or a command runs while you carry on. A layout's tabs are
+each left on the pane opened last rather than its `focus` pane.
+
 An input's field takes several lines, for a prompt: `shift+enter` starts a new one, as do `alt+enter` and
 `ctrl+j`, for a terminal that sends `shift+enter` as `enter`, and `enter` still submits the form. The field
 grows to show its lines, a long one wrapped, up to six, then scrolls with the cursor, and the rows below it

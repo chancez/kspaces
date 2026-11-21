@@ -105,6 +105,7 @@ func TestPopupHelp(t *testing.T) {
 	// Round the fields to the tabs.
 	p.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	p.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	p.Update(tea.KeyPressMsg{Code: tea.KeyTab})
 	p.Update(question)
 	row := func(s string) string { return "│ " + s + strings.Repeat(" ", 86-utf8.RuneCountInString(s)) + " │" }
 	want := []string{
@@ -114,6 +115,7 @@ func TestPopupHelp(t *testing.T) {
 		row(""),
 		row("branch     pr/me/"),
 		row("directory  .worktrees"),
+		row(backgroundRow[2:]),
 		row(""),
 		row("Name the branch to create or check out, or # for a PR"),
 	}
