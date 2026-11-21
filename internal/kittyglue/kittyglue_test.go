@@ -27,7 +27,7 @@ func TestFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := names(files), []string{"kspaces.conf", "kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py"}; !reflect.DeepEqual(got, want) {
+	if got, want := names(files), []string{"kspaces.conf", "kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", "kspaces_clear_status.py"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("files = %q, want %q", got, want)
 	}
 	watchers := func(files []File) []string {
@@ -48,7 +48,7 @@ func TestFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := names(files), []string{"kspaces.conf", "kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", "save_sessions.py"}; !reflect.DeepEqual(got, want) {
+	if got, want := names(files), []string{"kspaces.conf", "kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", "kspaces_clear_status.py", "save_sessions.py"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("files with save_sessions = %q, want %q", got, want)
 	}
 	if got, want := watchers(files), []string{"watcher /cfg/kitty/kspaces/save_sessions.py", "watcher /cfg/kitty/kspaces/kspaces_watcher.py"}; !reflect.DeepEqual(got, want) {
@@ -70,6 +70,9 @@ watcher /cfg/kitty/kspaces/kspaces_watcher.py
 # Hide and show every sidebar, and move the keyboard into this OS window's sidebar and back.
 action_alias kspaces_toggle kitten /cfg/kitty/kspaces/kspaces_toggle.py
 action_alias kspaces_focus kitten /cfg/kitty/kspaces/kspaces_focus.py
+
+# Remove program status records without focusing their windows, as the sidebar's status list does.
+action_alias kspaces_clear_status kitten /cfg/kitty/kspaces/kspaces_clear_status.py
 
 # The picker; the next and previous session with windows open, and the one used before this one.
 `
@@ -110,7 +113,7 @@ func TestInstallAndStale(t *testing.T) {
 		}
 		return got
 	}
-	if got, want := stale(cfg), []string{"kspaces.conf", "kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", "save_sessions.py"}; !reflect.DeepEqual(got, want) {
+	if got, want := stale(cfg), []string{"kspaces.conf", "kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", "kspaces_clear_status.py", "save_sessions.py"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("before install: %q, want %q", got, want)
 	}
 	if err := Install(cfg, dir); err != nil {
@@ -140,7 +143,7 @@ func TestInstallAndStale(t *testing.T) {
 	for _, e := range entries {
 		left = append(left, e.Name())
 	}
-	if want := []string{"kspaces.conf", "kspaces_focus.py", "kspaces_toggle.py", "kspaces_watcher.py", "mine.conf"}; !reflect.DeepEqual(left, want) {
+	if want := []string{"kspaces.conf", "kspaces_clear_status.py", "kspaces_focus.py", "kspaces_toggle.py", "kspaces_watcher.py", "mine.conf"}; !reflect.DeepEqual(left, want) {
 		t.Errorf("after the second install: %q, want %q", left, want)
 	}
 }

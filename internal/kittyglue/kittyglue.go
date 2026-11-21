@@ -1,5 +1,5 @@
 // Package kittyglue is what kitty needs to run kspaces: the watcher that docks a sidebar in every OS
-// window, the kittens that hide and focus it, the optional session saver, and a kitty.conf to include that
+// window, the kittens that hide and focus it and clear program statuses, the optional session saver, and a kitty.conf to include that
 // loads them.
 // The scripts are built into kspaces, so a kspaces from mise, go install, a release or a local build
 // installs the files that go with it.
@@ -28,7 +28,7 @@ const ConfName = "kspaces.conf"
 const sessionsScript = "save_sessions.py"
 
 // scriptNames are the scripts in files/, in the order they are installed.
-var scriptNames = []string{"kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", sessionsScript}
+var scriptNames = []string{"kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", "kspaces_clear_status.py", sessionsScript}
 
 // owned are the names install writes, and so may remove when cfg no longer wants them.
 var owned = append([]string{ConfName}, scriptNames...)
@@ -100,6 +100,9 @@ watcher %s
 action_alias kspaces_toggle kitten %s
 action_alias kspaces_focus kitten %s
 
+# Remove program status records without focusing their windows, as the sidebar's status list does.
+action_alias kspaces_clear_status kitten %s
+
 # The picker; the next and previous session with windows open, and the one used before this one.
 action_alias kspaces_pick %s
 action_alias kspaces_next launch --type=background --allow-remote-control kspaces next
@@ -112,7 +115,7 @@ action_alias kspaces_attention_prev launch --type=background --allow-remote-cont
 
 # Send a key to this OS window's sidebar without focusing it, as in: map --mode spaces j kspaces_key j
 action_alias kspaces_key remote_control send-key --match "var:^kspaces$ and state:parent_focused"
-`, path("kspaces_watcher.py"), path("kspaces_toggle.py"), path("kspaces_focus.py"), pick)
+`, path("kspaces_watcher.py"), path("kspaces_toggle.py"), path("kspaces_focus.py"), path("kspaces_clear_status.py"), pick)
 	return b.String()
 }
 
