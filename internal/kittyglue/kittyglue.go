@@ -115,8 +115,30 @@ action_alias kspaces_attention_prev launch --type=background --allow-remote-cont
 
 # Send a key to this OS window's sidebar without focusing it, as in: map --mode spaces j kspaces_key j
 action_alias kspaces_key remote_control send-key --match "var:^kspaces$ and state:parent_focused"
+
+# The forms, for the focused window's session, worktree or space, in a popup as the sidebar opens them.
+# Name the layout or command to run, as in: map f6 kspaces_run test
 `, path("kspaces_watcher.py"), path("kspaces_toggle.py"), path("kspaces_focus.py"), path("kspaces_clear_status.py"), pick)
+	for _, f := range forms {
+		fmt.Fprintf(&b, "action_alias kspaces_%s launch --type=background --allow-remote-control kspaces %s --from @active-kitty-window-id\n", f.action, f.command)
+	}
 	return b.String()
+}
+
+// forms are kspaces.conf's actions that open a form, each the command it runs with --from.
+var forms = []struct{ action, command string }{
+	{"new", "new"},
+	{"new_pr", "new --from-pr"},
+	{"new_issue", "new --from-issue"},
+	{"remove", "remove"},
+	{"cleanup", "cleanup"},
+	{"close", "close"},
+	{"suspend", "suspend"},
+	{"layout", "layout"},
+	{"save_layout", "layout save"},
+	{"run", "run"},
+	{"trust", "trust"},
+	{"add", "add"},
 }
 
 // Stale are the files in dir that are missing or differ from what install would write for cfg, and the

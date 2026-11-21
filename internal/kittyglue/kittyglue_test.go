@@ -86,6 +86,21 @@ action_alias kspaces_attention_prev launch --type=background --allow-remote-cont
 
 # Send a key to this OS window's sidebar without focusing it, as in: map --mode spaces j kspaces_key j
 action_alias kspaces_key remote_control send-key --match "var:^kspaces$ and state:parent_focused"
+
+# The forms, for the focused window's session, worktree or space, in a popup as the sidebar opens them.
+# Name the layout or command to run, as in: map f6 kspaces_run test
+action_alias kspaces_new launch --type=background --allow-remote-control kspaces new --from @active-kitty-window-id
+action_alias kspaces_new_pr launch --type=background --allow-remote-control kspaces new --from-pr --from @active-kitty-window-id
+action_alias kspaces_new_issue launch --type=background --allow-remote-control kspaces new --from-issue --from @active-kitty-window-id
+action_alias kspaces_remove launch --type=background --allow-remote-control kspaces remove --from @active-kitty-window-id
+action_alias kspaces_cleanup launch --type=background --allow-remote-control kspaces cleanup --from @active-kitty-window-id
+action_alias kspaces_close launch --type=background --allow-remote-control kspaces close --from @active-kitty-window-id
+action_alias kspaces_suspend launch --type=background --allow-remote-control kspaces suspend --from @active-kitty-window-id
+action_alias kspaces_layout launch --type=background --allow-remote-control kspaces layout --from @active-kitty-window-id
+action_alias kspaces_save_layout launch --type=background --allow-remote-control kspaces layout save --from @active-kitty-window-id
+action_alias kspaces_run launch --type=background --allow-remote-control kspaces run --from @active-kitty-window-id
+action_alias kspaces_trust launch --type=background --allow-remote-control kspaces trust --from @active-kitty-window-id
+action_alias kspaces_add launch --type=background --allow-remote-control kspaces add --from @active-kitty-window-id
 `
 	for _, c := range []struct {
 		popup, pick string

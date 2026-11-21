@@ -491,11 +491,20 @@ map cmd+alt+] kspaces_next
 map cmd+alt+/ kspaces_recent
 map cmd+alt+, kspaces_attention_prev
 map cmd+alt+. kspaces_attention_next
+map cmd+alt+n kspaces_new
+map cmd+alt+t kspaces_run test
 ```
 
 `kspaces_recent` switches to the session focused most recently other than the focused window's, as alt-tab
 does, so pressing it twice goes back; sessions in no space count, and docks never count as focusing one.
 With no other session open it fails, saying so in kitty's output, as the other actions do.
+
+The form actions open the sidebar's forms in a popup for the focused window, on its session, worktree or
+space: `kspaces_new`, `kspaces_new_pr` and `kspaces_new_issue` create a worktree, `kspaces_remove`,
+`kspaces_cleanup`, `kspaces_close`, `kspaces_suspend`, `kspaces_layout NAME`, `kspaces_save_layout`,
+`kspaces_run NAME` and `kspaces_trust` act on what they say, and `kspaces_add` adds the repository of the
+window's directory. Each runs its command with `--from @active-kitty-window-id`, as `kspaces_pick` does in
+a panel, and kitty appends a mapping's words, such as the layout's or command's name, to it.
 
 The watcher and the actions find `kspaces` the way kitty's `launch` does: kitty's `exe_search_path`, its
 own PATH, `~/.local/bin`, then the PATH of kitty.conf's `env` and your login shell. kitty started from the
