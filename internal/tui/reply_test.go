@@ -153,7 +153,7 @@ func TestReplyKey(t *testing.T) {
 	e.m.render()
 	e.press("m")
 	_, y := e.zone(fmt.Sprintf(entryZone, i))
-	if got, want := e.screen()[y+1:y+5], []string{menuRule(""), " Open", menuItem("Reply", "t"), menuRule("")}; !reflect.DeepEqual(got, want) {
+	if got, want := e.screen()[y+1:y+6], []string{menuRule(""), " Open", menuItem("Reply", "t"), menuItem("Clear", "x"), menuRule("")}; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	e.press("j")
@@ -181,7 +181,8 @@ func TestReplyKey(t *testing.T) {
 	}
 }
 
-// A right click on a status entry opens its menu under the mouse, Open and Reply, as on a spaces row; on
+// A right click on a status entry opens its menu under the mouse, Open, Reply and on a failed one Clear, as
+// on a spaces row; on
 // an entry's hover popup, the menu of the entry it shows, not of the one it covers.
 func TestStatusRightClick(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
@@ -191,9 +192,9 @@ func TestStatusRightClick(t *testing.T) {
 		top := []string{
 			spacesTitle, "", "  \uf120  default", "", "\u25bc \uf401  gr main", here + "\uf071  dev pr/me/dev", "  \ue725  fix fix", "",
 			"  \uf401  kitty master", "", "\u25b6 \uf110  docs main", "", "  \uf00d  broken", "", "", "", "", "", "", "", "", "",
-			rule, "STATUS", "Blocked 1", "\uf071  dev                   +1 5m", "   claude \u00b7 approve", "", "Failed 1", "\ue654  scratch",
+			rule, "STATUS                       \uf467", "Blocked 1", "\uf071  dev                   +1 5m", "   claude \u00b7 approve", "", "Failed 1", "\ue654  scratch                   \uf467",
 		}
-		menu := []string{rule, " Open", menuItem("Reply", "t"), rule}
+		menu := []string{rule, " Open", menuItem("Reply", "t"), menuItem("Clear", "x"), rule}
 		screen := func(lines ...[]string) []string {
 			var out []string
 			for _, l := range lines {
@@ -202,7 +203,7 @@ func TestStatusRightClick(t *testing.T) {
 			return out
 		}
 		e.click(fmt.Sprintf(entryZone, e.entry(21)), tea.MouseRight)
-		want := screen(top, menu, []string{"   make \u00b7 \u2588\u2588\u2588\u2588\u2588\u2588\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591\u2591 40%", "", "Idle 1", "\uf10c  default", "   claude", ""})
+		want := screen(top, menu, []string{"", "Idle 1", "\uf10c  default", "   claude", ""})
 		if got := e.screen(); !reflect.DeepEqual(got, want) {
 			t.Errorf("on the failed entry:\n%q\nwant\n%q", got, want)
 		}
@@ -212,6 +213,8 @@ func TestStatusRightClick(t *testing.T) {
 		e.hover(fmt.Sprintf(entryZone, e.entry(20)))
 		_, y := e.zone(popupZone)
 		e.clickAt(4, y+5, tea.MouseRight)
+		// The blocked entry has nothing to clear.
+		menu = []string{rule, " Open", menuItem("Reply", "t"), rule}
 		want = screen(top, []string{"   exit 1"}, menu, []string{"", "Idle 1", "\uf10c  default", "   claude", ""})
 		if got := e.screen(); !reflect.DeepEqual(got, want) || e.m.cursor != e.entry(20) {
 			t.Errorf("on the popup, cursor %d, want %d:\n%q\nwant\n%q", e.m.cursor, e.entry(20), got, want)

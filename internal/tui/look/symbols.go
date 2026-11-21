@@ -47,6 +47,8 @@ const (
 	GlyphSortStatus
 	// GlyphFilter is the attention filter's button.
 	GlyphFilter
+	// GlyphClear is the button that clears a status entry, and on the STATUS title the done and failed ones.
+	GlyphClear
 	// GlyphChosen marks the menu item chosen now, as the sort mode.
 	GlyphChosen
 	// GlyphChanges marks how many files a worktree has not committed, GlyphAhead and GlyphBehind how many
@@ -114,6 +116,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphSortActivity:     "@",
 		GlyphSortStatus:       "!",
 		GlyphFilter:           "Y",
+		GlyphClear:            "x",
 		GlyphChosen:           "*",
 		GlyphChanges:          "*",
 		GlyphAhead:            "+",
@@ -163,6 +166,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphSortActivity:     "\u25f7", // white circle with upper right quadrant, a clock face
 		GlyphSortStatus:       "!",
 		GlyphFilter:           "\u25bd", // white down-pointing triangle, a funnel
+		GlyphClear:            "\u00d7", // multiplication sign
 		GlyphChosen:           "\u2713", // check mark
 		GlyphChanges:          "\u25cf", // black circle
 		GlyphAhead:            "\u2191", // upwards arrow
@@ -216,6 +220,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphSortActivity: "\uf017", // clock
 		GlyphSortStatus:   "\uf071", // warning
 		GlyphFilter:       "\uf0b0", // filter
+		GlyphClear:        "\uf467", // x
 		GlyphChosen:       "\uf00c", // check
 		// Unicode rather than Nerd Font icons: they are followed by a number, not a space, or end the row.
 		GlyphChanges:          "\u25cf",

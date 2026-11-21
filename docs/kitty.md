@@ -525,7 +525,9 @@ active tab's. `kspaces_watcher.py`:
   sidebar answers with a `kitten @ ls` alone, so a switch to another session shows at once.
 
 `kspaces_toggle.py` hides and shows the sidebar, and `kspaces_focus.py` moves the keyboard into the
-sidebar, when the current OS window has it, and back.
+sidebar, when the current OS window has it, and back. `kspaces_clear_status.py` drops windows' program
+status records without focusing them, for the status list's clear buttons; the sidebar runs it through
+the `kspaces_clear_status` action.
 
 Every two seconds the sidebar runs `kitten @ ls` and `git worktree list` for each space, and in the
 background `git status` and `gh` for the [rows' git state](sidebar.md#spaces). It writes what git and gh

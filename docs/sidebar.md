@@ -233,7 +233,7 @@ cancelled changes nothing, and the ticks stay for another go.
 
 Right-click a row or a status entry, or press `m` on it. The menu lists what applies to the row, in
 sections, each named on the rule above it: what acts on the row's session, then on its worktree, then on
-the space as a whole, the same from any of its rows. A status entry's has Open and Reply. A menu of one
+the space as a whole, the same from any of its rows. A status entry's has Open, Reply and, on one with a done or failed record, Clear. A menu of one
 section names none. Each item shows its key at its right edge, when the sidebar leaves room for it beside
 the label, and the key runs the item from the menu as it does on the row. `j` / `k` and the mouse go over
 the items only. `esc`, a click outside it, or a click in another window closes it. On a hover popup, a right click is on the entry it shows. On the SPACES
@@ -251,6 +251,7 @@ group, and Add space.
 | Session | Close session | `c` | close every window of the session, on a session with windows open; with the session saver, keeping it to open again |
 | Session | Suspend session | `z` | stop what runs in the session's windows and close them, keeping them to resume, on a session with windows open; with the session saver |
 | Session | Reply | `t` | write to the window of a status entry without switching to it, in a form; on a status entry |
+| Session | Clear | `x` | drop a status entry's done and failed records without focusing its window; on a status entry with one |
 | Worktree | Open PR #N | `b` | open the branch's PR in the browser with `gh browse N`, on a worktree whose row shows a PR |
 | Worktree | Remove worktree | `x` | close the session and remove a linked worktree |
 | Worktree | Forget | `F`, `x` | delete the saved session file of a session with no windows open, and what the keeper kept of it; `x` on a missing worktree |
@@ -506,6 +507,13 @@ kitty keeps the records and ends them by the protocol's rules: working and block
 prompt, done and failed when the window is focused or typed in. The age comes from the kitty watcher; without
 it entries show none.
 
+An entry with a done or failed record has a button at the right end of its first row, which clears those
+records, as does `x` on it: kitty drops them without the window being focused, and an entry with no
+other record leaves the list. Working, blocked and idle records cannot be cleared, as they end by
+themselves at the next prompt. The button on the STATUS title, or `X` wherever the cursor is, clears every
+done and failed record the list shows, and is there only while it shows one. A program that reports again brings its entry back, as does a multiplexer that replays the
+records it keeps when a window attaches to it.
+
 `!` focuses the window that needs you most: the first blocked, failed or done entry, in the list's order.
 `kspaces next --attention` and `prev --attention`, which kspaces.conf's `kspaces_attention_next` and
 `kspaces_attention_prev` run, step through all of them from the focused window, wrapping around, and do
@@ -535,6 +543,8 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `a` | add a space, wherever the cursor is |
 | `!` | focus the window that needs you most, wherever the cursor is |
 | `t` | reply to the cursor's status entry: write to its window without switching to it |
+| `x` | clear the done and failed records of the cursor's status entry, without focusing its window; see [Status](#status) |
+| `X` | clear the done and failed status entries, wherever the cursor is |
 | `/` | filter the spaces list; see [Spaces](#spaces) |
 | `P` | open the picker; see [The picker](#the-picker) |
 | `f` | show only what is not idle, or everything again; see [Spaces](#spaces) |

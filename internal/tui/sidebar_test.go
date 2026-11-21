@@ -288,19 +288,19 @@ func TestStatusGroupsOnScreen(t *testing.T) {
 		e.splitStatus(15)
 		var got []string
 		for i, l := range e.screen() {
-			if l == "STATUS" {
+			if l == "STATUS                       \uf467" {
 				got = e.screen()[i : i+18]
 				break
 			}
 		}
 		want := []string{
-			"STATUS",
+			"STATUS                       \uf467",
 			"Blocked 1",
 			blocked + "dev                   +1 5m",
 			"   claude \u00b7 approve",
 			"",
 			"Failed 1",
-			"\ue654  scratch",
+			"\ue654  scratch                   \uf467",
 			"   exit 1",
 			"",
 			"Working 1",

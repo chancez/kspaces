@@ -428,6 +428,21 @@ func FocusWindow(id int) error {
 	return err
 }
 
+// ClearStatus removes the program status records of windows ids in states, or in any state with none, as
+// focusing a window does for its done and error ones, but leaving the focus where it is. It runs
+// kspaces.conf's kspaces_clear_status, which kspaces_clear_status.py installs.
+func ClearStatus(ids []int, states ...string) error {
+	args := []string{"action", "kspaces_clear_status"}
+	if len(states) > 0 {
+		args = append(args, "--state", strings.Join(states, ","))
+	}
+	for _, id := range ids {
+		args = append(args, strconv.Itoa(id))
+	}
+	_, err := kitten(args...)
+	return err
+}
+
 // acted is whether this process has run a kitty action, focused a window or opened a popup, each of which
 // leaves the keyboard where it wants it.
 var acted atomic.Bool

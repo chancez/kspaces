@@ -99,13 +99,13 @@ func TestSelectBar(t *testing.T) {
 		}
 	}
 	check("nothing ticked", []string{barTitle("0 selected", 30), item("Remove", "-", "x"), item("Close", "-", "c"),
-		item("Forget", "-", "F"), item("Cancel", "", "esc"), "Click or drag over rows to ti\u2026", rule, "STATUS"}, []string{"Cancel"})
+		item("Forget", "-", "F"), item("Cancel", "", "esc"), "Click or drag over rows to ti\u2026", rule, "STATUS                       \uf467"}, []string{"Cancel"})
 	e.clickRow(e.row("gr@fix"))
 	check("fix ticked, no windows, no saved file", []string{barTitle("1 selected", 30), item("Remove", "1", "x"), item("Close", "-", "c"),
-		item("Forget", "-", "F"), item("Cancel", "", "esc"), "Nothing to close or forget", rule, "STATUS"}, []string{"Cancel", "Remove"})
+		item("Forget", "-", "F"), item("Cancel", "", "esc"), "Nothing to close or forget", rule, "STATUS                       \uf467"}, []string{"Cancel", "Remove"})
 	e.clickRow(e.row("gr@dev"))
 	ticked := []string{barTitle("2 selected", 30), item("Remove", "2", "x"), item("Close", "1", "c"),
-		item("Forget", "-", "F"), item("Cancel", "", "esc"), "Nothing to forget", rule, "STATUS"}
+		item("Forget", "-", "F"), item("Cancel", "", "esc"), "Nothing to forget", rule, "STATUS                       \uf467"}
 	check("dev ticked, with windows", ticked, []string{"Cancel", "Close", "Remove"})
 
 	// The greyed row is muted, the others in the text's color.
@@ -145,11 +145,11 @@ func TestSelectBar(t *testing.T) {
 	e.m.render()
 	narrow := func(name, key string) string { return barItem(name, "", key, 14, 0, 3) }
 	check("narrow, the counts left out", []string{barTitle("2", 14), narrow("Remove", "x"), narrow("Close", "c"), narrow("Forget", "F"),
-		narrow("Cancel", "esc"), "Nothing to fo\u2026", strings.Repeat("\u2500", 14), "STATUS"}, []string{"Cancel", "Close", "Remove"})
+		narrow("Cancel", "esc"), "Nothing to fo\u2026", strings.Repeat("\u2500", 14), "STATUS       \uf467"}, []string{"Cancel", "Close", "Remove"})
 	e.m.Update(tea.WindowSizeMsg{Width: 12, Height: 40})
 	e.m.render()
 	check("narrowest, the keys left out too", []string{barTitle("2", 12), " Remove", " Close", " Forget", " Cancel",
-		"Nothing to \u2026", strings.Repeat("\u2500", 12), "STATUS"}, []string{"Cancel", "Close", "Remove"})
+		"Nothing to \u2026", strings.Repeat("\u2500", 12), "STATUS     \uf467"}, []string{"Cancel", "Close", "Remove"})
 
 	snap := fixture(time.Now())
 	cfg := testCommands(t)
@@ -158,7 +158,7 @@ func TestSelectBar(t *testing.T) {
 	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 40})
 	e.m.render()
 	check("with commands", []string{barTitle("2 selected", 30), item("Remove", "2", "x"), item("Close", "1", "c"), item("Forget", "-", "F"),
-		item("Run", "2", "R"), item("Cancel", "", "esc"), "Nothing to forget", rule, "STATUS"}, []string{"Cancel", "Close", "Remove", "Run"})
+		item("Run", "2", "R"), item("Cancel", "", "esc"), "Nothing to forget", rule, "STATUS                       \uf467"}, []string{"Cancel", "Close", "Remove", "Run"})
 }
 
 // Each action opens its form for what it applies to, in the list's order: Remove the clean up form with

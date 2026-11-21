@@ -376,6 +376,14 @@ func PickButton(hot bool) Span {
 	return glyph(elMuted, GlyphSearch, false)
 }
 
+// ClearButton is the icon button that clears status entries, drawn as AddButton is.
+func ClearButton(hot bool) Span {
+	if hot {
+		return glyph(elButton, GlyphClear, false)
+	}
+	return glyph(elMuted, GlyphClear, false)
+}
+
 // sortGlyphs are the sort button's icons, by mode.
 var sortGlyphs = map[spaces.SortMode]Glyph{
 	spaces.SortManual:   GlyphSortManual,

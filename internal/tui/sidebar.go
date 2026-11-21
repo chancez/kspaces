@@ -127,6 +127,8 @@ type sidebar struct {
 	// Whether the mouse is on the add space button, the sort button, the attention filter's button or the
 	// picker's button, which lights it.
 	addHot, sortHot, attentionHot, pickHot bool
+	// The zone of the clear button under the mouse, which lights it, or "", see statuslist.go.
+	clearHot string
 	// zones are where the last frame drew marked spans, by id, so a click maps back to what was drawn.
 	zones map[string][]look.Zone
 	// The spaces list's filters, see filter.go: the query narrows rows while filtering, the attention
@@ -475,7 +477,7 @@ func (m *sidebar) frame() string {
 	for len(lines) < l.statusTop-2 {
 		lines = append(lines, "")
 	}
-	lines = append(lines, th.DrawZone(splitZone, look.Plain, width, look.Rule(width, m.splitting || m.splitHot)), th.Render(look.Plain, th.Cut(width, look.Title("STATUS"))...))
+	lines = append(lines, th.DrawZone(splitZone, look.Plain, width, look.Rule(width, m.splitting || m.splitHot)), m.statusTitleLine(width))
 	if len(m.kitty.Statuses) == 0 {
 		lines = append(lines, th.Render(look.Plain, th.Cut(width, look.Text("Nothing to report").With(look.Dim))...))
 	}

@@ -235,7 +235,27 @@ var (
 			return m.reply(s.status.Window)
 		},
 	}
+	// actClearStatus removes the done and failed records of the entry's window, leaving the focus where it
+	// is. The others end by themselves, at the next prompt.
+	actClearStatus = &interact.Action[*sidebar, statusSubject]{
+		Title:   "Clear",
+		Section: sectionSession,
+		Applies: func(_ *sidebar, s statusSubject) bool { return hasFinished(s.status) },
+		Run: func(m *sidebar, s statusSubject) tea.Cmd {
+			return m.clearCmd([]int{s.status.Window}, finishedStates...)
+		},
+	}
 )
+
+// actClearFinished removes the done and failed records of the status list's windows, leaving the focus
+// where it is, wherever the cursor is.
+var actClearFinished = &interact.Action[*sidebar, paneSubject]{
+	Title:   "Clear done and failed",
+	Applies: func(m *sidebar, _ paneSubject) bool { return len(finished(m.kitty.Statuses)) > 0 },
+	Run: func(m *sidebar, _ paneSubject) tea.Cmd {
+		return m.clearCmd(finished(m.kitty.Statuses), finishedStates...)
+	},
+}
 
 // The sidebar's last line, while it shows an error.
 var actShowError = &interact.Action[*sidebar, errorSubject]{
@@ -1060,14 +1080,15 @@ func init() {
 	interact.Via(groupKind, func(s groupSubject) (spacesSubject, bool) { return spacesSubject{group: s.name}, true }, spacesKind)
 	groupHeaders = interact.List(groupKind)
 
-	statusKind = interact.NewKind(func(s statusSubject) string { return s.status.Session }, actOpenWindow, actReply)
+	statusKind = interact.NewKind(func(s statusSubject) string { return s.status.Session }, actOpenWindow, actReply, actClearStatus)
 	statusKind.Bind(actReply, "t", "reply", "t")
+	statusKind.Bind(actClearStatus, "x", "clear", "x")
 	statusList = interact.List(statusKind)
 	statusList.Bind(actOpenWindow, "enter/l", "open", "enter", "l")
 
 	paneKind = interact.NewKind(func(paneSubject) string { return "Sidebar" },
 		actDown, actUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit,
-		actAttend, actFilter, actAttention, actOpenOnly, actAwakeOnly, actOpenPicker, actCycleSort, actMoveUp, actMoveDown, actSelect, actHelp)
+		actAttend, actClearFinished, actFilter, actAttention, actOpenOnly, actAwakeOnly, actOpenPicker, actCycleSort, actMoveUp, actMoveDown, actSelect, actHelp)
 	paneKind.Bind(actDown, "j/k", "down/up", "j", "down")
 	paneKind.Bind(actUp, "", "", "k", "up")
 	paneKind.Bind(actTop, "g/G", "top/bottom", "g", "home")
@@ -1078,6 +1099,7 @@ func init() {
 	paneKind.BindQuiet(actEndRemote, "enter", "l")
 	paneKind.Bind(actQuit, "ctrl+c", "quit", "ctrl+c")
 	paneKind.Bind(actAttend, "!", "go to what needs you", "!")
+	paneKind.Bind(actClearFinished, "X", "clear the done and failed statuses", "X")
 	paneKind.Bind(actFilter, "/", "filter the spaces", "/")
 	paneKind.Bind(actAttention, "f", "show only what is not idle", "f")
 	paneKind.Bind(actOpenOnly, "O", "show only open sessions", "O")
