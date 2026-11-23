@@ -7,6 +7,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/chancez/kspaces/internal/kitty"
 )
 
 // fakeProvider puts a session provider on PATH, called prov, speaking the protocol from files: for each
@@ -94,5 +96,29 @@ func TestListSessions(t *testing.T) {
 	}}}
 	if got := sent(t, dir, "list"); !reflect.DeepEqual(got, wantSent) {
 		t.Errorf("sent %v, want %v", got, wantSent)
+	}
+}
+
+// A layout saved from windows that show the provider's sessions has what the provider says runs in them,
+// by the windows it lists each with; a provider that does not list has nothing to say.
+func TestProviderShows(t *testing.T) {
+	dir, _ := fakeProvider(t, map[string]string{
+		"capabilities": `{"capabilities": ["list"]}`,
+		"list":         `{"sessions": [{"id": "a1", "name": "build", "command": "make", "windows": [1, 2]}, {"id": "b2", "name": "idle"}]}`,
+	}, nil)
+	tabs := []kitty.FullTab{{Windows: []kitty.FullWindow{{ID: 1, PID: 7}, {ID: 2}, {ID: 3, UserVars: map[string]string{"kspaces": "1"}}}}}
+	build := ProviderSession{ID: "a1", Name: "build", Command: "make", Windows: []int{1, 2}}
+	if got, want := providerShows([]string{"prov"}, tabs), map[int]ProviderSession{1: build, 2: build}; !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+	w := func(id, pid float64) map[string]any {
+		return map[string]any{"id": id, "pid": pid, "cmdline": []any{}, "foreground": []any{}, "user_vars": map[string]any{}, "cwd": ""}
+	}
+	if got, want := sent(t, dir, "list"), map[string]any{"windows": []any{w(1, 7), w(2, 0)}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("sent %v, want %v", got, want)
+	}
+	fakeProvider(t, map[string]string{"capabilities": `{"capabilities": ["keep"]}`}, nil)
+	if got := providerShows([]string{"prov"}, tabs); got != nil {
+		t.Errorf("a provider that does not list: %v", got)
 	}
 }

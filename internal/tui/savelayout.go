@@ -469,7 +469,7 @@ func SaveLayoutForm(ctx context.Context, cfg config.Config, dir, name string, on
 	if err != nil {
 		return err
 	}
-	tabs, this, err := spaces.CaptureSession(wt, kitty.ThisWindowID())
+	tabs, this, err := spaces.CaptureSession(cfg, wt, kitty.ThisWindowID())
 	if err != nil {
 		return err
 	}

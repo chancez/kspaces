@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Command lines as a shell reads them, for a pane's command, which kitty and cm report as one line and a
+// Command lines as a shell reads them, for a pane's command, which kitty and a session provider report as one line and a
 // layout runs as words.
 
 // SplitWords is line's words as a POSIX shell splits them, its quotes and backslashes taken out. A quote

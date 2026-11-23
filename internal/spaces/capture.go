@@ -1,6 +1,7 @@
 package spaces
 
 import (
+	"cmp"
 	"fmt"
 	"math"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
+	"github.com/chancez/kspaces/internal/logs"
 )
 
 // Saving a session as a layout reads its tabs from kitty and writes each as a layout's tab that builds
@@ -28,28 +30,19 @@ type CapturedTab struct {
 // CaptureSession is wt's session's tabs, and the index among them of this tab: the one window self is
 // in, when it is one of them, such as the sidebar's tab for a form for it, else the one the session
 // focused most recently. A session with no windows is an error.
-func CaptureSession(wt Worktree, self int) ([]CapturedTab, int, error) {
-	tabs, err := kitty.ListTabs()
+func CaptureSession(cfg config.Config, wt Worktree, self int) ([]CapturedTab, int, error) {
+	all, err := kitty.ListTabs()
 	if err != nil {
 		return nil, 0, err
 	}
-	tabs, this := sessionTabs(tabs, wt.Session, self)
+	tabs, this := sessionTabs(all, wt.Session, self)
 	if len(tabs) == 0 {
 		return nil, 0, fmt.Errorf("%s has no windows to save", wt.Session)
 	}
-	var cm map[string]cmSession
-	for _, tab := range tabs {
-		for _, w := range tab.Windows {
-			if _, ok := cmAttached(w.Cmdline); ok && cm == nil {
-				if cm, err = cmSessions(); err != nil {
-					return nil, 0, err
-				}
-			}
-		}
-	}
+	shows := providerShows(cfg.Provider, all)
 	out := make([]CapturedTab, len(tabs))
 	for i, tab := range tabs {
-		out[i] = captureTab(tab, wt, cm)
+		out[i] = captureTab(tab, wt, shows)
 	}
 	return out, this, nil
 }
@@ -83,8 +76,29 @@ func sessionTabs(tabs []kitty.FullTab, session string, self int) ([]kitty.FullTa
 	return out, this
 }
 
-// captureTab is tab as a layout's tab in wt, with cm's sessions for its windows attached to one.
-func captureTab(tab kitty.FullTab, wt Worktree, cm map[string]cmSession) CapturedTab {
+// providerShows are the provider's sessions by the windows that show them, for windows that are its
+// clients, such as a multiplexer's attach, whose own program says nothing of what runs. None when the
+// provider lists no sessions or cannot now, which saves the layout from what kitty knows alone.
+func providerShows(provider []string, tabs []kitty.FullTab) map[int]ProviderSession {
+	if !ProviderCapabilities(provider)[CapList] {
+		return nil
+	}
+	st, err := listSessions(provider, fullWindows(tabs))
+	if err != nil {
+		logs.Error("listing the session provider's sessions", err)
+		return nil
+	}
+	shows := map[int]ProviderSession{}
+	for _, s := range st.Sessions {
+		for _, id := range s.Windows {
+			shows[id] = s
+		}
+	}
+	return shows
+}
+
+// captureTab is tab as a layout's tab in wt, with the provider's sessions by the windows that show them.
+func captureTab(tab kitty.FullTab, wt Worktree, shows map[int]ProviderSession) CapturedTab {
 	windows := map[int]kitty.FullWindow{}
 	for _, w := range tab.Windows {
 		windows[w.ID] = w
@@ -133,7 +147,11 @@ func captureTab(tab kitty.FullTab, wt Worktree, cm map[string]cmSession) Capture
 	}
 	out.Programs = make([]string, len(panes))
 	for i, g := range panes {
-		prog, cwd := detect(groups[g], cm)
+		var shown *ProviderSession
+		if s, ok := shows[groups[g].ID]; ok {
+			shown = &s
+		}
+		prog, cwd := detect(groups[g], shown)
 		out.Programs[i] = prog
 		out.Tab.Panes[i].Cwd = cwdTemplate(cwd, roots...)
 	}
@@ -244,27 +262,23 @@ func isShell(argv []string) bool {
 }
 
 // detect is what runs in w, a command line, empty for the shell at its prompt, and where: the command its
-// shell reports running, with shell integration; else for a cm attach window what cm says its session
-// runs, and where; else the program in its foreground, when that is not a shell.
-func detect(w kitty.FullWindow, cm map[string]cmSession) (string, string) {
+// shell reports running, with shell integration; else, for a window that shows one of the provider's
+// sessions, shown, what the provider says it runs, and where; else the program in its foreground, when
+// that is not a shell.
+func detect(w kitty.FullWindow, shown *ProviderSession) (string, string) {
 	cwd := w.Cwd
-	if name, ok := cmAttached(w.Cmdline); ok {
-		if s, ok := cm[name]; ok && s.Cwd != "" {
-			cwd = s.Cwd
-		}
+	if shown != nil {
+		cwd = cmp.Or(shown.Cwd, cwd)
 		if !w.AtPrompt && w.LastReportedCmdline != "" {
 			return w.LastReportedCmdline, cwd
 		}
-		return cm[name].Command, cwd
+		return shown.Command, cwd
 	}
 	if !w.AtPrompt && w.LastReportedCmdline != "" {
 		return w.LastReportedCmdline, cwd
 	}
 	for _, p := range w.ForegroundProcesses {
 		if !isShell(p.Cmdline) {
-			if _, ok := cmAttached(p.Cmdline); ok {
-				continue
-			}
 			return JoinWords(p.Cmdline), cwd
 		}
 	}

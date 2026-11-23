@@ -250,7 +250,7 @@ kspaces kitty install    install the files kitty needs; kspaces kitty check says
 
 Every kspaces process appends to `$XDG_STATE_HOME/kspaces/kspaces.log`, by default
 `~/.local/state/kspaces/kspaces.log`: what you asked of it, such as creating or removing a worktree, with how
-long it took; every git, gh, `kitten @` or cm run that failed; and errors the sidebar showed. Each line has
+long it took; every git, gh, `kitten @` or session provider run that failed; and errors the sidebar showed. Each line has
 the process's pid and role, the command it runs as. Past 5 MB the log moves to `kspaces.log.1`.
 `KSPACES_LOG=debug` also logs every run and sidebar refresh with how long it took, to find what is slow. Set
 it in the environment kitty starts kspaces with, such as `env KSPACES_LOG=debug` in kitty.conf.

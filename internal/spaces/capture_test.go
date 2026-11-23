@@ -175,8 +175,9 @@ func show(n *node) string {
 	return fmt.Sprintf("(%v %d %s %s)", n.Horizontal, n.Bias, show(n.One), show(n.Two))
 }
 
-// The tab kitty lists for the agent layout in gr@fix: claude in cm session c1 at window 1 with a form over
-// it, gr in cm's c2 right of it, which cm says runs gr, and below claude a shell in c3; the sidebar docked
+// The tab kitty lists for the agent layout in gr@fix: claude in the provider's session c1 at window 1 with a
+// form over it, gr in c2 right of it, which the provider says runs gr, and below claude a shell in c3; the
+// sidebar docked
 // at its left. The title is the branch's, set when it opened, and gr's pane has focus.
 const agentTab = `{
   "id": 1, "is_active": true, "title": "pr/me/fix: {x}", "title_overridden": true, "layout": "splits",
@@ -187,11 +188,11 @@ const agentTab = `{
     ]}
   },
   "windows": [
-    {"id": 1, "session_name": "gr@fix", "cwd": "/home", "cmdline": ["/usr/local/bin/cm", "attach", "c1"],
+    {"id": 1, "session_name": "gr@fix", "cwd": "/home", "cmdline": ["/usr/local/bin/mux", "attach", "c1"],
      "last_reported_cmdline": "claude --resume abc", "at_prompt": false},
-    {"id": 2, "session_name": "gr@fix", "cwd": "/home", "cmdline": ["cm", "attach", "--if-running=attach", "c2"],
+    {"id": 2, "session_name": "gr@fix", "cwd": "/home", "cmdline": ["mux", "attach", "--if-running=attach", "c2"],
      "last_reported_cmdline": "", "at_prompt": false},
-    {"id": 3, "session_name": "gr@fix", "cwd": "/src/gr/.worktrees/fix", "cmdline": ["cm", "attach", "c3"],
+    {"id": 3, "session_name": "gr@fix", "cwd": "/src/gr/.worktrees/fix", "cmdline": ["mux", "attach", "c3"],
      "last_reported_cmdline": "ls", "at_prompt": true},
     {"id": 4, "session_name": "gr@fix", "cmdline": ["kspaces", "sidebar"], "user_vars": {"kspaces": "1"}},
     {"id": 5, "session_name": "gr@fix", "cmdline": ["kspaces", "layout", "save"], "user_vars": {"kspaces_form": "1"}}
@@ -234,12 +235,12 @@ func decodeTab(t *testing.T, s string) kitty.FullTab {
 // windows in order.
 func TestCaptureTab(t *testing.T) {
 	wt := Worktree{Path: "/src/gr/.worktrees/fix", Branch: "pr/me/fix", Session: "gr@fix"}
-	cm := map[string]cmSession{
-		"c1": {Name: "c1", Command: "claude", Cwd: "/src/gr/.worktrees/fix"},
-		"c2": {Name: "c2", Command: "gr --watch", Cwd: "/src/gr/.worktrees/fix"},
-		"c3": {Name: "c3", Cwd: "/src/gr/.worktrees/fix/docs"},
+	shows := map[int]ProviderSession{
+		1: {Name: "c1", Command: "claude", Cwd: "/src/gr/.worktrees/fix"},
+		2: {Name: "c2", Command: "gr --watch", Cwd: "/src/gr/.worktrees/fix"},
+		3: {Name: "c3", Cwd: "/src/gr/.worktrees/fix/docs"},
 	}
-	got := []CapturedTab{captureTab(decodeTab(t, agentTab), wt, cm), captureTab(decodeTab(t, watchTab), wt, cm)}
+	got := []CapturedTab{captureTab(decodeTab(t, agentTab), wt, shows), captureTab(decodeTab(t, watchTab), wt, shows)}
 	want := []CapturedTab{
 		{
 			Tab: config.LayoutTab{Title: "{branch}: {{x}}", Panes: []config.Pane{
@@ -282,35 +283,37 @@ func TestCaptureTabMaximizedAndPruned(t *testing.T) {
 	}
 }
 
-// What runs in a window: the command its shell reports running; for cm attach, else what cm says its
-// session runs, and cm's cwd; else a program in its foreground that is not a shell; else the shell.
+// What runs in a window: the command its shell reports running; for a window showing a provider's
+// session, else what the provider says it runs, and where; else a program in its foreground that is not a
+// shell; else the shell.
 func TestDetect(t *testing.T) {
-	cm := map[string]cmSession{
-		"busy": {Name: "busy", Command: "gr --watch", Cwd: "/src/gr/web"},
-		"idle": {Name: "idle", Cwd: "/src/gr/docs"},
-	}
+	busy := &ProviderSession{Name: "busy", Command: "gr --watch", Cwd: "/src/gr/web"}
+	idle := &ProviderSession{Name: "idle", Cwd: "/src/gr/docs"}
+	nowhere := &ProviderSession{Name: "nowhere"}
 	type fg = []kitty.Process
 	for _, c := range []struct {
 		name      string
 		w         kitty.FullWindow
+		shown     *ProviderSession
 		prog, cwd string
 	}{
-		{"cm attach, running a command cm knows", kitty.FullWindow{Cwd: "/x", Cmdline: []string{"cm", "attach", "busy"}}, "gr --watch", "/src/gr/web"},
-		{"cm attach, at the prompt", kitty.FullWindow{Cwd: "/x", Cmdline: []string{"cm", "attach", "idle"}, AtPrompt: true}, "", "/src/gr/docs"},
-		{"cm attach, the shell reporting", kitty.FullWindow{Cwd: "/x", Cmdline: []string{"cm", "attach", "idle"}, LastReportedCmdline: "claude --resume abc"},
-			"claude --resume abc", "/src/gr/docs"},
-		{"cm attach, a session cm does not list", kitty.FullWindow{Cwd: "/x", Cmdline: []string{"cm", "attach", "gone"}}, "", "/x"},
-		{"a plain shell", kitty.FullWindow{Cwd: "/x", Cmdline: []string{"-zsh"}, ForegroundProcesses: fg{{Cmdline: []string{"-zsh"}}}}, "", "/x"},
+		{"a session, running a command", kitty.FullWindow{Cwd: "/x", Cmdline: []string{"mux", "attach", "busy"}}, busy, "gr --watch", "/src/gr/web"},
+		{"a session, at the prompt", kitty.FullWindow{Cwd: "/x", Cmdline: []string{"mux", "attach", "idle"}, AtPrompt: true}, idle, "", "/src/gr/docs"},
+		{"a session, the shell reporting", kitty.FullWindow{Cwd: "/x", Cmdline: []string{"mux", "attach", "idle"}, LastReportedCmdline: "claude --resume abc"},
+			idle, "claude --resume abc", "/src/gr/docs"},
+		{"a session the provider says nothing of", kitty.FullWindow{Cwd: "/x", Cmdline: []string{"mux", "attach", "nowhere"},
+			ForegroundProcesses: fg{{Cmdline: []string{"mux", "attach", "nowhere"}}}}, nowhere, "", "/x"},
+		{"a plain shell", kitty.FullWindow{Cwd: "/x", Cmdline: []string{"-zsh"}, ForegroundProcesses: fg{{Cmdline: []string{"-zsh"}}}}, nil, "", "/x"},
 		{"at the prompt after a command", kitty.FullWindow{Cwd: "/x", Cmdline: []string{"/bin/zsh"}, LastReportedCmdline: "make", AtPrompt: true,
-			ForegroundProcesses: fg{{Cmdline: []string{"/bin/zsh"}}}}, "", "/x"},
+			ForegroundProcesses: fg{{Cmdline: []string{"/bin/zsh"}}}}, nil, "", "/x"},
 		{"running a command, reported", kitty.FullWindow{Cwd: "/x", Cmdline: []string{"/bin/zsh"}, LastReportedCmdline: "make watch",
-			ForegroundProcesses: fg{{Cmdline: []string{"make", "watch"}}}}, "make watch", "/x"},
+			ForegroundProcesses: fg{{Cmdline: []string{"make", "watch"}}}}, nil, "make watch", "/x"},
 		{"running a program, no shell integration", kitty.FullWindow{Cwd: "/x", Cmdline: []string{"/bin/sh"},
-			ForegroundProcesses: fg{{Cmdline: []string{"/bin/sh"}}, {Cmdline: []string{"tail", "-f", "a log"}}}}, "tail -f 'a log'", "/x"},
+			ForegroundProcesses: fg{{Cmdline: []string{"/bin/sh"}}, {Cmdline: []string{"tail", "-f", "a log"}}}}, nil, "tail -f 'a log'", "/x"},
 		{"a held command", kitty.FullWindow{Cwd: "/x", Cmdline: []string{"htop"},
-			ForegroundProcesses: fg{{Cmdline: []string{"kitten", "run-shell", "htop"}}, {Cmdline: []string{"htop"}}}}, "htop", "/x"},
+			ForegroundProcesses: fg{{Cmdline: []string{"kitten", "run-shell", "htop"}}, {Cmdline: []string{"htop"}}}}, nil, "htop", "/x"},
 	} {
-		prog, cwd := detect(c.w, cm)
+		prog, cwd := detect(c.w, c.shown)
 		if prog != c.prog || cwd != c.cwd {
 			t.Errorf("%s: got %q in %q, want %q in %q", c.name, prog, cwd, c.prog, c.cwd)
 		}

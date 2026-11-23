@@ -88,6 +88,19 @@ func allWindows(data []kitty.OSWindow) []ProviderWindow {
 	return windows
 }
 
+// fullWindows are every window of tabs, kspaces' own left out, as the provider is told of them.
+func fullWindows(tabs []kitty.FullTab) []ProviderWindow {
+	windows := []ProviderWindow{}
+	for _, tab := range tabs {
+		for _, w := range tab.Windows {
+			if !w.Own() {
+				windows = append(windows, providerWindow(w.ID, w.PID, w.Cmdline, w.ForegroundProcesses, w.UserVars, w.Cwd))
+			}
+		}
+	}
+	return windows
+}
+
 // runProvider runs provider with verb and req on its stdin, and is what it printed. Its error is the
 // provider's stderr, as the sidebar shows it, after the provider and the verb.
 func runProvider(provider []string, verb string, req any) ([]byte, error) {
