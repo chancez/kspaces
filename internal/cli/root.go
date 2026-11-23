@@ -75,6 +75,7 @@ default ~/.config/kspaces/config.toml, then every other .toml file beside it, by
 		a.closeCommand(),
 		a.suspendCommand(),
 		a.forgetCommand(),
+		a.sessionsCommand(),
 		a.trustCommand(),
 		a.replyCommand(),
 		a.errorCommand(),

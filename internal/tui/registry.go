@@ -58,6 +58,9 @@ type removeSubject struct{}
 type closeSubject struct{}
 type addSubject struct{}
 
+// endSessionsSubject is the form that ends the provider's sessions.
+type endSessionsSubject struct{}
+
 // forgetSubject is the forget session form.
 type forgetSubject struct{}
 
@@ -772,6 +775,45 @@ var (
 	actForgetQuit = quit[*forgetSessionForm, forgetSubject]()
 )
 
+// The form that ends the provider's sessions'.
+var (
+	actEndSessionsDown = &interact.Action[*endSessionsForm, endSessionsSubject]{
+		Title:   "down",
+		Applies: func(f *endSessionsForm, _ endSessionsSubject) bool { return f.cleaning() },
+		Run:     do[*endSessionsForm, endSessionsSubject](func(f *endSessionsForm) { f.cursor = min(f.cursor+1, max(len(f.sessions)-1, 0)) }),
+	}
+	actEndSessionsUp = &interact.Action[*endSessionsForm, endSessionsSubject]{
+		Title:   "up",
+		Applies: func(f *endSessionsForm, _ endSessionsSubject) bool { return f.cleaning() },
+		Run:     do[*endSessionsForm, endSessionsSubject](func(f *endSessionsForm) { f.cursor = max(f.cursor-1, 0) }),
+	}
+	actEndSessionsToggle = &interact.Action[*endSessionsForm, endSessionsSubject]{
+		Title: "tick",
+		Applies: func(f *endSessionsForm, _ endSessionsSubject) bool {
+			return !f.busy && f.cleaning() && len(f.sessions) > 0
+		},
+		Run: do[*endSessionsForm, endSessionsSubject](func(f *endSessionsForm) { f.toggle(f.cursor) }),
+	}
+	actEndSessionsTickAll = &interact.Action[*endSessionsForm, endSessionsSubject]{
+		Title: "tick all",
+		Applies: func(f *endSessionsForm, _ endSessionsSubject) bool {
+			return !f.busy && f.cleaning() && len(f.sessions) > 0
+		},
+		Run: do[*endSessionsForm, endSessionsSubject]((*endSessionsForm).tickAll),
+	}
+	actEndSessions = &interact.Action[*endSessionsForm, endSessionsSubject]{
+		Title:   "end",
+		Applies: func(f *endSessionsForm, _ endSessionsSubject) bool { return !f.busy && len(f.chosen()) > 0 },
+		Run:     cmd[*endSessionsForm, endSessionsSubject]((*endSessionsForm).end),
+	}
+	actEndSessionsCancel = &interact.Action[*endSessionsForm, endSessionsSubject]{
+		Title:   "cancel",
+		Applies: func(f *endSessionsForm, _ endSessionsSubject) bool { return !f.busy },
+		Run:     func(*endSessionsForm, endSessionsSubject) tea.Cmd { return tea.Quit },
+	}
+	actEndSessionsQuit = quit[*endSessionsForm, endSessionsSubject]()
+)
+
 // The clean up worktrees form's.
 var (
 	actCleanupDown = &interact.Action[*cleanupForm, cleanupSubject]{
@@ -1017,66 +1059,68 @@ var (
 )
 
 var (
-	entryKind     *interact.Kind[*sidebar, entrySubject]
-	groupKind     *interact.Kind[*sidebar, groupSubject]
-	detachedKind  *interact.Kind[*sidebar, detachedSubject]
-	groupShowKind *interact.Kind[*sidebar, groupFilterSubject]
-	statusKind    *interact.Kind[*sidebar, statusSubject]
-	paneKind      *interact.Kind[*sidebar, paneSubject]
-	selectKind    *interact.Kind[*sidebar, selectSubject]
-	spacesKind    *interact.Kind[*sidebar, spacesSubject]
-	menuKind      *interact.Kind[*sidebar, menuSubject]
-	helpKind      *interact.Kind[*keyHelp, helpSubject]
-	pickerKind    *interact.Kind[*picker, pickerSubject]
-	formKind      *interact.Kind[*newWorktreeForm, formSubject]
-	removeKind    *interact.Kind[*removeWorktreeForm, removeSubject]
-	closeKind     *interact.Kind[*closeSessionForm, closeSubject]
-	forgetKind    *interact.Kind[*forgetSessionForm, forgetSubject]
-	addKind       *interact.Kind[*addSpaceForm, addSubject]
-	cleanKind     *interact.Kind[*cleanupForm, cleanupSubject]
-	runKind       *interact.Kind[*runForm, runSubject]
-	layoutKind    *interact.Kind[*layoutForm, layoutSubject]
-	saveKind      *interact.Kind[*saveLayoutForm, saveSubject]
-	trustKind     *interact.Kind[*trustForm, trustSubject]
-	replyKind     *interact.Kind[*replyForm, replySubject]
-	errorKind     *interact.Kind[*sidebar, errorSubject]
-	showKind      *interact.Kind[*errorForm, showSubject]
-	filterKind    *interact.Kind[*sidebar, filterSubject]
-	listKind      *interact.Kind[*choiceList, listSubject]
-	sortKind      *interact.Kind[*sidebar, sortSubject]
+	entryKind       *interact.Kind[*sidebar, entrySubject]
+	groupKind       *interact.Kind[*sidebar, groupSubject]
+	detachedKind    *interact.Kind[*sidebar, detachedSubject]
+	groupShowKind   *interact.Kind[*sidebar, groupFilterSubject]
+	statusKind      *interact.Kind[*sidebar, statusSubject]
+	paneKind        *interact.Kind[*sidebar, paneSubject]
+	selectKind      *interact.Kind[*sidebar, selectSubject]
+	spacesKind      *interact.Kind[*sidebar, spacesSubject]
+	menuKind        *interact.Kind[*sidebar, menuSubject]
+	helpKind        *interact.Kind[*keyHelp, helpSubject]
+	pickerKind      *interact.Kind[*picker, pickerSubject]
+	formKind        *interact.Kind[*newWorktreeForm, formSubject]
+	removeKind      *interact.Kind[*removeWorktreeForm, removeSubject]
+	closeKind       *interact.Kind[*closeSessionForm, closeSubject]
+	forgetKind      *interact.Kind[*forgetSessionForm, forgetSubject]
+	endSessionsKind *interact.Kind[*endSessionsForm, endSessionsSubject]
+	addKind         *interact.Kind[*addSpaceForm, addSubject]
+	cleanKind       *interact.Kind[*cleanupForm, cleanupSubject]
+	runKind         *interact.Kind[*runForm, runSubject]
+	layoutKind      *interact.Kind[*layoutForm, layoutSubject]
+	saveKind        *interact.Kind[*saveLayoutForm, saveSubject]
+	trustKind       *interact.Kind[*trustForm, trustSubject]
+	replyKind       *interact.Kind[*replyForm, replySubject]
+	errorKind       *interact.Kind[*sidebar, errorSubject]
+	showKind        *interact.Kind[*errorForm, showSubject]
+	filterKind      *interact.Kind[*sidebar, filterSubject]
+	listKind        *interact.Kind[*choiceList, listSubject]
+	sortKind        *interact.Kind[*sidebar, sortSubject]
 
-	spacesList      *interact.Place[*sidebar, entrySubject]
-	groupHeaders    *interact.Place[*sidebar, groupSubject]
-	detachedRows    *interact.Place[*sidebar, detachedSubject]
-	theGroups       *interact.Place[*sidebar, groupFilterSubject]
-	statusList      *interact.Place[*sidebar, statusSubject]
-	thePane         *interact.Place[*sidebar, paneSubject]
-	theMenu         *interact.Place[*sidebar, menuSubject]
-	theHelp         *interact.Place[*keyHelp, helpSubject]
-	thePicker       *interact.Place[*picker, pickerSubject]
-	pickRowKind     *interact.Kind[*picker, pickRowSubject]
-	pickStatusKind  *interact.Kind[*picker, pickStatusSubject]
-	pickMenuKind    *interact.Kind[*picker, pickMenuSubject]
-	thePickRows     *interact.Place[*picker, pickRowSubject]
-	thePickStatuses *interact.Place[*picker, pickStatusSubject]
-	thePickMenu     *interact.Place[*picker, pickMenuSubject]
-	theForm         *interact.Place[*newWorktreeForm, formSubject]
-	theRemoveForm   *interact.Place[*removeWorktreeForm, removeSubject]
-	theCloseForm    *interact.Place[*closeSessionForm, closeSubject]
-	theForgetForm   *interact.Place[*forgetSessionForm, forgetSubject]
-	theAddForm      *interact.Place[*addSpaceForm, addSubject]
-	theCleanup      *interact.Place[*cleanupForm, cleanupSubject]
-	theRunForm      *interact.Place[*runForm, runSubject]
-	theLayoutForm   *interact.Place[*layoutForm, layoutSubject]
-	theSaveForm     *interact.Place[*saveLayoutForm, saveSubject]
-	theTrustForm    *interact.Place[*trustForm, trustSubject]
-	theReplyForm    *interact.Place[*replyForm, replySubject]
-	theErrorLine    *interact.Place[*sidebar, errorSubject]
-	theShowForm     *interact.Place[*errorForm, showSubject]
-	theFilter       *interact.Place[*sidebar, filterSubject]
-	theSort         *interact.Place[*sidebar, sortSubject]
-	theChoiceList   *interact.Place[*choiceList, listSubject]
-	theSelection    *interact.Place[*sidebar, selectSubject]
+	spacesList         *interact.Place[*sidebar, entrySubject]
+	groupHeaders       *interact.Place[*sidebar, groupSubject]
+	detachedRows       *interact.Place[*sidebar, detachedSubject]
+	theGroups          *interact.Place[*sidebar, groupFilterSubject]
+	statusList         *interact.Place[*sidebar, statusSubject]
+	thePane            *interact.Place[*sidebar, paneSubject]
+	theMenu            *interact.Place[*sidebar, menuSubject]
+	theHelp            *interact.Place[*keyHelp, helpSubject]
+	thePicker          *interact.Place[*picker, pickerSubject]
+	pickRowKind        *interact.Kind[*picker, pickRowSubject]
+	pickStatusKind     *interact.Kind[*picker, pickStatusSubject]
+	pickMenuKind       *interact.Kind[*picker, pickMenuSubject]
+	thePickRows        *interact.Place[*picker, pickRowSubject]
+	thePickStatuses    *interact.Place[*picker, pickStatusSubject]
+	thePickMenu        *interact.Place[*picker, pickMenuSubject]
+	theForm            *interact.Place[*newWorktreeForm, formSubject]
+	theRemoveForm      *interact.Place[*removeWorktreeForm, removeSubject]
+	theCloseForm       *interact.Place[*closeSessionForm, closeSubject]
+	theForgetForm      *interact.Place[*forgetSessionForm, forgetSubject]
+	theEndSessionsForm *interact.Place[*endSessionsForm, endSessionsSubject]
+	theAddForm         *interact.Place[*addSpaceForm, addSubject]
+	theCleanup         *interact.Place[*cleanupForm, cleanupSubject]
+	theRunForm         *interact.Place[*runForm, runSubject]
+	theLayoutForm      *interact.Place[*layoutForm, layoutSubject]
+	theSaveForm        *interact.Place[*saveLayoutForm, saveSubject]
+	theTrustForm       *interact.Place[*trustForm, trustSubject]
+	theReplyForm       *interact.Place[*replyForm, replySubject]
+	theErrorLine       *interact.Place[*sidebar, errorSubject]
+	theShowForm        *interact.Place[*errorForm, showSubject]
+	theFilter          *interact.Place[*sidebar, filterSubject]
+	theSort            *interact.Place[*sidebar, sortSubject]
+	theChoiceList      *interact.Place[*choiceList, listSubject]
+	theSelection       *interact.Place[*sidebar, selectSubject]
 )
 
 // Kinds and places are made in init, as their actions run code that reads them.
@@ -1278,6 +1322,17 @@ func init() {
 	forgetKind.Bind(actForgetCancel, "n/esc", "cancel", "n", "esc")
 	forgetKind.Bind(actForgetQuit, "ctrl+c", "quit", "ctrl+c")
 	theForgetForm = interact.List(forgetKind)
+
+	endSessionsKind = interact.NewKind(func(endSessionsSubject) string { return "End sessions" },
+		actEndSessionsDown, actEndSessionsUp, actEndSessionsToggle, actEndSessionsTickAll, actEndSessions, actEndSessionsCancel, actEndSessionsQuit)
+	endSessionsKind.Bind(actEndSessionsDown, "j/k", "down/up", "j", "down")
+	endSessionsKind.Bind(actEndSessionsUp, "", "", "k", "up")
+	endSessionsKind.Bind(actEndSessionsToggle, "space", "tick", "space")
+	endSessionsKind.Bind(actEndSessionsTickAll, "A", "tick all", "A")
+	endSessionsKind.Bind(actEndSessions, "y/enter", "end", "y", "enter")
+	endSessionsKind.Bind(actEndSessionsCancel, "n/esc", "cancel", "n", "esc")
+	endSessionsKind.Bind(actEndSessionsQuit, "ctrl+c", "quit", "ctrl+c")
+	theEndSessionsForm = interact.List(endSessionsKind)
 
 	trustKind = interact.NewKind(func(trustSubject) string { return "Trust space config" }, actTrust, actTrustCancel, actTrustQuit)
 	trustKind.Bind(actTrust, "y/enter", "trust", "y", "enter")

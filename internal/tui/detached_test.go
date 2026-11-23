@@ -2,11 +2,8 @@ package tui
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -99,32 +96,5 @@ func TestDetachedRows(t *testing.T) {
 		if r.Detached != nil {
 			t.Errorf("a detached row under the open filter: %#v", r.Detached)
 		}
-	}
-}
-
-// fakeProvider puts a session provider called prov first on PATH, which records each call as its verb and
-// its request, and prints out[VERB]; a request naming fail fails, its stderr saying so. It returns the
-// calls.
-func fakeProvider(t *testing.T, out map[string]string, fail string) func() []string {
-	t.Helper()
-	dir := t.TempDir()
-	log := filepath.Join(dir, "calls")
-	script := "#!/bin/sh\nreq=$(/bin/cat)\necho \"$1 $req\" >> " + log + "\n"
-	if fail != "" {
-		script += "case \"$req\" in *'\"" + fail + "\"'*) echo \"no session " + fail + "\" >&2; exit 1;; esac\n"
-	}
-	for verb, text := range out {
-		script += "if [ \"$1\" = " + verb + " ]; then echo '" + text + "'; fi\n"
-	}
-	if err := os.WriteFile(filepath.Join(dir, "prov"), []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
-	return func() []string {
-		data, err := os.ReadFile(log)
-		if err != nil {
-			return nil
-		}
-		return strings.Split(strings.TrimSpace(string(data)), "\n")
 	}
 }

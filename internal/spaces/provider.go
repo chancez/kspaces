@@ -255,6 +255,16 @@ type sessionRequest struct {
 	Session string `json:"session"`
 }
 
+// KillSession ends s, which is running.
+func KillSession(provider []string, s ProviderSession) error {
+	return askProvider(provider, "kill", sessionRequest{s.ID}, nil)
+}
+
+// RemoveSession discards s, which has ended.
+func RemoveSession(provider []string, s ProviderSession) error {
+	return askProvider(provider, "remove", sessionRequest{s.ID}, nil)
+}
+
 // openCommand is what provider says opens s in a new tab: the command, and where it starts, empty for
 // kspaces to choose.
 func openCommand(provider []string, s ProviderSession) ([]string, string, error) {
