@@ -32,7 +32,11 @@ type removeWorktreeForm struct {
 	// branch is the worktree's branch as deleting it would find it, which deleteBranch does after removing.
 	branch       spaces.Branch
 	deleteBranch bool
-	busy         bool
+	// sessions are the provider's sessions the session's windows show, and those tagged with the worktree,
+	// and fate what becomes of them, see fateChoice.
+	sessions []spaces.ProviderSession
+	fate     fateChoice
+	busy     bool
 	// err is why starting the removal failed.
 	err   error
 	width int
@@ -55,7 +59,8 @@ func (f *removeWorktreeForm) Init() tea.Cmd { return nil }
 func (f *removeWorktreeForm) remove() tea.Cmd {
 	f.busy, f.err = true, nil
 	path := f.wt.Path
-	opts := spaces.RemoveOptions{Force: f.changes > 0, DeleteBranch: f.deleteBranch, ForceBranch: f.deleteBranch && f.branch.Unmerged > 0}
+	opts := spaces.RemoveOptions{Force: f.changes > 0, DeleteBranch: f.deleteBranch, ForceBranch: f.deleteBranch && f.branch.Unmerged > 0,
+		Sessions: f.fate.chosen()}
 	return func() tea.Msg { return removedMsg{spaces.RemoveInBackground(path, opts)} }
 }
 
@@ -132,6 +137,9 @@ func (f *removeWorktreeForm) render() string {
 		field("session", windows),
 		field("changes", changes),
 		"",
+	}
+	if f.fate.offered() {
+		lines = append(append(lines, f.fate.lines(th, width, f.sessions)...), "")
 	}
 	if f.branch.Offered() {
 		spans := append(look.BoxOf(f.deleteBranch, f.busy), look.Text("Delete branch "+f.branch.Name))
@@ -219,6 +227,8 @@ func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string, dele
 	if err != nil {
 		return err
 	}
+	closing := spaces.ClosingNow(cfg.Provider, []string{wt.Session}, false, true)
+	f.sessions, f.fate = closing.Sessions[wt.Session], fateChoice{fates: closing.Fates}
 	if err := runPopup(ctx, f); err != nil {
 		return fmt.Errorf("running the remove worktree form: %w", err)
 	}

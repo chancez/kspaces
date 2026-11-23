@@ -15,6 +15,7 @@ import (
 	"github.com/chancez/kspaces/internal/gittest"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/tui/look"
 )
 
 // The remove form offers deleting the branch, off at first, but not a detached HEAD, the default branch or
@@ -171,5 +172,49 @@ func TestRemoveFormDeleteBranch(t *testing.T) {
 	}
 	if !reflect.DeepEqual(calls, wantCalls) {
 		t.Errorf("launched\n%q\nwant\n%q", calls, wantCalls)
+	}
+}
+
+// With a provider that can end them, the remove form says how many of its sessions removing ends, and what
+// a busy one runs; left and right choose to shelve them or leave them running instead, which the removal
+// in the background is told.
+func TestRemoveFormSessions(t *testing.T) {
+	calls := fakeKittenCalls(t)
+	space := spaces.Space{Name: "gr", Root: "/src/gr", Worktrees: []spaces.Worktree{{Path: "/src/gr"}, {Path: "/src/gr/.worktrees/fix", Session: "gr@fix"}}}
+	f := &removeWorktreeForm{th: look.New(true), space: space, wt: space.Worktrees[1], windows: 2,
+		sessions: []spaces.ProviderSession{
+			{ID: "a", Name: "build", State: "running", Busy: true, Command: "make watch"},
+			{ID: "b", Name: "old", State: "exited"},
+		},
+		fate: fateChoice{fates: []spaces.Fate{spaces.FateEnd, spaces.FateShelve, spaces.FateLeave}}}
+	f.Update(tea.WindowSizeMsg{Width: 90, Height: 20})
+	screen := func(choice, says string) []string {
+		return []string{"", "  Remove worktree fix from gr", "",
+			"  directory  .worktrees/fix", "  branch     none, HEAD is detached kept", "  session    2 windows closed", "  changes    none", "",
+			"  sessions   < " + choice + " >  left/right change", "             " + says, "",
+			"   Remove y    Cancel n", ""}
+	}
+	got := [][]string{formScreen(f)}
+	f.Update(keyMsg("right"))
+	got = append(got, formScreen(f))
+	f.Update(keyMsg("l"))
+	got = append(got, formScreen(f))
+	want := [][]string{
+		screen("end", "Ends 2 sessions: build running make watch"),
+		screen("shelve", "Shelves 2 sessions, to bring back later: build running make watch"),
+		screen("leave running", "Leaves 2 sessions running"),
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("form:\n%q\nwant\n%q", got, want)
+	}
+	f.Update(keyMsg("h"))
+	_, remove := f.Update(keyMsg("y"))
+	remove()
+	var args []string
+	for _, c := range calls() {
+		args = c[len(c)-6:]
+	}
+	if want := []string{"remove", "--yes", "--sessions", "shelve", "/src/gr/.worktrees/fix"}; !reflect.DeepEqual(args[1:], want) {
+		t.Errorf("background ran %q, want %q", args, want)
 	}
 }

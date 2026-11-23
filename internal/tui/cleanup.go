@@ -33,8 +33,12 @@ type cleanupForm struct {
 	checked []bool
 	// deleteBranches deletes the branches of the items removed, those that can go.
 	deleteBranches bool
-	cursor         int
-	busy           bool
+	// sessions are the provider's sessions each item's session's windows show, and those tagged with its
+	// worktree, by session, and fate what becomes of them, see fateChoice.
+	sessions map[string][]spaces.ProviderSession
+	fate     fateChoice
+	cursor   int
+	busy     bool
 	// err is why starting the removal failed.
 	err   error
 	width int
@@ -168,9 +172,11 @@ func (f *cleanupForm) remove() tea.Cmd {
 		}
 		paths = append(paths, c.Worktree.Path)
 		branch := f.deleteBranches && c.Branch.Offered()
-		opts[c.Worktree.Path] = spaces.RemoveOptions{Force: c.Changes > 0, DeleteBranch: branch, ForceBranch: branch && c.Branch.Unmerged > 0}
+		opts[c.Worktree.Path] = spaces.RemoveOptions{Force: c.Changes > 0, DeleteBranch: branch, ForceBranch: branch && c.Branch.Unmerged > 0,
+			Sessions: f.fate.chosen()}
 	}
-	return func() tea.Msg { return cleanedMsg{spaces.RemoveAllInBackground(paths, opts, sessions, "")} }
+	fate := f.fate.chosen()
+	return func() tea.Msg { return cleanedMsg{spaces.RemoveAllInBackground(paths, opts, sessions, fate)} }
 }
 
 func (f *cleanupForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -310,6 +316,13 @@ func (f *cleanupForm) render() string {
 			lines = append(lines, line(th.Cut(width, look.Muted("A missing one has its windows closed and its saved file deleted."))...))
 		}
 		lines = append(lines, "")
+		if f.fate.offered() {
+			var sessions []spaces.ProviderSession
+			for _, c := range f.chosen() {
+				sessions = append(sessions, f.sessions[c.Worktree.Session]...)
+			}
+			lines = append(append(lines, f.fate.lines(th, width, sessions)...), "")
+		}
 	}
 	switch {
 	case f.busy:
@@ -364,6 +377,12 @@ func RunCleanup(ctx context.Context, cfg config.Config, root string, sessions []
 		}
 		f = newCleanupForm(&space, items, deleteBranchesFirst(cfg, []spaces.Space{space}, items))
 	}
+	var names []string
+	for _, c := range f.items {
+		names = append(names, c.Worktree.Session)
+	}
+	closing := spaces.ClosingNow(cfg.Provider, names, false, true)
+	f.sessions, f.fate = closing.Sessions, fateChoice{fates: closing.Fates}
 	if err := runPopup(ctx, f); err != nil {
 		return fmt.Errorf("running the clean up form: %w", err)
 	}
