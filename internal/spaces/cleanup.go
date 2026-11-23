@@ -178,9 +178,12 @@ func AskRemoveSessions(cfg config.Config, st kitty.State, sessions []string) err
 
 // RemoveAllInBackground runs `kspaces remove --yes` for the worktrees at paths, one after another, each as
 // opts has it, and then ends sessions, the missing worktrees', with EndSession, as a kitty background
-// process.
-func RemoveAllInBackground(paths []string, opts map[string]RemoveOptions, sessions []string) error {
+// process; fate is what becomes of the provider's sessions their windows show, for every one of them.
+func RemoveAllInBackground(paths []string, opts map[string]RemoveOptions, sessions []string, fate Fate) error {
 	args := []string{"remove", "--yes"}
+	if fate != "" {
+		args = append(args, "--sessions", string(fate))
+	}
 	for _, s := range sessions {
 		args = append(args, "--forget-session", s)
 	}

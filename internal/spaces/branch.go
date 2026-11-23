@@ -68,6 +68,9 @@ type RemoveOptions struct {
 	// DeleteBranch deletes the worktree's branch after removing it, when the branch is merged, or with
 	// ForceBranch even when it is not, losing its commits.
 	DeleteBranch, ForceBranch bool
+	// Sessions is what becomes of the provider's sessions its session's windows show, and those tagged with
+	// it, see Fate; empty ends them.
+	Sessions Fate
 }
 
 // BranchError is a branch that could not be deleted after its worktree was removed.

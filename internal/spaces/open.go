@@ -370,11 +370,36 @@ func WaitClosed(session string) error {
 
 // EndSession closes every window of session, waiting as CloseSession does, and deletes its saved file, so
 // it is not restored: all there is of a missing worktree, and what removing a worktree ends first. A
-// session with no saved file is fine. The keeper forgets what it kept of a kept session, see Kept.
-func EndSession(cfg config.Config, session string) error {
-	if err := CloseSession(session); err != nil {
-		return err
+// session with no saved file is fine. The provider forgets what it kept of a kept session, see Kept.
+//
+// First the provider's sessions the windows show, and those tagged with the session's worktree, whose
+// directory goes with it, are done fate to, see ApplyClosingFate: left to the windows closing, a
+// multiplexer's close watcher would shelve or detach them, and a removed worktree's would come back as its
+// space's detached sessions. Left running, the windows are marked kept, which tells such a watcher to leave
+// them alone. A session the provider fails to end does not stop the rest: the windows still close, and
+// the error is returned with what else failed.
+func EndSession(cfg config.Config, session string, fate Fate) error {
+	ended, err := endSession(cfg, session, fate)
+	return errors.Join(ended, err)
+}
+
+// endSession is EndSession, saying apart what the provider failed to do, which stops nothing, and what
+// else failed, which stopped it.
+func endSession(cfg config.Config, session string, fate Fate) (ended, err error) {
+	ended = ApplyClosingFate(cfg.Provider, session, fate, true)
+	if fate == FateLeave {
+		if err := kitty.SetSessionVar(session, kitty.KeepVar, string(KeepClosed)); err != nil {
+			return ended, err
+		}
 	}
+	if err := CloseSession(session); err != nil {
+		return ended, err
+	}
+	return ended, endFile(cfg, session)
+}
+
+// endFile deletes session's saved file and has the provider forget what it kept of it, see EndSession.
+func endFile(cfg config.Config, session string) error {
 	if cfg.SessionsDir == "" {
 		return nil
 	}
@@ -418,19 +443,26 @@ func RemoveWorktree(cfg config.Config, space Space, wt Worktree, opts RemoveOpti
 			return err
 		}
 	}
-	if err := EndSession(cfg, wt.Session); err != nil {
+	fate, err := ParseFate(string(opts.Sessions))
+	if err != nil {
 		return err
+	}
+	// The worktree goes even when the provider fails to end one of its sessions: the removal was confirmed,
+	// and the error says which is left.
+	ended, err := endSession(cfg, wt.Session, fate)
+	if err != nil {
+		return errors.Join(ended, err)
 	}
 	if err := git.RemoveWorktree(space.Root, wt.Path, opts.Force); err != nil {
-		return err
+		return errors.Join(ended, err)
 	}
 	if !opts.DeleteBranch {
-		return nil
+		return ended
 	}
 	if err := git.DeleteBranch(space.Root, branch.Name, branch.Unmerged > 0); err != nil {
-		return &BranchError{Branch: branch.Name, Err: err}
+		return errors.Join(ended, &BranchError{Branch: branch.Name, Err: err})
 	}
-	return nil
+	return ended
 }
 
 // RemoveInBackground runs `kspaces remove --yes` for the worktree at path as a kitty background process.
@@ -445,6 +477,9 @@ func RemoveInBackground(path string, opts RemoveOptions) error {
 	}
 	if opts.DeleteBranch && opts.ForceBranch {
 		args = append(args, "--force-branch")
+	}
+	if opts.Sessions != "" {
+		args = append(args, "--sessions", string(opts.Sessions))
 	}
 	return kitty.LaunchBackground(append(args, path)...)
 }

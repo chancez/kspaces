@@ -226,11 +226,12 @@ func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string, dele
 }
 
 // RemoveWorktrees removes the worktrees at paths without asking, one after another, each as opts has it,
-// then ends sessions, missing worktrees' whose directories are gone, with spaces.EndSession, for the
+// then ends sessions, missing worktrees' whose directories are gone, with spaces.EndSession, the provider's
+// sessions their windows show done fate to, for the
 // background process the forms start. It has no screen, so failures are shown in kitty as well as
 // returned; one failing does not stop the rest, and a branch git refuses to delete leaves its worktree
 // removed.
-func RemoveWorktrees(cfg config.Config, paths []string, opts map[string]spaces.RemoveOptions, sessions []string) error {
+func RemoveWorktrees(cfg config.Config, paths []string, opts map[string]spaces.RemoveOptions, sessions []string, fate spaces.Fate) error {
 	var failed []string
 	branches := 0
 	for _, path := range paths {
@@ -246,7 +247,7 @@ func RemoveWorktrees(cfg config.Config, paths []string, opts map[string]spaces.R
 		}
 	}
 	for _, s := range sessions {
-		if err := spaces.EndSession(cfg, s); err != nil {
+		if err := spaces.EndSession(cfg, s, fate); err != nil {
 			failed = append(failed, fmt.Sprintf("%s: %v", s, err))
 		}
 	}

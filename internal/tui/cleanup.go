@@ -170,7 +170,7 @@ func (f *cleanupForm) remove() tea.Cmd {
 		branch := f.deleteBranches && c.Branch.Offered()
 		opts[c.Worktree.Path] = spaces.RemoveOptions{Force: c.Changes > 0, DeleteBranch: branch, ForceBranch: branch && c.Branch.Unmerged > 0}
 	}
-	return func() tea.Msg { return cleanedMsg{spaces.RemoveAllInBackground(paths, opts, sessions)} }
+	return func() tea.Msg { return cleanedMsg{spaces.RemoveAllInBackground(paths, opts, sessions, "")} }
 }
 
 func (f *cleanupForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
