@@ -170,9 +170,12 @@ sidebar showing the last one that did not, so a provider restarting under it, as
 does, blanks nothing; after three failures in a row it is asked again a minute later, or at `r`.
 
 **Opening.** `open` prints the command to run in a new tab, and optionally where it starts, such as `cm
-attach @ID` or `tmux attach -t NAME`. kspaces opens the tab in the focused kitty session when that is in the
-session's space, else in the session its `worktree` tag names, else in the space's own session, and the
-tab carries the [launch variables](#spaces-and-sessions) of the session it opens in.
+attach @ID` or `tmux attach -t NAME`. kspaces opens the tab in the session's own place first: the kitty
+session of the worktree its `worktree` tag names, when the space has that worktree; else that of the
+worktree whose directory holds its `cwd`, the deepest, for a session from before tagging; else the focused
+kitty session, when that is in the session's space; else the space's own session. A missing worktree is
+never made again for it. The tab carries the [launch variables](#spaces-and-sessions) of the session it
+opens in.
 
 **Acting.** `kill` ends a running session, `shelve` ends one so it can be brought back as it was, `remove`
 discards one that has ended, and `move` puts one in another space, which the provider creates if it must.

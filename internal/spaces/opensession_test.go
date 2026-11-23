@@ -10,32 +10,37 @@ import (
 	"github.com/chancez/kspaces/internal/kitty"
 )
 
-// A detached session opens in the current session when it is the space's, else in the worktree its tag
-// names, else in the space's main worktree.
+// A detached session opens in its own place first: the worktree its tag names, else the deepest worktree
+// holding its cwd, else the current session when it is the space's, else the space's main worktree. A
+// missing worktree is never one but as the current session.
 func TestOpenTarget(t *testing.T) {
 	gr := Space{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{
 		{Path: "/src/gr", Session: "gr"}, {Path: "/src/gr/.worktrees/fix", Session: "gr@fix"}, {Path: "/src/gr/.worktrees/dev", Session: "gr@dev"},
 	}, Missing: []Worktree{{Session: "gr@gone"}}}
 	notes := Space{Name: "notes", Worktrees: []Worktree{{Session: "notes"}}}
-	tagged := ProviderSession{ID: "a1", Tags: map[string]string{"worktree": "fix"}}
-	untagged := ProviderSession{ID: "b2"}
+	tagged := ProviderSession{ID: "a1", Tags: map[string]string{"worktree": "fix"}, Cwd: "/src/gr/.worktrees/dev"}
+	inDev := ProviderSession{ID: "b2", Cwd: "/src/gr/.worktrees/dev/web"}
+	inRoot := ProviderSession{ID: "c3", Cwd: "/src/gr/docs"}
+	elsewhere := ProviderSession{ID: "d4", Cwd: "/tmp", Tags: map[string]string{"worktree": "nope"}}
 	got := []Worktree{
 		OpenTarget(kitty.State{Current: "gr@dev"}, gr, tagged),
-		OpenTarget(kitty.State{Current: "gr@gone"}, gr, tagged),
-		OpenTarget(kitty.State{Current: "kitty"}, gr, tagged),
-		OpenTarget(kitty.State{Current: "kitty"}, gr, untagged),
-		OpenTarget(kitty.State{Current: "kitty"}, gr, ProviderSession{Tags: map[string]string{"worktree": "nope"}}),
+		OpenTarget(kitty.State{Current: "gr@fix"}, gr, inDev),
+		OpenTarget(kitty.State{Current: "gr@fix"}, gr, inRoot),
+		OpenTarget(kitty.State{Current: "gr@dev"}, gr, elsewhere),
+		OpenTarget(kitty.State{Current: "gr@gone"}, gr, elsewhere),
+		OpenTarget(kitty.State{Current: "kitty"}, gr, elsewhere),
 		OpenTarget(kitty.State{Current: "kitty"}, gr, ProviderSession{Tags: map[string]string{"worktree": "gone"}}),
 		OpenTarget(kitty.State{Current: "gr"}, notes, tagged),
-		OpenTarget(kitty.State{}, Space{Name: "broken"}, untagged),
+		OpenTarget(kitty.State{}, Space{Name: "broken"}, ProviderSession{}),
 	}
 	want := []Worktree{
-		gr.Worktrees[2],
-		gr.Missing[0],
-		gr.Worktrees[1],
+		gr.Worktrees[1], // its tag, over its cwd and the current session
+		gr.Worktrees[2], // the deepest worktree holding its cwd, over the current session
 		gr.Worktrees[0],
-		gr.Worktrees[0],
-		gr.Worktrees[0],
+		gr.Worktrees[2], // the current session, in the space
+		gr.Missing[0],   // even a missing one, which has windows
+		gr.Worktrees[0], // the main worktree
+		gr.Worktrees[0], // a missing worktree's tag opens none
 		notes.Worktrees[0],
 		{Session: "broken"},
 	}

@@ -153,9 +153,10 @@ idle; one that is not running is faint. A folded space or group shows none of th
 `f` and `O`, which look for kitty sessions.
 
 `enter` on one, or a click, opens a tab running what the provider's `open` says, such as `cm attach ID`,
-which can bring back one that has ended or been shelved. The tab goes in the sidebar's own session when that
-is in the space; else in the linked worktree's session the session's `worktree` tag names, when the space
-has that worktree; else in the space's own session. It starts where the provider says, else in the
+which can bring back one that has ended or been shelved. The tab goes where the session belongs: in the linked
+worktree's session its `worktree` tag names, when the space has that worktree; else in that of the
+worktree whose directory holds the session's directory, the deepest; else in the sidebar's own session,
+when that is in the space; else in the space's own session. It starts where the provider says, else in the
 session's directory, and closes when its command ends, as at a detach. A session with no windows is
 restored from its saved file first, or gets the tab as its first, without its default layout.
 
