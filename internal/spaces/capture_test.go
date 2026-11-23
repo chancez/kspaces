@@ -289,10 +289,7 @@ func TestDetect(t *testing.T) {
 		"busy": {Name: "busy", Command: "gr --watch", Cwd: "/src/gr/web"},
 		"idle": {Name: "idle", Cwd: "/src/gr/docs"},
 	}
-	type fg = []struct {
-		Cmdline []string `json:"cmdline"`
-		Cwd     string   `json:"cwd"`
-	}
+	type fg = []kitty.Process
 	for _, c := range []struct {
 		name      string
 		w         kitty.FullWindow

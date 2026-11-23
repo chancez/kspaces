@@ -74,6 +74,18 @@ type Window struct {
 	LastFocusedAt float64           `json:"last_focused_at"`
 	UserVars      map[string]string `json:"user_vars"`
 	ProgramStatus []status.Record   `json:"program_status"`
+	// The program the window runs, as it was started.
+	Cmdline []string `json:"cmdline,omitempty"`
+	// The processes in the foreground of its terminal, such as a command its shell runs.
+	ForegroundProcesses []Process `json:"foreground_processes,omitempty"`
+	// PID is the window's own process, which a session provider may match a window to its session by.
+	PID int `json:"pid,omitempty"`
+}
+
+// Process is a process in a window's terminal, as `kitten @ ls` lists it.
+type Process struct {
+	Cmdline []string `json:"cmdline"`
+	Cwd     string   `json:"cwd"`
 }
 
 // Own reports whether w is one of kspaces' own windows, a dock, form or picker.

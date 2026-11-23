@@ -15,25 +15,25 @@ import (
 )
 
 // Keeping a session closes its windows so that opening it again brings them back. Its saved file keeps its
-// tabs and splits, which goto_session opens. What runs in its windows is the keeper's to keep, a program
-// the config names, see keeper: one running each window in a multiplexer session keeps that session, and
-// the window attaching to it again when the file reopens it brings it back. Without a keeper the layout
-// alone is kept.
+// tabs and splits, which goto_session opens. What runs in its windows is the session provider's to keep, a
+// program the config names, see provider.go: one running each window in a multiplexer session keeps that
+// session, and the window attaching to it again when the file reopens it brings it back. Without a
+// provider, or one that does not keep, the layout alone is kept.
 
 // KeepMode is how KeepSession keeps a session.
 type KeepMode string
 
 const (
-	// KeepClosed keeps the session to open again: its file, and what the keeper keeps for a while, as the
-	// keeper decides. What closing a session does.
+	// KeepClosed keeps the session to open again: its file, and what the provider keeps for a while, as the
+	// provider decides. What closing a session does.
 	KeepClosed KeepMode = "close"
-	// KeepSuspended keeps the session as KeepClosed does, and what the keeper keeps until the session is
+	// KeepSuspended keeps the session as KeepClosed does, and what the provider keeps until the session is
 	// opened again or forgotten.
 	KeepSuspended KeepMode = "suspend"
 )
 
 // keptFile, in the sessions directory, lists the kept sessions, a line each of tab-separated fields: the
-// mode, the session, then what the keeper kept of it. save_sessions.py reads it too: it keeps the file of a
+// mode, the session, then what the provider kept of it. save_sessions.py reads it too: it keeps the file of a
 // session listed there when its last window closes, and drops the session from the list once it has
 // windows again.
 const keptFile = ".kept-sessions"
@@ -41,7 +41,7 @@ const keptFile = ".kept-sessions"
 // Kept is a session KeepSession kept.
 type Kept struct {
 	Mode KeepMode
-	// What the keeper said it kept, which it is given back to forget, see keeper.
+	// What the provider said it kept, which it is given back to forget, see provider.go.
 	Handles []string
 }
 
@@ -134,7 +134,7 @@ func KeepSession(cfg config.Config, session string, mode KeepMode) error {
 	if len(tabs) == 0 {
 		return fmt.Errorf("%s has no windows open", session)
 	}
-	windows := keeperWindows(tabs, session)
+	windows := sessionWindows(tabs, session)
 	if err := kitty.SaveSessions(session); err != nil {
 		return fmt.Errorf("saving %s: %w", session, err)
 	}
@@ -146,7 +146,7 @@ func KeepSession(cfg config.Config, session string, mode KeepMode) error {
 	if err := saveKept(cfg.SessionsDir, kept); err != nil {
 		return err
 	}
-	// Marked before the keeper ends anything: a window whose program ends closes on its own, and the saver
+	// Marked before the provider ends anything: a window whose program ends closes on its own, and the saver
 	// and whatever ends a window's multiplexer session as it closes have to see it is kept by then.
 	undo := func(err error) error {
 		_ = kitty.SetSessionVar(session, kitty.KeepVar, "")
@@ -156,8 +156,8 @@ func KeepSession(cfg config.Config, session string, mode KeepMode) error {
 	if err := kitty.SetSessionVar(session, kitty.KeepVar, string(mode)); err != nil {
 		return undo(err)
 	}
-	if len(cfg.Provider) > 0 {
-		handles, err := keeperKeep(cfg.Provider, session, mode, windows)
+	if len(cfg.Provider) > 0 && ProviderCapabilities(cfg.Provider)[CapKeep] {
+		handles, err := providerKeep(cfg.Provider, session, mode, windows)
 		if err != nil {
 			return undo(err)
 		}
@@ -169,8 +169,8 @@ func KeepSession(cfg config.Config, session string, mode KeepMode) error {
 	return kitty.CloseSession(session)
 }
 
-// unkeep drops session from the kept sessions and has the keeper forget what it kept of it. What was kept
-// with a keeper that is no longer configured is left to it, and logged.
+// unkeep drops session from the kept sessions and has the provider forget what it kept of it. What was
+// kept with a provider that is no longer configured is left to it, and logged.
 func unkeep(cfg config.Config, session string) error {
 	if cfg.SessionsDir == "" {
 		return nil
@@ -183,9 +183,9 @@ func unkeep(cfg config.Config, session string) error {
 	switch {
 	case len(k.Handles) == 0:
 	case len(cfg.Provider) == 0:
-		logs.Error("forgetting "+session, fmt.Errorf("no keeper is configured to forget %s", strings.Join(k.Handles, " ")))
+		logs.Error("forgetting "+session, fmt.Errorf("no session provider is configured to forget %s", strings.Join(k.Handles, " ")))
 	default:
-		if err := keeperForget(cfg.Provider, session, k.Handles); err != nil {
+		if err := providerForget(cfg.Provider, session, k.Handles); err != nil {
 			return err
 		}
 	}

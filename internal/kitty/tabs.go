@@ -90,10 +90,9 @@ type FullWindow struct {
 	// The window's program, as it was started.
 	Cmdline []string `json:"cmdline"`
 	// The processes in the foreground of its terminal, such as a command its shell runs.
-	ForegroundProcesses []struct {
-		Cmdline []string `json:"cmdline"`
-		Cwd     string   `json:"cwd"`
-	} `json:"foreground_processes"`
+	ForegroundProcesses []Process `json:"foreground_processes"`
+	// PID is the window's own process.
+	PID int `json:"pid"`
 	// With shell integration, the last command line the shell ran, and whether it is at its prompt again.
 	LastReportedCmdline string `json:"last_reported_cmdline"`
 	AtPrompt            bool   `json:"at_prompt"`

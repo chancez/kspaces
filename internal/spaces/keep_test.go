@@ -15,8 +15,9 @@ import (
 // fakeKeepTools puts a kitten and a keeper on PATH that record each call, a line of its words, in order,
 // the keeper's stdin in the file it returns too. ls lists gr@dev's windows, one with a foreground program
 // and a user variable, and a dock, and a window of gr. The saver's action writes gr@dev's file with a
-// launch line, as save_sessions.py does. The keeper says it kept "k1" and "k2", or fails when keeperFails.
-func fakeKeepTools(t *testing.T, sessions string, keeperFails bool) (calls func() []string, stdin string) {
+// launch line, as save_sessions.py does. The keeper says it kept "k1" and "k2", or fails when keeperFails,
+// and fails capabilities, as a program written for keeper does, or names caps when there are any.
+func fakeKeepTools(t *testing.T, sessions string, keeperFails bool, caps ...string) (calls func() []string, stdin string) {
 	t.Helper()
 	dir := t.TempDir()
 	log := filepath.Join(dir, "calls")
@@ -38,7 +39,13 @@ func fakeKeepTools(t *testing.T, sessions string, keeperFails bool) (calls func(
 	if keeperFails {
 		keep = "echo 'no mux server' >&2; exit 1"
 	}
-	keeper := "#!/bin/sh\n" + record + "cat >> " + stdin + "\n" +
+	capabilities := "echo 'unknown verb capabilities' >&2; exit 1"
+	if len(caps) > 0 {
+		capabilities = `echo '{"capabilities": ["` + strings.Join(caps, `", "`) + `"]}'; exit 0`
+	}
+	keeper := "#!/bin/sh\n" + record +
+		"case \"$1\" in capabilities) " + capabilities + ";; esac\n" +
+		"cat >> " + stdin + "\n" +
 		"case \"$1\" in\n" +
 		"keep) " + keep + ";;\n" +
 		"esac\n"
@@ -82,8 +89,8 @@ func readJSON(t *testing.T, path string) any {
 // Without a keeper the layout alone is kept.
 func TestKeepSession(t *testing.T) {
 	windows := []any{
-		map[string]any{"id": 10.0, "cmdline": []any{"/bin/zsh"}, "foreground": []any{}, "user_vars": map[string]any{}, "cwd": "/src/gr/dev"},
-		map[string]any{"id": 11.0, "cmdline": []any{"nvim"}, "foreground": []any{[]any{"nvim", "notes.md"}}, "user_vars": map[string]any{"mux": "m1"}, "cwd": "/src/gr/dev"},
+		map[string]any{"id": 10.0, "pid": 0.0, "cmdline": []any{"/bin/zsh"}, "foreground": []any{}, "user_vars": map[string]any{}, "cwd": "/src/gr/dev"},
+		map[string]any{"id": 11.0, "pid": 0.0, "cmdline": []any{"nvim"}, "foreground": []any{[]any{"nvim", "notes.md"}}, "user_vars": map[string]any{"mux": "m1"}, "cwd": "/src/gr/dev"},
 	}
 	request := func(mode string) any {
 		return map[string]any{"session": "gr@dev", "mode": mode, "windows": windows}
@@ -97,9 +104,11 @@ func TestKeepSession(t *testing.T) {
 		mode        KeepMode
 		keeper      []string
 		keeperFails bool
-		calls       []string
-		request     any
-		kept        map[string]Kept
+		// What the keeper names as its capabilities, none for failing to.
+		caps    []string
+		calls   []string
+		request any
+		kept    map[string]Kept
 		// The error KeepSession returns, empty for none.
 		err string
 	}{
@@ -109,6 +118,7 @@ func TestKeepSession(t *testing.T) {
 			keeper: []string{"keeper"},
 			calls: append(before,
 				"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep=suspend",
+				"keeper capabilities",
 				"keeper keep",
 				"kitten @ close-window --ignore-no-match --match session:^gr@dev$",
 			),
@@ -121,6 +131,7 @@ func TestKeepSession(t *testing.T) {
 			keeper: []string{"keeper"},
 			calls: append(before,
 				"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep=close",
+				"keeper capabilities",
 				"keeper keep",
 				"kitten @ close-window --ignore-no-match --match session:^gr@dev$",
 			),
@@ -134,12 +145,25 @@ func TestKeepSession(t *testing.T) {
 			keeperFails: true,
 			calls: append(before,
 				"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep=suspend",
+				"keeper capabilities",
 				"keeper keep",
 				"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep",
 			),
 			request: request("suspend"),
 			kept:    map[string]Kept{"gr": {Mode: KeepClosed, Handles: []string{"m3"}}},
-			err:     "keeper keeper keep: exit status 1: no mux server",
+			err:     "keeper keep: no mux server",
+		},
+		{
+			name:   "a provider that does not keep",
+			mode:   KeepSuspended,
+			keeper: []string{"keeper"},
+			caps:   []string{"list", "open"},
+			calls: append(before,
+				"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep=suspend",
+				"keeper capabilities",
+				"kitten @ close-window --ignore-no-match --match session:^gr@dev$",
+			),
+			kept: map[string]Kept{"gr": {Mode: KeepClosed, Handles: []string{"m3"}}, "gr@dev": {Mode: KeepSuspended}},
 		},
 		{
 			name: "no keeper",
@@ -157,7 +181,7 @@ func TestKeepSession(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(dir, keptFile), []byte("close\tgr\tm3\n"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			calls, stdin := fakeKeepTools(t, dir, c.keeperFails)
+			calls, stdin := fakeKeepTools(t, dir, c.keeperFails, c.caps...)
 			cfg := config.Config{SessionsDir: dir, Provider: c.keeper, Kitty: config.Kitty{SaveSessions: true}}
 			err := KeepSession(cfg, "gr@dev", c.mode)
 			if got := fmt.Sprint(err); err == nil && c.err != "" || err != nil && got != c.err {
