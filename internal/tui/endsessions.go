@@ -258,7 +258,7 @@ func RunEndSessions(ctx context.Context, cfg config.Config, ids []string, yes bo
 // RunCleanupSessions runs the form that cleans up the provider's sessions of space no window shows, meant
 // for a kitty popup.
 func RunCleanupSessions(ctx context.Context, cfg config.Config, space string) error {
-	sessions, err := spaces.DetachedOf(cfg.Provider, space)
+	sessions, err := spaces.DetachedOf(cfg, space)
 	if err != nil {
 		return err
 	}

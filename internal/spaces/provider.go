@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"slices"
 
+	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/logs"
 )
@@ -345,12 +346,12 @@ func (st *ProviderState) Find(ids []string) ([]ProviderSession, error) {
 
 // DetachedOf are the sessions of space no window shows, on this machine, by name, as the sidebar lists
 // them.
-func DetachedOf(provider []string, space string) ([]ProviderSession, error) {
-	st, err := ListNow(provider)
+func DetachedOf(cfg config.Config, space string) ([]ProviderSession, error) {
+	st, err := ListNow(cfg.Provider)
 	if err != nil {
 		return nil, err
 	}
-	for _, h := range detachedBySpace(st)[space].Hosts {
+	for _, h := range detachedBySpace(st, keptHandles(cfg.SessionsDir))[space].Hosts {
 		if h.Host == "" {
 			return h.Sessions, nil
 		}

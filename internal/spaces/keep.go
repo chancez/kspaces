@@ -118,6 +118,18 @@ func suspendedSessions(dir string) []string {
 	return names
 }
 
+// keptHandles are what the provider kept of the kept sessions in dir, see Kept: a session of its that a
+// handle names is a kept kitty session's, which that session's row stands for, not a detached one.
+func keptHandles(dir string) map[string]bool {
+	out := map[string]bool{}
+	for _, k := range LoadKept(dir) {
+		for _, h := range k.Handles {
+			out[h] = true
+		}
+	}
+	return out
+}
+
 // KeepSession closes the windows of session, keeping it as mode says, see Kept. It saves the session's
 // file first, and refuses a session it saves no windows of. It does not wait for kitty to have closed the
 // windows, see CloseSession, but has done everything else by the time it asks: the form that asks may be

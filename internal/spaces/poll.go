@@ -7,8 +7,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -30,6 +32,8 @@ type Shared struct {
 	Saved []string `json:"saved,omitempty"`
 	// Saved sessions kept with KeepSuspended.
 	Suspended []string `json:"suspended,omitempty"`
+	// What the provider kept of the kept sessions, see keptHandles.
+	Kept []string `json:"kept,omitempty"`
 	// kitty's windows, as `kitten @ ls` lists them, and why they could not be listed.
 	Windows  []kitty.OSWindow `json:"windows,omitempty"`
 	KittyErr string           `json:"kitty_err,omitempty"`
@@ -81,6 +85,7 @@ func loadSpaces() Shared {
 	}
 	sh.Saved = savedSessions(cfg.SessionsDir)
 	sh.Suspended = suspendedSessions(cfg.SessionsDir)
+	sh.Kept = slices.Sorted(maps.Keys(keptHandles(cfg.SessionsDir)))
 	return sh
 }
 
@@ -130,7 +135,7 @@ func (sh Shared) View(self int) Snapshot {
 		snap.Err = errors.New(sh.KittyErr)
 	}
 	snap.Git = sh.Git
-	snap.Detached = detachedBySpace(sh.Provider)
+	snap.Detached = detachedBySpace(sh.Provider, toSet(sh.Kept))
 	if sh.Provider != nil {
 		snap.Caps = sh.Provider.Caps
 	}

@@ -161,7 +161,11 @@ spaces; one no configured space is named after is a topic space, below. Each ses
 | `tags` | the provider's labels; `worktree`, when the space has that worktree, picks the kitty session `open` uses |
 | `windows` | the ids of the windows that show it, which is the provider's to decide: by a window's pid, a user variable, its program, anything W carries |
 
-A session with no `windows` is detached and listed under its space, by host. A `list` that fails leaves the
+A session with no `windows` is detached and listed under its space, by host, unless it is a kept
+session's: a session whose `id` or `name` equals a handle `keep` returned for a kitty session kspaces closed
+or suspended, as `.kept-sessions` lists them, is that kitty session's, whose row stands for it, and comes
+back with it, so it is not listed as detached. Once that kitty session is opened again and its handles
+leave the list, the session is an ordinary one again. A `list` that fails leaves the
 sidebar showing the last one that did not, so a provider restarting under it, as a multiplexer upgrading
 does, blanks nothing; after three failures in a row it is asked again a minute later, or at `r`.
 

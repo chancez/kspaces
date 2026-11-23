@@ -2,6 +2,7 @@ package spaces
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -74,7 +75,7 @@ func TestDetachedHosts(t *testing.T) {
 		{ID: "4", Name: "d", Space: "gr", Host: "laptop"},
 		{ID: "5", Name: "e", Space: "gr", Windows: []int{7}},
 	}}
-	got := detachedBySpace(st)
+	got := detachedBySpace(st, nil)
 	want := map[string]Detached{"gr": {Hosts: []HostSessions{
 		{Sessions: []ProviderSession{{ID: "3", Name: "c", Space: "gr"}}},
 		{Host: "laptop", Sessions: []ProviderSession{{ID: "4", Name: "d", Space: "gr", Host: "laptop"}}},
@@ -177,5 +178,39 @@ func TestWithDetached(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got  %+v\nwant %+v", got, want)
+	}
+}
+
+// A session the provider kept for a kept kitty session, its id or its name one of the handles in
+// .kept-sessions, is that session's, whose row stands for it, not a detached one; once the kitty session
+// is opened again and its handles go, it is listed again.
+func TestDetachedLeavesOutKept(t *testing.T) {
+	dir, _ := fakeProvider(t, map[string]string{
+		"capabilities": `{"capabilities": ["list"]}`,
+		"list": `{"sessions": [{"id": "@a1", "name": "kitty.1631", "space": "gr"}, {"id": "@b2", "name": "build", "space": "gr"},
+			{"id": "@c3", "name": "other", "space": "gr"}]}`,
+	}, nil)
+	fakeKittenLs(t, dir, `[]`)
+	sessions := t.TempDir()
+	cfg := config.Config{Provider: []string{"prov"}, SessionsDir: sessions}
+	if err := os.WriteFile(filepath.Join(sessions, keptFile), []byte("close\tgr@dev\tkitty.1631\nsuspend\tgr@fix\t@b2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err := DetachedOf(cfg, "gr")
+	if want := []ProviderSession{{ID: "@c3", Name: "other", Space: "gr"}}; err != nil || !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, %v\nwant %v", got, err, want)
+	}
+	if err := os.WriteFile(filepath.Join(sessions, keptFile), []byte("suspend\tgr@fix\t@b2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err = DetachedOf(cfg, "gr")
+	if want := []ProviderSession{{ID: "@a1", Name: "kitty.1631", Space: "gr"}, {ID: "@c3", Name: "other", Space: "gr"}}; err != nil || !reflect.DeepEqual(got, want) {
+		t.Errorf("after opening gr@dev: got %v, %v\nwant %v", got, err, want)
+	}
+	// The sidebar's view leaves them out the same way, from the handles its load read.
+	sh := Shared{Config: &cfg, Provider: &ProviderState{Sessions: []ProviderSession{{ID: "@a1", Name: "kitty.1631", Space: "gr"}}}, Kept: []string{"kitty.1631"}}
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	if d := sh.View(0).Detached; len(d) != 0 {
+		t.Errorf("the view lists a kept session: %v", d)
 	}
 }

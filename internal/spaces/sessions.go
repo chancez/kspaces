@@ -36,14 +36,16 @@ func (d Detached) Count() int {
 	return n
 }
 
-// detachedBySpace are the provider's sessions no window shows, by space: those it lists with no windows.
-func detachedBySpace(st *ProviderState) map[string]Detached {
+// detachedBySpace are the provider's sessions no window shows, by space: those it lists with no windows,
+// but those kept, a session whose id or name is one of the handles in kept: the provider kept it for a
+// kept kitty session, see Kept, whose row stands for it, and it is that session's to bring back.
+func detachedBySpace(st *ProviderState, kept map[string]bool) map[string]Detached {
 	if st == nil {
 		return nil
 	}
 	by := map[string]map[string][]ProviderSession{}
 	for _, s := range st.Sessions {
-		if len(s.Windows) > 0 {
+		if len(s.Windows) > 0 || kept[s.ID] || kept[s.Name] {
 			continue
 		}
 		space := s.SpaceName()
