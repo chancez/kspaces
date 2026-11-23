@@ -478,6 +478,11 @@ var (
 		Title: "Run",
 		Run:   cmd[*sidebar, selectSubject]((*sidebar).runSelected),
 	}
+	actSelMove = &interact.Action[*sidebar, selectSubject]{
+		Title:   "Move",
+		Applies: func(m *sidebar, _ selectSubject) bool { return m.caps[spaces.CapMove] },
+		Run:     cmd[*sidebar, selectSubject]((*sidebar).moveSelected),
+	}
 )
 
 // sortAction chooses mode from the sort button's menu.
@@ -1296,7 +1301,7 @@ func init() {
 	thePane = interact.List(paneKind)
 
 	selectKind = interact.NewKind(func(selectSubject) string { return "Select" },
-		actTick, actTickAll, actSelRemove, actSelClose, actSelSuspend, actSelForget, actSelRun, actEndSelect)
+		actTick, actTickAll, actSelRemove, actSelClose, actSelSuspend, actSelForget, actSelRun, actSelMove, actEndSelect)
 	selectKind.Bind(actTick, "space", "tick the row", "space")
 	selectKind.Bind(actTickAll, "A", "tick every row", "A")
 	selectKind.Bind(actSelRemove, "x", "remove the ticked worktrees", "x")
@@ -1304,6 +1309,7 @@ func init() {
 	selectKind.Bind(actSelSuspend, "z", "suspend the ticked sessions", "z")
 	selectKind.Bind(actSelForget, "F", "forget the ticked sessions' saved files", "F")
 	selectKind.Bind(actSelRun, "R", "run a command in the ticked worktrees", "R")
+	selectKind.Bind(actSelMove, "M", "move the ticked sessions to another space", "M")
 	selectKind.Bind(actEndSelect, "esc", "leave the select mode", "esc")
 	theSelection = interact.List(selectKind)
 

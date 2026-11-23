@@ -5,6 +5,7 @@ import (
 	"os"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -162,5 +163,38 @@ func TestDetachedActions(t *testing.T) {
 	}
 	if got := calls(); len(got) != before {
 		t.Errorf("kitten ran %q", got[before:])
+	}
+}
+
+// In the select mode a detached session's row, or its head for all of them, ticks as a worktree's does,
+// and Move, M, moves the ticked ones in one form, with a provider that moves.
+func TestSelectDetached(t *testing.T) {
+	e := newSidebarEnv(t)
+	calls := fakeKittenCalls(t)
+	snap := detachedFixture()
+	snap.Caps = spaces.Capabilities{spaces.CapList: true, spaces.CapMove: true}
+	e.m.Update(snap)
+	e.m.Update(tea.FocusMsg{})
+	// gr@dev, fix, gr's head; then default's head, at the top.
+	e.press("j", "j", "v", "space", "g", "j", "space")
+	got := e.m.tickedDetached()
+	want := []spaces.ProviderSession{snap.Detached["default"].Hosts[0].Sessions[0], snap.Detached["gr"].Hosts[0].Sessions[0], snap.Detached["gr"].Hosts[0].Sessions[1]}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("ticked %#v\nwant %#v", got, want)
+	}
+	var bar []string
+	for _, l := range e.screen() {
+		if strings.HasPrefix(l, " Move") {
+			bar = append(bar, l)
+		}
+	}
+	if want := []string{" Move                  3    M"}; !reflect.DeepEqual(bar, want) {
+		t.Errorf("bar %q, want %q", bar, want)
+	}
+	if cmd := e.press("M"); cmd != nil {
+		cmd()
+	}
+	if got, want := formsOpened(t, calls()), [][]string{{"sessions", "move", "--", "d4", "a1", "b2"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("forms %q, want %q", got, want)
 	}
 }

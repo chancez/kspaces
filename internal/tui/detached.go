@@ -3,6 +3,8 @@ package tui
 import (
 	"cmp"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -116,6 +118,66 @@ func detachedKey(r spaces.DetachedRow) string {
 // sessionKey names s, a detached session of space, as its row and the select mode's ticks do.
 func sessionKey(space string, s spaces.ProviderSession) string {
 	return "detached:" + space + ":" + s.Host + ":" + s.ID
+}
+
+// tickedDetached are the detached sessions ticked in the select mode, by space, then as the rows list
+// them.
+func (m *sidebar) tickedDetached() []spaces.ProviderSession {
+	var out []spaces.ProviderSession
+	for _, space := range slices.Sorted(maps.Keys(m.detached)) {
+		for _, h := range m.detached[space].Hosts {
+			for _, s := range h.Sessions {
+				if m.ticked[sessionKey(space, s)] {
+					out = append(out, s)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// detachedTicks are the keys of the sessions r stands for in the select mode: a session's own, or its
+// head's every session, shown or not; a host's row stands for none.
+func detachedTicks(r spaces.DetachedRow) []string {
+	switch {
+	case r.Session != nil:
+		return []string{sessionKey(r.Of.Name, *r.Session)}
+	case r.Head():
+		var out []string
+		for _, h := range r.All.Hosts {
+			for _, s := range h.Sessions {
+				out = append(out, sessionKey(r.Of.Name, s))
+			}
+		}
+		return out
+	}
+	return nil
+}
+
+// moveSelected opens the move form with the ticked detached sessions. Done once one of them is in another
+// space or gone.
+func (m *sidebar) moveSelected() tea.Cmd {
+	sessions := m.tickedDetached()
+	if len(sessions) == 0 {
+		return m.refuse(noneToMove)
+	}
+	var ids, keys []string
+	for _, s := range sessions {
+		ids = append(ids, s.ID)
+		keys = append(keys, sessionKey(s.SpaceName(), s))
+	}
+	return m.launch(func(cfg config.Config, st kitty.State) error { return spaces.AskMoveProviderSessions(cfg, st, ids...) },
+		func(m *sidebar) bool {
+			listed := map[string]bool{}
+			for space, d := range m.detached {
+				for _, h := range d.Hosts {
+					for _, s := range h.Sessions {
+						listed[sessionKey(space, s)] = true
+					}
+				}
+			}
+			return slices.ContainsFunc(keys, func(k string) bool { return !listed[k] })
+		})
 }
 
 // askDetached opens a form with ask, which acts on the provider's sessions in a popup of its own; the next
