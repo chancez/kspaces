@@ -156,8 +156,8 @@ func KeepSession(cfg config.Config, session string, mode KeepMode) error {
 	if err := kitty.SetSessionVar(session, kitty.KeepVar, string(mode)); err != nil {
 		return undo(err)
 	}
-	if len(cfg.Keeper) > 0 {
-		handles, err := keeperKeep(cfg.Keeper, session, mode, windows)
+	if len(cfg.Provider) > 0 {
+		handles, err := keeperKeep(cfg.Provider, session, mode, windows)
 		if err != nil {
 			return undo(err)
 		}
@@ -182,10 +182,10 @@ func unkeep(cfg config.Config, session string) error {
 	}
 	switch {
 	case len(k.Handles) == 0:
-	case len(cfg.Keeper) == 0:
+	case len(cfg.Provider) == 0:
 		logs.Error("forgetting "+session, fmt.Errorf("no keeper is configured to forget %s", strings.Join(k.Handles, " ")))
 	default:
-		if err := keeperForget(cfg.Keeper, session, k.Handles); err != nil {
+		if err := keeperForget(cfg.Provider, session, k.Handles); err != nil {
 			return err
 		}
 	}

@@ -104,7 +104,7 @@ func (f *closeSessionForm) render() string {
 			lines = append(lines, line(row))
 		}
 	}
-	kept := len(f.cfg.Keeper) > 0
+	kept := len(f.cfg.Provider) > 0
 	if len(f.sessions) == 1 {
 		lines = []string{line(look.Heading(verb + " session " + f.sessions[0])), ""}
 		text(closesWhat(f.mode, f.windows[0], kept))

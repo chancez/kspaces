@@ -105,3 +105,31 @@ func TestTilde(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+// keeper is provider's earlier name, read as it; both is an error, and a space's own file has neither.
+func TestParseProvider(t *testing.T) {
+	type result struct {
+		Provider []string
+		Keeper   []string
+		Err      string
+	}
+	var got []result
+	for _, in := range []string{
+		`provider = ["kspaces-provider-cm"]`,
+		`keeper = ["kspaces-keeper-cm"]`,
+		"provider = [\"a\"]\nkeeper = [\"b\"]",
+		``,
+	} {
+		cfg, err := Parse(in)
+		got = append(got, result{cfg.Provider, cfg.Keeper, errString(err)})
+	}
+	want := []result{
+		{[]string{"kspaces-provider-cm"}, nil, "<nil>"},
+		{[]string{"kspaces-keeper-cm"}, nil, "<nil>"},
+		{nil, nil, "keeper is provider's earlier name; set provider alone"},
+		{nil, nil, "<nil>"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}

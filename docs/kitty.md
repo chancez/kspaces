@@ -59,6 +59,16 @@ which wraps kspaces' windows too. Change `launch` only for what kspaces' windows
 through: a kitten that passes the options on to kitty's `launch`, taking them as `--name=value` and the
 first argument that does not start with `-` as the start of the command.
 
+Every window kspaces opens in a session, a first tab, a layout's tabs and panes, a command's window, also
+carries `--var=kspaces_space=SPACE`, and in a linked worktree's session `SPACE@DIR`
+`--var=kspaces_worktree=DIR`, for a launch wrapper that files each window's multiplexer session by space:
+the wrapper runs before kitty adds the window to its session, so it cannot see the session, only the
+window's variables. A session in no space, `default` or a [topic space](#session-providers)'s, is a space of
+its own name. A wrapper that does not read them loses nothing.
+
+These two describe a window that runs the user's programs. Every other `kspaces_` variable marks one of
+kspaces' own windows, its sidebar, forms, pickers and popups, which a wrapper should leave unwrapped.
+
 kspaces itself never writes session files. The session saver below, which it can install into kitty, does.
 
 ## Closing and suspending sessions
@@ -72,40 +82,103 @@ opening the session again restores its tabs and splits from it rather than its d
 deletes it. **Suspend session**, `z` in the sidebar or `kspaces suspend [SESSION...]`, is the same, and
 its row shows the suspended marker until it is opened.
 
-What runs in the windows is the keeper's. kspaces knows only kitty's side; a program the config names keeps
-the rest, such as the multiplexer session a launch wrapper runs each window in:
-
-```toml
-keeper = ["kspaces-keeper-cm"]   # config.toml only, not a space's own config
-```
-
-Without one, Close and Suspend keep the layout alone, and the windows open again with fresh programs. With
+What runs in the windows is the [session provider](#session-providers)'s. kspaces knows only kitty's side;
+a program the config names keeps the rest, such as the multiplexer session a launch wrapper runs each
+window in. Without one, Close and Suspend keep the layout alone, and the windows open again with fresh programs. With
 one, opening the session again is opening it as ever: each window comes back from the file attached to
-whatever the keeper kept, which brings back what ran there as the multiplexer does. A keeper decides what
+whatever the provider kept, which brings back what ran there as the multiplexer does. A provider decides what
 each mode means, such as keeping a closed session's for a week and a suspended one's until it is opened or
 forgotten. Suspending frees what the session's programs held; what lived only in a program's memory, an
 unsaved buffer or a shell's variables, is gone, unless the program saves it itself.
 
-kspaces runs the keeper with a verb and a JSON request on its stdin. A keeper that fails exits non-zero,
-its stderr the error, and then kspaces closes nothing and takes back what it did.
+Closing and suspending use the provider's `keep` and `forget`, below. A provider that fails `keep` exits
+non-zero, its stderr the error, and then kspaces closes nothing and takes back what it did. The handles it
+prints are its own: kspaces lists them with the session and gives them back to `forget` when the session is
+forgotten or its worktree removed. A provider that keeps nothing prints `{"kept": []}`.
 
-```
-KEEPER keep     {"session": S, "mode": "close" | "suspend", "windows": [W...]}   prints {"kept": [H...]}
-KEEPER forget   {"session": S, "kept": [H...]}
-```
-
-Each window W is `{"id", "cmdline", "foreground", "user_vars", "cwd"}`: its program, the command lines in
-the foreground of its terminal, its user variables, such as one a launch wrapper set naming its
-multiplexer session, and its directory, all as `kitten @ ls` has them; kspaces' own windows are left out.
-The handles H are the keeper's own: kspaces lists them with the session and gives them back to `forget`
-when the session is forgotten or its worktree removed. A keeper that keeps nothing prints `{"kept": []}`.
-
-Before running the keeper kspaces lists the session in `.kept-sessions` in the `sessions` directory, a line
+Before running `keep` kspaces lists the session in `.kept-sessions` in the `sessions` directory, a line
 each of its mode, its name and the handles, tab-separated, and sets the `kspaces_keep` user variable on its
 windows, to the mode. The saver keeps the file of a listed session when its last window closes, and drops
 the session from the list once it has windows again. A watcher that ends a window's multiplexer session as
-the window closes should leave a window with `kspaces_keep` alone: ending it would lose what the keeper
+the window closes should leave a window with `kspaces_keep` alone: ending it would lose what the provider
 kept.
+
+## Session providers
+
+kspaces manages kitty's layout: spaces, kitty sessions, tabs, windows and their session files. What runs
+in the windows, and the sessions that run with no window at all, a multiplexer's on this machine or on
+another, are a session provider's: a program the config names, which kspaces runs with a verb and a JSON
+request on its stdin, and which prints JSON on its stdout.
+
+```toml
+provider = ["kspaces-provider-cm"]   # config.toml only, not a space's own config
+```
+
+`keeper` is deprecated: it is `provider`'s earlier name, still read as `provider` so an older config keeps
+working, and setting both is an error. Rename it. kspaces assumes
+nothing about how the provider's sessions relate to windows: one session per window, as a launch wrapper
+running each window in cm does, or one window running a multiplexer that holds many, as tmux does, are both
+the provider's to describe.
+
+```
+PROVIDER capabilities  {}                                                  prints {"capabilities": [C...]}
+PROVIDER keep          {"session": S, "mode": "close" | "suspend", "windows": [W...]}  prints {"kept": [H...]}
+PROVIDER forget        {"session": S, "kept": [H...]}
+PROVIDER list          {"windows": [W...]}                                 prints {"spaces": [N...], "sessions": [P...]}
+PROVIDER open          {"session": ID}                                     prints {"argv": [A...], "cwd": D}
+PROVIDER kill          {"session": ID}
+PROVIDER shelve        {"session": ID}
+PROVIDER remove        {"session": ID}
+PROVIDER move          {"session": ID, "space": N}
+```
+
+Every verb exits non-zero on failure, its stderr the error, which kspaces shows. A verb with no output
+prints nothing or `{}`.
+
+**Capabilities.** `capabilities` names what the provider does: `keep` (for `keep` and `forget`), `list`,
+`open`, `kill`, `shelve`, `remove` and `move`. kspaces offers only what is named: a provider without
+`shelve` never shows Shelve. It is asked once per sidebar, and again at `r`. A provider that fails
+`capabilities` is taken to have `keep` alone, which is what a program written as a keeper does.
+
+**Windows.** Each window W is `{"id", "pid", "cmdline", "foreground", "user_vars", "cwd"}`, as `kitten @
+ls` has them: its id, its own process, its program, the command lines in the foreground of its terminal,
+its user variables, and its directory. kspaces' own windows are left out.
+
+**Listing.** The sidebar runs `list` at each refresh, with every window. `spaces` names the provider's
+spaces; one no configured space is named after is a topic space, below. Each session P is:
+
+| Field | |
+| --- | --- |
+| `id` | the provider's own reference, opaque to kspaces, given back to every other verb |
+| `name` | what the sidebar shows it as |
+| `space` | the space it is in; empty is `default` |
+| `host` | the machine it runs on, empty for this one |
+| `state` | `running`, `exited`, `shelved` or `dead`; only `running` is offered Kill and Shelve, only the others Remove |
+| `busy` | whether a command is running, which a confirmation says |
+| `title`, `command` | what the row shows after its name: the title, else the command; `command` is also what a layout saved from a window showing it runs |
+| `cwd` | optional: where it is, which a layout saved from a window showing it starts in |
+| `status` | a program's own report of itself, as OSC 7501's states: `idle`, `working`, `done`, `blocked`, `error`, or empty |
+| `tags` | the provider's labels; `worktree`, when the space has that worktree, picks the kitty session `open` uses |
+| `windows` | the ids of the windows that show it, which is the provider's to decide: by a window's pid, a user variable, its program, anything W carries |
+
+A session with no `windows` is detached and listed under its space, by host. A `list` that fails leaves the
+sidebar showing the last one that did not, so a provider restarting under it, as a multiplexer upgrading
+does, blanks nothing; after three failures in a row it is asked again a minute later, or at `r`.
+
+**Opening.** `open` prints the command to run in a new tab, and optionally where it starts, such as `cm
+attach @ID` or `tmux attach -t NAME`. kspaces opens the tab in the focused kitty session when that is in the
+session's space, else in the session its `worktree` tag names, else in the space's own session, and the
+tab carries the [launch variables](#spaces-and-sessions) of the session it opens in.
+
+**Acting.** `kill` ends a running session, `shelve` ends one so it can be brought back as it was, `remove`
+discards one that has ended, and `move` puts one in another space, which the provider creates if it must.
+kspaces confirms `kill` and `remove`, and refreshes after each.
+
+**Topic spaces.** A space in `spaces` that no configured space has the name of is listed with the sessions in
+no space, as a topic space: one kitty session of its name, opened with a shell tab in the home directory, and
+its detached sessions listed as any space's are.
+
+Without a provider, or one without `list`, there are no detached sessions and no topic spaces.
 
 ## Running commands
 
@@ -315,9 +388,9 @@ write a layout from the session's tabs as kitty has them, read from `kitten @ ls
 - `focus = true` marks the tab's active window, unless it is pane 1.
 
 What runs in a pane, which the form offers, is the command its shell reports running, with kitty's shell
-integration; else for a window running `cm attach NAME`, what `cm list --json` says session NAME runs,
-and its cwd is cm's; else the program in the window's foreground, when that is not a shell; else the shell
-at its prompt.
+integration; else for a window that shows one of the [session provider](#session-providers)'s sessions,
+the `command` its `list` says that session runs, and its `cwd` when it says one; else the program in the
+window's foreground, when that is not a shell; else the shell at its prompt.
 
 The layout goes at the end of the file it is saved to, a space's [own config](#per-space-config) or
 config.toml, as a `[[layouts]]` block, its panes inline a line each, and the rest of the file is kept byte

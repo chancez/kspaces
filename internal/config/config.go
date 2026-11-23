@@ -49,9 +49,12 @@ type Config struct {
 	// windows but has a file here is restored from it rather than opened with Launch. Empty to always use
 	// Launch.
 	SessionsDir string `toml:"sessions"`
-	// The program that keeps what runs in a session's windows when kspaces closes or suspends the session,
-	// such as a multiplexer's sessions, so opening the session again brings them back; see the keeper
-	// protocol in docs/kitty.md. Empty keeps the session's layout alone.
+	// The session provider: the program that owns what runs in windows and the sessions with no window, such
+	// as a multiplexer's, asked in verbs; see Session providers in docs/kitty.md. Empty keeps a session's
+	// layout alone, and lists no sessions with no window.
+	Provider []string `toml:"provider"`
+	// Keeper is provider's earlier name. Deprecated: set provider. Still read as provider and then cleared,
+	// so a config written for a keeper keeps working; setting both is an error.
 	Keeper    []string  `toml:"keeper"`
 	Worktrees Worktrees `toml:"worktrees"`
 	Sidebar   Sidebar   `toml:"sidebar"`
@@ -318,6 +321,12 @@ func merge(names []string, parts []decoded) (Config, error) {
 	}
 	if len(cfg.Launch) == 0 {
 		return Config{}, fmt.Errorf("launch cannot be empty")
+	}
+	if len(cfg.Keeper) > 0 {
+		if len(cfg.Provider) > 0 {
+			return Config{}, fmt.Errorf("keeper is provider's earlier name; set provider alone")
+		}
+		cfg.Provider, cfg.Keeper = cfg.Keeper, nil
 	}
 	if w := cfg.Sidebar.Width; w < MinSidebarWidth || w > MaxSidebarWidth {
 		return Config{}, fmt.Errorf("sidebar.width is %d, it must be from %d to %d", w, MinSidebarWidth, MaxSidebarWidth)

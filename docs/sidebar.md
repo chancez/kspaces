@@ -254,7 +254,7 @@ group, and Add space.
 | Session | Clear | `x` | drop a status entry's done and failed records without focusing its window; on a status entry with one |
 | Worktree | Open PR #N | `b` | open the branch's PR in the browser with `gh browse N`, on a worktree whose row shows a PR |
 | Worktree | Remove worktree | `x` | close the session and remove a linked worktree |
-| Worktree | Forget | `F`, `x` | delete the saved session file of a session with no windows open, and what the keeper kept of it; `x` on a missing worktree |
+| Worktree | Forget | `F`, `x` | delete the saved session file of a session with no windows open, and what the provider kept of it; `x` on a missing worktree |
 | Space | New worktree | `n` | create a worktree in the space, in a form; on a linked worktree's row, a new branch starts from its branch |
 | Space | New worktree from PR | `N` | the same form on its Pull request tab, to check out one of the space's open PRs |
 | Space | New worktree from issue | `I` | the same form on its Issue tab, to create a branch for one of the space's open issues, from the row's branch as New worktree |
@@ -465,7 +465,7 @@ worktree whose branch would lose commits starts unticked, so only branches that 
 tick it.
 
 **Forget** shows the saved session file of a session with no windows open, a missing worktree's or a closed
-or suspended one's, and Delete deletes it, so kitty does not restore the session, and has the keeper forget
+or suspended one's, and Delete deletes it, so kitty does not restore the session, and has the provider forget
 what it kept of a kept session. `kspaces forget SESSION...` does the same for any sessions with no windows open,
 several in one form that lists each one's file and says the directory is gone only of a missing
 worktree's; one with windows open is refused, and `--yes` deletes without asking.

@@ -158,7 +158,7 @@ func TestKeepSession(t *testing.T) {
 				t.Fatal(err)
 			}
 			calls, stdin := fakeKeepTools(t, dir, c.keeperFails)
-			cfg := config.Config{SessionsDir: dir, Keeper: c.keeper, Kitty: config.Kitty{SaveSessions: true}}
+			cfg := config.Config{SessionsDir: dir, Provider: c.keeper, Kitty: config.Kitty{SaveSessions: true}}
 			err := KeepSession(cfg, "gr@dev", c.mode)
 			if got := fmt.Sprint(err); err == nil && c.err != "" || err != nil && got != c.err {
 				t.Fatalf("err %v, want %q", err, c.err)
@@ -179,7 +179,7 @@ func TestKeepSession(t *testing.T) {
 // Without the session saver nothing writes the file a kept session opens from, so nothing is kept or closed.
 func TestKeepSessionNeedsTheSaver(t *testing.T) {
 	calls, _ := fakeKeepTools(t, t.TempDir(), false)
-	cfg := config.Config{SessionsDir: t.TempDir(), Keeper: []string{"keeper"}}
+	cfg := config.Config{SessionsDir: t.TempDir(), Provider: []string{"keeper"}}
 	if err := KeepSession(cfg, "gr@dev", KeepSuspended); err == nil {
 		t.Error("kept a session without the saver")
 	}
@@ -216,7 +216,7 @@ func TestForgetKeptSession(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if err := ForgetSession(config.Config{SessionsDir: dir, Keeper: []string{"keeper"}}, "gr@dev"); err != nil {
+			if err := ForgetSession(config.Config{SessionsDir: dir, Provider: []string{"keeper"}}, "gr@dev"); err != nil {
 				t.Fatal(err)
 			}
 			if got := calls(); !reflect.DeepEqual(got, c.calls) {
