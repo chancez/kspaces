@@ -178,7 +178,7 @@ func TestPlaceSessions(t *testing.T) {
 	open := map[string]int{"gr": 1, "default": 2, "scratch": 3, "gr@gone": 4, "broken@x": 5, "nope@x": 6}
 	saved := []string{"default", "gr@dev", "old", "gr@saved", "gr@gone", "gr@"}
 
-	got := placeSessions(spaces, open, saved)
+	got := placeSessions(spaces, open, saved, nil)
 	// gr's sessions that match no worktree of it are its missing ones; a broken space's and an unknown
 	// space's stay others, as does a bare gr@.
 	want := []Space{
@@ -204,7 +204,7 @@ func TestMissingRows(t *testing.T) {
 		{Path: "/src/gr/.worktrees/dev", Branch: "dev", Session: "gr@dev"},
 	}}}
 	open := map[string]int{"gr": 1, "gr@open": 2, "kitty@x": 3, "default": 4}
-	others := placeSessions(spaces, open, []string{"gr@saved", "default"})
+	others := placeSessions(spaces, open, []string{"gr@saved", "default"}, nil)
 	gr := &spaces[0]
 	got := BuildRows(others, spaces, nil, nil, Order{})
 	want := []Row{

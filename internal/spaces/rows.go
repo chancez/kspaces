@@ -97,12 +97,13 @@ func BuildRows(others, spaces []Space, folded, hidden map[string]bool, order Ord
 	return rows
 }
 
-// placeSessions sorts the sessions that are open or have a saved file but belong to no worktree. One named
-// SPACE@DIR after a space whose worktrees were listed is a missing worktree of that space, added to its
-// Missing in name order: its directory is gone, as when a worktree is removed while its session has
+// placeSessions sorts the sessions that are open or have a saved file but belong to no worktree, and the
+// sessions of topics, the provider's spaces that are no configured space's, whether or not they are either. One
+// named SPACE@DIR after a space whose worktrees were listed is a missing worktree of that space, added to
+// its Missing in name order: its directory is gone, as when a worktree is removed while its session has
 // windows. The rest are returned as the others, such as the one kitty starts with, each a space of its
 // own with one worktree that has no path, so one created afresh starts in the home directory.
-func placeSessions(spaces []Space, open map[string]int, saved []string) (others []Space) {
+func placeSessions(spaces []Space, open map[string]int, saved []string, topics []string) (others []Space) {
 	inSpace := map[string]bool{}
 	for _, s := range spaces {
 		for _, wt := range s.Worktrees {
@@ -113,7 +114,7 @@ func placeSessions(spaces []Space, open map[string]int, saved []string) (others 
 	for name := range open {
 		names[name] = true
 	}
-	for _, name := range saved {
+	for _, name := range slices.Concat(saved, topics) {
 		names[name] = true
 	}
 	var sorted []string
@@ -185,7 +186,12 @@ type Snapshot struct {
 	Kitty     kitty.State
 	// What git and gh say of each worktree, by path, as far as the leading sidebar knows.
 	Git map[string]gitstate.State
-	Err error
+	// The provider's sessions no kitty window shows, by space, which is a configured space's name or a
+	// session's in no space; nil without a provider that lists them. Only the sidebar asks.
+	Detached map[string]Detached
+	// What the session provider does, see Capabilities; nil without one.
+	Caps Capabilities
+	Err  error
 }
 
 // Load reads the config on every call, so edits show up without restarting every dock, and a broken

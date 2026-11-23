@@ -68,3 +68,31 @@ func TestProviderCapabilities(t *testing.T) {
 		t.Errorf("got  %v\nwant %v", got, want)
 	}
 }
+
+// list sends the windows and reads the sessions and spaces.
+func TestListSessions(t *testing.T) {
+	dir, _ := fakeProvider(t, map[string]string{"list": `{"spaces": ["default", "gr"], "sessions": [
+		{"id": "a1", "name": "build", "space": "gr", "state": "running", "busy": true, "title": "vim", "command": "vim x",
+		 "cwd": "/src/gr", "status": "blocked", "tags": {"worktree": "fix"}, "windows": [3], "extra": 1},
+		{"id": "b2", "name": "old", "state": "shelved", "host": "server"}]}`}, nil)
+	windows := []ProviderWindow{{ID: 3, PID: 99, Cmdline: []string{"mux", "attach"}, Foreground: [][]string{{"vim", "x"}}, UserVars: map[string]string{"k": "v"}, Cwd: "/src"}}
+	got, err := listSessions([]string{"prov"}, windows)
+	want := &ProviderState{
+		Spaces: []string{"default", "gr"},
+		Sessions: []ProviderSession{
+			{ID: "a1", Name: "build", Space: "gr", State: "running", Busy: true, Title: "vim", Command: "vim x", Cwd: "/src/gr",
+				Status: "blocked", Tags: map[string]string{"worktree": "fix"}, Windows: []int{3}},
+			{ID: "b2", Name: "old", State: "shelved", Host: "server"},
+		},
+	}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, %v\nwant %#v", got, err, want)
+	}
+	wantSent := map[string]any{"windows": []any{map[string]any{
+		"id": 3.0, "pid": 99.0, "cmdline": []any{"mux", "attach"}, "foreground": []any{[]any{"vim", "x"}},
+		"user_vars": map[string]any{"k": "v"}, "cwd": "/src",
+	}}}
+	if got := sent(t, dir, "list"); !reflect.DeepEqual(got, wantSent) {
+		t.Errorf("sent %v, want %v", got, wantSent)
+	}
+}

@@ -35,6 +35,8 @@ type Shared struct {
 	KittyErr string           `json:"kitty_err,omitempty"`
 	// What git and gh say of each worktree, by path, which only the sidebar asks.
 	Git map[string]gitstate.State `json:"git,omitempty"`
+	// What the session provider says, which only the sidebar asks; nil without one, see Poller.sessions.
+	Provider *ProviderState `json:"provider,omitempty"`
 }
 
 // sharedSpace is a Space with its errors as text.
@@ -110,6 +112,7 @@ func (sh Shared) View(self int) Snapshot {
 		}
 	}
 	st := kitty.StateOf(sh.Windows, self)
+	topics := topicSpaces(sh.Provider, spaces)
 	saved := make(map[string]bool, len(sh.Saved))
 	for _, name := range sh.Saved {
 		saved[name] = true
@@ -121,12 +124,16 @@ func (sh Shared) View(self int) Snapshot {
 	// The missing worktrees go in the spaces, which are this view's own copies: what the load holds, and
 	// git is asked about in targets, is only what git lists.
 	kept := state.Load().Sidebar
-	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, st.Sessions, sh.Saved), Folded: toSet(kept.Folded), Hidden: toSet(kept.Hidden), Saved: saved, Suspended: suspended, Kitty: st}
+	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, st.Sessions, sh.Saved, topics), Folded: toSet(kept.Folded), Hidden: toSet(kept.Hidden), Saved: saved, Suspended: suspended, Kitty: st}
 	snap.Order = Order{Mode: sortMode(kept.Sort), Worktrees: worktreeOrder(kept.Order), Groups: sh.Config.Groups, Focused: st.Focused, Statuses: st.Statuses}
 	if sh.KittyErr != "" {
 		snap.Err = errors.New(sh.KittyErr)
 	}
 	snap.Git = sh.Git
+	snap.Detached = detachedBySpace(sh.Provider)
+	if sh.Provider != nil {
+		snap.Caps = sh.Provider.Caps
+	}
 	return snap
 }
 
@@ -150,6 +157,17 @@ type Poller struct {
 	git        *gitstate.Watcher
 	// written is what was last written, so unchanged states are not written again.
 	written []byte
+	// capabilities asks the session provider what it does, once per sidebar and again at a refresh; caps is
+	// what it said, nil until asked. listSessions is its list, nil for never. listed is the last list that
+	// worked, which one that fails leaves showing, as a provider restarting under the sidebar should not
+	// blank its rows; after listTries failures in a row it is not asked again until listAfter, so one that
+	// cannot say does not fail into the log at every poll.
+	capabilities func(provider []string) Capabilities
+	caps         Capabilities
+	listSessions func(provider []string, windows []ProviderWindow) (*ProviderState, error)
+	listedLast   *ProviderState
+	listFailures int
+	listAfter    time.Time
 	// saveWidth saves the width the sidebar's dock was dragged to from the config's width cfg, nil for
 	// none; drag follows the dock for it.
 	saveWidth func(width, cfg int) error
@@ -161,6 +179,8 @@ func NewPoller() *Poller {
 	p := newPoller(gitPath(), loadSpaces)
 	p.list = kitty.ListWindows
 	p.newWatcher = gitstate.NewWatcher
+	p.capabilities = ProviderCapabilities
+	p.listSessions = listSessions
 	p.saveWidth = saveDockWidth
 	return p
 }
@@ -201,6 +221,13 @@ func (p *Poller) Poll() Shared {
 	p.lastMu.Lock()
 	sh = p.listed(sh)
 	p.lastMu.Unlock()
+	// After kitty's windows, which the provider says which of its sessions show.
+	if sh.Config != nil {
+		sh.Provider = p.sessions(sh.Config.Provider, sh.Windows)
+		p.lastMu.Lock()
+		p.last.Provider = sh.Provider
+		p.lastMu.Unlock()
+	}
 	p.followDock(sh)
 	return sh
 }
@@ -224,6 +251,40 @@ func (p *Poller) listed(sh Shared) Shared {
 	}
 	p.last, p.have = sh, true
 	return sh
+}
+
+// listTries is how many lists in a row may fail before the poller waits listRetry to ask again.
+const (
+	listTries = 3
+	listRetry = time.Minute
+)
+
+// sessions is what provider says now of its sessions, for windows: its capabilities, and its sessions and
+// spaces when it lists them, or the last it listed when listing fails or waits, see listTries. Nil without
+// a provider.
+func (p *Poller) sessions(provider []string, data []kitty.OSWindow) *ProviderState {
+	if len(provider) == 0 || p.capabilities == nil {
+		return nil
+	}
+	if p.caps == nil {
+		p.caps = p.capabilities(provider)
+	}
+	if !p.caps[CapList] || p.listSessions == nil {
+		return &ProviderState{Caps: p.caps}
+	}
+	if !time.Now().Before(p.listAfter) {
+		if st, err := p.listSessions(provider, allWindows(data)); err == nil {
+			p.listedLast, p.listFailures = st, 0
+		} else if p.listFailures++; p.listFailures >= listTries {
+			p.listAfter, p.listFailures = time.Now().Add(listRetry), 0
+		}
+	}
+	if p.listedLast == nil {
+		return &ProviderState{Caps: p.caps}
+	}
+	st := *p.listedLast
+	st.Caps = p.caps
+	return &st
 }
 
 // watcher is the git states' watcher, made at the first poll, nil for none.
@@ -273,6 +334,7 @@ func (p *Poller) Refresh() Shared {
 	if w := p.watcher(); w != nil {
 		w.Refresh()
 	}
+	p.listAfter, p.listFailures, p.caps = time.Time{}, 0, nil
 	p.mu.Unlock()
 	return p.Poll()
 }

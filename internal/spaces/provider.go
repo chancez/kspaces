@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"slices"
 
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/logs"
@@ -66,6 +67,21 @@ func sessionWindows(tabs []kitty.FullTab, session string) []ProviderWindow {
 		for _, w := range tab.Windows {
 			if w.SessionName == session && !w.Own() {
 				windows = append(windows, providerWindow(w.ID, w.PID, w.Cmdline, w.ForegroundProcesses, w.UserVars, w.Cwd))
+			}
+		}
+	}
+	return windows
+}
+
+// allWindows are every window of data, kspaces' own left out, as the provider is told of them.
+func allWindows(data []kitty.OSWindow) []ProviderWindow {
+	windows := []ProviderWindow{}
+	for _, osw := range data {
+		for _, tab := range osw.Tabs {
+			for _, w := range tab.Windows {
+				if !kitty.Own(w) {
+					windows = append(windows, providerWindow(w.ID, w.PID, w.Cmdline, w.ForegroundProcesses, w.UserVars, w.Cwd))
+				}
 			}
 		}
 	}
@@ -155,4 +171,123 @@ func providerKeep(provider []string, session string, mode KeepMode, windows []Pr
 // providerForget has provider forget what it kept of session.
 func providerForget(provider []string, session string, kept []string) error {
 	return askProvider(provider, "forget", forgetRequest{Session: session, Kept: kept}, nil)
+}
+
+// ProviderSession is one of the provider's sessions, as list says it.
+type ProviderSession struct {
+	// ID is the provider's own reference, opaque to kspaces, given back to every other verb.
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Space is the space it is in, empty for default.
+	Space string `json:"space"`
+	// Host is the machine it runs on, empty for this one.
+	Host string `json:"host,omitempty"`
+	// State is running, exited, shelved or dead.
+	State string `json:"state"`
+	// Busy is a command running rather than the shell at its prompt.
+	Busy    bool   `json:"busy"`
+	Title   string `json:"title"`
+	Command string `json:"command"`
+	// Cwd is where it is, which a layout saved from a window showing it starts in; empty when unknown.
+	Cwd string `json:"cwd,omitempty"`
+	// Status is what a program in it says of itself, OSC 7501's states: idle, working, done, blocked or
+	// error, empty for nothing.
+	Status string            `json:"status"`
+	Tags   map[string]string `json:"tags"`
+	// Windows are the ids of the windows that show it; none is detached.
+	Windows []int `json:"windows"`
+}
+
+// SpaceName is the space the session is in, default for none.
+func (s ProviderSession) SpaceName() string {
+	if s.Space == "" {
+		return defaultSpace
+	}
+	return s.Space
+}
+
+// Ended reports whether s has ended: exited, dead or shelved, which only removing is for.
+func (s ProviderSession) Ended() bool {
+	return s.State != "running"
+}
+
+// defaultSpace is the space of a session the provider puts in none, and kitty's default session's.
+const defaultSpace = "default"
+
+// ProviderState is what the provider says: its sessions, its spaces' names, and what it does.
+type ProviderState struct {
+	Sessions []ProviderSession `json:"sessions,omitempty"`
+	Spaces   []string          `json:"spaces,omitempty"`
+	Caps     Capabilities      `json:"caps,omitempty"`
+}
+
+type listRequest struct {
+	Windows []ProviderWindow `json:"windows"`
+}
+
+// listSessions is provider's list for windows.
+func listSessions(provider []string, windows []ProviderWindow) (*ProviderState, error) {
+	var resp struct {
+		Spaces   []string          `json:"spaces"`
+		Sessions []ProviderSession `json:"sessions"`
+	}
+	if err := askProvider(provider, "list", listRequest{Windows: windows}, &resp); err != nil {
+		return nil, err
+	}
+	return &ProviderState{Sessions: resp.Sessions, Spaces: resp.Spaces}, nil
+}
+
+// ListNow is what provider says now, with kitty's windows as they are, for a form, which polls nothing.
+func ListNow(provider []string) (*ProviderState, error) {
+	caps := ProviderCapabilities(provider)
+	if !caps[CapList] {
+		return nil, errors.New("the session provider lists no sessions")
+	}
+	data, err := kitty.ListWindows()
+	if err != nil {
+		return nil, err
+	}
+	st, err := listSessions(provider, allWindows(data))
+	if err != nil {
+		return nil, err
+	}
+	st.Caps = caps
+	return st, nil
+}
+
+// FindSessions are the provider's sessions by ids, in their order; one it does not list is an error.
+func FindSessions(provider []string, ids []string) ([]ProviderSession, error) {
+	st, err := ListNow(provider)
+	if err != nil {
+		return nil, err
+	}
+	return st.Find(ids)
+}
+
+// Find are st's sessions by ids, in their order; one st does not list is an error.
+func (st *ProviderState) Find(ids []string) ([]ProviderSession, error) {
+	var out []ProviderSession
+	for _, id := range ids {
+		i := slices.IndexFunc(st.Sessions, func(s ProviderSession) bool { return s.ID == id })
+		if i < 0 {
+			return nil, fmt.Errorf("the session provider has no session %s", id)
+		}
+		out = append(out, st.Sessions[i])
+	}
+	return out, nil
+}
+
+// DetachedOf are the sessions of space no window shows, on this machine, by name, as the sidebar lists
+// them.
+func DetachedOf(provider []string, space string) ([]ProviderSession, error) {
+	st, err := ListNow(provider)
+	if err != nil {
+		return nil, err
+	}
+	for _, h := range detachedBySpace(st)[space].Hosts {
+		if h.Host == "" {
+			return h.Sessions, nil
+		}
+	}
+	return nil, nil
 }
