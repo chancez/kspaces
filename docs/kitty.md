@@ -130,13 +130,14 @@ PROVIDER kill          {"session": ID}
 PROVIDER shelve        {"session": ID}
 PROVIDER remove        {"session": ID}
 PROVIDER move          {"session": ID, "space": N}
+PROVIDER remove-space  {"space": N}
 ```
 
 Every verb exits non-zero on failure, its stderr the error, which kspaces shows. A verb with no output
 prints nothing or `{}`.
 
 **Capabilities.** `capabilities` names what the provider does: `keep` (for `keep` and `forget`), `list`,
-`open`, `kill`, `shelve`, `remove` and `move`. kspaces offers only what is named: a provider without
+`open`, `kill`, `shelve`, `remove`, `move` and `remove-space`. kspaces offers only what is named: a provider without
 `shelve` never shows Shelve. It is asked once per sidebar, and again at `r`. A provider that fails
 `capabilities` is taken to have `keep` alone, which is what a program written as a keeper does.
 
@@ -179,7 +180,8 @@ opens in.
 
 **Acting.** `kill` ends a running session, `shelve` ends one so it can be brought back as it was, `remove`
 discards one that has ended, and `move` puts one in another space, which the provider creates if it must.
-kspaces confirms `kill` and `remove`, and refreshes after each.
+`remove-space` removes one of its spaces, refusing as it must, such as one that still holds sessions, or
+`default`. kspaces confirms `kill`, `remove` and `remove-space`, and refreshes after each.
 
 **Topic spaces.** A space in `spaces` that no configured space has the name of is listed with the sessions in
 no space, as a topic space: one kitty session of its name, opened with a shell tab in the home directory, and

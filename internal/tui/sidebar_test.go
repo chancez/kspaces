@@ -442,7 +442,7 @@ func TestMenuOneSection(t *testing.T) {
 	broken := len(e.m.rows) - 1
 	e.click(fmt.Sprintf(entryZone, broken), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, broken))
-	if got, want := e.screen()[y+1:y+4], []string{menuRule(""), menuItem("Add space", "a"), menuRule("")}; !reflect.DeepEqual(got, want) {
+	if got, want := e.screen()[y+1:y+5], []string{menuRule(""), menuItem("Remove space", "D"), menuItem("Add space", "a"), menuRule("")}; !reflect.DeepEqual(got, want) {
 		t.Errorf("the broken space's menu:\n%q\nwant\n%q", got, want)
 	}
 }

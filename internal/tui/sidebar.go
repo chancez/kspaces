@@ -147,6 +147,8 @@ type sidebar struct {
 	detached     map[string]spaces.Detached
 	detachedOpen map[string]bool
 	caps         spaces.Capabilities
+	// providerSpaces are the provider's spaces, for removing a topic space.
+	providerSpaces []string
 }
 
 func newSidebar(self int) *sidebar {
@@ -315,7 +317,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.kitty.Statuses = spaces.Shown(m.cfg, m.hidden, m.statuses)
 			m.order = msg.Order
 			m.git = msg.Git
-			m.detached, m.caps = msg.Detached, msg.Caps
+			m.detached, m.caps, m.providerSpaces = msg.Detached, msg.Caps, msg.ProviderSpaces
 			m.rebuildRows(at)
 			m.settle()
 			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))
@@ -438,7 +440,8 @@ func (m *sidebar) leave() tea.Cmd {
 
 // view is what the sidebar knows as a snapshot, for what reads one, as the row actions do.
 func (m *sidebar) view() spaces.Snapshot {
-	return spaces.Snapshot{Config: &m.cfg, Git: m.git, Kitty: m.kitty, Saved: m.saved, Suspended: m.suspended}
+	return spaces.Snapshot{Config: &m.cfg, Git: m.git, Kitty: m.kitty, Saved: m.saved, Suspended: m.suspended,
+		Caps: m.caps, ProviderSpaces: m.providerSpaces}
 }
 
 func (m *sidebar) isOpen(wt *spaces.Worktree) bool {

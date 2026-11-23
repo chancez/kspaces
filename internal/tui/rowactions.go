@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"slices"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -215,6 +216,26 @@ var (
 		},
 		ask: func(snap spaces.Snapshot, r spaces.Row) error {
 			return spaces.AskCleanup(*snap.Config, snap.Kitty, r.Space.Root)
+		},
+	}
+	// rowRemoveSpace removes a space: a configured one from the config, a topic space from the provider,
+	// with what becomes of the provider's sessions in it chosen in its form.
+	rowRemoveSpace = &rowAction{
+		title:   "Remove space",
+		key:     "D",
+		desc:    "remove the space",
+		section: sectionSpace,
+		applies: func(snap spaces.Snapshot, r spaces.Row) bool {
+			if r.Space == nil || !r.Main {
+				return false
+			}
+			if !r.Other {
+				return true
+			}
+			return r.Space.Name != "default" && snap.Caps[spaces.CapRemoveSpace] && slices.Contains(snap.ProviderSpaces, r.Space.Name)
+		},
+		ask: func(snap spaces.Snapshot, r spaces.Row) error {
+			return spaces.AskRemoveSpace(*snap.Config, snap.Kitty, r.Space.Name)
 		},
 	}
 	// rowTrustConfig shows what the space's own config adds, and trusts it.

@@ -253,7 +253,9 @@ type Snapshot struct {
 	Detached map[string]Detached
 	// What the session provider does, see Capabilities; nil without one.
 	Caps Capabilities
-	Err  error
+	// The provider's spaces, nil without a provider that lists them. Only the sidebar asks.
+	ProviderSpaces []string
+	Err            error
 }
 
 // Load reads the config on every call, so edits show up without restarting every dock, and a broken

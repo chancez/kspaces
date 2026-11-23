@@ -71,6 +71,7 @@ default ~/.config/kspaces/config.toml, then every other .toml file beside it, by
 		a.runCommand(),
 		a.layoutCommand(),
 		a.removeCommand(),
+		a.removeSpaceCommand(),
 		a.cleanupCommand(),
 		a.closeCommand(),
 		a.suspendCommand(),

@@ -66,6 +66,9 @@ type endSessionsSubject struct{}
 // moveSubject is the form that moves the provider's sessions to another space.
 type moveSubject struct{}
 
+// removeSpaceSubject is the remove space form.
+type removeSpaceSubject struct{}
+
 // forgetSubject is the forget session form.
 type forgetSubject struct{}
 
@@ -201,6 +204,7 @@ var (
 	actForgetSession        = onEntry(rowForgetSession)
 	actCleanup              = onEntry(rowCleanup)
 	actTrustConfig          = onEntry(rowTrustConfig)
+	actRemoveSpaceRow       = onEntry(rowRemoveSpace)
 	// actSelectRow turns the select mode on with the row ticked.
 	actSelectRow = &interact.Action[*sidebar, entrySubject]{
 		Title:   "Select",
@@ -916,6 +920,31 @@ var (
 	actMoveCancel = quit[*moveSessionsForm, moveSubject]()
 )
 
+// The remove space form's.
+var (
+	actRemoveSpace = &interact.Action[*removeSpaceForm, removeSpaceSubject]{
+		Title:   "remove",
+		Applies: func(f *removeSpaceForm, _ removeSpaceSubject) bool { return !f.busy && f.refused() == nil },
+		Run:     cmd[*removeSpaceForm, removeSpaceSubject]((*removeSpaceForm).remove),
+	}
+	actRemoveSpaceCancel = &interact.Action[*removeSpaceForm, removeSpaceSubject]{
+		Title:   "cancel",
+		Applies: func(f *removeSpaceForm, _ removeSpaceSubject) bool { return !f.busy },
+		Run:     func(*removeSpaceForm, removeSpaceSubject) tea.Cmd { return tea.Quit },
+	}
+	actRemoveSpaceNextFate = &interact.Action[*removeSpaceForm, removeSpaceSubject]{
+		Title:   "next for sessions",
+		Applies: func(f *removeSpaceForm, _ removeSpaceSubject) bool { return !f.busy && f.fate.offered() },
+		Run:     do[*removeSpaceForm, removeSpaceSubject](func(f *removeSpaceForm) { f.fate.cycle(1) }),
+	}
+	actRemoveSpacePrevFate = &interact.Action[*removeSpaceForm, removeSpaceSubject]{
+		Title:   "previous for sessions",
+		Applies: func(f *removeSpaceForm, _ removeSpaceSubject) bool { return !f.busy && f.fate.offered() },
+		Run:     do[*removeSpaceForm, removeSpaceSubject](func(f *removeSpaceForm) { f.fate.cycle(-1) }),
+	}
+	actRemoveSpaceQuit = quit[*removeSpaceForm, removeSpaceSubject]()
+)
+
 // The clean up worktrees form's.
 var (
 	actCleanupDown = &interact.Action[*cleanupForm, cleanupSubject]{
@@ -1184,6 +1213,7 @@ var (
 	pickerKind      *interact.Kind[*picker, pickerSubject]
 	formKind        *interact.Kind[*newWorktreeForm, formSubject]
 	removeKind      *interact.Kind[*removeWorktreeForm, removeSubject]
+	removeSpaceKind *interact.Kind[*removeSpaceForm, removeSpaceSubject]
 	closeKind       *interact.Kind[*closeSessionForm, closeSubject]
 	forgetKind      *interact.Kind[*forgetSessionForm, forgetSubject]
 	endSessionsKind *interact.Kind[*endSessionsForm, endSessionsSubject]
@@ -1218,6 +1248,7 @@ var (
 	thePickMenu        *interact.Place[*picker, pickMenuSubject]
 	theForm            *interact.Place[*newWorktreeForm, formSubject]
 	theRemoveForm      *interact.Place[*removeWorktreeForm, removeSubject]
+	theRemoveSpaceForm *interact.Place[*removeSpaceForm, removeSpaceSubject]
 	theCloseForm       *interact.Place[*closeSessionForm, closeSubject]
 	theForgetForm      *interact.Place[*forgetSessionForm, forgetSubject]
 	theEndSessionsForm *interact.Place[*endSessionsForm, endSessionsSubject]
@@ -1245,7 +1276,7 @@ func init() {
 	spacesKind.Bind(actAddSpace, "a", "add space", "a")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
-		actOpenWorktree, actOpenPlain, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actSuspendSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actNewWorktreeFromPR, actNewWorktreeFromIssue, actFold, actUnfold, actCleanup, actTrustConfig, actSelectRow)
+		actOpenWorktree, actOpenPlain, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actSuspendSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actNewWorktreeFromPR, actNewWorktreeFromIssue, actFold, actUnfold, actCleanup, actTrustConfig, actRemoveSpaceRow, actSelectRow)
 	entryKind.Bind(actFold, "space", "fold or unfold the space's worktrees", "space")
 	entryKind.Bind(actUnfold, "", "", "space")
 	bindRow(entryKind, actNewWorktree, rowNewWorktree)
@@ -1262,6 +1293,7 @@ func init() {
 	// F too, as x removes a linked worktree before forgetting its closed or suspended session.
 	entryKind.Bind(actForgetSession, "F", "forget the saved session", "F")
 	bindRow(entryKind, actCleanup, rowCleanup)
+	bindRow(entryKind, actRemoveSpaceRow, rowRemoveSpace)
 	interact.Via(entryKind, func(s entrySubject) (spacesSubject, bool) {
 		if s.row.Space == nil || s.row.Other {
 			return spacesSubject{}, true
@@ -1421,6 +1453,15 @@ func init() {
 	removeKind.Bind(actRemovePrevFate, "", "", "left", "h")
 	removeKind.Bind(actRemoveQuit, "ctrl+c", "quit", "ctrl+c")
 	theRemoveForm = interact.List(removeKind)
+
+	removeSpaceKind = interact.NewKind(func(removeSpaceSubject) string { return "Remove space" },
+		actRemoveSpace, actRemoveSpaceCancel, actRemoveSpaceNextFate, actRemoveSpacePrevFate, actRemoveSpaceQuit)
+	removeSpaceKind.Bind(actRemoveSpace, "y/enter", "remove", "y", "enter")
+	removeSpaceKind.Bind(actRemoveSpaceCancel, "n/esc", "cancel", "n", "esc")
+	removeSpaceKind.Bind(actRemoveSpaceNextFate, "left/right", "what becomes of the sessions", "right", "l")
+	removeSpaceKind.Bind(actRemoveSpacePrevFate, "", "", "left", "h")
+	removeSpaceKind.Bind(actRemoveSpaceQuit, "ctrl+c", "quit", "ctrl+c")
+	theRemoveSpaceForm = interact.List(removeSpaceKind)
 
 	cleanKind = interact.NewKind(func(cleanupSubject) string { return "Clean up worktrees" },
 		actCleanupDown, actCleanupUp, actCleanupToggle, actCleanupTickAll, actCleanupBranches, actCleanupNextFate, actCleanupPrevFate, actCleanupRemove, actCleanupCancel, actCleanupQuit)

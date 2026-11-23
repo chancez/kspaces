@@ -137,11 +137,13 @@ func errText(err error) string {
 	return err.Error()
 }
 
-// fakeKittenLs puts a kitten in dir, which is on PATH, that records each call and lists ls for ls.
+// fakeKittenLs puts a kitten in dir, which is on PATH, that records each call and lists ls for ls, and no
+// windows once a close-window has closed them.
 func fakeKittenLs(t *testing.T, dir, ls string) func() []string {
 	t.Helper()
-	log := filepath.Join(dir, "kitten-calls")
-	script := "#!/bin/sh\necho \"$*\" >> " + log + "\ncase \"$2\" in ls) /bin/cat <<'EOF'\n" + ls + "\nEOF\n;; esac\n"
+	log, closed := filepath.Join(dir, "kitten-calls"), filepath.Join(dir, "kitten-closed")
+	script := "#!/bin/sh\necho \"$*\" >> " + log + "\ncase \"$2\" in\nclose-window) : > " + closed + ";;\n" +
+		"ls) if [ -f " + closed + " ]; then echo '[]'; else /bin/cat <<'EOF'\n" + ls + "\nEOF\nfi;;\nesac\n"
 	if err := os.WriteFile(filepath.Join(dir, "kitten"), []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}

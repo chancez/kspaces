@@ -168,3 +168,33 @@ func (a *app) forgetCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&yes, "yes", false, "delete without asking")
 	return cmd
 }
+
+func (a *app) removeSpaceCommand() *cobra.Command {
+	var yes bool
+	var sessions string
+	cmd := &cobra.Command{
+		Use:   "remove-space NAME",
+		Short: "Remove a space, after confirming in a form: a configured one from the config, its repository kept, a topic space from the session provider; its kitty sessions close and are forgotten",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+			var fate spaces.Fate
+			if sessions != "" {
+				if fate, err = spaces.ParseFate(sessions); err != nil {
+					return fmt.Errorf("--sessions: %w", err)
+				}
+			}
+			err = tui.RunRemoveSpace(cmd.Context(), cfg, args[0], yes, fate)
+			if err != nil && yes {
+				_ = kitty.ShowError("Could not remove the space", err.Error())
+			}
+			return err
+		},
+	}
+	cmd.Flags().BoolVar(&yes, "yes", false, "remove without asking, as the form does once confirmed; errors are also shown in kitty")
+	cmd.Flags().StringVar(&sessions, "sessions", "", "with --yes, what becomes of the session provider's sessions in a configured space: end (the default), shelve or leave; a topic space's are ended")
+	return cmd
+}

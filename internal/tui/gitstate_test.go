@@ -292,8 +292,8 @@ func TestOpenPR(t *testing.T) {
 	kitty := e.row("kitty")
 	e.click(fmt.Sprintf(entryZone, kitty), tea.MouseRight)
 	_, y = e.zone(fmt.Sprintf(entryZone, kitty))
-	want = []string{menuRule("Session"), " Open", menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), " Select", menuItem("Add space", "a"), menuRule("")}
-	if got := e.screen()[y+1 : y+10]; !reflect.DeepEqual(got, want) {
+	want = []string{menuRule("Session"), " Open", menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Remove space", "D"), " Select", menuItem("Add space", "a"), menuRule("")}
+	if got := e.screen()[y+1 : y+11]; !reflect.DeepEqual(got, want) {
 		t.Errorf("kitty's menu:\n%q\nwant\n%q", got, want)
 	}
 	e.press("esc")

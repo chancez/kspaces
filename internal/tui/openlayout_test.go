@@ -736,7 +736,7 @@ func TestOpenWithoutLayoutMenu(t *testing.T) {
 	}
 	main := func(session ...string) []string {
 		return slices.Concat([]string{menuRule("Session"), " Open"}, session, []string{menuItem("Open layout", "L"),
-			menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), " Select", menuItem("Add space", "a"), menuRule("")})
+			menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Remove space", "D"), " Select", menuItem("Add space", "a"), menuRule("")})
 	}
 	type result struct {
 		Session string
@@ -759,7 +759,7 @@ func TestOpenWithoutLayoutMenu(t *testing.T) {
 		{"kitty", main(menuItem("Open without layout", "o"))},
 		// With windows open, there is no default layout to skip.
 		{"gr", []string{menuRule("Session"), " Open", menuItem("Open layout", "L"), " Save as layout", menuItem("Close session", "c"),
-			menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), menuItem("Clean up worktrees", "p"), " Select", menuItem("Add space", "a"), menuRule("")}},
+			menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), menuItem("Clean up worktrees", "p"), menuItem("Remove space", "D"), " Select", menuItem("Add space", "a"), menuRule("")}},
 		{"default", []string{menuRule("Session"), " Open", menuItem("Close session", "c"), menuRule("Space"), " Select", menuItem("Add space", "a"), menuRule("")}},
 		{"gr@gone", []string{menuRule(""), menuItem("Fold worktrees", "space"), " Select", menuItem("Add space", "a"), menuRule("")}},
 	})
