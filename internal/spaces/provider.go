@@ -265,6 +265,23 @@ func RemoveSession(provider []string, s ProviderSession) error {
 	return askProvider(provider, "remove", sessionRequest{s.ID}, nil)
 }
 
+// MoveSessions puts sessions in space, which the provider creates if it must. One failing does not stop
+// the rest, and says which it was when there are several.
+func MoveSessions(provider []string, space string, sessions ...ProviderSession) error {
+	var errs []error
+	for _, s := range sessions {
+		err := askProvider(provider, "move", struct {
+			Session string `json:"session"`
+			Space   string `json:"space"`
+		}{s.ID, space}, nil)
+		if err != nil && len(sessions) > 1 {
+			err = fmt.Errorf("%s: %w", s.Name, err)
+		}
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
+}
+
 // openCommand is what provider says opens s in a new tab: the command, and where it starts, empty for
 // kspaces to choose.
 func openCommand(provider []string, s ProviderSession) ([]string, string, error) {

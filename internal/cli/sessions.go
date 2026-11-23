@@ -31,7 +31,22 @@ func (a *app) sessionsCommand() *cobra.Command {
 		c.Flags().BoolVar(&yes, "yes", false, "without asking")
 		return c
 	}
+	var to string
+	move := &cobra.Command{
+		Use:   "move ID...",
+		Short: "Move sessions to another space, chosen in a form; --to SPACE without asking",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+			return tui.RunMoveSessions(cmd.Context(), cfg, args, to)
+		},
+	}
+	move.Flags().StringVar(&to, "to", "", "the space to move them to, which the provider creates if it must")
 	cmd.AddCommand(
+		move,
 		end("kill", "Kill running sessions, after confirming in a form; an ended one is removed"),
 		end("remove", "Remove ended sessions, after confirming in a form; a running one is killed"),
 		&cobra.Command{

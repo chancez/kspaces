@@ -61,6 +61,9 @@ type addSubject struct{}
 // endSessionsSubject is the form that ends the provider's sessions.
 type endSessionsSubject struct{}
 
+// moveSubject is the form that moves the provider's sessions to another space.
+type moveSubject struct{}
+
 // forgetSubject is the forget session form.
 type forgetSubject struct{}
 
@@ -814,6 +817,24 @@ var (
 	actEndSessionsQuit = quit[*endSessionsForm, endSessionsSubject]()
 )
 
+// The move form's. Every other key types.
+var (
+	actMoveNext = &interact.Action[*moveSessionsForm, moveSubject]{
+		Title: "next space",
+		Run:   do[*moveSessionsForm, moveSubject](func(f *moveSessionsForm) { f.choose(1) }),
+	}
+	actMovePrev = &interact.Action[*moveSessionsForm, moveSubject]{
+		Title: "previous space",
+		Run:   do[*moveSessionsForm, moveSubject](func(f *moveSessionsForm) { f.choose(-1) }),
+	}
+	actMove = &interact.Action[*moveSessionsForm, moveSubject]{
+		Title:   "move",
+		Applies: func(f *moveSessionsForm, _ moveSubject) bool { return !f.busy && f.target() != "" },
+		Run:     cmd[*moveSessionsForm, moveSubject]((*moveSessionsForm).move),
+	}
+	actMoveCancel = quit[*moveSessionsForm, moveSubject]()
+)
+
 // The clean up worktrees form's.
 var (
 	actCleanupDown = &interact.Action[*cleanupForm, cleanupSubject]{
@@ -1075,6 +1096,7 @@ var (
 	closeKind       *interact.Kind[*closeSessionForm, closeSubject]
 	forgetKind      *interact.Kind[*forgetSessionForm, forgetSubject]
 	endSessionsKind *interact.Kind[*endSessionsForm, endSessionsSubject]
+	moveKind        *interact.Kind[*moveSessionsForm, moveSubject]
 	addKind         *interact.Kind[*addSpaceForm, addSubject]
 	cleanKind       *interact.Kind[*cleanupForm, cleanupSubject]
 	runKind         *interact.Kind[*runForm, runSubject]
@@ -1108,6 +1130,7 @@ var (
 	theCloseForm       *interact.Place[*closeSessionForm, closeSubject]
 	theForgetForm      *interact.Place[*forgetSessionForm, forgetSubject]
 	theEndSessionsForm *interact.Place[*endSessionsForm, endSessionsSubject]
+	theMoveForm        *interact.Place[*moveSessionsForm, moveSubject]
 	theAddForm         *interact.Place[*addSpaceForm, addSubject]
 	theCleanup         *interact.Place[*cleanupForm, cleanupSubject]
 	theRunForm         *interact.Place[*runForm, runSubject]
@@ -1333,6 +1356,13 @@ func init() {
 	endSessionsKind.Bind(actEndSessionsCancel, "n/esc", "cancel", "n", "esc")
 	endSessionsKind.Bind(actEndSessionsQuit, "ctrl+c", "quit", "ctrl+c")
 	theEndSessionsForm = interact.List(endSessionsKind)
+
+	moveKind = interact.NewKind(func(moveSubject) string { return "Move sessions" }, actMoveNext, actMovePrev, actMove, actMoveCancel)
+	moveKind.Bind(actMoveNext, "down/up", "choose a space", "down", "ctrl+n", "ctrl+j")
+	moveKind.Bind(actMovePrev, "", "", "up", "ctrl+p", "ctrl+k")
+	moveKind.Bind(actMove, "enter", "move", "enter")
+	moveKind.Bind(actMoveCancel, "esc", "cancel", "esc", "ctrl+c")
+	theMoveForm = interact.List(moveKind)
 
 	trustKind = interact.NewKind(func(trustSubject) string { return "Trust space config" }, actTrust, actTrustCancel, actTrustQuit)
 	trustKind.Bind(actTrust, "y/enter", "trust", "y", "enter")

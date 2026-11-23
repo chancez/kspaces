@@ -184,3 +184,9 @@ func AskRemoveProviderSessions(cfg config.Config, st kitty.State, ids ...string)
 func AskCleanupProviderSessions(cfg config.Config, st kitty.State, space string) error {
 	return launchForm(cfg, st, listPanel, "sessions", "cleanup", space)
 }
+
+// AskMoveProviderSessions opens the form that moves sessions to another space, in a popup sized as
+// AskOpenLayout's.
+func AskMoveProviderSessions(cfg config.Config, st kitty.State, ids ...string) error {
+	return launchForm(cfg, st, formPanel, append([]string{"sessions", "move", "--"}, ids...)...)
+}
