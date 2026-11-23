@@ -7,6 +7,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
@@ -114,4 +116,29 @@ func detachedKey(r spaces.DetachedRow) string {
 // sessionKey names s, a detached session of space, as its row and the select mode's ticks do.
 func sessionKey(space string, s spaces.ProviderSession) string {
 	return "detached:" + space + ":" + s.Host + ":" + s.ID
+}
+
+// askDetached opens a form with ask, which acts on the provider's sessions in a popup of its own; the next
+// poll shows what it did.
+func (m *sidebar) askDetached(ask func(cfg config.Config, st kitty.State) error) tea.Cmd {
+	m.remote = false
+	cfg, st := m.cfg, m.kitty
+	return func() tea.Msg {
+		if err := ask(cfg, st); err != nil {
+			return failedMsg{err}
+		}
+		return nil
+	}
+}
+
+// shelveDetachedCmd has the provider shelve s, which asks nothing first: it ends s only so it can be
+// brought back as it was. What the provider says when it cannot goes on the sidebar's last line.
+func (m *sidebar) shelveDetachedCmd(s spaces.ProviderSession) tea.Cmd {
+	provider, self, p := m.cfg.Provider, m.self, m.poller
+	return func() tea.Msg {
+		if err := spaces.ShelveSession(provider, s); err != nil {
+			return failedMsg{err}
+		}
+		return p.Poll().View(self)
+	}
 }

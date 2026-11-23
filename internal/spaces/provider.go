@@ -260,6 +260,11 @@ func KillSession(provider []string, s ProviderSession) error {
 	return askProvider(provider, "kill", sessionRequest{s.ID}, nil)
 }
 
+// ShelveSession ends s so it can be brought back as it was.
+func ShelveSession(provider []string, s ProviderSession) error {
+	return askProvider(provider, "shelve", sessionRequest{s.ID}, nil)
+}
+
 // RemoveSession discards s, which has ended.
 func RemoveSession(provider []string, s ProviderSession) error {
 	return askProvider(provider, "remove", sessionRequest{s.ID}, nil)

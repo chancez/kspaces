@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"slices"
 	"testing"
@@ -96,5 +97,70 @@ func TestDetachedRows(t *testing.T) {
 		if r.Detached != nil {
 			t.Errorf("a detached row under the open filter: %#v", r.Detached)
 		}
+	}
+}
+
+// formsOpened are the kspaces commands calls opened forms with, each its arguments after the program.
+func formsOpened(t *testing.T, calls [][]string) [][]string {
+	t.Helper()
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out [][]string
+	for _, c := range calls {
+		if i := slices.Index(c, exe); i >= 0 {
+			out = append(out, c[i+1:])
+		}
+	}
+	return out
+}
+
+// On a detached session's row x kills a running one and removes an ended one, as F does, each confirmed in
+// a form; z shelves a running one at once; M moves one, in a form; p on the head cleans up the space's. A
+// provider without a verb has no key for it.
+func TestDetachedActions(t *testing.T) {
+	e := newSidebarEnv(t)
+	calls := fakeKittenCalls(t)
+	asked := fakeProvider(t, nil, "")
+	snap := detachedFixture()
+	snap.Caps = spaces.Capabilities{spaces.CapList: true, spaces.CapOpen: true, spaces.CapKill: true, spaces.CapShelve: true,
+		spaces.CapRemove: true, spaces.CapMove: true}
+	e.m.Update(snap)
+	e.m.Update(tea.FocusMsg{})
+	run := func(keys ...string) {
+		for _, k := range keys {
+			if cmd := e.press(k); cmd != nil {
+				cmd()
+			}
+		}
+	}
+	// gr@dev, fix, the head, which opens; build, running; @b2, shelved.
+	run("j", "j", "space", "j", "x", "z", "M", "j", "x", "F", "z", "k", "k", "p")
+	want := [][]string{
+		{"sessions", "kill", "--", "a1"},
+		{"sessions", "move", "--", "a1"},
+		{"sessions", "remove", "--", "b2"},
+		{"sessions", "remove", "--", "b2"},
+		{"sessions", "cleanup", "gr"},
+	}
+	if got := formsOpened(t, calls()); !reflect.DeepEqual(got, want) {
+		t.Errorf("forms\n%q\nwant\n%q", got, want)
+	}
+	if got, want := asked(), []string{`shelve {"session":"a1"}`}; !reflect.DeepEqual(got, want) {
+		t.Errorf("asked %q, want %q", got, want)
+	}
+
+	snap.Caps = spaces.Capabilities{spaces.CapList: true}
+	e.m.Update(snap)
+	before := len(calls())
+	// The head, then build and @b2.
+	for _, k := range []string{"p", "j", "x", "z", "M", "j", "x", "F"} {
+		if cmd := e.press(k); cmd != nil && k != "j" {
+			t.Errorf("%s ran %v with a provider that only lists", k, cmd())
+		}
+	}
+	if got := calls(); len(got) != before {
+		t.Errorf("kitten ran %q", got[before:])
 	}
 }

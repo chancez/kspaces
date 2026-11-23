@@ -3,6 +3,8 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/status"
 	"github.com/chancez/kspaces/internal/tui/interact"
@@ -239,6 +241,60 @@ var (
 		Run: func(m *sidebar, s detachedSubject) tea.Cmd {
 			m.remote = false
 			return m.openDetachedCmd(s.row)
+		},
+	}
+	actKillDetached = &interact.Action[*sidebar, detachedSubject]{
+		Title:   "Kill",
+		Section: sectionSession,
+		Applies: func(m *sidebar, s detachedSubject) bool {
+			return s.row.Session != nil && !s.row.Session.Ended() && m.caps[spaces.CapKill]
+		},
+		Run: func(m *sidebar, s detachedSubject) tea.Cmd {
+			return m.askDetached(func(cfg config.Config, st kitty.State) error {
+				return spaces.AskKillProviderSessions(cfg, st, s.row.Session.ID)
+			})
+		},
+	}
+	actShelveDetached = &interact.Action[*sidebar, detachedSubject]{
+		Title:   "Shelve",
+		Section: sectionSession,
+		Applies: func(m *sidebar, s detachedSubject) bool {
+			return s.row.Session != nil && !s.row.Session.Ended() && m.caps[spaces.CapShelve]
+		},
+		Run: func(m *sidebar, s detachedSubject) tea.Cmd { return m.shelveDetachedCmd(*s.row.Session) },
+	}
+	actRemoveDetached = &interact.Action[*sidebar, detachedSubject]{
+		Title:   "Remove",
+		Section: sectionSession,
+		Applies: func(m *sidebar, s detachedSubject) bool {
+			return s.row.Session != nil && s.row.Session.Ended() && m.caps[spaces.CapRemove]
+		},
+		Run: func(m *sidebar, s detachedSubject) tea.Cmd {
+			return m.askDetached(func(cfg config.Config, st kitty.State) error {
+				return spaces.AskRemoveProviderSessions(cfg, st, s.row.Session.ID)
+			})
+		},
+	}
+	actMoveDetached = &interact.Action[*sidebar, detachedSubject]{
+		Title:   "Move to space",
+		Section: sectionSession,
+		Applies: func(m *sidebar, s detachedSubject) bool { return s.row.Session != nil && m.caps[spaces.CapMove] },
+		Run: func(m *sidebar, s detachedSubject) tea.Cmd {
+			return m.askDetached(func(cfg config.Config, st kitty.State) error {
+				return spaces.AskMoveProviderSessions(cfg, st, s.row.Session.ID)
+			})
+		},
+	}
+	actCleanupDetached = &interact.Action[*sidebar, detachedSubject]{
+		Title:   "Clean up sessions",
+		Section: sectionSpace,
+		Applies: func(m *sidebar, s detachedSubject) bool {
+			return s.row.Head() && (m.caps[spaces.CapKill] || m.caps[spaces.CapRemove])
+		},
+		Run: func(m *sidebar, s detachedSubject) tea.Cmd {
+			return m.askDetached(func(cfg config.Config, st kitty.State) error {
+				return spaces.AskCleanupProviderSessions(cfg, st, s.row.Of.Name)
+			})
 		},
 	}
 	actShowDetached = &interact.Action[*sidebar, detachedSubject]{
@@ -1191,9 +1247,15 @@ func init() {
 			return s.row.Session.Name
 		}
 		return s.row.Of.Name
-	}, actOpenDetached, actShowDetached, actHideDetached)
+	}, actOpenDetached, actKillDetached, actShelveDetached, actRemoveDetached, actMoveDetached, actShowDetached, actHideDetached, actCleanupDetached)
 	detachedKind.Bind(actShowDetached, "space", "show or hide the space's detached sessions", "space")
 	detachedKind.Bind(actHideDetached, "", "", "space")
+	// x as on a worktree's row: kill a running one, remove an ended one, which F does too, as forgetting.
+	detachedKind.Bind(actKillDetached, "x", "kill the session", "x")
+	detachedKind.Bind(actRemoveDetached, "F/x", "remove the ended session", "F", "x")
+	detachedKind.Bind(actShelveDetached, "z", "shelve the session", "z")
+	detachedKind.Bind(actMoveDetached, "M", "move the session to another space", "M")
+	detachedKind.Bind(actCleanupDetached, "p", "clean up the space's detached sessions", "p")
 	interact.Via(detachedKind, func(s detachedSubject) (spacesSubject, bool) { return spacesSubject{group: s.row.Of.Group}, true }, spacesKind)
 	detachedRows = interact.List(detachedKind)
 	detachedRows.Bind(actOpenDetached, "enter/l", "open", "enter", "l")

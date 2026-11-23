@@ -99,6 +99,45 @@ func TestListSessions(t *testing.T) {
 	}
 }
 
+// Each action is one verb on the session's id; the provider's stderr is the error, after its name and the
+// verb. A move of several moves each, and one failing does not stop the rest.
+func TestProviderActions(t *testing.T) {
+	dir, calls := fakeProvider(t, map[string]string{"open": `{"argv": ["mux", "attach", "a1"], "cwd": "/src/gr"}`},
+		map[string]string{"shelve": "build saves no output"})
+	p := []string{"prov"}
+	s, o := ProviderSession{ID: "a1", Name: "build"}, ProviderSession{ID: "b2", Name: "old"}
+	errText := func(err error) string {
+		if err == nil {
+			return "<nil>"
+		}
+		return err.Error()
+	}
+	argv, cwd, err := openCommand(p, s)
+	got := []string{
+		errText(KillSession(p, s)), errText(RemoveSession(p, o)), errText(ShelveSession(p, s)),
+		errText(MoveSessions(p, "notes", s, o)), strings.Join(argv, " "), cwd, errText(err),
+	}
+	want := []string{"<nil>", "<nil>", "prov shelve: build saves no output", "<nil>", "mux attach a1", "/src/gr", "<nil>"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
+	if got, want := calls(), []string{"open", "kill", "remove", "shelve", "move", "move"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("called %q, want %q", got, want)
+	}
+	reqs := []any{sent(t, dir, "kill"), sent(t, dir, "remove"), sent(t, dir, "shelve"), sent(t, dir, "move"), sent(t, dir, "open")}
+	wantReqs := []any{
+		map[string]any{"session": "a1"}, map[string]any{"session": "b2"}, map[string]any{"session": "a1"},
+		map[string]any{"session": "b2", "space": "notes"}, map[string]any{"session": "a1"},
+	}
+	if !reflect.DeepEqual(reqs, wantReqs) {
+		t.Errorf("sent %v, want %v", reqs, wantReqs)
+	}
+	fakeProvider(t, map[string]string{"open": `{}`}, nil)
+	if _, _, err := openCommand(p, s); errText(err) != "prov open printed no command for build" {
+		t.Errorf("an open with no command: %v", err)
+	}
+}
+
 // A layout saved from windows that show the provider's sessions has what the provider says runs in them,
 // by the windows it lists each with; a provider that does not list has nothing to say.
 func TestProviderShows(t *testing.T) {
