@@ -25,6 +25,8 @@ Blocked 1
 - Create, close and remove worktrees and sessions from a right-click menu.
 - See each worktree's uncommitted changes, how far it is ahead of and behind its upstream, and its PR.
 - See which programs are blocked, failed, done or working, from kitty's program status protocol (OSC 7501).
+- With a session provider, such as one for [cm](https://github.com/chancez/cm), see each space's sessions
+  that no window shows, open one in a tab of the space, and kill, shelve, remove or move them.
 - Switch with a fuzzy picker, to the next and previous session, or back to the one used before.
 - Filter the list as you type, and jump to the windows whose programs are blocked, failed or done.
 
@@ -233,6 +235,8 @@ kspaces close [SESSION...]  close every window of the sessions, after confirming
 kspaces suspend [SESSION...]  stop what runs in the sessions and close them, keeping them, and with a
                          provider what ran in them, to resume, after confirming
 kspaces forget SESSION...   delete the saved files of sessions with no windows, after confirming
+kspaces sessions kill|remove ID...  kill or remove the session provider's sessions, after confirming;
+kspaces sessions move ID...  move them to another space, in a form; cleanup SPACE: a space's detached ones
 kspaces trust [PATH]     trust the .kspaces.toml of the space PATH is in, after seeing what it adds in a
   --yes, --revoke        form; --yes without asking, --revoke to forget it
 kspaces reply WINDOW_ID [TEXT]  type TEXT and Enter into a window without switching to it; no TEXT: a form

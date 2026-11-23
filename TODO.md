@@ -7,6 +7,11 @@
 - Windows in no session are saved into `default` at quit and come back labelled `default`, including one
   open only then, such as a tab switcher in an OS window of its own. Left as is for now.
 - The dotfiles' `cm_reap.py` kills a multiplexer session when one of two windows showing it closes.
+- Detached sessions are only in the sidebar: the picker does not list them, the query does not find them,
+  and their row does not show the most urgent status among them while hidden.
+- The select mode's bar only moves detached sessions; killing or removing several is the head's Clean up.
+- Sessions on other hosts are grouped by host, but no provider lists any yet, so that is untested against a
+  real one.
 
 ## kitty work
 
