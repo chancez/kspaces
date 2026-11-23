@@ -321,6 +321,7 @@ group, and Add space.
 | Space | New worktree from issue | `I` | the same form on its Issue tab, to create a branch for one of the space's open issues, from the row's branch as New worktree |
 | Space | Fold / Unfold worktrees | `space` | hide or show a space's linked worktrees |
 | Space | Clean up worktrees | `p` | remove the space's linked worktrees that look done with, and its missing ones, on a space's row |
+| Space | Remove space | `D` | take a configured space out of the config, its repository kept, or remove a topic space from the provider, closing its kitty sessions, in a form; on a space's row |
 | Space | Trust space config | | show what the space's own config adds, and trust it, in a form; while its `.kspaces.toml` is untrusted or changed |
 | Group | Fold / Unfold group | `space` | hide or show a group's spaces, on its header |
 | Space | Select | | turn on the [select mode](#selecting) with the row ticked, a group's header too |
@@ -478,12 +479,35 @@ window closes still runs; with the session saver it saves the session first and 
 [Closing and suspending sessions](kitty.md#closing-and-suspending-sessions) says. `kspaces close SESSION...`
 with several sessions lists each with its windows and closes them all; one with no windows is an error,
 and `--yes` closes them without asking. **Suspend session** and `kspaces suspend SESSION...` are the same
-form, suspending. They, Remove worktree, Clean up worktrees, Forget and Trust space config confirm with `y`
-or `enter`, and cancel with `n` or `esc`.
+form, suspending. They, Remove worktree, Clean up worktrees, Remove space, Forget and Trust space config
+confirm with `y` or `enter`, and cancel with `n` or `esc`.
+
+With a [session provider](kitty.md#session-providers) that can end or shelve them, Close session, Remove
+worktree, Clean up worktrees and Remove space have a `sessions` choice, `left` and `right` or `h` and `l`,
+for what becomes of the provider's sessions the closing windows show, and for removing, those of the space
+tagged with the worktree, whose directory goes with it: **end**, at first, which kills the running ones and
+removes the ended and shelved ones; **shelve**, which for Close is the provider's keep, so opening the
+session again brings them back, and otherwise its shelve; or **leave running**, which only closes the
+windows. The line under it says how many sessions it does that to, and what a busy one runs, in the error
+color when ending or shelving stops it. Only what the provider allows is offered, and without a provider
+there is no choice. Left to the windows closing, a multiplexer's close watcher would decide instead, and cm's
+shelves an idle session and detaches a busy one, so a removed worktree's sessions came back as detached
+rows of its space. `--sessions end`, `shelve` or `leave` on `kspaces close`, `kspaces remove --yes` and
+`kspaces remove-space --yes` choose without the form. Suspend session has no choice: it is shelving them.
+
+**Remove space** takes a configured space out of the config, as text, its entry with its own comments and
+its `[space.NAME]` tables, from the file that has them; the repository stays as it is. A topic space is
+removed from the provider with its `remove-space`, which refuses `default` and a space that still holds
+sessions, so a topic space's sessions are only ended, never shelved or left. Either way the space's kitty
+sessions close and their saved files go, as nothing lists them under a space any more, and the provider's
+sessions in it get the `sessions` choice: ended, a configured space's provider space is removed too; left
+running or shelved, it stays, listed as a topic space holding them. `kspaces remove-space NAME` opens the
+same form; it runs as a kitty background process, so an error is shown by kitty.
 
 **Remove worktree** shows the directory, the session's windows and the files that are not committed, which
-are lost. It closes the session, waits for its windows to go, deletes the session's saved file and runs
-`git worktree remove`. What git would refuse, such as a locked worktree, is said before you confirm. The
+are lost. It does the `sessions` choice to the provider's sessions, closes the session, waits for its
+windows to go, deletes the session's saved file and runs `git worktree remove`. A session the provider fails
+to end does not stop it, as the removal was confirmed: kitty shows the provider's error with the rest. What git would refuse, such as a locked worktree, is said before you confirm. The
 removal runs as a kitty background process, so an error after that is shown by kitty.
 
 The branch is kept unless you tick **Delete branch**, off at first, with `d` or a click. The box is not
@@ -611,6 +635,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `n`, `N`, `c`, `z`, `x` | new worktree, new worktree from a PR, close session, suspend session, remove worktree (forget, on a missing worktree) |
 | `F` | forget a session's saved file, on a session with no windows open |
 | `p` | clean up the space's worktrees, on a space's row; its detached sessions, on the row of how many |
+| `D` | remove the space, on a space's row or a topic space's |
 | `R` | run a command in the worktree, with commands configured |
 | `L` | open a layout in the worktree's session, with layouts configured |
 | `o` | open without the default layout, where it would open |

@@ -79,7 +79,9 @@ closing a session closes its windows and keeps nothing.
 
 **Close session**, `kspaces close`, saves the session's file, then closes its windows. The file stays, so
 opening the session again restores its tabs and splits from it rather than its default layout; **Forget**
-deletes it. **Suspend session**, `z` in the sidebar or `kspaces suspend [SESSION...]`, is the same, and
+deletes it. With a provider that can, its form chooses what becomes of the provider's sessions its windows
+show, as [the sidebar](sidebar.md#the-menu) says: ended, the first, shelved, which is the provider's `keep`
+below, or left running. Ended or left, the provider keeps nothing, and the file alone is kept. **Suspend session**, `z` in the sidebar or `kspaces suspend [SESSION...]`, is the same, and
 its row shows the suspended marker until it is opened.
 
 What runs in the windows is the [session provider](#session-providers)'s. kspaces knows only kitty's side;
@@ -101,7 +103,9 @@ each of its mode, its name and the handles, tab-separated, and sets the `kspaces
 windows, to the mode. The saver keeps the file of a listed session when its last window closes, and drops
 the session from the list once it has windows again. A watcher that ends a window's multiplexer session as
 the window closes should leave a window with `kspaces_keep` alone: ending it would lose what the provider
-kept.
+kept. Every close kspaces makes sets it, whatever was chosen for the sessions: ended, they are gone before
+the windows close; left running, it is what keeps the watcher from shelving or detaching them. Removing a
+worktree sets it only to leave them running.
 
 ## Session providers
 

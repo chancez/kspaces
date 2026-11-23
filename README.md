@@ -241,6 +241,8 @@ kspaces trust [PATH]     trust the .kspaces.toml of the space PATH is in, after 
   --yes, --revoke        form; --yes without asking, --revoke to forget it
 kspaces reply WINDOW_ID [TEXT]  type TEXT and Enter into a window without switching to it; no TEXT: a form
   --no-enter             showing its screen; --no-enter sends TEXT alone, as for a single key
+kspaces remove-space NAME   take a space out of the config, or a topic space out of the provider, closing
+                         its sessions, after confirming
 kspaces remove PATH      close a linked worktree's session and remove the worktree, after confirming
   --delete-branch        and then its branch, if merged; --force-branch even if not, losing its commits
 kspaces cleanup SPACE    remove the worktrees whose PR is merged, upstream gone or branch merged, and the
