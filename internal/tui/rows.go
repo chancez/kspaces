@@ -70,6 +70,8 @@ func (m *sidebar) renderRow(i int) string {
 	switch {
 	case r.Group != nil:
 		return m.renderHeader(i)
+	case r.Detached != nil:
+		return m.renderDetached(i)
 	case r.Space == nil:
 		return th.Draw(look.Plain, width)
 	}

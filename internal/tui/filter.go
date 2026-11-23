@@ -222,6 +222,11 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 	if m.awakeOnly {
 		m.rows = spaces.AwakeRows(m.rows, m.suspended)
 	}
+	// The provider's sessions no window shows are not what the query, the attention filter or the open filter
+	// look for, and a drag moves only the rows it knows.
+	if !m.filtering && !m.attending && !m.openOnly && (m.press == nil || m.press.drag == nil) {
+		m.rows = spaces.WithDetached(m.rows, m.detached, m.detachedOpen)
+	}
 	m.pruneTicks()
 	if entry >= 0 {
 		m.cursor = min(len(m.rows)+entry, max(m.numEntries()-1, 0))
@@ -258,10 +263,12 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 }
 
 // rowKey names the entry a row is, the same across refreshes and filters: its session, for a space whose
-// worktrees could not be listed its root, and for a group's header the group's key in the folded file. The
-// blank row is none.
+// worktrees could not be listed its root, for a group's header the group's key in the folded file, and for
+// a detached session's row, see detachedKey, one no session's name can be. The blank row is none.
 func rowKey(r spaces.Row) string {
 	switch {
+	case r.Detached != nil:
+		return detachedKey(*r.Detached)
 	case r.Worktree != nil:
 		return r.Worktree.Session
 	case r.Space != nil:

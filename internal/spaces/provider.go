@@ -250,6 +250,27 @@ func listSessions(provider []string, windows []ProviderWindow) (*ProviderState, 
 	return &ProviderState{Sessions: resp.Sessions, Spaces: resp.Spaces}, nil
 }
 
+// sessionRequest names one of the provider's sessions to a verb.
+type sessionRequest struct {
+	Session string `json:"session"`
+}
+
+// openCommand is what provider says opens s in a new tab: the command, and where it starts, empty for
+// kspaces to choose.
+func openCommand(provider []string, s ProviderSession) ([]string, string, error) {
+	var resp struct {
+		Argv []string `json:"argv"`
+		Cwd  string   `json:"cwd"`
+	}
+	if err := askProvider(provider, "open", sessionRequest{s.ID}, &resp); err != nil {
+		return nil, "", err
+	}
+	if len(resp.Argv) == 0 {
+		return nil, "", fmt.Errorf("%s open printed no command for %s", provider[0], s.Name)
+	}
+	return resp.Argv, resp.Cwd, nil
+}
+
 // ListNow is what provider says now, with kitty's windows as they are, for a form, which polls nothing.
 func ListNow(provider []string) (*ProviderState, error) {
 	caps := ProviderCapabilities(provider)

@@ -24,6 +24,13 @@ type entrySubject struct {
 // groupSubject is a group's header in the spaces list, by the group's name.
 type groupSubject struct{ name string }
 
+// detachedSubject is a row of a space's provider sessions that no window shows, by its index in the rows: their head,
+// a host's or a session's.
+type detachedSubject struct {
+	index int
+	row   spaces.DetachedRow
+}
+
 // groupFilterSubject is a group in the spaces list's menu, which shows or hides it.
 type groupFilterSubject struct{ name string }
 
@@ -214,6 +221,31 @@ var (
 		Section: sectionSpace,
 		Applies: func(m *sidebar, _ groupSubject) bool { return !m.selecting },
 		Run:     func(m *sidebar, s groupSubject) tea.Cmd { m.tickRow(spaces.GroupKey(s.name)); return nil },
+	}
+)
+
+// A space's detached sessions' rows'. A click on the head does what space does, as there is nothing to open.
+var (
+	actOpenDetached = &interact.Action[*sidebar, detachedSubject]{
+		Title:   "Open",
+		Section: sectionSession,
+		Applies: func(m *sidebar, s detachedSubject) bool { return s.row.Session != nil && m.caps[spaces.CapOpen] },
+		Run: func(m *sidebar, s detachedSubject) tea.Cmd {
+			m.remote = false
+			return m.openDetachedCmd(s.row)
+		},
+	}
+	actShowDetached = &interact.Action[*sidebar, detachedSubject]{
+		Title:   "Show sessions",
+		Section: sectionSpace,
+		Applies: func(_ *sidebar, s detachedSubject) bool { return s.row.Head() && !s.row.Expanded },
+		Run:     func(m *sidebar, s detachedSubject) tea.Cmd { m.toggleDetached(s.row.Of.Name); return nil },
+	}
+	actHideDetached = &interact.Action[*sidebar, detachedSubject]{
+		Title:   "Hide sessions",
+		Section: sectionSpace,
+		Applies: func(_ *sidebar, s detachedSubject) bool { return s.row.Head() && s.row.Expanded },
+		Run:     func(m *sidebar, s detachedSubject) tea.Cmd { m.toggleDetached(s.row.Of.Name); return nil },
 	}
 )
 
@@ -987,6 +1019,7 @@ var (
 var (
 	entryKind     *interact.Kind[*sidebar, entrySubject]
 	groupKind     *interact.Kind[*sidebar, groupSubject]
+	detachedKind  *interact.Kind[*sidebar, detachedSubject]
 	groupShowKind *interact.Kind[*sidebar, groupFilterSubject]
 	statusKind    *interact.Kind[*sidebar, statusSubject]
 	paneKind      *interact.Kind[*sidebar, paneSubject]
@@ -1014,6 +1047,7 @@ var (
 
 	spacesList      *interact.Place[*sidebar, entrySubject]
 	groupHeaders    *interact.Place[*sidebar, groupSubject]
+	detachedRows    *interact.Place[*sidebar, detachedSubject]
 	theGroups       *interact.Place[*sidebar, groupFilterSubject]
 	statusList      *interact.Place[*sidebar, statusSubject]
 	thePane         *interact.Place[*sidebar, paneSubject]
@@ -1084,6 +1118,20 @@ func init() {
 	groupKind.Bind(actUnfoldGroup, "", "", "space")
 	interact.Via(groupKind, func(s groupSubject) (spacesSubject, bool) { return spacesSubject{group: s.name}, true }, spacesKind)
 	groupHeaders = interact.List(groupKind)
+
+	detachedKind = interact.NewKind(func(s detachedSubject) string {
+		if s.row.Session != nil {
+			return s.row.Session.Name
+		}
+		return s.row.Of.Name
+	}, actOpenDetached, actShowDetached, actHideDetached)
+	detachedKind.Bind(actShowDetached, "space", "show or hide the space's detached sessions", "space")
+	detachedKind.Bind(actHideDetached, "", "", "space")
+	interact.Via(detachedKind, func(s detachedSubject) (spacesSubject, bool) { return spacesSubject{group: s.row.Of.Group}, true }, spacesKind)
+	detachedRows = interact.List(detachedKind)
+	detachedRows.Bind(actOpenDetached, "enter/l", "open", "enter", "l")
+	detachedRows.Bind(actShowDetached, "", "", "enter", "l")
+	detachedRows.Bind(actHideDetached, "", "", "enter", "l")
 
 	statusKind = interact.NewKind(func(s statusSubject) string { return s.status.Session }, actOpenWindow, actReply, actClearStatus)
 	statusKind.Bind(actReply, "t", "reply", "t")
@@ -1354,6 +1402,8 @@ func (m *sidebar) entryTarget(i int) (interact.Target[*sidebar], bool) {
 	switch {
 	case i >= 0 && i < len(m.rows) && m.rows[i].Group != nil:
 		return groupHeaders.Target(groupSubject{name: m.rows[i].Group.Name}), true
+	case i >= 0 && i < len(m.rows) && m.rows[i].Detached != nil:
+		return detachedRows.Target(detachedSubject{index: i, row: *m.rows[i].Detached}), true
 	case i >= 0 && i < len(m.rows) && m.rows[i].Space != nil:
 		return spacesList.Target(entrySubject{index: i, row: m.rows[i]}), true
 	case i >= len(m.rows) && i < m.numEntries():

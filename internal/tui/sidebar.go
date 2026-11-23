@@ -142,6 +142,11 @@ type sidebar struct {
 	poller    *spaces.Poller
 	// What git and gh say of each worktree, by path, from the poller.
 	git map[string]gitstate.State
+	// The provider's sessions no window shows, by space, see spaces.Snapshot, the spaces whose sessions
+	// show under their head, see detached.go, and what the provider does.
+	detached     map[string]spaces.Detached
+	detachedOpen map[string]bool
+	caps         spaces.Capabilities
 }
 
 func newSidebar(self int) *sidebar {
@@ -310,6 +315,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.kitty.Statuses = spaces.Shown(m.cfg, m.hidden, m.statuses)
 			m.order = msg.Order
 			m.git = msg.Git
+			m.detached, m.caps = msg.Detached, msg.Caps
 			m.rebuildRows(at)
 			m.settle()
 			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))

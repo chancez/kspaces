@@ -140,7 +140,7 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 		t, _ := m.entryTarget(i)
 		if m.inZone(fmt.Sprintf(caretZone, i), msg.X, msg.Y) {
 			m.unhover()
-			return runFirst(m, t, actFold, actUnfold, actFoldGroup, actUnfoldGroup)
+			return runFirst(m, t, actFold, actUnfold, actFoldGroup, actUnfoldGroup, actShowDetached, actHideDetached)
 		}
 		if i < len(m.rows) {
 			// A row's popup stays until the release, which finds the row by it as the press did.

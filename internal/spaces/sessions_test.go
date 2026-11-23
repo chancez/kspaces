@@ -147,3 +147,35 @@ func TestPollerSessions(t *testing.T) {
 		}
 	})
 }
+
+// A space's detached sessions follow its rows: a head, then, expanded, each session, under its host's row
+// when they run on several. A folded space has none.
+func TestWithDetached(t *testing.T) {
+	gr := Space{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Session: "gr"}, {Path: "/src/gr/dev", Session: "gr@dev"}}}
+	docs := Space{Name: "docs", Root: "/src/docs", Worktrees: []Worktree{{Path: "/src/docs", Session: "docs"}, {Path: "/src/docs/x", Session: "docs@x"}}}
+	notes := Space{Name: "notes", Worktrees: []Worktree{{Session: "notes"}}}
+	a, b, c := ProviderSession{ID: "a"}, ProviderSession{ID: "b", Host: "server"}, ProviderSession{ID: "c"}
+	grD := Detached{Hosts: []HostSessions{{Sessions: []ProviderSession{a}}, {Host: "server", Sessions: []ProviderSession{b}}}}
+	notesD := Detached{Hosts: []HostSessions{{Sessions: []ProviderSession{c}}}}
+	detached := map[string]Detached{"gr": grD, "docs": notesD, "notes": notesD}
+	rows := BuildRows([]Space{notes}, []Space{gr, docs}, map[string]bool{"/src/docs": true}, nil, Order{})
+	got := WithDetached(rows, detached, map[string]bool{"gr": true})
+	s := func(i int) *Space { return rows[i].Space }
+	want := []Row{
+		rows[0],
+		{Detached: &DetachedRow{Of: s(0), All: notesD}},
+		{},
+		rows[2],
+		rows[3],
+		{Detached: &DetachedRow{Of: s(2), All: grD, Expanded: true}},
+		{Detached: &DetachedRow{Of: s(2), HostRow: true}},
+		{Detached: &DetachedRow{Of: s(2), Session: &a}},
+		{Detached: &DetachedRow{Of: s(2), Host: "server", HostRow: true}},
+		{Detached: &DetachedRow{Of: s(2), Host: "server", Session: &b}},
+		{},
+		rows[5],
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got  %+v\nwant %+v", got, want)
+	}
+}

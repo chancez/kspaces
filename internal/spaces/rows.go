@@ -26,6 +26,29 @@ type Row struct {
 	Folded bool
 	// A group's header, which has no Space, heading its spaces' rows.
 	Group *Group
+	// A row of a space's provider sessions no window shows, which has no Space either, see WithDetached.
+	Detached *DetachedRow
+}
+
+// DetachedRow is a row of a space's provider sessions no window shows: their group's head, standing for them all, a
+// host's heading its sessions when they run on several, or one session.
+type DetachedRow struct {
+	// Of is the space the sessions are in, as its row has it.
+	Of *Space
+	// On the head: all of them, and whether they show under it.
+	All      Detached
+	Expanded bool
+	// On a host's row, and on each of its sessions': the host, empty for this machine. HostRow is the
+	// host's own row.
+	Host    string
+	HostRow bool
+	// On a session's row: the session.
+	Session *ProviderSession
+}
+
+// Head reports whether r is the head of a space's detached sessions.
+func (r DetachedRow) Head() bool {
+	return !r.HostRow && r.Session == nil
 }
 
 // Group is a group of spaces, as its header has it: its name, and its spaces in the rows' order.
@@ -36,7 +59,7 @@ type Group struct {
 
 // Blank reports whether r is the blank line between spaces, which is no entry.
 func (r Row) Blank() bool {
-	return r.Space == nil && r.Group == nil
+	return r.Space == nil && r.Group == nil && r.Detached == nil
 }
 
 // Dir names a linked worktree's row: its directory, or for a missing one the directory its session is
@@ -95,6 +118,45 @@ func BuildRows(others, spaces []Space, folded, hidden map[string]bool, order Ord
 		}
 	}
 	return rows
+}
+
+// WithDetached is rows with the provider's sessions no window shows, detached by space, after the rows of the
+// space they are in: a head row standing for them, then, for a space in expanded, by name, a row for each,
+// under a row for its host when they run on several. A folded space's are left out with its worktrees, as
+// are a folded group's, whose spaces have no rows. The rows point into copies of the sessions.
+func WithDetached(rows []Row, detached map[string]Detached, expanded map[string]bool) []Row {
+	if len(detached) == 0 {
+		return rows
+	}
+	var out []Row
+	var folded bool
+	for i, r := range rows {
+		out = append(out, r)
+		if r.Space == nil {
+			continue
+		}
+		if r.Main {
+			folded = r.Folded
+		}
+		d, ok := detached[r.Space.Name]
+		if folded || !ok || d.Count() == 0 || i+1 < len(rows) && rows[i+1].Space == r.Space {
+			continue
+		}
+		open := expanded[r.Space.Name]
+		out = append(out, Row{Detached: &DetachedRow{Of: r.Space, All: d, Expanded: open}})
+		if !open {
+			continue
+		}
+		for _, h := range d.Hosts {
+			if len(d.Hosts) > 1 {
+				out = append(out, Row{Detached: &DetachedRow{Of: r.Space, Host: h.Host, HostRow: true}})
+			}
+			for _, sess := range slices.Clone(h.Sessions) {
+				out = append(out, Row{Detached: &DetachedRow{Of: r.Space, Host: h.Host, Session: &sess}})
+			}
+		}
+	}
+	return out
 }
 
 // placeSessions sorts the sessions that are open or have a saved file but belong to no worktree, and the
