@@ -182,7 +182,7 @@ func runActions(cfg config.Config, st kitty.State, space Space, wt Worktree, r R
 	default:
 		launch = append(launch, "--type=tab")
 	}
-	launch = append(append(launch, "--cwd="+wt.Path, "--add-to-session="+wt.Session), stay...)
+	launch = append(append(append(launch, "--cwd="+wt.Path), inSession(wt.Session)...), stay...)
 	launch = append(launch, env...)
 	if r.Open != "overlay" {
 		launch = append(launch, "--hold")

@@ -406,7 +406,7 @@ run = ["gr"]
 	}
 	wt := filepath.Join(root, ".worktrees", "fix")
 	if got, want := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n"), []string{
-		"@", "action", "launch", "--type=tab", "--cwd=" + wt, "--add-to-session=gr@fix",
+		"@", "action", "launch", "--type=tab", "--cwd=" + wt, "--add-to-session=gr@fix", "--var=kspaces_space=gr", "--var=kspaces_worktree=fix",
 		"--env=KSPACES_SPACE=gr", "--env=KSPACES_ROOT=" + root, "--env=KSPACES_WORKTREE=" + wt, "--env=KSPACES_BRANCH=pr/me/fix",
 		"--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr@fix", "--env=KSPACES_PR=", "--env=KSPACES_ISSUE=",
 		`'--env=KSPACES_INPUT_PROMPT=fix "it" in $$$$HOME'`, `'--env=TASK=fix "it" in $$$$HOME'`,
@@ -472,7 +472,7 @@ func TestNewWorktreeFormBackground(t *testing.T) {
 	}
 	wt := filepath.Join(root, ".worktrees", "fix")
 	if got, want := strings.Split(strings.TrimSuffix(string(data), "\n"), "\n"), []string{
-		"@", "action", "launch", "--type=tab", "--cwd=" + wt, "--add-to-session=gr@fix", "--keep-focus", "--",
+		"@", "action", "launch", "--type=tab", "--cwd=" + wt, "--add-to-session=gr@fix", "--var=kspaces_space=gr", "--var=kspaces_worktree=fix", "--keep-focus", "--",
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
 	}
@@ -580,7 +580,7 @@ inputs = [{ name = "prompt", label = "Prompt", default = "Fix issue #{issue}" }]
 		Ran   []string
 	}
 	if got, want := (created{links, strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")}), (created{spaces.Links{Issue: 12}, []string{
-		"@", "action", "launch", "--type=tab", "--cwd=" + wt, "--add-to-session=gr@40-old-one-x",
+		"@", "action", "launch", "--type=tab", "--cwd=" + wt, "--add-to-session=gr@40-old-one-x", "--var=kspaces_space=gr", "--var=kspaces_worktree=40-old-one-x",
 		"--env=KSPACES_SPACE=gr", "--env=KSPACES_ROOT=" + root, "--env=KSPACES_WORKTREE=" + wt, "--env=KSPACES_BRANCH=pr/me/40-old-one-x",
 		"--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr@40-old-one-x", "--env=KSPACES_PR=", "--env=KSPACES_ISSUE=12",
 		"'--env=KSPACES_INPUT_PROMPT=Fix issue #12'", "--hold", "claude", "'Fix issue #12'", "--",

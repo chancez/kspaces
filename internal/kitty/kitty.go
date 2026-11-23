@@ -22,11 +22,15 @@ import (
 // session's own windows.
 const dockVar = "kspaces"
 
+// LaunchVars are the user variables every window kspaces opens in a session carries for a launch wrapper,
+// see spaces.inSession, which mark no window of kspaces' own, unlike every other kspaces* variable.
+var LaunchVars = []string{"kspaces_space", "kspaces_worktree"}
+
 // ownWindow reports whether w is one of kspaces' own, a dock, form or picker, which mark themselves with a
-// user variable starting kspaces, as the saved sessions leave them out.
+// user variable starting kspaces, as the saved sessions leave them out; a launch variable is not one.
 func ownWindow(w Window) bool {
 	for k := range w.UserVars {
-		if strings.HasPrefix(k, dockVar) {
+		if strings.HasPrefix(k, dockVar) && !slices.Contains(LaunchVars, k) {
 			return true
 		}
 	}
@@ -71,6 +75,9 @@ type Window struct {
 	UserVars      map[string]string `json:"user_vars"`
 	ProgramStatus []status.Record   `json:"program_status"`
 }
+
+// Own reports whether w is one of kspaces' own windows, a dock, form or picker.
+func Own(w Window) bool { return ownWindow(w) }
 
 // Tab is a tab in `kitten @ ls`.
 type Tab struct {
@@ -302,7 +309,7 @@ type Popup struct {
 
 // LaunchPopup runs this kspaces with args, such as `new ROOT`, in a popup for the window from, marked
 // with the user variable v, kspaces_form or kspaces_picker, which keeps it out of saved sessions, whose
-// match leaves out var:kspaces. An overlay goes over from, or over the active window when from is zero.
+// match leaves out kspaces' own variables. An overlay goes over from, or over the active window when from is zero.
 // A panel is told from in FromEnv. When kitty cannot open a panel, as on GNOME's Wayland or before kitty
 // had them, it opens as an overlay, and the error says so. The popup takes the keyboard, which counts as
 // acting, see Acted.

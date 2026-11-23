@@ -150,7 +150,7 @@ func buildLayout(cfg config.Config, st kitty.State, space Space, wt Worktree, lr
 		ids := make([]int, len(tab.Panes))
 		for i, p := range tab.Panes {
 			var args []string
-			at := append([]string{kitty.Quote("--cwd=" + p.CwdWith(vars)), "--add-to-session=" + wt.Session}, stay...)
+			at := slices.Concat([]string{kitty.Quote("--cwd=" + p.CwdWith(vars))}, inSession(wt.Session), stay)
 			switch {
 			case i == 0:
 				if anchor != 0 {

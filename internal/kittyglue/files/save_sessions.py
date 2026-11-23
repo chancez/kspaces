@@ -105,17 +105,33 @@ def main_os_window(boss, sessions):
     return max(counts, key=counts.get) if counts else last_focused_os_window_id()
 
 
+# LAUNCH_VARS are the user variables every window kspaces opens in a session carries for a launch wrapper,
+# which, unlike every other kspaces* variable, mark no window of kspaces' own.
+LAUNCH_VARS = ('kspaces_space', 'kspaces_worktree')
+
+# OWN_VARS are the variables of kspaces' own windows, and of windows being kept, as a kitty match leaves them
+# out by name: a match's var: is a regex searched for, so var:kspaces would leave out every window with a
+# launch variable too.
+OWN_VARS = ('kspaces', 'kspaces_form', 'kspaces_picker', 'kspaces_popup', 'kspaces_keep')
+NOT_OWN = ' and '.join(f'not var:^{v}$' for v in OWN_VARS)
+
+
+# own reports whether window is one of kspaces' own, or being kept, by its variables.
+def own(window):
+    return any(k.startswith('kspaces') and k not in LAUNCH_VARS for k in window.user_vars)
+
+
 # session_match matches the windows saved as session name. With unsessioned, the default session also takes
 # the windows in no session.
 def session_match(name, unsessioned=False):
     if unsessioned and name == default_name():
-        return f'(session:^{re.escape(name)}$ or session:^$) and not var:kspaces'
-    return f'session:^{re.escape(name)}$ and not var:kspaces'
+        return f'(session:^{re.escape(name)}$ or session:^$) and {NOT_OWN}'
+    return f'session:^{re.escape(name)}$ and {NOT_OWN}'
 
 
 # focused_session is the session of the window focused most recently, kspaces' own left out, empty for none.
 def focused_session(boss):
-    windows = [w for w in boss.all_windows if w.created_in_session_name and not any(k.startswith('kspaces') for k in w.user_vars)]
+    windows = [w for w in boss.all_windows if w.created_in_session_name and not own(w)]
     return max(windows, key=lambda w: w.last_focused_at).created_in_session_name if windows else ''
 
 
@@ -158,7 +174,7 @@ _timer = None
 def note_change(boss, window, torn_down=False):
     global _timer
     name = window.created_in_session_name
-    if _quitting or not name or not startup_path() or any(k.startswith('kspaces') for k in window.user_vars):
+    if _quitting or not name or not startup_path() or own(window):
         return
     _pending[name] = _pending.get(name, False) or torn_down
     if _timer is None:

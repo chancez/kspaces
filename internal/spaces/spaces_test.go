@@ -256,8 +256,8 @@ func TestOpenActions(t *testing.T) {
 	cfg := config.Config{Launch: []string{"launch"}, SessionsDir: dir}
 	st := kitty.State{Sessions: map[string]int{"gr@fix": 7}}
 	file := func(name string) string { return filepath.Join(dir, name+".kitty-session") }
-	newTab := func(cwd, session string) []string {
-		return []string{"launch", "--type=tab", "--cwd=" + cwd, "--add-to-session=" + session}
+	newTab := func(cwd, session string, vars ...string) []string {
+		return append([]string{"launch", "--type=tab", "--cwd=" + cwd, "--add-to-session=" + session}, vars...)
 	}
 	for _, c := range []struct {
 		cfg  config.Config
@@ -267,13 +267,13 @@ func TestOpenActions(t *testing.T) {
 		{cfg, Worktree{Path: "/src/gr/.worktrees/fix", Session: "gr@fix"}, [][]string{{"goto_session", file("gr@fix")}}},
 		{cfg, Worktree{Path: "/src/gr", Session: "gr"}, [][]string{{"goto_session", file("gr")}}},
 		// A file kitty would open no window from is not restored: goto_session does nothing with it.
-		{cfg, Worktree{Path: "/src/gr/.worktrees/dev", Session: "gr@dev"}, [][]string{newTab("/src/gr/.worktrees/dev", "gr@dev"), {"goto_session", file("gr@dev")}}},
-		{cfg, Worktree{Path: "/src/gr/.worktrees/new", Session: "gr@new"}, [][]string{newTab("/src/gr/.worktrees/new", "gr@new"), {"goto_session", file("gr@new")}}},
+		{cfg, Worktree{Path: "/src/gr/.worktrees/dev", Session: "gr@dev"}, [][]string{newTab("/src/gr/.worktrees/dev", "gr@dev", "--var=kspaces_space=gr", "--var=kspaces_worktree=dev"), {"goto_session", file("gr@dev")}}},
+		{cfg, Worktree{Path: "/src/gr/.worktrees/new", Session: "gr@new"}, [][]string{newTab("/src/gr/.worktrees/new", "gr@new", "--var=kspaces_space=gr", "--var=kspaces_worktree=new"), {"goto_session", file("gr@new")}}},
 		// A session in no space starts in the home directory.
-		{cfg, Worktree{Session: "default"}, [][]string{newTab(home, "default"), {"goto_session", file("default")}}},
-		{cfg, Worktree{Session: "old"}, [][]string{newTab(home, "old"), {"goto_session", file("old")}}},
+		{cfg, Worktree{Session: "default"}, [][]string{newTab(home, "default", "--var=kspaces_space=default"), {"goto_session", file("default")}}},
+		{cfg, Worktree{Session: "old"}, [][]string{newTab(home, "old", "--var=kspaces_space=old"), {"goto_session", file("old")}}},
 		// Without a sessions directory nothing is restored, and the file only names the session.
-		{config.Config{Launch: cfg.Launch}, Worktree{Path: "/src/gr", Session: "gr"}, [][]string{newTab("/src/gr", "gr"), {"goto_session", "gr.kitty-session"}}},
+		{config.Config{Launch: cfg.Launch}, Worktree{Path: "/src/gr", Session: "gr"}, [][]string{newTab("/src/gr", "gr", "--var=kspaces_space=gr"), {"goto_session", "gr.kitty-session"}}},
 	} {
 		got, err := openActions(c.cfg, st, c.wt)
 		if err != nil {

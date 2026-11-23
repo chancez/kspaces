@@ -299,8 +299,8 @@ def on_resize(boss, window, data):
 # The user variable that holds when each of a window's program status records last changed state, as JSON:
 # {"pid": KITTY_PID, "records": {"RECORD_ID": ["STATE", UNIX_TIME]}}. Kept on the window and noted here, at
 # the change, so the sidebar, which refreshes every two seconds, reads the time it changed, and a sidebar
-# started later still has it. Not named kspaces*, as save_sessions.py leaves windows with a var:kspaces out
-# of saved sessions.
+# started later still has it. Not named kspaces*, as save_sessions.py leaves windows with most kspaces*
+# variables out of saved sessions.
 STATUS_AT_VAR = 'program_status_at'
 
 

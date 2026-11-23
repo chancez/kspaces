@@ -197,7 +197,7 @@ func TestRunForm(t *testing.T) {
 	}
 	if got, want := calls(), []string{
 		"@", "action", "goto_session", "gr@fix.kitty-session", "--",
-		"@", "action", "--match=id:7", "launch", "--type=tab", "--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix",
+		"@", "action", "--match=id:7", "launch", "--type=tab", "--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix", "--var=kspaces_space=gr", "--var=kspaces_worktree=fix",
 		"--env=KSPACES_SPACE=gr", "--env=KSPACES_ROOT=/src/gr", "--env=KSPACES_WORKTREE=/src/gr/.worktrees/fix",
 		"--env=KSPACES_BRANCH=fix", "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=gr@fix", "--env=KSPACES_PR=", "--env=KSPACES_ISSUE=",
 		"'--env=KSPACES_INPUT_PROMPT=fix it'", "--hold", "claude", "'fix it'", "--",
@@ -246,13 +246,13 @@ func TestRunCommandNow(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q\nwant %q", got, want)
 	}
-	if got, want := calls(), []string{
+	if got, want := calls(), slices.Concat([]string{
 		"@", "action", "goto_session", wt.Session + ".kitty-session", "--",
-		"@", "action", "--match=id:7", "launch", "--type=overlay", "--next-to=id:7", "--cwd=" + wt.Path, "--add-to-session=" + wt.Session,
+		"@", "action", "--match=id:7", "launch", "--type=overlay", "--next-to=id:7", "--cwd=" + wt.Path}, inSession(wt.Session), []string{
 		"--env=KSPACES_SPACE=" + filepath.Base(root), "--env=KSPACES_ROOT=" + root, "--env=KSPACES_WORKTREE=" + wt.Path,
 		"--env=KSPACES_BRANCH=fix", "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=" + wt.Session, "--env=KSPACES_PR=", "--env=KSPACES_ISSUE=",
 		"gr", "--",
-	}; !reflect.DeepEqual(got, want) {
+	}); !reflect.DeepEqual(got, want) {
 		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
 	}
 }
@@ -309,8 +309,8 @@ func TestRunSeveral(t *testing.T) {
 	}
 	ran := slices.Concat(
 		[]string{"@", "action", "--match=id:7", "launch", "--type=window", "--location=split", "--next-to=id:7",
-			"--cwd=" + wts[0].Path, "--add-to-session=" + wts[0].Session, "--keep-focus"}, env(wts[0]), []string{"--hold", "gr", "--"},
-		[]string{"@", "action", "launch", "--type=tab", "--cwd=" + wts[1].Path, "--add-to-session=" + wts[1].Session, "--keep-focus"},
+			"--cwd=" + wts[0].Path}, inSession(wts[0].Session), []string{"--keep-focus"}, env(wts[0]), []string{"--hold", "gr", "--"},
+		[]string{"@", "action", "launch", "--type=tab", "--cwd=" + wts[1].Path}, inSession(wts[1].Session), []string{"--keep-focus"},
 		env(wts[1]), []string{"--hold", "gr", "--"})
 	if got := calls(); !reflect.DeepEqual(got, ran) {
 		t.Errorf("kitten ran as\n%q\nwant\n%q", got, ran)

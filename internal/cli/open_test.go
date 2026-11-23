@@ -54,7 +54,7 @@ func TestOpenNoLayout(t *testing.T) {
 	}
 	session := filepath.Base(root)
 	want := []string{
-		"@ action launch --type=tab --cwd=" + root + " --add-to-session=" + session,
+		"@ action launch --type=tab --cwd=" + root + " --add-to-session=" + session + " --var=kspaces_space=" + session,
 		"@ action goto_session " + session + ".kitty-session",
 	}
 	if got := run(r.Dir); !reflect.DeepEqual(got, want) {

@@ -29,7 +29,7 @@ func TestRunActions(t *testing.T) {
 		`'--env=KSPACES_INPUT_PROMPT=fix it'\''s $$$$HOME'`, "--env=TASK_PR=#12",
 	}
 	argv := []string{"claude", "--name=gr", `'fix it'\''s $$HOME'`}
-	at := []string{"--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix"}
+	at := []string{"--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix", "--var=kspaces_space=gr", "--var=kspaces_worktree=fix"}
 	goTo := []string{"goto_session", "gr@fix.kitty-session"}
 	// launch is a launch action: the launcher, the options, at, env, maybe --hold, then argv.
 	launch := func(launcher []string, hold bool, opts ...string) []string {

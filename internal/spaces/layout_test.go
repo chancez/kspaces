@@ -99,7 +99,7 @@ func TestBuildLayout(t *testing.T) {
 		"--env=KSPACES_ISSUE=4",
 	}
 	withPrompt := append(slices.Clone(builtins), "'--env=KSPACES_INPUT_PROMPT=fix\nit'")
-	at := []string{"--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix"}
+	at := []string{"--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix", "--var=kspaces_space=gr", "--var=kspaces_worktree=fix"}
 	goTo := []string{"action", "goto_session", "gr@fix.kitty-session"}
 	type result struct {
 		Calls [][]string
@@ -172,7 +172,7 @@ panes = [{}]
 	if err := buildLayout(cfg, kitty.State{}, space, wt, lr, k); err != nil {
 		t.Fatal(err)
 	}
-	at := []string{"--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix", "--keep-focus"}
+	at := []string{"--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix", "--var=kspaces_space=gr", "--var=kspaces_worktree=fix", "--keep-focus"}
 	want := [][]string{
 		slices.Concat([]string{"action", "launch", "--type=tab"}, at),
 		{"goto-layout", "--match=window_id:11", "splits"},
@@ -233,14 +233,14 @@ panes = [
 		err := buildLayout(cfg, kitty.State{}, space, space.Worktrees[0], lr, k)
 		got = append(got, result{k.calls, errString(err)})
 	}
-	first := []string{"action", "launch", "--type=tab", "--cwd=/src/gr/docs", "--add-to-session=gr"}
+	first := []string{"action", "launch", "--type=tab", "--cwd=/src/gr/docs", "--add-to-session=gr", "--var=kspaces_space=gr"}
 	want := []result{
 		{[][]string{
 			first,
 			{"goto-layout", "--match=window_id:11", "tall"},
-			slices.Concat([]string{"action", "--match=id:11", "launch", "--type=window", "--location=after", "--next-to=id:11", "--cwd=/src/gr", "--add-to-session=gr"},
+			slices.Concat([]string{"action", "--match=id:11", "launch", "--type=window", "--location=after", "--next-to=id:11", "--cwd=/src/gr", "--add-to-session=gr", "--var=kspaces_space=gr"},
 				env, []string{"--hold", "make", "watch"}),
-			{"action", "--match=id:12", "launch", "--type=window", "--location=after", "--next-to=id:12", "'--cwd=/tmp/a dir'", "--add-to-session=gr"},
+			{"action", "--match=id:12", "launch", "--type=window", "--location=after", "--next-to=id:12", "'--cwd=/tmp/a dir'", "--add-to-session=gr", "--var=kspaces_space=gr"},
 			{"focus-window", "--match", "id:11"},
 			{"action", "goto_session", "gr.kitty-session"},
 		}, "<nil>"},

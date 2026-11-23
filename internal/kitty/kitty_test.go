@@ -219,3 +219,18 @@ func TestSidebarWidths(t *testing.T) {
 		t.Fatalf("got %v, want %v", got, want)
 	}
 }
+
+// kspaces' own windows carry a kspaces* variable; the launch variables every window kspaces opens in a
+// session carries do not make it one.
+func TestOwnWindow(t *testing.T) {
+	var got []bool
+	for _, vars := range []map[string]string{
+		{"kspaces": "1"}, {"kspaces_form": "1"}, {"kspaces_picker": "1", "kspaces_popup": "1"},
+		{"kspaces_space": "gr", "kspaces_worktree": "fix"}, {"kspaces_space": "gr", "kspaces_form": "1"}, {"mux": "s1"}, nil,
+	} {
+		got = append(got, Own(Window{UserVars: vars}))
+	}
+	if want := []bool{true, true, true, false, true, false, false}; !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}

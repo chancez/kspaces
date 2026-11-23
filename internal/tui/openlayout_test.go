@@ -109,6 +109,17 @@ esac
 	}
 }
 
+// inSession are the launch options that put a window in session: --add-to-session, and the kspaces_space and,
+// for SPACE@DIR, kspaces_worktree user variables, see spaces.TestLaunchVars.
+func inSession(session string) []string {
+	space, dir, linked := strings.Cut(session, "@")
+	ans := []string{"--add-to-session=" + session, "--var=kspaces_space=" + space}
+	if linked {
+		ans = append(ans, "--var=kspaces_worktree="+dir)
+	}
+	return ans
+}
+
 // envOf is the --env options of a command run in wt, a worktree of the space at root, then extra.
 func envOf(root string, wt spaces.Worktree, extra ...string) []string {
 	return append([]string{
@@ -121,7 +132,7 @@ func envOf(root string, wt spaces.Worktree, extra ...string) []string {
 // agentCalls are the kitten calls that build the agent layout in wt, a worktree of the space at root, its
 // prompt "fix it", its tab launched with opts first, windows 11 to 13 opening.
 func agentCalls(root string, wt spaces.Worktree, opts ...string) []string {
-	at := []string{"--cwd=" + wt.Path, "--add-to-session=" + wt.Session}
+	at := append([]string{"--cwd=" + wt.Path}, inSession(wt.Session)...)
 	return slices.Concat(
 		[]string{"@", "action"}, opts, []string{"launch", "--type=tab"}, at, []string{"--tab-title=" + wt.Branch},
 		envOf(root, wt, "'--env=KSPACES_INPUT_PROMPT=fix it'"), []string{"--hold", "claude", "'fix it'", "--"},
@@ -277,7 +288,7 @@ func TestLayoutFormShell(t *testing.T) {
 	cfg := testLayouts(t)
 	space := spaces.Space{Name: "gr", Root: "/src/gr", Worktrees: []spaces.Worktree{{Path: "/src/gr", Branch: "main", Session: "gr"}}}
 	wt := spaces.Worktree{Path: "/src/gr/.worktrees/fix", Branch: "fix", Session: "gr@fix"}
-	tab := []string{"@", "action", "launch", "--type=tab", "--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix", "--"}
+	tab := []string{"@", "action", "launch", "--type=tab", "--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix", "--var=kspaces_space=gr", "--var=kspaces_worktree=fix", "--"}
 	goTo := []string{"@", "action", "goto_session", "gr@fix.kitty-session", "--"}
 	type result struct {
 		Screen []string
@@ -623,7 +634,7 @@ func TestOpenWorktreeLayout(t *testing.T) {
 		got = append(got, result{errString(err), calls()})
 	}
 	at := func(wt spaces.Worktree) []string {
-		return []string{"--cwd=" + wt.Path, "--add-to-session=" + wt.Session}
+		return append([]string{"--cwd=" + wt.Path}, inSession(wt.Session)...)
 	}
 	main := space.Worktrees[0]
 	want := []result{
@@ -668,7 +679,7 @@ func TestOpenWithoutLayout(t *testing.T) {
 			got = append(got, result{errString(err), calls()})
 		}
 	}
-	tab := []string{"@", "action", "launch", "--type=tab", "--cwd=" + wt.Path, "--add-to-session=" + wt.Session, "--"}
+	tab := slices.Concat([]string{"@", "action", "launch", "--type=tab", "--cwd=" + wt.Path}, inSession(wt.Session), []string{"--"})
 	goTo := []string{"@", "action", "goto_session", wt.Session + ".kitty-session", "--"}
 	plain := result{"<nil>", slices.Concat(tab, goTo)}
 	restored := result{"<nil>", []string{"@", "action", "goto_session", filepath.Join(saved, wt.Session+".kitty-session"), "--"}}
@@ -785,7 +796,7 @@ func TestOpenWithoutLayoutMenu(t *testing.T) {
 		t.Fatalf("o said %v", msg.Err)
 	}
 	want := []string{"@", "focus-window", "--match", "id:11", "--",
-		"@", "action", "launch", "--type=tab", "--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix", "--",
+		"@", "action", "launch", "--type=tab", "--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix", "--var=kspaces_space=gr", "--var=kspaces_worktree=fix", "--",
 		"@", "action", "goto_session", "gr@fix.kitty-session", "--"}
 	if got := calls(); !reflect.DeepEqual(got, want) {
 		t.Errorf("o ran kitten as\n%q\nwant\n%q", got, want)
@@ -866,7 +877,7 @@ func TestPickWithoutLayout(t *testing.T) {
 		if msg := cmd(); msg != (tea.QuitMsg{}) {
 			t.Fatalf("%s said %v", k, msg)
 		}
-		want := []string{"@", "action", "launch", "--type=tab", "--cwd=/src/kitty", "--add-to-session=kitty", "--",
+		want := []string{"@", "action", "launch", "--type=tab", "--cwd=/src/kitty", "--add-to-session=kitty", "--var=kspaces_space=kitty", "--",
 			"@", "action", "goto_session", "kitty.kitty-session", "--"}
 		if got := calls(); !reflect.DeepEqual(got, want) {
 			t.Errorf("%s ran kitten as\n%q\nwant\n%q", k, got, want)

@@ -109,7 +109,7 @@ func OpensDefaultLayout(cfg config.Config, st kitty.State, space Space, wt Workt
 // firstTab is the launch action that opens a session's first tab, in cwd.
 func firstTab(cfg config.Config, cwd, session string) []string {
 	args := append([]string{}, cfg.Launch...)
-	return append(args, "--type=tab", "--cwd="+cwd, "--add-to-session="+session)
+	return append(append(args, "--type=tab", "--cwd="+cwd), inSession(session)...)
 }
 
 // opensWindows says whether goto_session opens any window from the session file at path. Windows come only
