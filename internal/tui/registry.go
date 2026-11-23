@@ -831,6 +831,16 @@ var (
 		Applies: func(f *closeSessionForm, _ closeSubject) bool { return !f.busy },
 		Run:     func(*closeSessionForm, closeSubject) tea.Cmd { return tea.Quit },
 	}
+	actCloseNextFate = &interact.Action[*closeSessionForm, closeSubject]{
+		Title:   "next for sessions",
+		Applies: func(f *closeSessionForm, _ closeSubject) bool { return !f.busy && f.fate.offered() },
+		Run:     do[*closeSessionForm, closeSubject](func(f *closeSessionForm) { f.fate.cycle(1) }),
+	}
+	actClosePrevFate = &interact.Action[*closeSessionForm, closeSubject]{
+		Title:   "previous for sessions",
+		Applies: func(f *closeSessionForm, _ closeSubject) bool { return !f.busy && f.fate.offered() },
+		Run:     do[*closeSessionForm, closeSubject](func(f *closeSessionForm) { f.fate.cycle(-1) }),
+	}
 	actCloseQuit = quit[*closeSessionForm, closeSubject]()
 )
 
@@ -1426,9 +1436,11 @@ func init() {
 	cleanKind.Bind(actCleanupQuit, "ctrl+c", "quit", "ctrl+c")
 	theCleanup = interact.List(cleanKind)
 
-	closeKind = interact.NewKind(func(closeSubject) string { return "Close session" }, actClose, actCloseCancel, actCloseQuit)
+	closeKind = interact.NewKind(func(closeSubject) string { return "Close session" }, actClose, actCloseCancel, actCloseNextFate, actClosePrevFate, actCloseQuit)
 	closeKind.Bind(actClose, "y/enter", "close", "y", "enter")
 	closeKind.Bind(actCloseCancel, "n/esc", "cancel", "n", "esc")
+	closeKind.Bind(actCloseNextFate, "left/right", "what becomes of the sessions", "right", "l")
+	closeKind.Bind(actClosePrevFate, "", "", "left", "h")
 	closeKind.Bind(actCloseQuit, "ctrl+c", "quit", "ctrl+c")
 	theCloseForm = interact.List(closeKind)
 

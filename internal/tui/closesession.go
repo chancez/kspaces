@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -24,6 +25,10 @@ type closeSessionForm struct {
 	sessions []string
 	// windows is how many windows each session has open, which closing it closes.
 	windows []int
+	// closing are the provider's sessions each session's windows show, and fate what becomes of them, see
+	// fateChoice; no choice for suspending, which is shelving them.
+	closing map[string][]spaces.ProviderSession
+	fate    fateChoice
 	busy    bool
 	err     error
 	width   int
@@ -41,24 +46,16 @@ func (f *closeSessionForm) Init() tea.Cmd { return nil }
 // the rest.
 func (f *closeSessionForm) closeSession() tea.Cmd {
 	f.busy, f.err = true, nil
-	cfg, mode, sessions := f.cfg, f.mode, f.sessions
+	cfg, mode, sessions, fate := f.cfg, f.mode, f.sessions, f.fate.chosen()
 	return func() tea.Msg {
 		var errs []error
 		for _, s := range sessions {
-			if err := closeOne(cfg, mode, s); err != nil {
+			if err := spaces.CloseSessionAs(cfg, s, mode, fate); err != nil {
 				errs = append(errs, fmt.Errorf("%s: %w", s, err))
 			}
 		}
 		return closedMsg{errors.Join(errs...)}
 	}
-}
-
-// closeOne closes session's windows, keeping it as mode says, see closeSessionForm.
-func closeOne(cfg config.Config, mode spaces.KeepMode, session string) error {
-	if mode == "" {
-		return kitty.CloseSession(session)
-	}
-	return spaces.KeepSession(cfg, session, mode)
 }
 
 func (f *closeSessionForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -105,9 +102,16 @@ func (f *closeSessionForm) render() string {
 		}
 	}
 	kept := len(f.cfg.Provider) > 0
+	if f.fate.offered() {
+		kept = f.fate.chosen() == spaces.FateShelve
+	}
 	if len(f.sessions) == 1 {
 		lines = []string{line(look.Heading(verb + " session " + f.sessions[0])), ""}
-		text(closesWhat(f.mode, f.windows[0], kept))
+		does := closesWhat(f.mode, f.windows[0], kept)
+		if f.fate.chosen() == spaces.FateLeave {
+			does = fmt.Sprintf("Closes %s, leaving what runs in them running.", plural(f.windows[0], "window"))
+		}
+		text(does)
 		lines = append(lines, "")
 	} else {
 		lines = []string{line(look.Heading(fmt.Sprintf("%s %d sessions", verb, len(f.sessions)))), ""}
@@ -119,8 +123,19 @@ func (f *closeSessionForm) render() string {
 			lines = append(lines, line(th.Cut(width, look.Text(s), look.Default(strings.Repeat(" ", names-len(s)+2)), look.Muted(plural(f.windows[i], "window")))...))
 		}
 		lines = append(lines, "")
-		text(closeTheirs(f.mode, kept))
+		does := closeTheirs(f.mode, kept)
+		if f.fate.chosen() == spaces.FateLeave {
+			does = "Closes their windows, leaving what runs in them running."
+		}
+		text(does)
 		lines = append(lines, "")
+	}
+	if f.fate.offered() {
+		var sessions []spaces.ProviderSession
+		for _, s := range f.sessions {
+			sessions = append(sessions, f.closing[s]...)
+		}
+		lines = append(append(lines, f.fate.lines(th, width, sessions)...), "")
 	}
 	switch {
 	case f.busy:
@@ -176,8 +191,10 @@ func closeTheirs(mode spaces.KeepMode, kept bool) string {
 // keyboard when there are none, meant for a kitty popup. A session with no windows is refused. Closing keeps
 // the sessions to open again when cfg's session saver can, see spaces.KeepClosed; with suspend they are
 // suspended instead, see spaces.KeepSuspended, which needs the saver. With yes it closes them without
-// asking, each waiting for kitty, one failing not stopping the rest.
-func RunCloseSession(ctx context.Context, cfg config.Config, sessions []string, yes, suspend bool) error {
+// asking, each waiting for kitty, one failing not stopping the rest. fate is what becomes of the provider's
+// sessions the windows show when the provider offers a choice, see spaces.Fates; the first it allows
+// when it allows none named.
+func RunCloseSession(ctx context.Context, cfg config.Config, sessions []string, yes, suspend bool, fate spaces.Fate) error {
 	var mode spaces.KeepMode
 	switch {
 	case suspend && !spaces.CanKeep(cfg):
@@ -207,10 +224,18 @@ func RunCloseSession(ctx context.Context, cfg config.Config, sessions []string, 
 			return fmt.Errorf("session %s has no windows open", s)
 		}
 	}
+	var closing spaces.Closing
+	if !suspend {
+		closing = spaces.ClosingNow(cfg.Provider, sessions, mode != "", false)
+	}
+	choice := fateChoice{fates: closing.Fates}
+	if i := slices.Index(choice.fates, fate); i >= 0 {
+		choice.at = i
+	}
 	if yes {
 		var errs []error
 		for _, s := range sessions {
-			err := closeOne(cfg, mode, s)
+			err := spaces.CloseSessionAs(cfg, s, mode, choice.chosen())
 			if err == nil {
 				err = spaces.WaitClosed(s)
 			}
@@ -220,7 +245,7 @@ func RunCloseSession(ctx context.Context, cfg config.Config, sessions []string, 
 		}
 		return errors.Join(errs...)
 	}
-	f := &closeSessionForm{th: look.New(true), cfg: cfg, mode: mode, sessions: sessions, windows: windows}
+	f := &closeSessionForm{th: look.New(true), cfg: cfg, mode: mode, sessions: sessions, windows: windows, closing: closing.Sessions, fate: choice}
 	if err := runPopup(ctx, f); err != nil {
 		return fmt.Errorf("running the close session form: %w", err)
 	}

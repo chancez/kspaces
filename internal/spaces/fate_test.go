@@ -4,8 +4,10 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
+	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
 )
 
@@ -133,4 +135,53 @@ func errText(err error) string {
 		return "<nil>"
 	}
 	return err.Error()
+}
+
+// fakeKittenLs puts a kitten in dir, which is on PATH, that records each call and lists ls for ls.
+func fakeKittenLs(t *testing.T, dir, ls string) func() []string {
+	t.Helper()
+	log := filepath.Join(dir, "kitten-calls")
+	script := "#!/bin/sh\necho \"$*\" >> " + log + "\ncase \"$2\" in ls) /bin/cat <<'EOF'\n" + ls + "\nEOF\n;; esac\n"
+	if err := os.WriteFile(filepath.Join(dir, "kitten"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("KITTY_INSTALLATION_DIR", "")
+	return func() []string {
+		data, err := os.ReadFile(log)
+		if err != nil {
+			return nil
+		}
+		var out []string
+		for _, l := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+			out = append(out, l)
+		}
+		return out
+	}
+}
+
+// Closing a session not kept to open again ends what its windows show, shelves it, or leaves it running;
+// every way marks the windows kept before they close, which tells a close watcher to leave them alone.
+func TestCloseSessionAs(t *testing.T) {
+	ls := `[{"tabs": [{"windows": [{"id": 10, "session_name": "gr@dev"}]}]}]`
+	var got [][]string
+	for _, fate := range []Fate{FateEnd, FateShelve, FateLeave} {
+		dir, provider := fakeProvider(t, map[string]string{
+			"capabilities": `{"capabilities": ["list", "kill", "shelve"]}`,
+			"list":         `{"sessions": [{"id": "a", "state": "running", "windows": [10]}]}`,
+		}, nil)
+		kitten := fakeKittenLs(t, dir, ls)
+		if err := CloseSessionAs(config.Config{Provider: []string{"prov"}}, "gr@dev", "", fate); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, append(provider(), kitten()...))
+	}
+	marked := []string{"@ set-user-vars --match session:^gr@dev$ kspaces_keep=close", "@ close-window --ignore-no-match --match session:^gr@dev$"}
+	want := [][]string{
+		append([]string{"capabilities", "list", "kill", "@ ls"}, marked...),
+		append([]string{"capabilities", "list", "shelve", "@ ls"}, marked...),
+		marked,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got  %q\nwant %q", got, want)
+	}
 }

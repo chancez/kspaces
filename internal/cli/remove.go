@@ -95,6 +95,7 @@ func removeOptions(paths []string, force, deleteBranch, forceBranch bool, forceP
 func (a *app) closeCommand() *cobra.Command {
 	var yes bool
 	var window int
+	var sessions string
 	cmd := &cobra.Command{
 		Use:   "close [SESSION...]",
 		Short: "Close every window of the sessions, the current one by default, after confirming in a form; with the session saver, opening one again brings its windows back",
@@ -106,10 +107,18 @@ func (a *app) closeCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return tui.RunCloseSession(cmd.Context(), cfg, args, yes, false)
+			fate, err := spaces.ParseFate(sessions)
+			if err != nil {
+				return fmt.Errorf("--sessions: %w", err)
+			}
+			if sessions == "" {
+				fate = ""
+			}
+			return tui.RunCloseSession(cmd.Context(), cfg, args, yes, false, fate)
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "close without asking")
+	cmd.Flags().StringVar(&sessions, "sessions", "", "what becomes of the session provider's sessions the windows show, chosen first in the form: end, shelve or leave; the first the provider allows by default")
 	fromFlag(cmd, &window, "its session by default")
 	cmd.MarkFlagsMutuallyExclusive("from", "yes")
 	return cmd
@@ -133,7 +142,7 @@ func (a *app) suspendCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return tui.RunCloseSession(cmd.Context(), cfg, args, yes, true)
+			return tui.RunCloseSession(cmd.Context(), cfg, args, yes, true, "")
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "suspend without asking")

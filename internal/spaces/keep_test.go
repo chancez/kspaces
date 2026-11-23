@@ -258,3 +258,26 @@ func TestForgetKeptSession(t *testing.T) {
 		})
 	}
 }
+
+// Closing with the provider's sessions ended or left running keeps the session's file and marks its
+// windows, but does not ask the provider to keep anything.
+func TestKeepSessionWithoutTheProvider(t *testing.T) {
+	dir := t.TempDir()
+	calls, _ := fakeKeepTools(t, dir, false, "keep")
+	cfg := config.Config{SessionsDir: dir, Provider: []string{"keeper"}, Kitty: config.Kitty{SaveSessions: true}}
+	if err := keepSession(cfg, "gr@dev", KeepClosed, false); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"kitten @ ls",
+		"kitten @ action kspaces_save_sessions 'gr@dev'",
+		"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep=close",
+		"kitten @ close-window --ignore-no-match --match session:^gr@dev$",
+	}
+	if got := calls(); !reflect.DeepEqual(got, want) {
+		t.Errorf("calls\n%q\nwant\n%q", got, want)
+	}
+	if got, want := LoadKept(dir), map[string]Kept{"gr@dev": {Mode: KeepClosed}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("kept %v, want %v", got, want)
+	}
+}

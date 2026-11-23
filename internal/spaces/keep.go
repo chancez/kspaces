@@ -123,6 +123,12 @@ func suspendedSessions(dir string) []string {
 // windows, see CloseSession, but has done everything else by the time it asks: the form that asks may be
 // over one of them.
 func KeepSession(cfg config.Config, session string, mode KeepMode) error {
+	return keepSession(cfg, session, mode, true)
+}
+
+// keepSession is KeepSession, asking the provider to keep what runs in the windows only with ask: closing
+// with the provider's sessions ended, or left running, keeps the session's file alone.
+func keepSession(cfg config.Config, session string, mode KeepMode, ask bool) error {
 	if !CanKeep(cfg) {
 		return errors.New("keeping a session needs [kitty] save_sessions and a sessions directory")
 	}
@@ -156,7 +162,7 @@ func KeepSession(cfg config.Config, session string, mode KeepMode) error {
 	if err := kitty.SetSessionVar(session, kitty.KeepVar, string(mode)); err != nil {
 		return undo(err)
 	}
-	if len(cfg.Provider) > 0 && ProviderCapabilities(cfg.Provider)[CapKeep] {
+	if ask && len(cfg.Provider) > 0 && ProviderCapabilities(cfg.Provider)[CapKeep] {
 		handles, err := providerKeep(cfg.Provider, session, mode, windows)
 		if err != nil {
 			return undo(err)
@@ -191,4 +197,31 @@ func unkeep(cfg config.Config, session string) error {
 	}
 	delete(kept, session)
 	return saveKept(cfg.SessionsDir, kept)
+}
+
+// CloseSessionAs closes session's windows, keeping it to open again as mode says, or not with mode empty,
+// after doing fate to the provider's sessions its windows show, see ApplyClosingFate. Shelving a session
+// kept to open again is the provider's keep, so opening it brings them back; ending or leaving them keeps
+// its file alone. Every way marks the windows kept, which tells a multiplexer's close watcher to leave
+// what is left of them alone: nothing, once ended. Without a fate, as without a choice in the form, it
+// closes as KeepSession does, or only closes the windows.
+func CloseSessionAs(cfg config.Config, session string, mode KeepMode, fate Fate) error {
+	if fate == "" {
+		if mode == "" {
+			return kitty.CloseSession(session)
+		}
+		return KeepSession(cfg, session, mode)
+	}
+	keeps := fate == FateShelve && mode != "" && ProviderCapabilities(cfg.Provider)[CapKeep]
+	var done error
+	if !keeps {
+		done = ApplyClosingFate(cfg.Provider, session, fate, false)
+	}
+	if mode != "" {
+		return errors.Join(done, keepSession(cfg, session, mode, keeps))
+	}
+	if err := kitty.SetSessionVar(session, kitty.KeepVar, string(KeepClosed)); err != nil {
+		return errors.Join(done, err)
+	}
+	return errors.Join(done, kitty.CloseSession(session))
 }
