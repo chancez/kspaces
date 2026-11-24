@@ -483,14 +483,17 @@ form, suspending. They, Remove worktree, Clean up worktrees, Remove space, Forge
 confirm with `y` or `enter`, and cancel with `n` or `esc`.
 
 With a [session provider](kitty.md#session-providers) that can end or shelve them, Close session, Remove
-worktree, Clean up worktrees and Remove space have a `sessions` choice, `left` and `right` or `h` and `l`,
+worktree, Clean up worktrees and Remove space have a `sessions` choice, `left` and `right`, `h` and `l`, or
+a click on its arrows,
 for what becomes of the provider's sessions the closing windows show, and for removing, those of the space
 tagged with the worktree, whose directory goes with it: **end**, at first, which kills the running ones and
 removes the ended and shelved ones; **shelve**, which for Close is the provider's keep, so opening the
 session again brings them back, and otherwise its shelve; or **leave running**, which only closes the
 windows. The line under it says how many sessions it does that to, and what a busy one runs, in the error
 color when ending or shelving stops it. Only what the provider allows is offered, and without a provider
-there is no choice. Left to the windows closing, a multiplexer's close watcher would decide instead, and cm's
+there is no choice; one alone, as a topic space's end, is said as it is. Closing saves the session's file
+and marks its windows before the sessions end, as a multiplexer's client exits with its session and its
+window can close before kspaces closes it. Left to the windows closing, a multiplexer's close watcher would decide instead, and cm's
 shelves an idle session and detaches a busy one, so a removed worktree's sessions came back as detached
 rows of its space. `--sessions end`, `shelve` or `leave` on `kspaces close`, `kspaces remove --yes` and
 `kspaces remove-space --yes` choose without the form. Suspend session has no choice: it is shelving them.
