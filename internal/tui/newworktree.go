@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -147,6 +148,7 @@ type newWorktreeForm struct {
 	// zones and buttons are where the last frame drew its buttons, and what each runs, for a click.
 	zones   map[string][]look.Zone
 	buttons controls[*newWorktreeForm]
+	kept    drafts
 }
 
 type createdMsg struct{ err error }
@@ -503,6 +505,7 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case createdMsg:
 		f.busy, f.err = false, msg.err
 		if msg.err == nil {
+			f.kept.done = true
 			return f, tea.Quit
 		}
 		return f, nil
@@ -724,7 +727,8 @@ func (f *newWorktreeForm) render() string {
 	}
 	buttons := f.buttons.draw(f, theForm.Target(formSubject{}),
 		control{action: actCreate, label: "Create"},
-		control{action: actCancel, label: "Cancel"})
+		control{action: actCancel, label: "Cancel"},
+		control{action: actFormClear, label: "Clear"})
 	hints := []look.Span{look.Text("  "), look.Key("tab"), look.KeyDesc(" next field")}
 	switch {
 	case f.onTabs():
@@ -815,20 +819,78 @@ func (f *newWorktreeForm) startFrom(base string) error {
 	return nil
 }
 
-// RunNewWorktree runs the new worktree form for space, with the config as the space sees it, meant for a
-// kitty popup, until the worktree is created and opened or the form is left. It starts on the tab from
-// says, on arg, a PR's or an issue's number or URL, when not empty, and a new branch's base on base, a
-// local branch, when not empty.
-func RunNewWorktree(ctx context.Context, cfg config.Config, space spaces.Space, from spaces.From, arg, base string) error {
-	f := newForm(space.ConfigOf(cfg), space)
-	err := f.startFrom(base)
-	switch {
-	case err != nil:
-	case from == spaces.FromPR:
-		err = startOn(f, tabPR, f.prs, arg)
-	case from == spaces.FromIssue:
-		err = startOn(f, tabIssue, f.issues, arg)
+func (f *newWorktreeForm) drafts() *drafts { return &f.kept }
+
+// draft is the tab shown and what every tab has: its fields, its choice of base and of what the session
+// opens with, and their inputs. Whether to open in the background is kept on its own, see create.
+func (f *newWorktreeForm) draft() map[string]string {
+	d := map[string]string{
+		"tab":         strconv.Itoa(f.tab),
+		"branch":      f.branch.Value(),
+		"pr":          f.prs.field.Value(),
+		"issue":       f.issues.field.Value(),
+		"issueBranch": f.issueBranch.Value(),
+		"issueFilled": f.issueFilled,
 	}
+	for i := range f.tabs {
+		t := &f.tabs[i]
+		t.base.draftInto(d, fmt.Sprintf("%d/from", i))
+		d[fmt.Sprintf("%d/dir", i)] = t.dir.Value()
+		t.open.draftInto(d, fmt.Sprintf("%d/open", i))
+	}
+	return d
+}
+
+// restore fills the form in from d and shows its tab, focus on the tab's first field.
+func (f *newWorktreeForm) restore(d map[string]string) tea.Cmd {
+	if len(d) == 0 {
+		return nil
+	}
+	if tab, err := strconv.Atoi(d["tab"]); err == nil && tab >= 0 && tab < len(f.tabs) {
+		f.tab = tab
+	}
+	for name, fl := range map[string]*lineField{"branch": &f.branch, "pr": &f.prs.field, "issue": &f.issues.field, "issueBranch": &f.issueBranch} {
+		if v, ok := d[name]; ok {
+			fl.fill(v)
+		}
+	}
+	if v, ok := d["issueFilled"]; ok {
+		f.issueFilled = v
+	}
+	for i := range f.tabs {
+		t := &f.tabs[i]
+		t.base.restore(d, fmt.Sprintf("%d/from", i))
+		if v, ok := d[fmt.Sprintf("%d/dir", i)]; ok {
+			t.dir.fill(v)
+		}
+		t.open.restore(d, fmt.Sprintf("%d/open", i))
+	}
+	return f.showTab(f.tab, 1)
+}
+
+// openNewWorktree is the new worktree form for space, with the config as the space sees it, its draft
+// restored. It starts on the tab from says, on arg, a PR's or an issue's number or URL, when not empty, and
+// a new branch's base on base, a local branch, when not empty.
+func openNewWorktree(cfg config.Config, space spaces.Space, from spaces.From, arg, base string) (*newWorktreeForm, error) {
+	return withDraft("new worktree:"+space.Root, func(saved map[string]string) (*newWorktreeForm, error) {
+		f := newForm(space.ConfigOf(cfg), space)
+		f.restore(saved)
+		err := f.startFrom(base)
+		switch {
+		case err != nil:
+		case from == spaces.FromPR:
+			err = startOn(f, tabPR, f.prs, arg)
+		case from == spaces.FromIssue:
+			err = startOn(f, tabIssue, f.issues, arg)
+		}
+		return f, err
+	})
+}
+
+// RunNewWorktree runs the new worktree form, see openNewWorktree, meant for a kitty popup, until the
+// worktree is created and opened or the form is left.
+func RunNewWorktree(ctx context.Context, cfg config.Config, space spaces.Space, from spaces.From, arg, base string) error {
+	f, err := openNewWorktree(cfg, space, from, arg, base)
 	if err != nil {
 		return err
 	}

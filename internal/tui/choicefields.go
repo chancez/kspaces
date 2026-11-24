@@ -175,6 +175,42 @@ func (c *choiceFields[T]) choose(name string) {
 	}
 }
 
+// chosenName is the name of the one chosen, or of none.
+func (c *choiceFields[T]) chosenName() string {
+	if ch, ok := c.chosen(); ok {
+		return c.nameOf(ch)
+	}
+	if c.none != nil {
+		return c.none.name
+	}
+	return ""
+}
+
+// draftInto adds to d, a form's draft, the one chosen as key and every choice's inputs as key/choice/input,
+// so switching back to another after reopening loses nothing either.
+func (c *choiceFields[T]) draftInto(d map[string]string, key string) {
+	d[key] = c.chosenName()
+	for i, ch := range c.choices {
+		for j, in := range c.inputOf(ch) {
+			d[key+"/"+c.nameOf(ch)+"/"+in.Name] = c.inputs[i][j].Value()
+		}
+	}
+}
+
+// restore chooses and fills in what draftInto added to d as key, what d does not have left as it is.
+func (c *choiceFields[T]) restore(d map[string]string, key string) {
+	if name, ok := d[key]; ok {
+		c.choose(name)
+	}
+	for i, ch := range c.choices {
+		for j, in := range c.inputOf(ch) {
+			if v, ok := d[key+"/"+c.nameOf(ch)+"/"+in.Name]; ok {
+				c.inputs[i][j].fill(v)
+			}
+		}
+	}
+}
+
 // fields are the chosen one's text boxes, in order.
 func (c *choiceFields[T]) fields() []field {
 	if c.sel < 0 {

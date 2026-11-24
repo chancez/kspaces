@@ -436,6 +436,12 @@ grows to show its lines, a long one wrapped, up to six, then scrolls with the cu
 move down. `up` and `down` move between its lines, and leave it only from the first or the last. While it
 has focus the keys row lists `shift+enter newline`. Every form with an input, below, has these.
 
+Left without creating, by `esc`, a click elsewhere that closes its panel, or its window closing, the form
+keeps what it has: every tab's fields, choices and inputs, and the tab shown. Opened again for the space it
+has them back, what it was opened with, such as a PR from `--pr`, still filled in over them. While it has
+other than what it opens with, a **Clear** `ctrl+r` button puts it back so. Creating the worktree drops
+what was kept, as does a week without opening it. It is kept in `$XDG_STATE_HOME/kspaces/state.json`.
+
 **Run** chooses a command, with the same `command` field when there is more than one, and has a field for
 each input of the one chosen. It says where the command opens: as the session's first tab when the session
 has no windows, else where the command's `open` says, beside the window switching to the session focuses.

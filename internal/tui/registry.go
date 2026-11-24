@@ -787,7 +787,8 @@ var (
 		Title: "creating",
 		Run:   func(*newWorktreeForm, formSubject) tea.Cmd { return nil },
 	}
-	actCancel = quit[*newWorktreeForm, formSubject]()
+	actCancel    = quit[*newWorktreeForm, formSubject]()
+	actFormClear = clearDraft[*newWorktreeForm, formSubject]()
 )
 
 // The remove worktree form's.
@@ -1412,7 +1413,7 @@ func init() {
 	thePickMenu = interact.List(pickMenuKind)
 
 	formKind = interact.NewKind(func(formSubject) string { return "New worktree" },
-		actSwitchField, actPrevField, actNextChoice, actPrevChoice, actFormList, actFormBackground, actCreate, actCancel)
+		actSwitchField, actPrevField, actNextChoice, actPrevChoice, actFormList, actFormBackground, actCreate, actCancel, actFormClear)
 	formKind.Bind(actSwitchField, "tab", "next field", "tab", "down")
 	formKind.Bind(actPrevField, "shift+tab", "previous field", "shift+tab", "up")
 	formKind.Bind(actNextChoice, "left/right", "choose", "right", "l")
@@ -1422,6 +1423,7 @@ func init() {
 	formKind.Bind(actCreate, "enter", "create", "enter")
 	formKind.BindQuiet(actWaitForCreate, "enter")
 	formKind.Bind(actCancel, "esc", "cancel", "esc", "ctrl+c")
+	formKind.Bind(actFormClear, "ctrl+r", "clear what was typed", "ctrl+r")
 	theForm = interact.List(formKind)
 
 	removeKind = interact.NewKind(func(removeSubject) string { return "Remove worktree" },

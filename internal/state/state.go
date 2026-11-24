@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Version is the file's format. A file of another version is read as far as its fields allow.
@@ -26,6 +27,16 @@ type State struct {
 	Trust map[string]string `json:"trust,omitempty"`
 	// NewWorktree is what the new worktree form keeps of the worktree last created with it.
 	NewWorktree NewWorktree `json:"newWorktree"`
+	// Drafts are what was typed in the popup forms left without doing what they are for, by the form and
+	// what it was opened on, so opening it again the same way fills it back in.
+	Drafts map[string]Draft `json:"drafts,omitempty"`
+}
+
+// Draft is what a form had when it was left: its fields' values by name, and when it was saved, which
+// drops one left long enough to be forgotten.
+type Draft struct {
+	Values map[string]string `json:"values"`
+	Saved  time.Time         `json:"saved"`
 }
 
 // NewWorktree is what the new worktree form keeps.

@@ -2,8 +2,10 @@ package tui
 
 import (
 	"context"
+	"os/signal"
 	"slices"
 	"strings"
+	"syscall"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -356,10 +358,17 @@ func (p *popup) leave() error {
 	return p.focus(p.from)
 }
 
-// runPopup runs m in the popup kspaces runs in, see popup.
+// runPopup runs m in the popup kspaces runs in, see popup, and keeps its draft, when it is a form that
+// does, however it is left: closing its window hangs it up.
 func runPopup(ctx context.Context, m popupModel) error {
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGHUP)
+	defer stop()
 	p := newPopup(m, kitty.PanelFrom())
-	if _, err := tea.NewProgram(p, tea.WithContext(ctx)).Run(); err != nil {
+	_, err := tea.NewProgram(p, tea.WithContext(ctx)).Run()
+	if f, ok := p.inner.(drafting); ok {
+		keepDraft(f)
+	}
+	if err != nil {
 		return err
 	}
 	return p.leave()

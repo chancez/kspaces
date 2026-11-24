@@ -12,6 +12,7 @@ import (
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/gittest"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/state"
 )
 
 // fakeGH puts a gh first on PATH that answers `gh pr list` with the PRs of open, a JSON list, and `gh pr
@@ -724,5 +725,75 @@ func TestNewWorktreeFormStartsFrom(t *testing.T) {
 	want := []result{{"feat", "feat", ""}, {}, {}, {Err: "nope is not a local branch"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v\nwant %+v", got, want)
+	}
+}
+
+// What was typed in the form, left without creating, fills it in again the next time it opens for the
+// space; ctrl+r clears it back to what it opens with, and leaving it so, or creating, drops the draft.
+func TestNewWorktreeFormDraft(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	root := mainRepo(t)
+	cfg, err := config.Parse(`
+[worktrees]
+branch_prefix = "pr/me"
+[[commands]]
+name = "claude"
+run = ["claude", "{prompt}"]
+[[commands.inputs]]
+name = "prompt"
+label = "Prompt"
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	space := spaces.Space{Name: "gr", Root: root, Worktrees: []spaces.Worktree{{Path: root, Branch: "main", Session: "gr"}}}
+	open := func() *newWorktreeForm {
+		t.Helper()
+		f, err := openNewWorktree(cfg, space, spaces.FromBranch, "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+		return f
+	}
+	f := open()
+	typeInto(f, "fix")
+	f.Update(keyMsg("tab"))
+	f.Update(keyMsg("tab"))
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	f.Update(keyMsg("tab"))
+	typeInto(f, "fix the crash")
+	typed := f.draft()
+	keepDraft(f)
+
+	f = open()
+	if got := f.draft(); !reflect.DeepEqual(got, typed) {
+		t.Errorf("reopened with\n%v\nwant\n%v", got, typed)
+	}
+	if got, want := formScreen(f), []string{"", "  New worktree in gr", "", "   Branch   Pull request   Issue", "",
+		"  branch     pr/me/fix", "  directory  .worktrees/fix", "  open with  < claude >", "  Prompt     fix the crash",
+		backgroundRow, "", "  Creates pr/me/fix from main", "  Runs claude in the first tab", "",
+		"   Create enter    Cancel esc    Clear ctrl+r   tab next field", ""}; !reflect.DeepEqual(got, want) {
+		t.Errorf("reopened:\n%q\nwant\n%q", got, want)
+	}
+
+	f.Update(keyMsg("ctrl+r"))
+	if got, want := formScreen(f), []string{"", "  New worktree in gr", "", "   Branch   Pull request   Issue", "",
+		"  branch     pr/me/", "  directory  .worktrees", "  open with  < shell >", backgroundRow, "",
+		"  Name the branch to create or check out, or # for a PR", "", "   Create enter    Cancel esc   tab next field", ""}; !reflect.DeepEqual(got, want) {
+		t.Errorf("cleared:\n%q\nwant\n%q", got, want)
+	}
+	keepDraft(f)
+	if got := state.Load().Drafts; got != nil {
+		t.Errorf("cleared, kept %v", got)
+	}
+
+	typeInto(f, "fix")
+	keepDraft(f)
+	f = open()
+	f.Update(createdMsg{})
+	keepDraft(f)
+	if got := state.Load().Drafts; len(got) != 0 {
+		t.Errorf("created, kept %v", got)
 	}
 }
