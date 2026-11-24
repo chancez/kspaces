@@ -1170,6 +1170,7 @@ var (
 		Run:     func(f *replyForm, _ replySubject) tea.Cmd { return f.reply(false) },
 	}
 	actReplyCancel = quit[*replyForm, replySubject]()
+	actReplyClear  = clearDraft[*replyForm, replySubject]()
 )
 
 // The show error form's.
@@ -1506,10 +1507,11 @@ func init() {
 	addKind.Bind(actAddCancel, "esc", "cancel", "esc", "ctrl+c")
 	theAddForm = interact.List(addKind)
 
-	replyKind = interact.NewKind(func(replySubject) string { return "Reply" }, actReplySend, actReplyType, actReplyCancel)
+	replyKind = interact.NewKind(func(replySubject) string { return "Reply" }, actReplySend, actReplyType, actReplyCancel, actReplyClear)
 	replyKind.Bind(actReplySend, "enter", "send", "enter")
 	replyKind.Bind(actReplyType, "ctrl+s", "send without enter", "ctrl+s")
 	replyKind.Bind(actReplyCancel, "esc", "cancel", "esc", "ctrl+c")
+	replyKind.Bind(actReplyClear, "ctrl+r", "clear what was typed", "ctrl+r")
 	theReplyForm = interact.List(replyKind)
 
 	errorKind = interact.NewKind(func(errorSubject) string { return "Error" }, actShowError)

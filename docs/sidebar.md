@@ -600,7 +600,8 @@ switching to it. It shows the last lines of the entry's window's screen that fit
 fetched again every second, and under them a `reply` field, which takes several lines as an input does.
 `enter` sends what it holds and then Enter, or Enter alone when it is empty; `ctrl+s` sends it as it is,
 without Enter, as for a single key a choice menu takes. `shift+enter`, `alt+enter` or `ctrl+j` start a new
-line, which goes to the program as a line feed. The form then closes; it does not switch sessions.
+line, which goes to the program as a line feed. The form then closes; it does not switch sessions. Left
+unsent, the reply is kept for the session, as the new worktree form keeps what it has.
 `kspaces reply WINDOW_ID [TEXT]` sends TEXT and Enter to the window, `--no-enter` TEXT alone, and with no
 TEXT opens the form. [docs/kitty.md](kitty.md#replying-to-a-window) says how the text gets there.
 

@@ -39,6 +39,7 @@ type replyForm struct {
 	// zones and buttons are where the last frame drew its buttons, and what each runs, for a click.
 	zones   map[string][]look.Zone
 	buttons controls[*replyForm]
+	kept    drafts
 }
 
 type sentMsg struct{ err error }
@@ -105,6 +106,7 @@ func (f *replyForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case sentMsg:
 		f.busy, f.err = false, msg.err
 		if msg.err == nil {
+			f.kept.done = true
 			return f, tea.Quit
 		}
 		return f, nil
@@ -167,7 +169,8 @@ func (f *replyForm) render() string {
 	spans := f.buttons.draw(f, theReplyForm.Target(replySubject{}),
 		control{action: actReplySend, label: "Send"},
 		control{action: actReplyType, label: "Send without enter"},
-		control{action: actReplyCancel, label: "Cancel"})
+		control{action: actReplyCancel, label: "Cancel"},
+		control{action: actReplyClear, label: "Clear"})
 	bottom = append(bottom, line(append(spans, newlineHints(&f.in)...)...))
 
 	// The screen's last rows fill what the rest leaves, under a rule, boxed's two rows of padding counted.
@@ -179,6 +182,33 @@ func (f *replyForm) render() string {
 		screen = append(screen, line(look.Rule(width, false)))
 	}
 	return boxed(append(append(top, screen...), bottom...))
+}
+
+// openReplyForm is newReplyForm with the draft kept for the session restored, or for the window, for
+// one in none.
+func openReplyForm(window int, session, title string) *replyForm {
+	to := session
+	if to == "" {
+		to = "window " + strconv.Itoa(window)
+	}
+	f, _ := withDraft(draftKey("reply", []string{to}, nil), func(saved map[string]string) (*replyForm, error) {
+		f := newReplyForm(window, session, title)
+		f.restore(saved)
+		return f, nil
+	})
+	return f
+}
+
+func (f *replyForm) drafts() *drafts { return &f.kept }
+
+// draft is the reply typed.
+func (f *replyForm) draft() map[string]string { return map[string]string{"reply": f.in.Value()} }
+
+func (f *replyForm) restore(d map[string]string) tea.Cmd {
+	if v, ok := d["reply"]; ok {
+		f.in.fill(v)
+	}
+	return nil
 }
 
 // RunReply replies to window: sends text, then Enter unless noEnter, without asking when text is given,
@@ -195,7 +225,7 @@ func RunReply(ctx context.Context, window int, text *string, noEnter bool) error
 	if !ok {
 		return fmt.Errorf("no window %d", window)
 	}
-	if err := runPopup(ctx, newReplyForm(window, w.SessionName, w.Title)); err != nil {
+	if err := runPopup(ctx, openReplyForm(window, w.SessionName, w.Title)); err != nil {
 		return fmt.Errorf("running the reply form: %w", err)
 	}
 	return nil

@@ -10,6 +10,8 @@ import (
 	"testing/synctest"
 
 	tea "charm.land/bubbletea/v2"
+
+	"github.com/chancez/kspaces/internal/state"
 )
 
 // replyScreen is a screen of twelve lines, the second red, the last a prompt, and blank rows under it.
@@ -220,4 +222,33 @@ func TestStatusRightClick(t *testing.T) {
 			t.Errorf("on the popup, cursor %d, want %d:\n%q\nwant\n%q", e.m.cursor, e.entry(20), got, want)
 		}
 	})
+}
+
+// The reply left unsent is there again the next time the form opens for the session, until ctrl+r clears
+// it or it is sent.
+func TestReplyFormDraft(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	f := openReplyForm(7, "gr@fix", "claude")
+	typeInto(f, "yes")
+	keepDraft(f)
+
+	f = openReplyForm(9, "gr@fix", "claude")
+	f.Update(tea.WindowSizeMsg{Width: 80, Height: 16})
+	if got, want := formScreen(f), []string{"", "  Reply to gr@fix  claude", "", "  reply      yes", "",
+		"   Send enter    Send without enter ctrl+s    Cancel esc    Clear ctrl+r   shift+enter newline", ""}; !reflect.DeepEqual(got, want) {
+		t.Errorf("reopened:\n%q\nwant\n%q", got, want)
+	}
+	if got := openReplyForm(7, "gr@other", "claude").draft(); !reflect.DeepEqual(got, map[string]string{"reply": ""}) {
+		t.Errorf("another session's form has %v", got)
+	}
+	f.Update(keyMsg("ctrl+r"))
+	if got := f.draft(); !reflect.DeepEqual(got, map[string]string{"reply": ""}) {
+		t.Errorf("cleared to %v", got)
+	}
+	typeInto(f, "no")
+	f.Update(sentMsg{})
+	keepDraft(f)
+	if got := state.Load().Drafts; len(got) != 0 {
+		t.Errorf("sent, kept %v", got)
+	}
 }
