@@ -32,7 +32,7 @@ func TestCloseFormSessions(t *testing.T) {
 	}
 	want := [][]string{
 		screen("Closes its 2 windows, and what runs in them. Opening it again restores its layout, with fresh\n  programs.", "end          ", "Ends 1 session: build running make"),
-		screen("Closes its 2 windows, keeping what runs in them. Opening it again brings them back.", "shelve       ", "Shelves 1 session, to bring back later: build running make"),
+		screen("Stops what runs in its 2 windows and closes them. Opening it again brings them back as they\n  were.", "shelve       ", "Shelves 1 session, to bring back later: build running make"),
 		screen("Closes 2 windows, leaving what runs in them running.", "leave running", "Leaves 1 session running"),
 	}
 	if !reflect.DeepEqual(got, want) {

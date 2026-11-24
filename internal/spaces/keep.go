@@ -222,8 +222,8 @@ func unkeep(cfg config.Config, session string) error {
 
 // CloseSessionAs closes session's windows, keeping it to open again as mode says, or not with mode empty,
 // after doing fate to the provider's sessions its windows show, see ApplyClosingFate. Shelving a session
-// kept to open again is the provider's keep, so opening it brings them back; ending or leaving them keeps
-// its file alone. Every way marks the windows kept, which tells a multiplexer's close watcher to leave
+// kept to open again suspends it, as KeepSession with KeepSuspended does, so opening it brings them back;
+// ending or leaving them keeps its file alone. Every way marks the windows kept, which tells a multiplexer's close watcher to leave
 // what is left of them alone: nothing, once ended. Without a fate, as without a choice in the form, it
 // closes as KeepSession does, or only closes the windows.
 func CloseSessionAs(cfg config.Config, session string, mode KeepMode, fate Fate) error {
@@ -236,6 +236,11 @@ func CloseSessionAs(cfg config.Config, session string, mode KeepMode, fate Fate)
 	var caps Capabilities
 	if fate != FateLeave {
 		caps = ProviderCapabilities(cfg.Provider)
+	}
+	// Shelving a session kept to open again is suspending it: kept until it is opened again, and marked
+	// suspended in the list, rather than looking closed with what ran in it shelved.
+	if fate == FateShelve && mode != "" {
+		mode = KeepSuspended
 	}
 	keeps := fate == FateShelve && mode != "" && caps[CapKeep]
 	// Which sessions the windows show is asked first, before the windows are marked or any closes.

@@ -105,9 +105,13 @@ func (f *closeSessionForm) render() string {
 			lines = append(lines, line(row))
 		}
 	}
-	kept := len(f.cfg.Provider) > 0
+	kept, mode := len(f.cfg.Provider) > 0, f.mode
 	if f.fate.offered() {
 		kept = f.fate.chosen() == spaces.FateShelve
+	}
+	// Shelving a session kept to open again suspends it, see spaces.CloseSessionAs, and says so.
+	if f.fate.chosen() == spaces.FateShelve && mode != "" {
+		mode = spaces.KeepSuspended
 	}
 	// The choice goes above what it changes, so its row stays put as the words below it change length.
 	choice := func() {
@@ -123,7 +127,7 @@ func (f *closeSessionForm) render() string {
 	if len(f.sessions) == 1 {
 		lines = []string{line(look.Heading(verb + " session " + f.sessions[0])), ""}
 		choice()
-		does := closesWhat(f.mode, f.windows[0], kept)
+		does := closesWhat(mode, f.windows[0], kept)
 		if f.fate.chosen() == spaces.FateLeave {
 			does = fmt.Sprintf("Closes %s, leaving what runs in them running.", plural(f.windows[0], "window"))
 		}
@@ -140,7 +144,7 @@ func (f *closeSessionForm) render() string {
 		}
 		lines = append(lines, "")
 		choice()
-		does := closeTheirs(f.mode, kept)
+		does := closeTheirs(mode, kept)
 		if f.fate.chosen() == spaces.FateLeave {
 			does = "Closes their windows, leaving what runs in them running."
 		}

@@ -240,6 +240,24 @@ func TestCloseSessionAsEndsBeforeClosing(t *testing.T) {
 	}
 }
 
+// Shelving a session kept to open again suspends it, as Suspend does: the provider keeps it as suspended,
+// its windows are marked suspended, and the kept list says suspended, which the list marks it with.
+func TestCloseSessionAsShelveSuspends(t *testing.T) {
+	ran, sessions := fakeVanishing(t)
+	cfg := config.Config{Provider: []string{"prov"}, SessionsDir: sessions, Kitty: config.Kitty{SaveSessions: true}}
+	if err := CloseSessionAs(cfg, "cm@test", KeepClosed, FateShelve); err != nil {
+		t.Fatal(err)
+	}
+	want := "prov capabilities\nkitten ls\nkitten action\nkitten set-user-vars\nprov capabilities\nprov keep\nkitten close-window\n"
+	if got := ran(); got != want {
+		t.Errorf("ran\n%s\nwant\n%s", got, want)
+	}
+	got := []any{LoadKept(sessions), suspendedSessions(sessions)}
+	if want := []any{map[string]Kept{"cm@test": {Mode: KeepSuspended}}, []string{"cm@test"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("kept %v, want %v", got, want)
+	}
+}
+
 // Closing without the saver, and removing, end the sessions as well with their windows going first.
 func TestEndingWindowsGoFirst(t *testing.T) {
 	ran, _ := fakeVanishing(t)
