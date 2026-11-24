@@ -27,7 +27,8 @@ type roles struct {
 	success   color.Color
 	danger    color.Color
 	attention color.Color
-	// merged is for a merged pull request, as GitHub draws one.
+	// merged is for a merged pull request, as GitHub draws one: its own purple, as many themes make ANSI
+	// magenta a red.
 	merged color.Color
 	// onSolid is text on a solid background, such as a button that confirms losing work.
 	onSolid color.Color
@@ -46,7 +47,7 @@ func newRoles(isDark bool) roles {
 		success:   lipgloss.Color("2"),
 		danger:    lipgloss.Color("1"),
 		attention: lipgloss.Color("3"),
-		merged:    lipgloss.Color("5"),
+		merged:    ld(purple, lavender),
 		onSolid:   lipgloss.Color("15"),
 		controlBg: ld(paleGray, charcoal),
 		onControl: ld(slate, ash),
