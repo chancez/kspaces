@@ -3,6 +3,7 @@ package spaces
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/kitty"
 )
 
 // fakeKeepTools puts a kitten and a keeper on PATH that record each call, a line of its words, in order,
@@ -350,5 +352,67 @@ func TestKeepSessionWhileTheProviderKeeps(t *testing.T) {
 	}
 	if got, want := LoadKept(sessions), map[string]Kept{"cm@test": {Mode: KeepSuspended, Handles: []string{"h-a"}}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("kept %v, want %v", got, want)
+	}
+}
+
+// A session left listed as keeping for longer than a keep takes is settled: kept, as it was being, when
+// the provider lists what its windows showed as shelved, with their ids, and what is left of its windows
+// closed; else no longer listed, and its windows no longer marked. Without a list from the provider, or
+// with no sessions noted to look for, one with no windows left is kept. One listed as keeping a moment ago, and one kept, are left as they are.
+func TestSettleKept(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	old, recent := now.Add(-2*keepingFor), now.Add(-time.Second)
+	kept := map[string]Kept{
+		"gr":   {Mode: KeepClosed, Handles: []string{"m3"}},
+		"gr@a": {Mode: KeepSuspending, Handles: []string{"a", "build"}, Since: old},
+		"gr@b": {Mode: KeepClosing, Handles: []string{"b", "web"}, Since: old},
+		"gr@c": {Mode: KeepSuspending, Handles: []string{"c", "tests"}, Since: recent},
+		"gr@d": {Mode: KeepSuspending, Since: old},
+	}
+	st := &ProviderState{Sessions: []ProviderSession{
+		{ID: "a", Name: "build", State: "shelved"},
+		{ID: "b", Name: "web", State: "running", Windows: []int{20}},
+		{ID: "c", Name: "tests", State: "shelved"},
+	}}
+	data := []kitty.OSWindow{{Tabs: []kitty.Tab{{Windows: []kitty.Window{
+		{ID: 10, SessionName: "gr@a", UserVars: map[string]string{kitty.KeepVar: "suspend"}},
+		{ID: 20, SessionName: "gr@b", UserVars: map[string]string{kitty.KeepVar: "close"}},
+	}}}}}
+	var got []any
+	for _, c := range []struct {
+		st   *ProviderState
+		data []kitty.OSWindow
+	}{{st, data}, {nil, data}} {
+		dir := t.TempDir()
+		if err := saveKept(dir, kept); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+		calls := fakeKittenLs(t, dir, "[]")
+		if err := settleKept(config.Config{SessionsDir: dir}, c.st, c.data, now); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, LoadKept(dir), calls())
+	}
+	unchanged := map[string]Kept{"gr": kept["gr"], "gr@c": kept["gr@c"]}
+	withLists := maps.Clone(unchanged)
+	withLists["gr@a"] = Kept{Mode: KeepSuspended, Handles: []string{"a"}}
+	withLists["gr@d"] = Kept{Mode: KeepSuspended}
+	withoutLists := maps.Clone(unchanged)
+	withoutLists["gr@d"] = Kept{Mode: KeepSuspended}
+	want := []any{
+		withLists, []string{
+			"@ close-window --ignore-no-match --match session:^gr@a$",
+			"@ set-user-vars --match session:^gr@b$ kspaces_keep",
+			"@ close-window --ignore-no-match --match session:^gr@d$",
+		},
+		withoutLists, []string{
+			"@ set-user-vars --match session:^gr@a$ kspaces_keep",
+			"@ set-user-vars --match session:^gr@b$ kspaces_keep",
+			"@ close-window --ignore-no-match --match session:^gr@d$",
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got\n%v\nwant\n%v", got, want)
 	}
 }

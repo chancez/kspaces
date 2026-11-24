@@ -172,6 +172,66 @@ func keepingSessions(dir string) map[string]KeepMode {
 	return out
 }
 
+// keepingFor is how long a session may be listed as keeping, see KeepClosing, before settleKept takes it
+// for the leftover of a kspaces that stopped part way: a keep takes about a second.
+const keepingFor = time.Minute
+
+// settleKept settles the sessions in cfg's sessions directory listed as keeping for longer than keepingFor
+// at now, left by a kspaces that stopped before the provider said what it kept: listed so, a session's
+// windows stay marked and the sessions they showed are hidden, for good. One whose sessions st lists as
+// shelved is kept, as it was being, with their ids, and what is left of its windows closed. One whose
+// sessions are not shelved was never kept: it is no longer listed and its windows are no longer marked.
+// st is nil for a provider that has not listed. Without a list, or with no sessions noted to look for, a
+// session is kept when kitty, as data lists it, has none of its windows left, and otherwise no longer listed.
+func settleKept(cfg config.Config, st *ProviderState, data []kitty.OSWindow, now time.Time) error {
+	if cfg.SessionsDir == "" {
+		return nil
+	}
+	kept := LoadKept(cfg.SessionsDir)
+	var errs []error
+	for _, name := range slices.Sorted(maps.Keys(kept)) {
+		k := kept[name]
+		if !k.Mode.Keeping() || now.Sub(k.Since) <= keepingFor {
+			continue
+		}
+		var shelved []string
+		if st != nil {
+			for _, s := range st.Sessions {
+				if s.State == "shelved" && (slices.Contains(k.Handles, s.ID) || slices.Contains(k.Handles, s.Name)) {
+					shelved = append(shelved, s.ID)
+				}
+			}
+		}
+		told := st != nil && len(k.Handles) > 0
+		keep := len(shelved) > 0 || !told && !hasWindows(data, name)
+		logs.Debug("settling a session left keeping", "session", name, "mode", string(k.Mode), "kept", keep)
+		if keep {
+			errs = append(errs, setKept(cfg.SessionsDir, name, &Kept{Mode: k.Mode.Settled(), Handles: shelved}), kitty.CloseSession(name))
+			continue
+		}
+		// Unmarked first: listed no longer, a marked window would be left out of what the provider is told.
+		if hasWindows(data, name) {
+			errs = append(errs, kitty.SetSessionVar(name, kitty.KeepVar, ""))
+		}
+		errs = append(errs, setKept(cfg.SessionsDir, name, nil))
+	}
+	return errors.Join(errs...)
+}
+
+// hasWindows says whether session has a window in data, marked kept or not.
+func hasWindows(data []kitty.OSWindow, session string) bool {
+	for _, osw := range data {
+		for _, tab := range osw.Tabs {
+			for _, w := range tab.Windows {
+				if w.SessionName == session {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // keptHandles are what the provider kept of the kept sessions in dir, see Kept: a session of its that a
 // handle names is a kept kitty session's, which that session's row stands for, not a detached one.
 func keptHandles(dir string) map[string]bool {

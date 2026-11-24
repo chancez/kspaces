@@ -122,8 +122,17 @@ space for a moment, then the session as suspended. So keeping runs in this order
    mode and the handles `keep` printed.
 5. It closes the windows.
 
-If `keep` fails, kspaces removes the line and clears `kspaces_keep`. The saver reads only the session's name
-from each line, so the suspending and closing modes do not change how it treats a listed session.
+If `keep` fails, kspaces removes the line and clears `kspaces_keep`. A kspaces that stops part way leaves the
+line as it is. The sidebar settles any line still suspending or closing a minute after it was written, which
+is far longer than a keep takes:
+
+- If the provider lists one of the noted sessions as shelved, kspaces keeps the session with the ids of
+  the shelved sessions and closes what is left of its windows.
+- If the provider lists none of them as shelved, kspaces removes the line and clears `kspaces_keep`.
+- If the provider does not list, or there were no noted sessions, the session is kept when none of its
+  windows is left, and the line is removed otherwise.
+
+The saver reads only the session's name from each line, so the suspending and closing modes do not change how it treats a listed session.
 
 ## Session providers
 

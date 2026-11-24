@@ -180,6 +180,9 @@ type Poller struct {
 	// none; drag follows the dock for it.
 	saveWidth func(width, cfg int) error
 	drag      dockDrag
+	// settle settles the sessions left listed as keeping, see settleKept, given the provider's sessions,
+	// nil when it has not listed, and kitty's windows; nil for never.
+	settle func(cfg config.Config, st *ProviderState, data []kitty.OSWindow)
 }
 
 // NewPoller is the poller of the kitty kspaces runs in.
@@ -190,6 +193,11 @@ func NewPoller() *Poller {
 	p.capabilities = ProviderCapabilities
 	p.listSessions = listSessions
 	p.saveWidth = saveDockWidth
+	p.settle = func(cfg config.Config, st *ProviderState, data []kitty.OSWindow) {
+		if err := settleKept(cfg, st, data, time.Now()); err != nil {
+			logs.Error("settling the sessions left keeping", err)
+		}
+	}
 	return p
 }
 
@@ -235,6 +243,13 @@ func (p *Poller) Poll() Shared {
 		p.lastMu.Lock()
 		p.last.Provider = sh.Provider
 		p.lastMu.Unlock()
+		if len(sh.Keeping) > 0 && p.settle != nil {
+			var listed *ProviderState
+			if p.listedLast != nil {
+				listed = sh.Provider
+			}
+			p.settle(*sh.Config, listed, sh.Windows)
+		}
 	}
 	p.followDock(sh)
 	return sh

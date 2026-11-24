@@ -177,3 +177,37 @@ func TestPollerWindows(t *testing.T) {
 		t.Errorf("got\n%+v\nwant\n%+v", got, want)
 	}
 }
+
+// A poll that finds a session listed as keeping has it settled, given the provider's list, or nil before
+// the provider has listed, and kitty's windows; a poll that finds none does not.
+func TestPollerSettles(t *testing.T) {
+	keeping := map[string]KeepMode{"gr@dev": KeepSuspending}
+	polls := 0
+	p := newPoller(filepath.Join(t.TempDir(), "kitty.git.json"), func() Shared {
+		polls++
+		if polls == 3 {
+			return Shared{Config: &config.Config{Provider: []string{"prov"}}}
+		}
+		return Shared{Config: &config.Config{Provider: []string{"prov"}}, Keeping: keeping}
+	})
+	windows := []kitty.OSWindow{{Tabs: []kitty.Tab{{ID: 1}}}}
+	p.list = func() ([]kitty.OSWindow, error) { return windows, nil }
+	p.capabilities = func([]string) Capabilities { return Capabilities{CapList: true} }
+	listed := &ProviderState{Sessions: []ProviderSession{{ID: "a", State: "shelved"}}}
+	lists := 0
+	p.listSessions = func([]string, []ProviderWindow) (*ProviderState, error) {
+		if lists++; lists == 1 {
+			return nil, errors.New("not yet")
+		}
+		return listed, nil
+	}
+	var got []any
+	p.settle = func(cfg config.Config, st *ProviderState, data []kitty.OSWindow) { got = append(got, st, data) }
+	p.Poll()
+	p.Poll()
+	p.Poll()
+	want := []any{(*ProviderState)(nil), windows, &ProviderState{Caps: Capabilities{CapList: true}, Sessions: listed.Sessions}, windows}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("settled with\n%v\nwant\n%v", got, want)
+	}
+}
