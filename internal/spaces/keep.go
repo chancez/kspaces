@@ -135,12 +135,16 @@ func keptHandles(dir string) map[string]bool {
 // windows, see CloseSession, but has done everything else by the time it asks: the form that asks may be
 // over one of them.
 func KeepSession(cfg config.Config, session string, mode KeepMode) error {
-	return keepSession(cfg, session, mode, true)
+	return keepSession(cfg, session, mode, true, nil)
 }
 
 // keepSession is KeepSession, asking the provider to keep what runs in the windows only with ask: closing
-// with the provider's sessions ended, or left running, keeps the session's file alone.
-func keepSession(cfg config.Config, session string, mode KeepMode, ask bool) error {
+// with the provider's sessions ended, or left running, keeps the session's file alone. then, when not nil,
+// runs once the file is saved and the windows marked, before they are closed: ending the provider's
+// sessions there can close a window before kspaces does, as a multiplexer's client exits with its
+// session, so the file has to be saved by then, and the window marked for the saver to leave it whole.
+// What then fails stops nothing, and is returned with the rest.
+func keepSession(cfg config.Config, session string, mode KeepMode, ask bool, then func() error) error {
 	if !CanKeep(cfg) {
 		return errors.New("keeping a session needs [kitty] save_sessions and a sessions directory")
 	}
@@ -184,7 +188,12 @@ func keepSession(cfg config.Config, session string, mode KeepMode, ask bool) err
 			return err
 		}
 	}
-	return kitty.CloseSession(session)
+	var done error
+	if then != nil {
+		done = then()
+	}
+	// Windows that went as their sessions ended are closed already: --ignore-no-match.
+	return errors.Join(done, kitty.CloseSession(session))
 }
 
 // unkeep drops session from the kept sessions and has the provider forget what it kept of it. What was
@@ -224,16 +233,23 @@ func CloseSessionAs(cfg config.Config, session string, mode KeepMode, fate Fate)
 		}
 		return KeepSession(cfg, session, mode)
 	}
-	keeps := fate == FateShelve && mode != "" && ProviderCapabilities(cfg.Provider)[CapKeep]
-	var done error
-	if !keeps {
-		done = ApplyClosingFate(cfg.Provider, session, fate, false)
+	var caps Capabilities
+	if fate != FateLeave {
+		caps = ProviderCapabilities(cfg.Provider)
 	}
+	keeps := fate == FateShelve && mode != "" && caps[CapKeep]
+	// Which sessions the windows show is asked first, before the windows are marked or any closes.
+	var sessions []ProviderSession
+	var listed error
+	if !keeps && fate != FateLeave {
+		sessions, listed = closingSessionsNow(cfg.Provider, caps, session, false)
+	}
+	end := func() error { return errors.Join(listed, ApplyFate(cfg.Provider, caps, fate, sessions)) }
 	if mode != "" {
-		return errors.Join(done, keepSession(cfg, session, mode, keeps))
+		return keepSession(cfg, session, mode, keeps, end)
 	}
 	if err := kitty.SetSessionVar(session, kitty.KeepVar, string(KeepClosed)); err != nil {
-		return errors.Join(done, err)
+		return err
 	}
-	return errors.Join(done, kitty.CloseSession(session))
+	return errors.Join(end(), kitty.CloseSession(session))
 }

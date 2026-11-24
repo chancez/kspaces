@@ -156,18 +156,29 @@ func ApplyClosingFate(provider []string, session string, fate Fate, worktree boo
 		return nil
 	}
 	caps := ProviderCapabilities(provider)
+	sessions, err := closingSessionsNow(provider, caps, session, worktree)
+	if err != nil {
+		return err
+	}
+	return ApplyFate(provider, caps, fate, sessions)
+}
+
+// closingSessionsNow are ClosingSessions for session as kitty and the provider list them now, none from a
+// provider that does not list. Asked before anything marks or closes the windows: a window marked kept is
+// left out of what the provider is told, as one of kspaces' own, and one whose session ended is gone.
+func closingSessionsNow(provider []string, caps Capabilities, session string, worktree bool) ([]ProviderSession, error) {
 	if !caps[CapList] {
-		return nil
+		return nil, nil
 	}
 	data, err := kitty.ListWindows()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	st, err := listSessions(provider, allWindows(data))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return ApplyFate(provider, caps, fate, ClosingSessions(st, data, session, worktree))
+	return ClosingSessions(st, data, session, worktree), nil
 }
 
 // Closing is what closing sessions would do to the provider's sessions, for a form that confirms it: what

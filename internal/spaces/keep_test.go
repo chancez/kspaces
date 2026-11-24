@@ -265,7 +265,7 @@ func TestKeepSessionWithoutTheProvider(t *testing.T) {
 	dir := t.TempDir()
 	calls, _ := fakeKeepTools(t, dir, false, "keep")
 	cfg := config.Config{SessionsDir: dir, Provider: []string{"keeper"}, Kitty: config.Kitty{SaveSessions: true}}
-	if err := keepSession(cfg, "gr@dev", KeepClosed, false); err != nil {
+	if err := keepSession(cfg, "gr@dev", KeepClosed, false, nil); err != nil {
 		t.Fatal(err)
 	}
 	want := []string{

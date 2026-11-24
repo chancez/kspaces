@@ -187,3 +187,73 @@ func TestCloseSessionAs(t *testing.T) {
 		t.Errorf("got  %q\nwant %q", got, want)
 	}
 }
+
+// fakeVanishing puts a provider and a kitten on PATH where the provider's kill takes its session's window
+// with it, as a multiplexer's client exits with its session: kitty lists no window after, and set-user-vars
+// fails with none to match, as kitty's does. The session's saver writes its file. It returns the log of
+// both, a line each, in order, and the sessions directory.
+func fakeVanishing(t *testing.T) (func() string, string) {
+	t.Helper()
+	sessions := t.TempDir()
+	dir, _ := fakeProvider(t, map[string]string{
+		"capabilities": `{"capabilities": ["keep", "list", "kill", "shelve"]}`,
+		"list":         `{"sessions": [{"id": "a", "state": "running", "windows": [10]}]}`,
+	}, nil)
+	log, gone := filepath.Join(dir, "order"), filepath.Join(dir, "gone")
+	ls := `[{"tabs": [{"id": 1, "windows": [{"id": 10, "session_name": "cm@test", "cmdline": ["htop"]}]}]}]`
+	provider := filepath.Join(dir, "prov")
+	data, _ := os.ReadFile(provider)
+	script := strings.Replace(string(data), "/bin/cat > \"$d/$1.in\"\n", "/bin/cat > \"$d/$1.in\"\necho \"prov $1\" >> "+log+"\nif [ \"$1\" = kill ]; then : > "+gone+"; fi\n", 1)
+	if err := os.WriteFile(provider, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	kitten := "#!/bin/sh\necho \"kitten $2\" >> " + log + "\ncase \"$2\" in\n" +
+		"ls) if [ -f " + gone + " ]; then echo '[]'; else /bin/cat <<'EOF'\n" + ls + "\nEOF\nfi;;\n" +
+		"set-user-vars) if [ -f " + gone + " ]; then echo 'No matching windows' >&2; exit 1; fi;;\n" +
+		"action) printf 'new_tab\\nlaunch htop\\n' > " + filepath.Join(sessions, "cm@test.kitty-session") + ";;\n" +
+		"esac\n"
+	if err := os.WriteFile(filepath.Join(dir, "kitten"), []byte(kitten), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("KITTY_INSTALLATION_DIR", "")
+	return func() string { data, _ := os.ReadFile(log); return string(data) }, sessions
+}
+
+// Ending a closed session's sessions makes their windows go on their own: the session's file is saved and
+// its windows marked before that, so closing still keeps it whole to open again, and the windows already
+// gone are no error.
+func TestCloseSessionAsEndsBeforeClosing(t *testing.T) {
+	ran, sessions := fakeVanishing(t)
+	cfg := config.Config{Provider: []string{"prov"}, SessionsDir: sessions, Kitty: config.Kitty{SaveSessions: true}}
+	if err := CloseSessionAs(cfg, "cm@test", KeepClosed, FateEnd); err != nil {
+		t.Fatal(err)
+	}
+	want := "prov capabilities\nkitten ls\nprov list\nkitten ls\nkitten action\nkitten set-user-vars\nprov kill\nkitten close-window\n"
+	if got := ran(); got != want {
+		t.Errorf("ran\n%s\nwant\n%s", got, want)
+	}
+	if got, want := LoadKept(sessions), map[string]Kept{"cm@test": {Mode: KeepClosed}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("kept %v, want %v", got, want)
+	}
+	if !opensWindows(SessionFile(cfg, "cm@test")) {
+		t.Error("the session's file opens no windows")
+	}
+}
+
+// Closing without the saver, and removing, end the sessions as well with their windows going first.
+func TestEndingWindowsGoFirst(t *testing.T) {
+	ran, _ := fakeVanishing(t)
+	if err := CloseSessionAs(config.Config{Provider: []string{"prov"}}, "cm@test", "", FateEnd); err != nil {
+		t.Errorf("closing: %v", err)
+	}
+	if got, want := ran(), "prov capabilities\nkitten ls\nprov list\nkitten set-user-vars\nprov kill\nkitten close-window\n"; got != want {
+		t.Errorf("closing ran\n%s\nwant\n%s", got, want)
+	}
+	ran, sessions := fakeVanishing(t)
+	if err := EndSession(config.Config{Provider: []string{"prov"}, SessionsDir: sessions}, "cm@test", FateEnd); err != nil {
+		t.Errorf("removing: %v", err)
+	}
+	if got, want := ran(), "prov capabilities\nkitten ls\nprov list\nprov kill\nkitten close-window\nkitten ls\n"; got != want {
+		t.Errorf("removing ran\n%s\nwant\n%s", got, want)
+	}
+}
