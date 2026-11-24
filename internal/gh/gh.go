@@ -235,6 +235,8 @@ func Browse(dir string, number int) error {
 func run(ctx context.Context, dir, doing string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "gh", args...)
 	cmd.Dir = dir
+	// Once ctx is done and gh killed, what it started may still hold its output open.
+	cmd.WaitDelay = 5 * time.Second
 	out, err := logs.Output(cmd)
 	var ee *exec.ExitError
 	switch {
