@@ -248,7 +248,7 @@ func TestCloseSessionAsShelveSuspends(t *testing.T) {
 	if err := CloseSessionAs(cfg, "cm@test", KeepClosed, FateShelve); err != nil {
 		t.Fatal(err)
 	}
-	want := "prov capabilities\nkitten ls\nkitten action\nkitten set-user-vars\nprov capabilities\nprov keep\nkitten close-window\n"
+	want := "prov capabilities\nkitten ls\nkitten action\nprov capabilities\nprov list\nkitten set-user-vars\nprov keep\nkitten close-window\n"
 	if got := ran(); got != want {
 		t.Errorf("ran\n%s\nwant\n%s", got, want)
 	}

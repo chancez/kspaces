@@ -28,7 +28,8 @@ OPEN_LIST = '.open-sessions'
 
 # Sessions kspaces closed to open again later, a line each of tab-separated fields: how it keeps them, the
 # session, and what the keeper kept of it. kspaces writes it; this keeps the file of a listed session whose last window
-# closed, and drops a session from it once it has windows again.
+# closed, and drops a session from it once it has windows again. Only the session is read: a session kspaces is
+# still keeping has a mode such as suspending:1732464000, which is listed all the same.
 KEPT_LIST = '.kept-sessions'
 
 

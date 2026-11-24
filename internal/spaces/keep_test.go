@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/chancez/kspaces/internal/config"
 )
@@ -117,8 +118,8 @@ func TestKeepSession(t *testing.T) {
 			mode:   KeepSuspended,
 			keeper: []string{"keeper"},
 			calls: append(before,
-				"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep=suspend",
 				"keeper capabilities",
+				"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep=suspend",
 				"keeper keep",
 				"kitten @ close-window --ignore-no-match --match session:^gr@dev$",
 			),
@@ -130,8 +131,8 @@ func TestKeepSession(t *testing.T) {
 			mode:   KeepClosed,
 			keeper: []string{"keeper"},
 			calls: append(before,
-				"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep=close",
 				"keeper capabilities",
+				"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep=close",
 				"keeper keep",
 				"kitten @ close-window --ignore-no-match --match session:^gr@dev$",
 			),
@@ -144,8 +145,8 @@ func TestKeepSession(t *testing.T) {
 			keeper:      []string{"keeper"},
 			keeperFails: true,
 			calls: append(before,
-				"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep=suspend",
 				"keeper capabilities",
+				"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep=suspend",
 				"keeper keep",
 				"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep",
 			),
@@ -159,8 +160,8 @@ func TestKeepSession(t *testing.T) {
 			keeper: []string{"keeper"},
 			caps:   []string{"list", "open"},
 			calls: append(before,
-				"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep=suspend",
 				"keeper capabilities",
+				"kitten @ set-user-vars --match session:^gr@dev$ kspaces_keep=suspend",
 				"kitten @ close-window --ignore-no-match --match session:^gr@dev$",
 			),
 			kept: map[string]Kept{"gr": {Mode: KeepClosed, Handles: []string{"m3"}}, "gr@dev": {Mode: KeepSuspended}},
@@ -278,6 +279,76 @@ func TestKeepSessionWithoutTheProvider(t *testing.T) {
 		t.Errorf("calls\n%q\nwant\n%q", got, want)
 	}
 	if got, want := LoadKept(dir), map[string]Kept{"gr@dev": {Mode: KeepClosed}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("kept %v, want %v", got, want)
+	}
+}
+
+// While the provider keeps a session, a list sees the sessions its windows showed as that session's, not
+// detached: the provider here shelves them and takes its time saying what it kept, and before it does the
+// session is listed as suspending, with their ids and names. Once it says, the session is listed as
+// suspended with what it kept.
+func TestKeepSessionWhileTheProviderKeeps(t *testing.T) {
+	sessions := t.TempDir()
+	dir, _ := fakeProvider(t, map[string]string{
+		"capabilities": `{"capabilities": ["keep", "list", "shelve"]}`,
+	}, nil)
+	provider := filepath.Join(dir, "prov")
+	started, shelved, release := filepath.Join(dir, "started"), filepath.Join(dir, "shelved"), filepath.Join(dir, "release")
+	script := "#!/bin/sh\nd=" + dir + "\n/bin/cat > \"$d/$1.in\"\ncase \"$1\" in\n" +
+		"capabilities) /bin/cat \"$d/capabilities.out\";;\n" +
+		"list) if [ -f " + shelved + " ]; then echo '{\"sessions\": [{\"id\": \"a\", \"name\": \"build\", \"state\": \"shelved\", \"windows\": []}]}';\n" +
+		"  else echo '{\"sessions\": [{\"id\": \"a\", \"name\": \"build\", \"state\": \"running\", \"windows\": [10]}]}'; fi;;\n" +
+		"keep) : > " + shelved + "; : > " + started + "\n" +
+		"  while [ ! -f " + release + " ]; do sleep 0.01; done\n" +
+		"  echo '{\"kept\": [\"h-a\"]}';;\n" +
+		"esac\n"
+	if err := os.WriteFile(provider, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ls := `[{"tabs": [{"id": 1, "windows": [{"id": 10, "session_name": "cm@test", "cmdline": ["htop"]}]}]}]`
+	kitten := "#!/bin/sh\ncase \"$2\" in\n" +
+		"ls) /bin/cat <<'EOF'\n" + ls + "\nEOF\n;;\n" +
+		"action) printf 'new_tab\\nlaunch htop\\n' > " + filepath.Join(sessions, "cm@test.kitty-session") + ";;\n" +
+		"esac\n"
+	if err := os.WriteFile(filepath.Join(dir, "kitten"), []byte(kitten), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("KITTY_INSTALLATION_DIR", "")
+	cfg := config.Config{Provider: []string{"prov"}, SessionsDir: sessions, Kitty: config.Kitty{SaveSessions: true}}
+	done := make(chan error, 1)
+	go func() { done <- KeepSession(cfg, "cm@test", KeepSuspended) }()
+	for deadline := time.Now().Add(10 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+		if _, err := os.Stat(started); err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the provider was never asked to keep")
+		}
+	}
+	st, err := listSessions(cfg.Provider, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mid := LoadKept(sessions)
+	if k := mid["cm@test"]; k.Since.IsZero() {
+		t.Errorf("listed keeping with no time: %v", k)
+	}
+	for name, k := range mid {
+		k.Since = time.Time{}
+		mid[name] = k
+	}
+	got := []any{detachedBySpace(st, keptHandles(sessions)), mid}
+	want := []any{map[string]Detached{}, map[string]Kept{"cm@test": {Mode: KeepSuspending, Handles: []string{"a", "build"}}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("while keeping\n%v\nwant\n%v", got, want)
+	}
+	if err := os.WriteFile(release, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if got, want := LoadKept(sessions), map[string]Kept{"cm@test": {Mode: KeepSuspended, Handles: []string{"h-a"}}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("kept %v, want %v", got, want)
 	}
 }

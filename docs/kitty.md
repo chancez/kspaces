@@ -107,6 +107,23 @@ kept. Every close kspaces makes sets it, whatever was chosen for the sessions: e
 the windows close; left running, it is what keeps the watcher from shelving or detaching them. Removing a
 worktree does not set it: it ends them.
 
+A provider's `keep` shelves the sessions, and the windows marked then are left out of what `list` is told,
+before `keep` says what it kept. A list in between would show those sessions as detached rows of their
+space for a moment, then the session as suspended. So keeping runs in this order:
+
+1. kspaces asks `capabilities`, then `list`, and notes the ids and names of the sessions the session's
+   windows show.
+2. It lists the session as `suspending` or `closing`, followed by `:` and the time in Unix seconds, with
+   those ids and names as its handles. The sidebar treats them as the session's, as it does a kept
+   session's handles, and marks the row as suspending or closing.
+3. It sets `kspaces_keep` on the windows, to the mode, `suspend` or `close`.
+4. It runs `keep`, then replaces the line, written to a temporary file and renamed over the list, with the
+   mode and the handles `keep` printed.
+5. It closes the windows.
+
+If `keep` fails, kspaces removes the line and clears `kspaces_keep`. The saver reads only the session's name
+from each line, so the suspending and closing modes do not change how it treats a listed session.
+
 ## Session providers
 
 kspaces manages kitty's layout: spaces, kitty sessions, tabs, windows and their session files. What runs
