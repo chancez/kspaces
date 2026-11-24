@@ -34,6 +34,7 @@ func (f *addSpaceForm) theme() *look.Theme       { return f.th }
 func (f *cleanupForm) theme() *look.Theme        { return f.th }
 func (f *closeSessionForm) theme() *look.Theme   { return f.th }
 func (f *forgetSessionForm) theme() *look.Theme  { return f.th }
+func (f *resumeSessionForm) theme() *look.Theme  { return f.th }
 func (f *newWorktreeForm) theme() *look.Theme    { return f.th }
 func (f *layoutForm) theme() *look.Theme         { return f.th }
 func (f *removeWorktreeForm) theme() *look.Theme { return f.th }
@@ -48,6 +49,7 @@ func (f *addSpaceForm) working() bool       { return f.busy }
 func (f *cleanupForm) working() bool        { return f.busy }
 func (f *closeSessionForm) working() bool   { return f.busy }
 func (f *forgetSessionForm) working() bool  { return f.busy }
+func (f *resumeSessionForm) working() bool  { return f.busy }
 func (f *newWorktreeForm) working() bool    { return f.busy }
 func (f *layoutForm) working() bool         { return f.busy }
 func (f *removeWorktreeForm) working() bool { return f.busy }
@@ -60,6 +62,7 @@ func (f *addSpaceForm) failed() bool       { return f.err != nil }
 func (f *cleanupForm) failed() bool        { return f.err != nil }
 func (f *closeSessionForm) failed() bool   { return f.err != nil }
 func (f *forgetSessionForm) failed() bool  { return f.err != nil }
+func (f *resumeSessionForm) failed() bool  { return f.err != nil }
 func (f *newWorktreeForm) failed() bool    { return f.err != nil }
 func (f *layoutForm) failed() bool         { return f.err != nil }
 func (f *removeWorktreeForm) failed() bool { return f.err != nil }
@@ -80,6 +83,9 @@ func (f *closeSessionForm) keys() ([]interact.Section, bool) {
 }
 func (f *forgetSessionForm) keys() ([]interact.Section, bool) {
 	return interact.Help(f, theForgetForm.Target(forgetSubject{})), false
+}
+func (f *resumeSessionForm) keys() ([]interact.Section, bool) {
+	return interact.Help(f, theResumeForm.Target(resumeSubject{})), false
 }
 func (f *newWorktreeForm) keys() ([]interact.Section, bool) {
 	t := f.current()

@@ -159,6 +159,24 @@ func (a *app) forgetCommand() *cobra.Command {
 	return cmd
 }
 
+func (a *app) resumeCommand() *cobra.Command {
+	var yes bool
+	cmd := &cobra.Command{
+		Use:   "resume SESSION",
+		Short: "Open a suspended session again, restoring its windows and what was kept running in them, after confirming in a form",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := config.Load()
+			if err != nil {
+				return err
+			}
+			return tui.RunResumeSession(cmd.Context(), cfg, args[0], yes)
+		},
+	}
+	cmd.Flags().BoolVar(&yes, "yes", false, "resume without asking")
+	return cmd
+}
+
 func (a *app) removeSpaceCommand() *cobra.Command {
 	var yes bool
 	var sessions string

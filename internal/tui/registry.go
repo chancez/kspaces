@@ -72,6 +72,9 @@ type removeSpaceSubject struct{}
 // forgetSubject is the forget session form.
 type forgetSubject struct{}
 
+// resumeSubject is the resume session form.
+type resumeSubject struct{}
+
 // cleanupSubject is the clean up worktrees form.
 type cleanupSubject struct{}
 
@@ -163,7 +166,7 @@ var (
 		},
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
-			return m.openWorktreeCmd(*s.row.Worktree, spaces.OpenOptions{})
+			return m.openOrResumeCmd(*s.row.Worktree, spaces.OpenOptions{})
 		},
 	}
 	actOpenPlain = &interact.Action[*sidebar, entrySubject]{
@@ -176,7 +179,7 @@ var (
 		},
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
-			return m.openWorktreeCmd(*s.row.Worktree, spaces.OpenOptions{NoLayout: true})
+			return m.openOrResumeCmd(*s.row.Worktree, spaces.OpenOptions{NoLayout: true})
 		},
 	}
 	actFold = &interact.Action[*sidebar, entrySubject]{
@@ -854,6 +857,21 @@ var (
 	actForgetQuit = quit[*forgetSessionForm, forgetSubject]()
 )
 
+// The resume session form's.
+var (
+	actResume = &interact.Action[*resumeSessionForm, resumeSubject]{
+		Title:   "resume",
+		Applies: func(f *resumeSessionForm, _ resumeSubject) bool { return !f.busy },
+		Run:     cmd[*resumeSessionForm, resumeSubject]((*resumeSessionForm).resume),
+	}
+	actResumeCancel = &interact.Action[*resumeSessionForm, resumeSubject]{
+		Title:   "cancel",
+		Applies: func(f *resumeSessionForm, _ resumeSubject) bool { return !f.busy },
+		Run:     func(*resumeSessionForm, resumeSubject) tea.Cmd { return tea.Quit },
+	}
+	actResumeQuit = quit[*resumeSessionForm, resumeSubject]()
+)
+
 // The form that ends the provider's sessions'.
 var (
 	actEndSessionsDown = &interact.Action[*endSessionsForm, endSessionsSubject]{
@@ -1202,6 +1220,7 @@ var (
 	removeSpaceKind *interact.Kind[*removeSpaceForm, removeSpaceSubject]
 	closeKind       *interact.Kind[*closeSessionForm, closeSubject]
 	forgetKind      *interact.Kind[*forgetSessionForm, forgetSubject]
+	resumeKind      *interact.Kind[*resumeSessionForm, resumeSubject]
 	endSessionsKind *interact.Kind[*endSessionsForm, endSessionsSubject]
 	moveKind        *interact.Kind[*moveSessionsForm, moveSubject]
 	addKind         *interact.Kind[*addSpaceForm, addSubject]
@@ -1237,6 +1256,7 @@ var (
 	theRemoveSpaceForm *interact.Place[*removeSpaceForm, removeSpaceSubject]
 	theCloseForm       *interact.Place[*closeSessionForm, closeSubject]
 	theForgetForm      *interact.Place[*forgetSessionForm, forgetSubject]
+	theResumeForm      *interact.Place[*resumeSessionForm, resumeSubject]
 	theEndSessionsForm *interact.Place[*endSessionsForm, endSessionsSubject]
 	theMoveForm        *interact.Place[*moveSessionsForm, moveSubject]
 	theAddForm         *interact.Place[*addSpaceForm, addSubject]
@@ -1473,6 +1493,11 @@ func init() {
 	forgetKind.Bind(actForgetCancel, "n/esc", "cancel", "n", "esc")
 	forgetKind.Bind(actForgetQuit, "ctrl+c", "quit", "ctrl+c")
 	theForgetForm = interact.List(forgetKind)
+	resumeKind = interact.NewKind(func(resumeSubject) string { return "Resume session" }, actResume, actResumeCancel, actResumeQuit)
+	resumeKind.Bind(actResume, "y/enter", "resume", "y", "enter")
+	resumeKind.Bind(actResumeCancel, "n/esc", "cancel", "n", "esc")
+	resumeKind.Bind(actResumeQuit, "ctrl+c", "quit", "ctrl+c")
+	theResumeForm = interact.List(resumeKind)
 
 	endSessionsKind = interact.NewKind(func(endSessionsSubject) string { return "End sessions" },
 		actEndSessionsDown, actEndSessionsUp, actEndSessionsToggle, actEndSessionsTickAll, actEndSessions, actEndSessionsCancel, actEndSessionsQuit)

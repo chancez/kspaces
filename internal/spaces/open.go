@@ -293,6 +293,11 @@ func AskForgetSession(cfg config.Config, st kitty.State, sessions ...string) err
 	return launchForm(cfg, st, panelFor(len(sessions)), append([]string{"forget"}, sessions...)...)
 }
 
+// AskResumeSession opens the form that confirms resuming a suspended session, in a popup of a question's size.
+func AskResumeSession(cfg config.Config, st kitty.State, session string) error {
+	return launchForm(cfg, st, formPanel, "resume", session)
+}
+
 // AskTrust opens the form that trusts the own config of the space at root, in a popup as NewWorktree's.
 func AskTrust(cfg config.Config, st kitty.State, root string) error {
 	return launchForm(cfg, st, listPanel, "trust", root)

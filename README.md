@@ -242,6 +242,7 @@ kspaces close [SESSION...]  close every window of the sessions, after confirming
 kspaces suspend [SESSION...]  stop what runs in the sessions and close them, keeping them, and with a
                          provider what ran in them, to resume, after confirming
 kspaces forget SESSION...   delete the saved files of sessions with no windows, after confirming
+kspaces resume SESSION   open a suspended session again, after confirming
 kspaces sessions kill|remove ID...  kill or remove the session provider's sessions, after confirming;
 kspaces sessions move ID...  move them to another space, in a form; cleanup SPACE: a space's detached ones
 kspaces trust [PATH]     trust the .kspaces.toml of the space PATH is in, after seeing what it adds in a

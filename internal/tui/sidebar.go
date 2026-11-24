@@ -240,6 +240,21 @@ func (m *sidebar) openWorktreeCmd(wt spaces.Worktree, opts spaces.OpenOptions) t
 	}
 }
 
+// openOrResumeCmd opens wt's session as openWorktreeCmd does, unless it is suspended with no windows:
+// then it asks first in the resume session form, as resuming brings back all it ran.
+func (m *sidebar) openOrResumeCmd(wt spaces.Worktree, opts spaces.OpenOptions) tea.Cmd {
+	if !m.suspended[wt.Session] || m.isOpen(&wt) {
+		return m.openWorktreeCmd(wt, opts)
+	}
+	cfg, st := m.cfg, m.kitty
+	return func() tea.Msg {
+		if err := spaces.AskResumeSession(cfg, st, wt.Session); err != nil {
+			return failedMsg{err}
+		}
+		return nil
+	}
+}
+
 func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var start tea.Cmd
 	if _, ok := msg.(tea.MouseMsg); ok {
