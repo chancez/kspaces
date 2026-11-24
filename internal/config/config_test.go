@@ -32,6 +32,7 @@ auto_install = true
 
 [git]
 timeout = "1m"
+fetch_timeout = 0
 
 [space.gr]
 group = "work"
@@ -61,7 +62,7 @@ group = "work"
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := (Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: ".worktrees"}, Sidebar: Sidebar{Width: 28, Popup: PopupOverlay}, Git: Git{Timeout: 30 * time.Second}}); !reflect.DeepEqual(got, want) {
+	if want := (Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: ".worktrees"}, Sidebar: Sidebar{Width: 28, Popup: PopupOverlay}, Git: Git{Timeout: 30 * time.Second, FetchTimeout: 2 * time.Minute}}); !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}
 
@@ -78,6 +79,7 @@ group = "work"
 		"[git]\ntimeout = \"-1s\"",
 		"[git]\ntimeout = \"soon\"",
 		"[git]\ntimeout = 30", // nanoseconds
+		"[git]\nfetch_timeout = \"-1m\"",
 	} {
 		if _, err := Parse(bad); err == nil {
 			t.Fatalf("%q was accepted", bad)

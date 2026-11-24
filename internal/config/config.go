@@ -39,6 +39,7 @@ import (
 //
 //	[git]
 //	timeout = "30s"
+//	fetch_timeout = "2m"
 //
 //	[[commands]]
 //	name = "gr"
@@ -114,8 +115,12 @@ type Kitty struct {
 // Git is how kspaces runs git.
 type Git struct {
 	// Timeout is how long git may take to answer what kspaces asks, such as the sidebar's git status, before
-	// it is stopped; 0 for no limit. What changes a repository, such as adding a worktree, has none.
+	// it is stopped; 0 for no limit. What changes a repository, such as adding a worktree, has none but a
+	// fetch.
 	Timeout time.Duration `toml:"timeout"`
+	// FetchTimeout is how long a fetch may take, as when the new worktree form checks out a PR; 0 for no
+	// limit.
+	FetchTimeout time.Duration `toml:"fetch_timeout"`
 }
 
 // The sidebar's width when none is set, and the range a width must be in to leave room for names and for
@@ -279,7 +284,7 @@ func decode(data string) (decoded, error) {
 // is one file's to set: set in two, or a command, layout or group in two, it is an error naming both,
 // rather than one silently winning.
 func merge(names []string, parts []decoded) (Config, error) {
-	cfg := Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: defaultWorktreeDir}, Sidebar: Sidebar{Width: DefaultSidebarWidth, Popup: PopupOverlay}, Git: Git{Timeout: git.DefaultTimeout}}
+	cfg := Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: defaultWorktreeDir}, Sidebar: Sidebar{Width: DefaultSidebarWidth, Popup: PopupOverlay}, Git: Git{Timeout: git.DefaultTimeout, FetchTimeout: git.DefaultFetchTimeout}}
 	// The file that set each setting, a space's by "space.NAME.KEY", and each command, layout and group.
 	setBy := map[string]int{}
 	// once records file i setting key, what is called name, or says it is done twice: done is how, as in
@@ -348,9 +353,11 @@ func merge(names []string, parts []decoded) (Config, error) {
 	if p := cfg.Sidebar.Popup; p != PopupOverlay && p != PopupPanel {
 		return Config{}, fmt.Errorf("sidebar.popup is %q, it must be %q or %q", p, PopupOverlay, PopupPanel)
 	}
-	if t := cfg.Git.Timeout; t < 0 || t > 0 && t < time.Second {
-		// A number is read as nanoseconds.
-		return Config{}, fmt.Errorf("git.timeout is %s, it must be 0 or a second or more, written with its unit, such as \"30s\"", t)
+	if err := checkTimeout("git.timeout", cfg.Git.Timeout); err != nil {
+		return Config{}, err
+	}
+	if err := checkTimeout("git.fetch_timeout", cfg.Git.FetchTimeout); err != nil {
+		return Config{}, err
 	}
 	if err := checkCommands(cfg.Commands); err != nil {
 		return Config{}, err
@@ -390,6 +397,15 @@ func mergeSettings(dst, src reflect.Value, key []string, md toml.MetaData, set f
 			return err
 		}
 		dst.Field(i).Set(src.Field(i))
+	}
+	return nil
+}
+
+// checkTimeout says what is wrong with the timeout key is set to: one under a second, as a bare number,
+// read as nanoseconds, gives.
+func checkTimeout(key string, t time.Duration) error {
+	if t < 0 || t > 0 && t < time.Second {
+		return fmt.Errorf("%s is %s, it must be 0 or a second or more, written with its unit, such as \"30s\"", key, t)
 	}
 	return nil
 }

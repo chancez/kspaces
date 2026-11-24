@@ -25,8 +25,8 @@ func TestAskTimeout(t *testing.T) {
 				t.Fatal(err)
 			}
 			t.Setenv("PATH", dir)
-			SetTimeout(time.Second)
-			t.Cleanup(func() { SetTimeout(DefaultTimeout) })
+			SetTimeouts(time.Second, 0)
+			t.Cleanup(func() { SetTimeouts(DefaultTimeout, DefaultFetchTimeout) })
 			delay := killDelay
 			killDelay = 200 * time.Millisecond
 			t.Cleanup(func() { killDelay = delay })
@@ -39,5 +39,20 @@ func TestAskTimeout(t *testing.T) {
 				t.Errorf("got %v, want %s", err, tc.want)
 			}
 		})
+	}
+}
+
+// A fetch that runs past the fetch timeout is stopped, and says so.
+func TestFetchTimeout(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "git"), []byte("#!/bin/sh\nexec /bin/sleep 60\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	SetTimeouts(0, time.Second)
+	t.Cleanup(func() { SetTimeouts(DefaultTimeout, DefaultFetchTimeout) })
+	err := TrackRemoteBranch(dir, "origin", "main")
+	if want := "git fetch took longer than 1s, and was stopped"; err == nil || err.Error() != want {
+		t.Errorf("got %v, want %s", err, want)
 	}
 }

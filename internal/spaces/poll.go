@@ -75,7 +75,7 @@ func loadSpaces() Shared {
 		return Shared{Err: err.Error()}
 	}
 	// Each poll, so the sidebar follows an edit.
-	git.SetTimeout(cfg.Git.Timeout)
+	git.SetTimeouts(cfg.Git.Timeout, cfg.Git.FetchTimeout)
 	sh := Shared{Config: &cfg}
 	for _, root := range cfg.Spaces {
 		s := ReadSpace(cfg, root)

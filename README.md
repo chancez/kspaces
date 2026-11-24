@@ -182,9 +182,11 @@ auto_install = true
 save_sessions = true
 
 # How long git may take to answer what kspaces asks, such as the sidebar's git status, before it is
-# stopped. 0 for no limit. Commands that change a repository, such as adding a worktree, have none.
+# stopped, and how long a fetch may take, as when checking out a PR. 0 for no limit. Other commands that
+# change a repository, such as adding a worktree, have none.
 [git]
 timeout = "30s"
+fetch_timeout = "2m"
 ```
 
 Every key is optional. An unknown key is an error. Other `.toml` files beside config.toml, such as a

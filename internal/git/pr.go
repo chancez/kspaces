@@ -3,28 +3,42 @@ package git
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/chancez/kspaces/internal/logs"
 )
 
 // gitDo runs git in the repository at root, its output as the error when it fails. A fetch that needs a
 // password fails rather than waiting at a prompt nobody sees.
-func gitDo(root string, args ...string) error {
-	cmd := exec.Command("git", append([]string{"-C", root}, args...)...)
+func gitDo(root string, args ...string) error { return gitFor(0, root, args...) }
+
+// fetch is gitDo for a fetch, stopped once it runs past the fetch timeout, see SetTimeouts.
+func fetch(root string, args ...string) error {
+	return gitFor(time.Duration(fetchTimeout.Load()), root, append([]string{"fetch"}, args...)...)
+}
+
+// gitFor is gitDo stopped once it runs for longer than d, 0 for no limit, see limited.
+func gitFor(d time.Duration, root string, args ...string) error {
+	cmd, cancel := limited(d, append([]string{"-C", root}, args...)...)
+	defer cancel()
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-	if out, err := logs.CombinedOutput(cmd); err != nil {
-		return fmt.Errorf("%s", strings.TrimSpace(string(out)))
+	start := time.Now()
+	out, err := logs.CombinedOutput(cmd)
+	switch {
+	case err == nil:
+		return nil
+	case d > 0 && time.Since(start) >= d:
+		return fmt.Errorf("git %s took longer than %s, and was stopped", args[0], d)
 	}
-	return nil
+	return fmt.Errorf("%s", strings.TrimSpace(string(out)))
 }
 
 // TrackRemoteBranch fetches branch from remote and creates the local branch of that name on it, tracking
 // it. The refspec is explicit, as a clone of a single branch fetches nothing else into remote/branch.
 func TrackRemoteBranch(root, remote, branch string) error {
 	upstream := remote + "/" + branch
-	if err := gitDo(root, "fetch", remote, "+refs/heads/"+branch+":refs/remotes/"+upstream); err != nil {
+	if err := fetch(root, remote, "+refs/heads/"+branch+":refs/remotes/"+upstream); err != nil {
 		return err
 	}
 	return gitDo(root, "branch", "--track", branch, upstream)
@@ -35,7 +49,7 @@ func TrackRemoteBranch(root, remote, branch string) error {
 // remote for.
 func FetchPullHead(root, remote string, number int, branch string) error {
 	ref := fmt.Sprintf("refs/pull/%d/head", number)
-	if err := gitDo(root, "fetch", remote, ref+":refs/heads/"+branch); err != nil {
+	if err := fetch(root, remote, ref+":refs/heads/"+branch); err != nil {
 		return err
 	}
 	if err := gitDo(root, "config", "branch."+branch+".remote", remote); err != nil {

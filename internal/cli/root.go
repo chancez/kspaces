@@ -36,7 +36,7 @@ func Execute(ctx context.Context) int {
 	logs.Debug("start", "args", os.Args[1:])
 	// A config that cannot load leaves git's default; the command loading it says why.
 	if cfg, err := config.Load(); err == nil {
-		git.SetTimeout(cfg.Git.Timeout)
+		git.SetTimeouts(cfg.Git.Timeout, cfg.Git.FetchTimeout)
 	}
 	if err := cmd.ExecuteContext(ctx); err != nil {
 		logs.Error("exit", err)
