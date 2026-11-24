@@ -172,11 +172,9 @@ func (f *cleanupForm) remove() tea.Cmd {
 		}
 		paths = append(paths, c.Worktree.Path)
 		branch := f.deleteBranches && c.Branch.Offered()
-		opts[c.Worktree.Path] = spaces.RemoveOptions{Force: c.Changes > 0, DeleteBranch: branch, ForceBranch: branch && c.Branch.Unmerged > 0,
-			Sessions: f.fate.chosen()}
+		opts[c.Worktree.Path] = spaces.RemoveOptions{Force: c.Changes > 0, DeleteBranch: branch, ForceBranch: branch && c.Branch.Unmerged > 0}
 	}
-	fate := f.fate.chosen()
-	return func() tea.Msg { return cleanedMsg{spaces.RemoveAllInBackground(paths, opts, sessions, fate)} }
+	return func() tea.Msg { return cleanedMsg{spaces.RemoveAllInBackground(paths, opts, sessions)} }
 }
 
 func (f *cleanupForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -196,9 +194,6 @@ func (f *cleanupForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		f.paint = nil
 		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
 			return f, cmd
-		}
-		if f.fate.click(f.zones, msg) {
-			return f, nil
 		}
 		for i := range f.items {
 			for _, z := range f.zones[fmt.Sprintf(cleanupZone, i)] {
@@ -385,7 +380,7 @@ func RunCleanup(ctx context.Context, cfg config.Config, root string, sessions []
 		names = append(names, c.Worktree.Session)
 	}
 	closing := spaces.ClosingNow(cfg.Provider, names, false, true)
-	f.sessions, f.fate = closing.Sessions, fateChoice{fates: closing.Fates}
+	f.sessions, f.fate = closing.Sessions, endsOnly(closing.Fates)
 	if err := runPopup(ctx, f); err != nil {
 		return fmt.Errorf("running the clean up form: %w", err)
 	}

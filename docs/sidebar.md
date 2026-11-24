@@ -482,22 +482,24 @@ and `--yes` closes them without asking. **Suspend session** and `kspaces suspend
 form, suspending. They, Remove worktree, Clean up worktrees, Remove space, Forget and Trust space config
 confirm with `y` or `enter`, and cancel with `n` or `esc`.
 
-With a [session provider](kitty.md#session-providers) that can end or shelve them, Close session, Remove
-worktree, Clean up worktrees and Remove space have a `sessions` choice, `left` and `right`, `h` and `l`, or
-a click on its arrows,
-for what becomes of the provider's sessions the closing windows show, and for removing, those of the space
-tagged with the worktree, whose directory goes with it: **end**, at first, which kills the running ones and
-removes the ended and shelved ones; **shelve**, which for Close suspends the session, exactly as Suspend
-session does, so opening it again brings them back, and otherwise is the provider's shelve; or **leave running**, which only closes the
-windows. It sits above what the form says the choice changes, each name padded to the widest, so its
-arrows stay where they are as it changes. The line under it says how many sessions it does that to, and what a busy one runs, in the error
+With a [session provider](kitty.md#session-providers) that can end or shelve them, Close session and
+Remove space have a `sessions` choice, `left` and `right`, `h` and `l`, or a click on its arrows, for what
+becomes of the provider's sessions the closing windows show: **end**, at first, which kills the running
+ones and removes the ended and shelved ones; **shelve**, which for Close suspends the session, exactly as
+Suspend session does, so opening it again brings them back, and otherwise is the provider's shelve; or
+**leave running**, which only closes the windows. It sits above what the form says the choice changes,
+each name padded to the widest, so its arrows stay where they are as it changes. The line under it says
+how many sessions it does that to, and what a busy one runs, in the error
 color when ending or shelving stops it. Only what the provider allows is offered, and without a provider
-there is no choice; one alone, as a topic space's end, is said as it is. Closing saves the session's file
+there is no choice; one alone, as a topic space's end, is said as it is. Remove worktree and Clean up
+worktrees have no choice: they end the sessions the windows show, and those of the space tagged with the
+worktree, as once the directory is gone there is nothing for them to run in or come back to, and say so on
+the same lines. Closing saves the session's file
 and marks its windows before the sessions end, as a multiplexer's client exits with its session and its
 window can close before kspaces closes it. Left to the windows closing, a multiplexer's close watcher would decide instead, and cm's
 shelves an idle session and detaches a busy one, so a removed worktree's sessions came back as detached
-rows of its space. `--sessions end`, `shelve` or `leave` on `kspaces close`, `kspaces remove --yes` and
-`kspaces remove-space --yes` choose without the form. Suspend session has no choice: it is shelving them.
+rows of its space. `--sessions end`, `shelve` or `leave` on `kspaces close` and `kspaces remove-space
+--yes` choose without the form; `kspaces remove` has no `--sessions`, and always ends them. Suspend session has no choice: it is shelving them.
 
 **Remove space** takes a configured space out of the config, as text, its entry with its own comments and
 its `[space.NAME]` tables, from the file that has them; the repository stays as it is. A topic space is
@@ -509,7 +511,7 @@ running or shelved, it stays, listed as a topic space holding them. `kspaces rem
 same form; it runs as a kitty background process, so an error is shown by kitty.
 
 **Remove worktree** shows the directory, the session's windows and the files that are not committed, which
-are lost. It does the `sessions` choice to the provider's sessions, closes the session, waits for its
+are lost. It ends the provider's sessions, closes the session, waits for its
 windows to go, deletes the session's saved file and runs `git worktree remove`. A session the provider fails
 to end does not stop it, as the removal was confirmed: kitty shows the provider's error with the rest. What git would refuse, such as a locked worktree, is said before you confirm. The
 removal runs as a kitty background process, so an error after that is shown by kitty.

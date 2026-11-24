@@ -44,6 +44,16 @@ func (c *fateChoice) cycle(delta int) {
 var fateNames = map[spaces.Fate]string{spaces.FateEnd: "end", spaces.FateShelve: "shelve", spaces.FateLeave: "leave running"}
 
 // Zones of the choice: the fate before, and the fate after, which a click goes to.
+// endsOnly is the choice for removing a worktree: ending what the provider runs there when fates, those the
+// provider allows, include it, with nothing to choose. Once the directory is gone there is nothing for a
+// session to keep running in or come back to. None when the provider cannot end them.
+func endsOnly(fates []spaces.Fate) fateChoice {
+	if !slices.Contains(fates, spaces.FateEnd) {
+		return fateChoice{}
+	}
+	return fateChoice{fates: []spaces.Fate{spaces.FateEnd}}
+}
+
 const (
 	fatePrevZone = "fate:prev"
 	fateNextZone = "fate:next"

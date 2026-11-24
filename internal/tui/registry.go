@@ -810,16 +810,6 @@ var (
 		Applies: func(f *removeWorktreeForm, _ removeSubject) bool { return !f.busy && f.branch.Offered() },
 		Run:     do[*removeWorktreeForm, removeSubject](func(f *removeWorktreeForm) { f.deleteBranch = !f.deleteBranch }),
 	}
-	actRemoveNextFate = &interact.Action[*removeWorktreeForm, removeSubject]{
-		Title:   "next for sessions",
-		Applies: func(f *removeWorktreeForm, _ removeSubject) bool { return !f.busy && f.fate.offered() },
-		Run:     do[*removeWorktreeForm, removeSubject](func(f *removeWorktreeForm) { f.fate.cycle(1) }),
-	}
-	actRemovePrevFate = &interact.Action[*removeWorktreeForm, removeSubject]{
-		Title:   "previous for sessions",
-		Applies: func(f *removeWorktreeForm, _ removeSubject) bool { return !f.busy && f.fate.offered() },
-		Run:     do[*removeWorktreeForm, removeSubject](func(f *removeWorktreeForm) { f.fate.cycle(-1) }),
-	}
 	actRemoveQuit = quit[*removeWorktreeForm, removeSubject]()
 )
 
@@ -979,16 +969,6 @@ var (
 		Title:   "cancel",
 		Applies: func(f *cleanupForm, _ cleanupSubject) bool { return !f.busy },
 		Run:     func(*cleanupForm, cleanupSubject) tea.Cmd { return tea.Quit },
-	}
-	actCleanupNextFate = &interact.Action[*cleanupForm, cleanupSubject]{
-		Title:   "next for sessions",
-		Applies: func(f *cleanupForm, _ cleanupSubject) bool { return !f.busy && f.fate.offered() },
-		Run:     do[*cleanupForm, cleanupSubject](func(f *cleanupForm) { f.fate.cycle(1) }),
-	}
-	actCleanupPrevFate = &interact.Action[*cleanupForm, cleanupSubject]{
-		Title:   "previous for sessions",
-		Applies: func(f *cleanupForm, _ cleanupSubject) bool { return !f.busy && f.fate.offered() },
-		Run:     do[*cleanupForm, cleanupSubject](func(f *cleanupForm) { f.fate.cycle(-1) }),
 	}
 	actCleanupQuit = quit[*cleanupForm, cleanupSubject]()
 )
@@ -1445,12 +1425,10 @@ func init() {
 	theForm = interact.List(formKind)
 
 	removeKind = interact.NewKind(func(removeSubject) string { return "Remove worktree" },
-		actRemove, actRemoveCancel, actRemoveDeleteBranch, actRemoveNextFate, actRemovePrevFate, actRemoveQuit)
+		actRemove, actRemoveCancel, actRemoveDeleteBranch, actRemoveQuit)
 	removeKind.Bind(actRemove, "y/enter", "remove", "y", "enter")
 	removeKind.Bind(actRemoveCancel, "n/esc", "cancel", "n", "esc")
 	removeKind.Bind(actRemoveDeleteBranch, "d", "delete branch", "d")
-	removeKind.Bind(actRemoveNextFate, "left/right", "what becomes of the sessions", "right", "l")
-	removeKind.Bind(actRemovePrevFate, "", "", "left", "h")
 	removeKind.Bind(actRemoveQuit, "ctrl+c", "quit", "ctrl+c")
 	theRemoveForm = interact.List(removeKind)
 
@@ -1464,14 +1442,12 @@ func init() {
 	theRemoveSpaceForm = interact.List(removeSpaceKind)
 
 	cleanKind = interact.NewKind(func(cleanupSubject) string { return "Clean up worktrees" },
-		actCleanupDown, actCleanupUp, actCleanupToggle, actCleanupTickAll, actCleanupBranches, actCleanupNextFate, actCleanupPrevFate, actCleanupRemove, actCleanupCancel, actCleanupQuit)
+		actCleanupDown, actCleanupUp, actCleanupToggle, actCleanupTickAll, actCleanupBranches, actCleanupRemove, actCleanupCancel, actCleanupQuit)
 	cleanKind.Bind(actCleanupDown, "j/k", "down/up", "j", "down")
 	cleanKind.Bind(actCleanupUp, "", "", "k", "up")
 	cleanKind.Bind(actCleanupToggle, "space", "tick", "space")
 	cleanKind.Bind(actCleanupTickAll, "A", "tick all", "A")
 	cleanKind.Bind(actCleanupBranches, "d", "delete branches", "d")
-	cleanKind.Bind(actCleanupNextFate, "left/right", "what becomes of the sessions", "right", "l")
-	cleanKind.Bind(actCleanupPrevFate, "", "", "left", "h")
 	cleanKind.Bind(actCleanupRemove, "y/enter", "remove", "y", "enter")
 	cleanKind.Bind(actCleanupCancel, "n/esc", "cancel", "n", "esc")
 	cleanKind.Bind(actCleanupQuit, "ctrl+c", "quit", "ctrl+c")

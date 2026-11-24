@@ -268,7 +268,7 @@ func TestEndingWindowsGoFirst(t *testing.T) {
 		t.Errorf("closing ran\n%s\nwant\n%s", got, want)
 	}
 	ran, sessions := fakeVanishing(t)
-	if err := EndSession(config.Config{Provider: []string{"prov"}, SessionsDir: sessions}, "cm@test", FateEnd); err != nil {
+	if err := EndSession(config.Config{Provider: []string{"prov"}, SessionsDir: sessions}, "cm@test"); err != nil {
 		t.Errorf("removing: %v", err)
 	}
 	if got, want := ran(), "prov capabilities\nkitten ls\nprov list\nprov kill\nkitten close-window\nkitten ls\n"; got != want {

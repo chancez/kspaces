@@ -105,7 +105,7 @@ the session from the list once it has windows again. A watcher that ends a windo
 the window closes should leave a window with `kspaces_keep` alone: ending it would lose what the provider
 kept. Every close kspaces makes sets it, whatever was chosen for the sessions: ended, they are gone before
 the windows close; left running, it is what keeps the watcher from shelving or detaching them. Removing a
-worktree sets it only to leave them running.
+worktree does not set it: it ends them.
 
 ## Session providers
 

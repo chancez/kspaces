@@ -33,7 +33,7 @@ type removeWorktreeForm struct {
 	branch       spaces.Branch
 	deleteBranch bool
 	// sessions are the provider's sessions the session's windows show, and those tagged with the worktree,
-	// and fate what becomes of them, see fateChoice.
+	// which removing it ends, as fate says, see endsOnly.
 	sessions []spaces.ProviderSession
 	fate     fateChoice
 	busy     bool
@@ -59,8 +59,7 @@ func (f *removeWorktreeForm) Init() tea.Cmd { return nil }
 func (f *removeWorktreeForm) remove() tea.Cmd {
 	f.busy, f.err = true, nil
 	path := f.wt.Path
-	opts := spaces.RemoveOptions{Force: f.changes > 0, DeleteBranch: f.deleteBranch, ForceBranch: f.deleteBranch && f.branch.Unmerged > 0,
-		Sessions: f.fate.chosen()}
+	opts := spaces.RemoveOptions{Force: f.changes > 0, DeleteBranch: f.deleteBranch, ForceBranch: f.deleteBranch && f.branch.Unmerged > 0}
 	return func() tea.Msg { return removedMsg{spaces.RemoveInBackground(path, opts)} }
 }
 
@@ -80,9 +79,6 @@ func (f *removeWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.MouseClickMsg:
 		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
 			return f, cmd
-		}
-		if f.fate.click(f.zones, msg) {
-			return f, nil
 		}
 		for _, z := range f.zones[removeBranchZone] {
 			if msg.Button == tea.MouseLeft && z.Contains(msg.X, msg.Y) && actRemoveDeleteBranch.Applies(f, removeSubject{}) {
@@ -231,7 +227,7 @@ func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string, dele
 		return err
 	}
 	closing := spaces.ClosingNow(cfg.Provider, []string{wt.Session}, false, true)
-	f.sessions, f.fate = closing.Sessions[wt.Session], fateChoice{fates: closing.Fates}
+	f.sessions, f.fate = closing.Sessions[wt.Session], endsOnly(closing.Fates)
 	if err := runPopup(ctx, f); err != nil {
 		return fmt.Errorf("running the remove worktree form: %w", err)
 	}
@@ -239,12 +235,11 @@ func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string, dele
 }
 
 // RemoveWorktrees removes the worktrees at paths without asking, one after another, each as opts has it,
-// then ends sessions, missing worktrees' whose directories are gone, with spaces.EndSession, the provider's
-// sessions their windows show done fate to, for the
+// then ends sessions, missing worktrees' whose directories are gone, with spaces.EndSession, for the
 // background process the forms start. It has no screen, so failures are shown in kitty as well as
 // returned; one failing does not stop the rest, and a branch git refuses to delete leaves its worktree
 // removed.
-func RemoveWorktrees(cfg config.Config, paths []string, opts map[string]spaces.RemoveOptions, sessions []string, fate spaces.Fate) error {
+func RemoveWorktrees(cfg config.Config, paths []string, opts map[string]spaces.RemoveOptions, sessions []string) error {
 	var failed []string
 	branches := 0
 	for _, path := range paths {
@@ -260,7 +255,7 @@ func RemoveWorktrees(cfg config.Config, paths []string, opts map[string]spaces.R
 		}
 	}
 	for _, s := range sessions {
-		if err := spaces.EndSession(cfg, s, fate); err != nil {
+		if err := spaces.EndSession(cfg, s); err != nil {
 			failed = append(failed, fmt.Sprintf("%s: %v", s, err))
 		}
 	}

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -176,8 +177,8 @@ func TestRemoveFormDeleteBranch(t *testing.T) {
 }
 
 // With a provider that can end them, the remove form says how many of its sessions removing ends, and what
-// a busy one runs; left and right choose to shelve them or leave them running instead, which the removal
-// in the background is told.
+// a busy one runs, with nothing to choose: the worktree going leaves them nowhere to run or come back to.
+// A provider that cannot end them has nothing said.
 func TestRemoveFormSessions(t *testing.T) {
 	calls := fakeKittenCalls(t)
 	space := spaces.Space{Name: "gr", Root: "/src/gr", Worktrees: []spaces.Worktree{{Path: "/src/gr"}, {Path: "/src/gr/.worktrees/fix", Session: "gr@fix"}}}
@@ -186,35 +187,27 @@ func TestRemoveFormSessions(t *testing.T) {
 			{ID: "a", Name: "build", State: "running", Busy: true, Command: "make watch"},
 			{ID: "b", Name: "old", State: "exited"},
 		},
-		fate: fateChoice{fates: []spaces.Fate{spaces.FateEnd, spaces.FateShelve, spaces.FateLeave}}}
+		fate: endsOnly([]spaces.Fate{spaces.FateEnd, spaces.FateShelve, spaces.FateLeave})}
 	f.Update(tea.WindowSizeMsg{Width: 90, Height: 20})
-	screen := func(choice, says string) []string {
-		return []string{"", "  Remove worktree fix from gr", "",
-			"  directory  .worktrees/fix", "  branch     none, HEAD is detached kept", "  session    2 windows closed", "  changes    none", "",
-			"  sessions   < " + choice + " >  left/right change", "             " + says, "",
-			"   Remove y    Cancel n", ""}
-	}
+	head := []string{"", "  Remove worktree fix from gr", "",
+		"  directory  .worktrees/fix", "  branch     none, HEAD is detached kept", "  session    2 windows closed", "  changes    none", ""}
 	got := [][]string{formScreen(f)}
 	f.Update(keyMsg("right"))
 	got = append(got, formScreen(f))
-	f.Update(keyMsg("l"))
+	f.fate = endsOnly([]spaces.Fate{spaces.FateShelve, spaces.FateLeave})
 	got = append(got, formScreen(f))
-	want := [][]string{
-		screen("end          ", "Ends 2 sessions: build running make watch"),
-		screen("shelve       ", "Shelves 2 sessions, to bring back later: build running make watch"),
-		screen("leave running", "Leaves 2 sessions running"),
-	}
+	ends := append(slices.Clone(head), "  sessions   end", "             Ends 2 sessions: build running make watch", "", "   Remove y    Cancel n", "")
+	want := [][]string{ends, ends, append(slices.Clone(head), "   Remove y    Cancel n", "")}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("form:\n%q\nwant\n%q", got, want)
 	}
-	f.Update(keyMsg("h"))
 	_, remove := f.Update(keyMsg("y"))
 	remove()
 	var args []string
 	for _, c := range calls() {
-		args = c[len(c)-6:]
+		args = c[len(c)-4:]
 	}
-	if want := []string{"remove", "--yes", "--sessions", "shelve", "/src/gr/.worktrees/fix"}; !reflect.DeepEqual(args[1:], want) {
+	if want := []string{"remove", "--yes", "/src/gr/.worktrees/fix"}; !reflect.DeepEqual(args[1:], want) {
 		t.Errorf("background ran %q, want %q", args, want)
 	}
 }

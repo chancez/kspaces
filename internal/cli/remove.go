@@ -14,7 +14,6 @@ import (
 func (a *app) removeCommand() *cobra.Command {
 	var yes, force, deleteBranch, forceBranch bool
 	var forcePaths, deletePaths, forceBranchPaths, forgetSessions []string
-	var sessions string
 	var window int
 	cmd := &cobra.Command{
 		Use:   "remove [PATH...]",
@@ -39,17 +38,9 @@ func (a *app) removeCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fate, err := spaces.ParseFate(sessions)
-			if err != nil {
-				return fmt.Errorf("--sessions: %w", err)
-			}
 			if yes {
 				opts := removeOptions(args, force, deleteBranch, forceBranch, forcePaths, deletePaths, forceBranchPaths)
-				for p, o := range opts {
-					o.Sessions = fate
-					opts[p] = o
-				}
-				return tui.RemoveWorktrees(cfg, args, opts, forgetSessions, fate)
+				return tui.RemoveWorktrees(cfg, args, opts, forgetSessions)
 			}
 			if len(args) > 1 {
 				return fmt.Errorf("the form removes one worktree; give --yes to remove several")
@@ -59,7 +50,6 @@ func (a *app) removeCommand() *cobra.Command {
 	}
 	cmd.Flags().StringArrayVar(&forgetSessions, "forget-session", nil, "with --yes, after the worktrees, close this session's windows, wait for kitty to have, and delete its saved file, as for a missing worktree; repeatable")
 	cmd.Flags().BoolVar(&yes, "yes", false, "remove without asking, as the form does once confirmed, one after another; errors are also shown in kitty")
-	cmd.Flags().StringVar(&sessions, "sessions", "", "with --yes, what becomes of the session provider's sessions the windows show, and those tagged with the worktree: end (the default), shelve or leave")
 	cmd.Flags().BoolVar(&force, "force", false, "with --yes, remove the worktrees even with changes that are not committed, losing them")
 	cmd.Flags().StringArrayVar(&forcePaths, "force-path", nil, "with --yes, remove the worktree at this path even with changes that are not committed; repeatable")
 	cmd.Flags().BoolVar(&deleteBranch, "delete-branch", false, "delete each worktree's local branch after removing it; with --yes refusing one with commits not merged and keeping its worktree, without it ticking the form's box")

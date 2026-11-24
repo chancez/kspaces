@@ -544,14 +544,14 @@ func TestCleanupFormSessions(t *testing.T) {
 	}
 }
 
-// With a provider that can end them, the clean up form says what becomes of the ticked worktrees'
-// sessions, and the removal in the background is told what was chosen.
+// With a provider that can end them, the clean up form says it ends the ticked worktrees' sessions, with
+// nothing to choose, and the removal in the background is told nothing else.
 func TestCleanupFormFate(t *testing.T) {
 	calls := fakeKittenCalls(t)
 	space, items := cleanupFixture()
 	f := newCleanupForm(space, items[:1], false)
 	f.sessions = map[string][]spaces.ProviderSession{items[0].Worktree.Session: {{ID: "a", Name: "build", State: "running"}}}
-	f.fate = fateChoice{fates: []spaces.Fate{spaces.FateEnd, spaces.FateLeave}}
+	f.fate = endsOnly([]spaces.Fate{spaces.FateEnd, spaces.FateLeave})
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	var got []string
 	for _, l := range cleanupScreen(f) {
@@ -559,7 +559,7 @@ func TestCleanupFormFate(t *testing.T) {
 			got = append(got, l)
 		}
 	}
-	want := []string{"  sessions   < end           >  left/right change", "             Ends 1 session"}
+	want := []string{"  sessions   end", "             Ends 1 session"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q\nwant %q", got, want)
 	}
@@ -567,7 +567,7 @@ func TestCleanupFormFate(t *testing.T) {
 	_, remove := f.Update(keyMsg("y"))
 	remove()
 	all := calls()
-	if c := all[len(all)-1]; !slices.Contains(c, "--sessions") || c[slices.Index(c, "--sessions")+1] != "leave" {
-		t.Errorf("background ran %q, want --sessions leave", c)
+	if c := all[len(all)-1]; slices.Contains(c, "--sessions") {
+		t.Errorf("background ran %q, want no --sessions", c)
 	}
 }
