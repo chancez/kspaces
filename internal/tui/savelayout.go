@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -56,6 +57,7 @@ type saveLayoutForm struct {
 	// zones and buttons are where the last frame drew its buttons, and what each runs, for a click.
 	zones   map[string][]look.Zone
 	buttons controls[*saveLayoutForm]
+	kept    drafts
 }
 
 // paneChoice is what a saved pane can run: a configured command by name, its command line as run, or the
@@ -330,6 +332,7 @@ func (f *saveLayoutForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case layoutSavedMsg:
 		f.busy, f.err = false, msg.err
 		if msg.err == nil {
+			f.kept.done = true
 			return f, tea.Quit
 		}
 		return f, nil
@@ -446,7 +449,8 @@ func (f *saveLayoutForm) render() string {
 	}
 	spans := f.buttons.draw(f, t,
 		control{action: actSaveLayout, label: "Save"},
-		control{action: actSaveCancel, label: "Cancel"})
+		control{action: actSaveCancel, label: "Cancel"},
+		control{action: actSaveClear, label: "Clear"})
 	spans = append(spans, look.Text("  "), look.Key("tab"), look.KeyDesc(" next field"))
 	switch {
 	case on != nil:
@@ -455,6 +459,62 @@ func (f *saveLayoutForm) render() string {
 		spans = append(spans, look.Text("  "), look.Key("space"), look.KeyDesc(" tick"))
 	}
 	return boxed(append(lines, line(spans...)))
+}
+
+// openSaveLayoutForm is newSaveLayoutForm with the draft kept for wt, name and only restored.
+func openSaveLayoutForm(global config.Config, space spaces.Space, wt spaces.Worktree, tabs []spaces.CapturedTab, this int, name string, only bool) *saveLayoutForm {
+	f, _ := withDraft(draftKey("save layout", []string{wt.Path, name, strconv.FormatBool(only)}, nil), func(saved map[string]string) (*saveLayoutForm, error) {
+		f := newSaveLayoutForm(global, space, wt, tabs, this, name, only)
+		f.restore(saved)
+		return f, nil
+	})
+	return f
+}
+
+func (f *saveLayoutForm) drafts() *drafts { return &f.kept }
+
+// programs are what runs in each pane of each tab, which a draft's choices for the panes are for.
+func (f *saveLayoutForm) programs() string {
+	var tabs []string
+	for _, t := range f.tabs {
+		tabs = append(tabs, strings.Join(t.Programs, "\t"))
+	}
+	return strings.Join(tabs, "\n")
+}
+
+// draft is the name, the choices, the box and each pane's choice, with what the panes run.
+func (f *saveLayoutForm) draft() map[string]string {
+	d := map[string]string{"name": f.name.Value(), "exclude": strconv.FormatBool(f.exclude), "programs": f.programs()}
+	f.scope.draftInto(d, "scope")
+	f.target.draftInto(d, "target")
+	for t := range f.panes {
+		for p := range f.panes[t] {
+			f.panes[t][p].draftInto(d, fmt.Sprintf("pane:%d:%d", t, p))
+		}
+	}
+	return d
+}
+
+// restore fills the form in from d, its panes' choices only while the panes run what they did, focus on
+// the name.
+func (f *saveLayoutForm) restore(d map[string]string) tea.Cmd {
+	if v, ok := d["name"]; ok {
+		f.name.fill(v)
+	}
+	if v, err := strconv.ParseBool(d["exclude"]); err == nil {
+		f.exclude = v
+	}
+	f.scope.restore(d, "scope")
+	f.target.restore(d, "target")
+	if d["programs"] == f.programs() {
+		for t := range f.panes {
+			for p := range f.panes[t] {
+				f.panes[t][p].restore(d, fmt.Sprintf("pane:%d:%d", t, p))
+			}
+		}
+	}
+	f.focus, f.confirm = 0, false
+	return moveFocus(f.boxes(), &f.focus, 0)
 }
 
 // SaveLayoutForm runs the save form for the session of the worktree dir is in, its name filled in with
@@ -473,7 +533,7 @@ func SaveLayoutForm(ctx context.Context, cfg config.Config, dir, name string, on
 	if err != nil {
 		return err
 	}
-	if err := runPopup(ctx, newSaveLayoutForm(cfg, space, wt, tabs, this, name, only)); err != nil {
+	if err := runPopup(ctx, openSaveLayoutForm(cfg, space, wt, tabs, this, name, only)); err != nil {
 		return fmt.Errorf("running the save layout form: %w", err)
 	}
 	return nil

@@ -416,3 +416,43 @@ func TestSaveLayoutToSpaceFile(t *testing.T) {
 		t.Errorf("to the global config: %q", got)
 	}
 }
+
+// The form left without saving has its name, choices and the panes' choices back the next time it opens
+// for the worktree, the panes' only while they run what they did; ctrl+r clears it.
+func TestSaveLayoutFormDraft(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	cfg, err := config.Parse(saveConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	space := spaces.Space{Name: "gr", Root: "/src/gr"}
+	wt := spaces.Worktree{Path: "/src/gr/.worktrees/fix", Branch: "fix", Session: "gr@fix"}
+	open := func(tabs []spaces.CapturedTab) *saveLayoutForm {
+		return openSaveLayoutForm(cfg, space, wt, tabs, 1, "", false)
+	}
+	f := open(capturedTabs)
+	blank := f.draft()
+	typeInto(f, "watch")
+	f.panes[0][1].cycle(1)
+	typed := f.draft()
+	keepDraft(f)
+
+	if got := open(capturedTabs).draft(); !reflect.DeepEqual(got, typed) {
+		t.Errorf("reopened with\n%v\nwant\n%v", got, typed)
+	}
+	// Other programs running, the panes start as they would.
+	other := slices.Clone(capturedTabs)
+	other[1] = spaces.CapturedTab{Tab: other[1].Tab, Programs: []string{"top"}}
+	f = open(other)
+	want := newSaveLayoutForm(cfg, space, wt, other, 1, "", false).draft()
+	want["name"] = "watch"
+	if got := f.draft(); !reflect.DeepEqual(got, want) {
+		t.Errorf("reopened over other programs with\n%v\nwant\n%v", got, want)
+	}
+
+	f = open(capturedTabs)
+	f.Update(keyMsg("ctrl+r"))
+	if got := f.draft(); !reflect.DeepEqual(got, blank) {
+		t.Errorf("cleared to\n%v\nwant\n%v", got, blank)
+	}
+}

@@ -1106,6 +1106,7 @@ var (
 		Run:     do[*saveLayoutForm, saveSubject](func(f *saveLayoutForm) { f.confirm = false }),
 	}
 	actSaveCancel = quit[*saveLayoutForm, saveSubject]()
+	actSaveClear  = clearDraft[*saveLayoutForm, saveSubject]()
 )
 
 // The trust space config form's.
@@ -1131,6 +1132,7 @@ var (
 		Run:     cmd[*addSpaceForm, addSubject]((*addSpaceForm).add),
 	}
 	actAddCancel    = quit[*addSpaceForm, addSubject]()
+	actAddClear     = clearDraft[*addSpaceForm, addSubject]()
 	actAddNextField = &interact.Action[*addSpaceForm, addSubject]{
 		Title: "next field",
 		Run:   cmd[*addSpaceForm, addSubject]((*addSpaceForm).nextField),
@@ -1497,7 +1499,7 @@ func init() {
 	theTrustForm = interact.List(trustKind)
 
 	addKind = interact.NewKind(func(addSubject) string { return "Add space" },
-		actAddNextField, actAddPrevField, actAddNextGroup, actAddPrevGroup, actAddList, actAdd, actAddCancel)
+		actAddNextField, actAddPrevField, actAddNextGroup, actAddPrevGroup, actAddList, actAdd, actAddCancel, actAddClear)
 	addKind.Bind(actAddNextField, "tab", "next field", "tab", "down")
 	addKind.Bind(actAddPrevField, "shift+tab", "previous field", "shift+tab", "up")
 	addKind.Bind(actAddNextGroup, "left/right", "group", "right", "l")
@@ -1505,6 +1507,7 @@ func init() {
 	addKind.Bind(actAddList, "space", "list", "space")
 	addKind.Bind(actAdd, "enter", "add", "enter")
 	addKind.Bind(actAddCancel, "esc", "cancel", "esc", "ctrl+c")
+	addKind.Bind(actAddClear, "ctrl+r", "clear what was typed", "ctrl+r")
 	theAddForm = interact.List(addKind)
 
 	replyKind = interact.NewKind(func(replySubject) string { return "Reply" }, actReplySend, actReplyType, actReplyCancel, actReplyClear)
@@ -1554,7 +1557,7 @@ func init() {
 	theLayoutForm = interact.List(layoutKind)
 
 	saveKind = interact.NewKind(func(saveSubject) string { return "Save layout" },
-		actSaveNextField, actSavePrevField, actSaveNextChoice, actSavePrevChoice, actSaveList, actSaveTick, actSaveLayout, actSaveReplace, actSaveKeep, actSaveCancel)
+		actSaveNextField, actSavePrevField, actSaveNextChoice, actSavePrevChoice, actSaveList, actSaveTick, actSaveLayout, actSaveReplace, actSaveKeep, actSaveCancel, actSaveClear)
 	saveKind.Bind(actSaveNextField, "tab", "next field", "tab", "down")
 	saveKind.Bind(actSavePrevField, "shift+tab", "previous field", "shift+tab", "up")
 	saveKind.Bind(actSaveNextChoice, "left/right", "choose", "right", "l")
@@ -1566,6 +1569,7 @@ func init() {
 	saveKind.Bind(actSaveKeep, "n/esc", "keep it", "n", "esc")
 	saveKind.BindQuiet(actWaitForSave, "enter")
 	saveKind.Bind(actSaveCancel, "esc", "cancel", "esc", "ctrl+c")
+	saveKind.Bind(actSaveClear, "ctrl+r", "clear what was typed", "ctrl+r")
 	theSaveForm = interact.List(saveKind)
 
 	// j and k type, as worktrees are named with them, so only arrows and the picker's ctrl keys move.

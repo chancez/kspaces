@@ -218,3 +218,24 @@ func TestAddSpaceFormGroupHL(t *testing.T) {
 		t.Errorf("got\n%q\nwant\n%q", got, want)
 	}
 }
+
+// The form left without adding has its path and group back the next time it opens the same way, and
+// ctrl+r clears them.
+func TestAddSpaceFormDraft(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	groups := []string{"work", "fun"}
+	f := openAddSpaceForm(nil, groups, "~/repo", "")
+	typeInto(f, "/sub")
+	f.Update(keyMsg("tab"))
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	keepDraft(f)
+
+	f = openAddSpaceForm(nil, groups, "~/repo", "")
+	if got, want := f.draft(), map[string]string{"path": "~/repo/sub", "group": "work"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("reopened with %v, want %v", got, want)
+	}
+	f.Update(keyMsg("ctrl+r"))
+	if got, want := f.draft(), map[string]string{"path": "~/repo", "group": "none"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("cleared to %v, want %v", got, want)
+	}
+}

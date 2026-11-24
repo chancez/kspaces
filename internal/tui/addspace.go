@@ -40,6 +40,7 @@ type addSpaceForm struct {
 	height  int
 	zones   map[string][]look.Zone
 	buttons controls[*addSpaceForm]
+	kept    drafts
 }
 
 // groupZone is the zone the choice of group is drawn in, and its label.
@@ -128,6 +129,7 @@ func (f *addSpaceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case addedMsg:
 		f.busy, f.err = false, msg.err
 		if msg.err == nil {
+			f.kept.done = true
 			return f, tea.Quit
 		}
 		return f, nil
@@ -206,7 +208,8 @@ func (f *addSpaceForm) render() string {
 	}
 	buttons := f.buttons.draw(f, theAddForm.Target(addSubject{}),
 		control{action: actAdd, label: "Add", off: f.problem != nil},
-		control{action: actAddCancel, label: "Cancel"})
+		control{action: actAddCancel, label: "Cancel"},
+		control{action: actAddClear, label: "Clear"})
 	if f.group.picks() {
 		buttons = append(buttons, look.Text("  "), look.Key("tab"), look.KeyDesc(" next field"))
 	}
@@ -217,6 +220,37 @@ func (f *addSpaceForm) render() string {
 	return boxed(lines)
 }
 
+// openAddSpaceForm is newAddSpaceForm with the draft kept for path and group restored.
+func openAddSpaceForm(roots, groups []string, path, group string) *addSpaceForm {
+	f, _ := withDraft(draftKey("add space", []string{path, group}, nil), func(saved map[string]string) (*addSpaceForm, error) {
+		f := newAddSpaceForm(roots, groups, path, group)
+		f.restore(saved)
+		return f, nil
+	})
+	return f
+}
+
+func (f *addSpaceForm) drafts() *drafts { return &f.kept }
+
+// draft is the path and the group.
+func (f *addSpaceForm) draft() map[string]string {
+	return map[string]string{"path": f.path.Value(), "group": f.group.chosenName()}
+}
+
+// restore fills the form in from d, focus on the path.
+func (f *addSpaceForm) restore(d map[string]string) tea.Cmd {
+	if v, ok := d["path"]; ok {
+		f.path.fill(v)
+	}
+	if v, ok := d["group"]; ok {
+		f.group.choose(v)
+	}
+	f.check()
+	f.locate()
+	f.focus = 0
+	return moveFocus(f.fields(), &f.focus, 0)
+}
+
 // RunAddSpace runs the add space form, meant for a kitty popup, with path filled in and group chosen,
 // until the space is added or the form is left.
 func RunAddSpace(ctx context.Context, path, group string) error {
@@ -224,7 +258,7 @@ func RunAddSpace(ctx context.Context, path, group string) error {
 	if err != nil {
 		return err
 	}
-	if err := runPopup(ctx, newAddSpaceForm(cfg.Spaces, groupNames(cfg), path, group)); err != nil {
+	if err := runPopup(ctx, openAddSpaceForm(cfg.Spaces, groupNames(cfg), path, group)); err != nil {
 		return fmt.Errorf("running the add space form: %w", err)
 	}
 	return nil

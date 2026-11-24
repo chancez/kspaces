@@ -481,7 +481,8 @@ has already asks whether to replace it, `y` or `n`; Replace puts the new layout 
 were. A layout saved to the space's file under a name config.toml has takes that one's place in the space.
 `kspaces layout save [NAME] [PATH]` opens the same form for the worktree PATH, or the current directory, is
 in, its name filled in, with `--tab` for this tab at first: the one kspaces runs in, if it is the
-session's.
+session's. Left without saving, the form keeps what it has for the worktree, NAME and `--tab`, as the new
+worktree form does; the panes' choices come back only while the panes run what they did.
 
 **Close session** closes every window the way closing them by hand does, so whatever kitty.conf runs when a
 window closes still runs; with the session saver it saves the session first and keeps it to open again, as
@@ -593,7 +594,8 @@ file's comments and layout stay as they were, and writes through a symlinked con
 group as `{ path = "~/src/x", group = "work" }`, in the config file that lists the most of the group's
 spaces, whatever its name, so a `work.toml` holding the work group's spaces gets the new one, else in
 config.toml, which the form names when it is another file. Every sidebar shows the new space at its next
-refresh. `kspaces add [PATH] --group NAME` opens the form on a group.
+refresh. `kspaces add [PATH] --group NAME` opens the form on a group. Left without adding, the form keeps
+its path and group for the next time it opens on the same PATH and group.
 
 **Reply**, on a status entry, is for answering a program that waits, a blocked one above all, without
 switching to it. It shows the last lines of the entry's window's screen that fit, with their colors,
