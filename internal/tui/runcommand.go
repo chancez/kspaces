@@ -48,6 +48,7 @@ type runForm struct {
 	// zones and buttons are where the last frame drew its buttons, and what each runs, for a click.
 	zones   map[string][]look.Zone
 	buttons controls[*runForm]
+	kept    drafts
 }
 
 type ranMsg struct{ err error }
@@ -230,6 +231,7 @@ func (f *runForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ranMsg:
 		f.busy, f.err = false, msg.err
 		if msg.err == nil {
+			f.kept.done = true
 			return f, tea.Quit
 		}
 		return f, nil
@@ -306,7 +308,8 @@ func (f *runForm) render() string {
 	}
 	spans := f.buttons.draw(f, theRunForm.Target(runSubject{}),
 		control{action: actRun, label: "Run"},
-		control{action: actRunCancel, label: "Cancel"})
+		control{action: actRunCancel, label: "Cancel"},
+		control{action: actRunClear, label: "Clear"})
 	if len(f.fields()) > 1 {
 		spans = append(spans, look.Text("  "), look.Key("tab"), look.KeyDesc(" next field"))
 	}
@@ -371,10 +374,41 @@ func RunCommandForm(ctx context.Context, global config.Config, dirs []string, na
 	if err != nil {
 		return err
 	}
-	if err := runPopup(ctx, newRunForm(targets, st, cmd.Name, inputs, open)); err != nil {
+	if err := runPopup(ctx, openRunForm(targets, st, name, cmd.Name, inputs, open)); err != nil {
 		return fmt.Errorf("running the run form: %w", err)
 	}
 	return nil
+}
+
+// openRunForm is newRunForm for the command chosen, its draft restored: the one kept for the targets'
+// worktrees and how the form was asked for, name, empty for none, and inputs.
+func openRunForm(targets []runTarget, st kitty.State, name, chosen string, inputs map[string]string, open string) *runForm {
+	var paths []string
+	for _, t := range targets {
+		paths = append(paths, t.wt.Path)
+	}
+	f, _ := withDraft(draftKey("run "+name, paths, inputs), func(saved map[string]string) (*runForm, error) {
+		f := newRunForm(targets, st, chosen, inputs, open)
+		f.restore(saved)
+		return f, nil
+	})
+	return f
+}
+
+func (f *runForm) drafts() *drafts { return &f.kept }
+
+// draft is the command chosen and every command's inputs.
+func (f *runForm) draft() map[string]string {
+	d := map[string]string{}
+	f.cmds.draftInto(d, "command")
+	return d
+}
+
+// restore fills the form in from d, focus on its first field.
+func (f *runForm) restore(d map[string]string) tea.Cmd {
+	f.cmds.restore(d, "command")
+	f.focus = 0
+	return moveFocus(f.fields(), &f.focus, 0)
 }
 
 // RunCommandNow runs the command called name in the worktrees dirs are in, with inputs, without asking. A

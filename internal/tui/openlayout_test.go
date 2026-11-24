@@ -897,3 +897,24 @@ func TestPickWithoutLayout(t *testing.T) {
 		t.Errorf("shift+enter chose gr: %v", cmd != nil)
 	}
 }
+
+// The form left without opening has its layout back the next time it opens for the worktree, and ctrl+r
+// clears it.
+func TestLayoutFormDraft(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	cfg := testLayouts(t)
+	space := spaces.Space{Name: "gr", Root: "/src/gr", Worktrees: []spaces.Worktree{{Path: "/src/gr", Branch: "main", Session: "gr"}}}
+	wt := spaces.Worktree{Path: "/src/gr/.worktrees/fix", Branch: "fix", Session: "gr@fix"}
+	f := openLayoutForm(cfg, space, wt, kitty.State{}, "", nil)
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	keepDraft(f)
+
+	f = openLayoutForm(cfg, space, wt, kitty.State{}, "", nil)
+	if got, want := f.draft(), map[string]string{"layout": "plain", "layout/agent/prompt": ""}; !reflect.DeepEqual(got, want) {
+		t.Errorf("reopened with %v, want %v", got, want)
+	}
+	f.Update(keyMsg("ctrl+r"))
+	if got, want := f.draft(), map[string]string{"layout": "shell", "layout/agent/prompt": ""}; !reflect.DeepEqual(got, want) {
+		t.Errorf("cleared to %v, want %v", got, want)
+	}
+}

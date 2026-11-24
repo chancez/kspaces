@@ -17,6 +17,7 @@ import (
 	"github.com/chancez/kspaces/internal/gittest"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/state"
 )
 
 // testCommands are a command with a required input and one with none.
@@ -382,5 +383,42 @@ inputs = [{ name = "msg", default = "on {branch}" }]
 	want := result{"on fix", []string{"on fix", "on dev", "on fix!", "on fix!"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q\nwant %q", got, want)
+	}
+}
+
+// The form left without running has its command and inputs back the next time it opens for the worktree
+// the same way, and ctrl+r clears them.
+func TestRunFormDraft(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	cfg := testCommands(t)
+	space := spaces.Space{Name: "gr", Root: "/src/gr", Worktrees: []spaces.Worktree{{Path: "/src/gr", Branch: "main", Session: "gr"}}}
+	wt := spaces.Worktree{Path: "/src/gr/.worktrees/fix", Branch: "fix", Session: "gr@fix"}
+	open := func(name string) *runForm {
+		f := openRunForm([]runTarget{{cfg, space, wt}}, kitty.State{}, name, "claude", nil, "")
+		f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+		return f
+	}
+	f := open("")
+	f.Update(keyMsg("tab"))
+	typeInto(f, "fix it")
+	keepDraft(f)
+
+	f = open("")
+	if got, want := formScreen(f), []string{"", "  Run in gr@fix", "", "  command    < claude >  left/right change  space list", "  Prompt     fix it", "",
+		"  Runs claude", "  Opens as the first tab of gr@fix, which has no windows", "",
+		"   Run enter    Cancel esc    Clear ctrl+r   tab next field  left/right command  space list", ""}; !reflect.DeepEqual(got, want) {
+		t.Errorf("reopened:\n%q\nwant\n%q", got, want)
+	}
+	// Asked for by name, it is another draft.
+	if got := open("claude").draft()["command/claude/prompt"]; got != "" {
+		t.Errorf("by name, the prompt is %q", got)
+	}
+	f.Update(keyMsg("ctrl+r"))
+	if got := f.draft()["command/claude/prompt"]; got != "" {
+		t.Errorf("cleared, the prompt is %q", got)
+	}
+	keepDraft(f)
+	if got := state.Load().Drafts; got != nil {
+		t.Errorf("cleared, kept %v", got)
 	}
 }

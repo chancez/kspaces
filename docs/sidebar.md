@@ -451,7 +451,9 @@ name, in the first's order, NAME chosen, or else the first of them; none in comm
 the command in each, as its own space configures it and with the inputs it has, without switching
 sessions: launch keeps the focus, so the form stays in view. An input left at its default, shown filled in
 for the first worktree, is filled in for each with its own built-ins. One failing does not stop the rest,
-and the form stays, a line for each that failed saying why. `--yes` runs in each without the form.
+and the form stays, a line for each that failed saying why. `--yes` runs in each without the form. Left
+without running, the form keeps its command and every command's inputs, as the new worktree form does, and
+has them back opened again on the same worktrees with the same NAME and `--input`s.
 
 **Open layout** chooses a layout, the worktree's default at first, else the first configured, or `shell`,
 listed first as in the new worktree form, for one tab in the worktree that is a shell, with a `layout`
@@ -459,7 +461,8 @@ field, and has a field for each of its inputs. It says what each tab holds, and 
 the session's own or, for a session with no windows, open it; for `shell` it says it adds one tab, a
 shell, or opens the session with it. Open builds them, as [layouts](kitty.md#layouts) says, and switches
 to the session; `shell` adds a tab as `launch` opens it, by the window switching to the session focuses,
-or opens a session with no windows with it alone, as **Open without layout** does.
+or opens a session with no windows with it alone, as **Open without layout** does. Left without opening,
+the form keeps its layout and inputs, as the run form does.
 
 **Save as layout** saves the session's tabs, as kitty has them, as a [layout](kitty.md#saving-a-layout):
 a `name` field, then `save`, `every tab` at first or `this tab`, which is the active tab for its

@@ -2,6 +2,8 @@ package tui
 
 import (
 	"maps"
+	"slices"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -52,6 +54,16 @@ func withDraft[M drafting](key string, build func(saved map[string]string) (M, e
 	}
 	*f.drafts() = drafts{key: key, blank: blank.draft()}
 	return f, nil
+}
+
+// draftKey is the key of the draft of form opened on on, with inputs given, which are part of how it was
+// opened as much as what on.
+func draftKey(form string, on []string, inputs map[string]string) string {
+	parts := append([]string{form}, on...)
+	for _, k := range slices.Sorted(maps.Keys(inputs)) {
+		parts = append(parts, k+"="+inputs[k])
+	}
+	return strings.Join(parts, " ")
 }
 
 // changed says whether f has other than what it opens with without a draft, which clear would lose: never

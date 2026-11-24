@@ -38,6 +38,7 @@ type layoutForm struct {
 	// zones and buttons are where the last frame drew its buttons, and what each runs, for a click.
 	zones   map[string][]look.Zone
 	buttons controls[*layoutForm]
+	kept    drafts
 }
 
 type layoutOpenedMsg struct{ err error }
@@ -128,6 +129,7 @@ func (f *layoutForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case layoutOpenedMsg:
 		f.busy, f.err = false, msg.err
 		if msg.err == nil {
+			f.kept.done = true
 			return f, tea.Quit
 		}
 		return f, nil
@@ -229,7 +231,8 @@ func (f *layoutForm) render() string {
 	}
 	spans := f.buttons.draw(f, theLayoutForm.Target(layoutSubject{}),
 		control{action: actOpenLayoutNow, label: "Open"},
-		control{action: actLayoutCancel, label: "Cancel"})
+		control{action: actLayoutCancel, label: "Cancel"},
+		control{action: actLayoutClear, label: "Clear"})
 	if len(f.fields()) > 1 {
 		spans = append(spans, look.Text("  "), look.Key("tab"), look.KeyDesc(" next field"))
 	}
@@ -275,10 +278,36 @@ func OpenLayoutForm(ctx context.Context, global config.Config, dir, name string,
 	if err != nil {
 		return err
 	}
-	if err := runPopup(ctx, newLayoutForm(cfg, space, wt, st, name, inputs)); err != nil {
+	if err := runPopup(ctx, openLayoutForm(cfg, space, wt, st, name, inputs)); err != nil {
 		return fmt.Errorf("running the layout form: %w", err)
 	}
 	return nil
+}
+
+// openLayoutForm is newLayoutForm with the draft kept for wt and how the form was asked for restored.
+func openLayoutForm(cfg config.Config, space spaces.Space, wt spaces.Worktree, st kitty.State, name string, inputs map[string]string) *layoutForm {
+	f, _ := withDraft(draftKey("layout "+name, []string{wt.Path}, inputs), func(saved map[string]string) (*layoutForm, error) {
+		f := newLayoutForm(cfg, space, wt, st, name, inputs)
+		f.restore(saved)
+		return f, nil
+	})
+	return f
+}
+
+func (f *layoutForm) drafts() *drafts { return &f.kept }
+
+// draft is the layout chosen and every layout's inputs.
+func (f *layoutForm) draft() map[string]string {
+	d := map[string]string{}
+	f.layouts.draftInto(d, "layout")
+	return d
+}
+
+// restore fills the form in from d, focus on its first field.
+func (f *layoutForm) restore(d map[string]string) tea.Cmd {
+	f.layouts.restore(d, "layout")
+	f.focus = 0
+	return moveFocus(f.fields(), &f.focus, 0)
 }
 
 // OpenLayoutNow opens the layout called name in the worktree dir is in, with inputs, without asking. A

@@ -872,7 +872,7 @@ func (f *newWorktreeForm) restore(d map[string]string) tea.Cmd {
 // restored. It starts on the tab from says, on arg, a PR's or an issue's number or URL, when not empty, and
 // a new branch's base on base, a local branch, when not empty.
 func openNewWorktree(cfg config.Config, space spaces.Space, from spaces.From, arg, base string) (*newWorktreeForm, error) {
-	return withDraft("new worktree:"+space.Root, func(saved map[string]string) (*newWorktreeForm, error) {
+	return withDraft(draftKey("new worktree", []string{space.Root}, nil), func(saved map[string]string) (*newWorktreeForm, error) {
 		f := newForm(space.ConfigOf(cfg), space)
 		f.restore(saved)
 		err := f.startFrom(base)

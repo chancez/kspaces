@@ -1010,6 +1010,7 @@ var (
 		Run:   func(*runForm, runSubject) tea.Cmd { return nil },
 	}
 	actRunCancel = quit[*runForm, runSubject]()
+	actRunClear  = clearDraft[*runForm, runSubject]()
 )
 
 // The layout form's.
@@ -1048,6 +1049,7 @@ var (
 		Run:   func(*layoutForm, layoutSubject) tea.Cmd { return nil },
 	}
 	actLayoutCancel = quit[*layoutForm, layoutSubject]()
+	actLayoutClear  = clearDraft[*layoutForm, layoutSubject]()
 )
 
 // The save layout form's. Typing goes to the name and run boxes, so y and n only answer the question
@@ -1524,7 +1526,7 @@ func init() {
 	theShowForm = interact.List(showKind)
 
 	runKind = interact.NewKind(func(runSubject) string { return "Run" },
-		actRunNextField, actRunPrevField, actRunNextCommand, actRunPrevCommand, actRunList, actRun, actRunCancel)
+		actRunNextField, actRunPrevField, actRunNextCommand, actRunPrevCommand, actRunList, actRun, actRunCancel, actRunClear)
 	runKind.Bind(actRunNextField, "tab", "next field", "tab", "down")
 	runKind.Bind(actRunPrevField, "shift+tab", "previous field", "shift+tab", "up")
 	runKind.Bind(actRunNextCommand, "left/right", "command", "right", "l")
@@ -1533,10 +1535,11 @@ func init() {
 	runKind.Bind(actRun, "enter", "run", "enter")
 	runKind.BindQuiet(actWaitForRun, "enter")
 	runKind.Bind(actRunCancel, "esc", "cancel", "esc", "ctrl+c")
+	runKind.Bind(actRunClear, "ctrl+r", "clear what was typed", "ctrl+r")
 	theRunForm = interact.List(runKind)
 
 	layoutKind = interact.NewKind(func(layoutSubject) string { return "Open layout" },
-		actLayoutNextField, actLayoutPrevField, actNextLayout, actPrevLayout, actLayoutList, actOpenLayoutNow, actLayoutCancel)
+		actLayoutNextField, actLayoutPrevField, actNextLayout, actPrevLayout, actLayoutList, actOpenLayoutNow, actLayoutCancel, actLayoutClear)
 	layoutKind.Bind(actLayoutNextField, "tab", "next field", "tab", "down")
 	layoutKind.Bind(actLayoutPrevField, "shift+tab", "previous field", "shift+tab", "up")
 	layoutKind.Bind(actNextLayout, "left/right", "layout", "right", "l")
@@ -1545,6 +1548,7 @@ func init() {
 	layoutKind.Bind(actOpenLayoutNow, "enter", "open", "enter")
 	layoutKind.BindQuiet(actWaitForLayout, "enter")
 	layoutKind.Bind(actLayoutCancel, "esc", "cancel", "esc", "ctrl+c")
+	layoutKind.Bind(actLayoutClear, "ctrl+r", "clear what was typed", "ctrl+r")
 	theLayoutForm = interact.List(layoutKind)
 
 	saveKind = interact.NewKind(func(saveSubject) string { return "Save layout" },
