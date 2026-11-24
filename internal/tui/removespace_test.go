@@ -30,7 +30,7 @@ func TestRemoveSpaceForm(t *testing.T) {
 			"   Remove y    Cancel n", ""},
 		{"", "  Remove space notes", "", "  Removes the session provider's space notes.",
 			"  Closes 1 kitty session and deletes the saved files: notes.", "",
-			"  Ends 1 session: build running make", "",
+			"  sessions   end", "             Ends 1 session: build running make", "",
 			"   Remove y    Cancel n", ""},
 		{"", "  Remove space notes", "", "  Removes the session provider's space notes.", "",
 			"  the session provider cannot remove notes, or end the sessions in it", "",

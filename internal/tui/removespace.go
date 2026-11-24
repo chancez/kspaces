@@ -82,6 +82,9 @@ func (f *removeSpaceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
 			return f, cmd
 		}
+		if f.fate.click(f.zones, msg) {
+			return f, nil
+		}
 	}
 	return f, nil
 }
@@ -113,15 +116,8 @@ func (f *removeSpaceForm) render() string {
 		text(fmt.Sprintf("Closes %s and deletes the saved files: %s.", plural(n, "kitty session"), strings.Join(f.plan.Sessions, ", ")))
 	}
 	lines = append(lines, "")
-	switch {
-	case f.fate.offered():
+	if f.fate.shown() {
 		lines = append(append(lines, f.fate.lines(th, width, f.plan.Provider)...), "")
-	case f.plan.Root == "" && len(f.plan.Provider) > 0:
-		words := look.Text(spaces.FateWords(spaces.FateEnd, f.plan.Provider))
-		if busy(f.plan.Provider) {
-			words = look.Error(spaces.FateWords(spaces.FateEnd, f.plan.Provider))
-		}
-		lines = append(lines, line(th.Cut(width, words)...), "")
 	}
 	err := f.err
 	if err == nil {

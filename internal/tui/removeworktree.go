@@ -81,6 +81,9 @@ func (f *removeWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
 			return f, cmd
 		}
+		if f.fate.click(f.zones, msg) {
+			return f, nil
+		}
 		for _, z := range f.zones[removeBranchZone] {
 			if msg.Button == tea.MouseLeft && z.Contains(msg.X, msg.Y) && actRemoveDeleteBranch.Applies(f, removeSubject{}) {
 				f.deleteBranch = !f.deleteBranch
@@ -138,7 +141,7 @@ func (f *removeWorktreeForm) render() string {
 		field("changes", changes),
 		"",
 	}
-	if f.fate.offered() {
+	if f.fate.shown() {
 		lines = append(append(lines, f.fate.lines(th, width, f.sessions)...), "")
 	}
 	if f.branch.Offered() {

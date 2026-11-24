@@ -197,6 +197,9 @@ func (f *cleanupForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
 			return f, cmd
 		}
+		if f.fate.click(f.zones, msg) {
+			return f, nil
+		}
 		for i := range f.items {
 			for _, z := range f.zones[fmt.Sprintf(cleanupZone, i)] {
 				if msg.Button == tea.MouseLeft && z.Contains(msg.X, msg.Y) && !f.busy {
@@ -316,7 +319,7 @@ func (f *cleanupForm) render() string {
 			lines = append(lines, line(th.Cut(width, look.Muted("A missing one has its windows closed and its saved file deleted."))...))
 		}
 		lines = append(lines, "")
-		if f.fate.offered() {
+		if f.fate.shown() {
 			var sessions []spaces.ProviderSession
 			for _, c := range f.chosen() {
 				sessions = append(sessions, f.sessions[c.Worktree.Session]...)

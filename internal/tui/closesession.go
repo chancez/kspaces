@@ -11,6 +11,7 @@ import (
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
+	"github.com/chancez/kspaces/internal/logs"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
@@ -75,6 +76,9 @@ func (f *closeSessionForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if cmd, ok := f.buttons.click(f, f.zones, msg); ok {
 			return f, cmd
 		}
+		if f.fate.click(f.zones, msg) {
+			return f, nil
+		}
 	}
 	return f, nil
 }
@@ -130,7 +134,7 @@ func (f *closeSessionForm) render() string {
 		text(does)
 		lines = append(lines, "")
 	}
-	if f.fate.offered() {
+	if f.fate.shown() {
 		var sessions []spaces.ProviderSession
 		for _, s := range f.sessions {
 			sessions = append(sessions, f.closing[s]...)
@@ -229,6 +233,7 @@ func RunCloseSession(ctx context.Context, cfg config.Config, sessions []string, 
 		closing = spaces.ClosingNow(cfg.Provider, sessions, mode != "", false)
 	}
 	choice := fateChoice{fates: closing.Fates}
+	logs.Debug("closing sessions", "sessions", sessions, "caps", closing.Caps, "fates", closing.Fates)
 	if i := slices.Index(choice.fates, fate); i >= 0 {
 		choice.at = i
 	}
