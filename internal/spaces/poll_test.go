@@ -27,7 +27,8 @@ func TestSharedView(t *testing.T) {
 			{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Branch: "main", Session: "gr"}, {Path: "/src/gr/dev", Branch: "dev", Session: "gr@dev"}}},
 			{Name: "broken", Root: "/src/broken", Err: "not a git repository"},
 		},
-		Saved: []string{"gr", "notes", "gr@gone"},
+		Saved:   []string{"gr", "notes", "gr@gone"},
+		Keeping: map[string]KeepMode{"gr@dev": KeepSuspending},
 		Windows: []kitty.OSWindow{{Tabs: []kitty.Tab{
 			{ID: 1, Windows: []kitty.Window{{ID: 10, SessionName: "gr", LastFocusedAt: 2, Cwd: "/src/gr"}, {ID: 11, SessionName: "gr", UserVars: dock}}},
 			{ID: 2, Windows: []kitty.Window{{ID: 20, SessionName: "gr@dev", LastFocusedAt: 1, Cwd: "/src/gr/dev"}, {ID: 21, SessionName: "gr@dev", UserVars: dock}}},
@@ -57,7 +58,7 @@ func TestSharedView(t *testing.T) {
 		return Snapshot{
 			Config: &cfg, Spaces: spaces,
 			Others: []Space{{Name: "notes", Worktrees: []Worktree{{Session: "notes"}}}},
-			Folded: map[string]bool{}, Hidden: map[string]bool{}, Saved: map[string]bool{"gr": true, "notes": true, "gr@gone": true}, Suspended: map[string]bool{}, Kitty: st,
+			Folded: map[string]bool{}, Hidden: map[string]bool{}, Saved: map[string]bool{"gr": true, "notes": true, "gr@gone": true}, Suspended: map[string]bool{}, Keeping: sh.Keeping, Kitty: st,
 			// Nothing saved: manual, with kitty's times, and config.toml's groups.
 			Order: Order{Mode: SortManual, Worktrees: map[string][]string{}, Groups: []string{"work", "home"}, Focused: st.Focused},
 		}

@@ -32,6 +32,8 @@ type Shared struct {
 	Saved []string `json:"saved,omitempty"`
 	// Saved sessions kept with KeepSuspended.
 	Suspended []string `json:"suspended,omitempty"`
+	// Sessions the provider is keeping, with the mode each is listed as, see KeepClosing.
+	Keeping map[string]KeepMode `json:"keeping,omitempty"`
 	// What the provider kept of the kept sessions, see keptHandles.
 	Kept []string `json:"kept,omitempty"`
 	// kitty's windows, as `kitten @ ls` lists them, and why they could not be listed.
@@ -85,6 +87,7 @@ func loadSpaces() Shared {
 	}
 	sh.Saved = savedSessions(cfg.SessionsDir)
 	sh.Suspended = suspendedSessions(cfg.SessionsDir)
+	sh.Keeping = keepingSessions(cfg.SessionsDir)
 	sh.Kept = slices.Sorted(maps.Keys(keptHandles(cfg.SessionsDir)))
 	return sh
 }
@@ -129,7 +132,7 @@ func (sh Shared) View(self int) Snapshot {
 	// The missing worktrees go in the spaces, which are this view's own copies: what the load holds, and
 	// git is asked about in targets, is only what git lists.
 	kept := state.Load().Sidebar
-	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, st.Sessions, sh.Saved, topics), Folded: toSet(kept.Folded), Hidden: toSet(kept.Hidden), Saved: saved, Suspended: suspended, Kitty: st}
+	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, st.Sessions, sh.Saved, topics), Folded: toSet(kept.Folded), Hidden: toSet(kept.Hidden), Saved: saved, Suspended: suspended, Keeping: sh.Keeping, Kitty: st}
 	snap.Order = Order{Mode: sortMode(kept.Sort), Worktrees: worktreeOrder(kept.Order), Groups: sh.Config.Groups, Focused: st.Focused, Statuses: st.Statuses}
 	if sh.KittyErr != "" {
 		snap.Err = errors.New(sh.KittyErr)

@@ -64,7 +64,8 @@ func rowHolds(r spaces.Row, session string) bool {
 // indents linked worktrees under their space, its box in the select mode, then the row's icon and its
 // name. The icon says what the row is, and is replaced by the most urgent status of its sessions' windows;
 // see look.RowIcon. A missing worktree has the gone marker and `gone` for its branch, faint only once its
-// session has no windows. A suspended session has the suspended marker.
+// session has no windows. A suspended session has the suspended marker, and one being suspended or closed
+// says so until it is.
 func (m *sidebar) renderRow(i int) string {
 	r, width, th := m.rows[i], m.contentWidth(), m.th
 	switch {
@@ -97,6 +98,8 @@ func (m *sidebar) renderRow(i int) string {
 	switch {
 	case r.Missing && state == "":
 		icon = look.DimIf(!open, look.GoneMarker(open)...)
+	case state == "" && r.Worktree != nil && m.keeping[r.Worktree.Session] != "":
+		icon = look.KeepingMarker(m.keeping[r.Worktree.Session] == spaces.KeepSuspending)
 	case state == "" && !open && r.Worktree != nil && m.suspended[r.Worktree.Session]:
 		icon = look.SuspendedMarker()
 	case state == "" && r.Worktree != nil:

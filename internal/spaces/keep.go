@@ -160,6 +160,18 @@ func suspendedSessions(dir string) []string {
 	return names
 }
 
+// keepingSessions are the sessions the provider is keeping in the sessions directory dir, see
+// KeepClosing, by name, each with the mode it is listed as.
+func keepingSessions(dir string) map[string]KeepMode {
+	out := map[string]KeepMode{}
+	for name, k := range LoadKept(dir) {
+		if k.Mode.Keeping() {
+			out[name] = k.Mode
+		}
+	}
+	return out
+}
+
 // keptHandles are what the provider kept of the kept sessions in dir, see Kept: a session of its that a
 // handle names is a kept kitty session's, which that session's row stands for, not a detached one.
 func keptHandles(dir string) map[string]bool {

@@ -245,7 +245,9 @@ type Snapshot struct {
 	Saved map[string]bool
 	// Saved sessions that were suspended, see KeepSuspended.
 	Suspended map[string]bool
-	Kitty     kitty.State
+	// Sessions the provider is keeping, with the mode each is listed as, see KeepClosing.
+	Keeping map[string]KeepMode
+	Kitty   kitty.State
 	// What git and gh say of each worktree, by path, as far as the leading sidebar knows.
 	Git map[string]gitstate.State
 	// The provider's sessions no kitty window shows, by space, which is a configured space's name or a

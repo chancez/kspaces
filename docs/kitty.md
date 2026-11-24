@@ -82,7 +82,8 @@ opening the session again restores its tabs and splits from it rather than its d
 deletes it. With a provider that can, its form chooses what becomes of the provider's sessions its windows
 show, as [the sidebar](sidebar.md#the-menu) says: ended, the first, shelved, which suspends the session as
 Suspend session below does, or left running. Ended or left, the provider keeps nothing, and the file alone is kept. **Suspend session**, `z` in the sidebar or `kspaces suspend [SESSION...]`, is the same, and
-its row shows the suspended marker until it is opened.
+its row shows the suspended marker until it is opened. While the provider keeps it, the row shows the suspended
+marker dimmed, or for Close the working marker dimmed.
 
 What runs in the windows is the [session provider](#session-providers)'s. kspaces knows only kitty's side;
 a program the config names keeps the rest, such as the multiplexer session a launch wrapper runs each
