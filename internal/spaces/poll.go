@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/logs"
@@ -73,6 +74,8 @@ func loadSpaces() Shared {
 	if err != nil {
 		return Shared{Err: err.Error()}
 	}
+	// Each poll, so the sidebar follows an edit.
+	git.SetTimeout(cfg.Git.Timeout)
 	sh := Shared{Config: &cfg}
 	for _, root := range cfg.Spaces {
 		s := ReadSpace(cfg, root)

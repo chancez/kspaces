@@ -10,8 +10,11 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/chancez/kspaces/internal/git"
 )
 
 // Config is what ~/.config/kspaces/config.toml says, with the other config files merged in, see readFiles:
@@ -33,6 +36,9 @@ import (
 //	[kitty]
 //	auto_install = true
 //	save_sessions = true
+//
+//	[git]
+//	timeout = "30s"
 //
 //	[[commands]]
 //	name = "gr"
@@ -59,6 +65,7 @@ type Config struct {
 	Worktrees Worktrees `toml:"worktrees"`
 	Sidebar   Sidebar   `toml:"sidebar"`
 	Kitty     Kitty     `toml:"kitty"`
+	Git       Git       `toml:"git"`
 	// Commands to run in a worktree, see Command.
 	Commands []Command `toml:"commands"`
 	// Layouts to open in a session, see Layout.
@@ -102,6 +109,13 @@ type Kitty struct {
 	// SaveSessions installs the session saver, which saves each kitty session to its own file in kitty's
 	// sessions directory and restores them at startup.
 	SaveSessions bool `toml:"save_sessions"`
+}
+
+// Git is how kspaces runs git.
+type Git struct {
+	// Timeout is how long git may take to answer what kspaces asks, such as the sidebar's git status, before
+	// it is stopped; 0 for no limit. What changes a repository, such as adding a worktree, has none.
+	Timeout time.Duration `toml:"timeout"`
 }
 
 // The sidebar's width when none is set, and the range a width must be in to leave room for names and for
@@ -265,7 +279,7 @@ func decode(data string) (decoded, error) {
 // is one file's to set: set in two, or a command, layout or group in two, it is an error naming both,
 // rather than one silently winning.
 func merge(names []string, parts []decoded) (Config, error) {
-	cfg := Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: defaultWorktreeDir}, Sidebar: Sidebar{Width: DefaultSidebarWidth, Popup: PopupOverlay}}
+	cfg := Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: defaultWorktreeDir}, Sidebar: Sidebar{Width: DefaultSidebarWidth, Popup: PopupOverlay}, Git: Git{Timeout: git.DefaultTimeout}}
 	// The file that set each setting, a space's by "space.NAME.KEY", and each command, layout and group.
 	setBy := map[string]int{}
 	// once records file i setting key, what is called name, or says it is done twice: done is how, as in
@@ -333,6 +347,10 @@ func merge(names []string, parts []decoded) (Config, error) {
 	}
 	if p := cfg.Sidebar.Popup; p != PopupOverlay && p != PopupPanel {
 		return Config{}, fmt.Errorf("sidebar.popup is %q, it must be %q or %q", p, PopupOverlay, PopupPanel)
+	}
+	if t := cfg.Git.Timeout; t < 0 || t > 0 && t < time.Second {
+		// A number is read as nanoseconds.
+		return Config{}, fmt.Errorf("git.timeout is %s, it must be 0 or a second or more, written with its unit, such as \"30s\"", t)
 	}
 	if err := checkCommands(cfg.Commands); err != nil {
 		return Config{}, err

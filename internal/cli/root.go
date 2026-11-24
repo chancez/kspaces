@@ -10,6 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/logs"
 	"github.com/chancez/kspaces/internal/tui"
 )
@@ -32,6 +34,10 @@ func Execute(ctx context.Context) int {
 	}
 	logs.Init(role)
 	logs.Debug("start", "args", os.Args[1:])
+	// A config that cannot load leaves git's default; the command loading it says why.
+	if cfg, err := config.Load(); err == nil {
+		git.SetTimeout(cfg.Git.Timeout)
+	}
 	if err := cmd.ExecuteContext(ctx); err != nil {
 		logs.Error("exit", err)
 		fmt.Fprintln(a.stderr, "kspaces:", err)

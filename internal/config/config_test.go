@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func TestParse(t *testing.T) {
@@ -29,6 +30,9 @@ popup = "panel"
 [kitty]
 auto_install = true
 
+[git]
+timeout = "1m"
+
 [space.gr]
 group = "work"
 `
@@ -44,6 +48,7 @@ group = "work"
 		Worktrees:   Worktrees{Dir: ".worktrees", BranchPrefix: "pr/me", DeleteBranch: true},
 		Sidebar:     Sidebar{Width: 40, Popup: PopupPanel},
 		Kitty:       Kitty{AutoInstall: true},
+		Git:         Git{Timeout: time.Minute},
 		Space:       map[string]SpaceSettings{"gr": {Group: "work"}},
 		Groups:      []string{"personal", "work"},
 	}
@@ -56,7 +61,7 @@ group = "work"
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := (Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: ".worktrees"}, Sidebar: Sidebar{Width: 28, Popup: PopupOverlay}}); !reflect.DeepEqual(got, want) {
+	if want := (Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: ".worktrees"}, Sidebar: Sidebar{Width: 28, Popup: PopupOverlay}, Git: Git{Timeout: 30 * time.Second}}); !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %#v\nwant %#v", got, want)
 	}
 
@@ -70,6 +75,9 @@ group = "work"
 		"[sidebar]\nwidth = 121",
 		"[sidebar]\npopup = \"window\"",
 		"[sidebar]\npopup = \"\"",
+		"[git]\ntimeout = \"-1s\"",
+		"[git]\ntimeout = \"soon\"",
+		"[git]\ntimeout = 30", // nanoseconds
 	} {
 		if _, err := Parse(bad); err == nil {
 			t.Fatalf("%q was accepted", bad)

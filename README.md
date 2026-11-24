@@ -180,6 +180,11 @@ popup = "overlay"
 [kitty]
 auto_install = true
 save_sessions = true
+
+# How long git may take to answer what kspaces asks, such as the sidebar's git status, before it is
+# stopped. 0 for no limit. Commands that change a repository, such as adding a worktree, have none.
+[git]
+timeout = "30s"
 ```
 
 Every key is optional. An unknown key is an error. Other `.toml` files beside config.toml, such as a
