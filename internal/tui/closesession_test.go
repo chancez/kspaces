@@ -22,9 +22,8 @@ func TestCloseFormSessions(t *testing.T) {
 		fate:    fateChoice{fates: []spaces.Fate{spaces.FateEnd, spaces.FateShelve, spaces.FateLeave}}}
 	f.Update(tea.WindowSizeMsg{Width: 100, Height: 20})
 	screen := func(does, choice, says string) []string {
-		return append(append([]string{"", "  Close session gr@dev", ""}, strings.Split("  "+does, "\n")...),
-			"", "  sessions   < "+choice+" >  left/right change", "             "+says, "",
-			"   Close y    Cancel n", "")
+		return append(append([]string{"", "  Close session gr@dev", "", "  sessions   < " + choice + " >  left/right change", "             " + says, ""},
+			strings.Split("  "+does, "\n")...), "", "   Close y    Cancel n", "")
 	}
 	var got [][]string
 	for range 3 {
@@ -32,8 +31,8 @@ func TestCloseFormSessions(t *testing.T) {
 		f.Update(keyMsg("right"))
 	}
 	want := [][]string{
-		screen("Closes its 2 windows, and what runs in them. Opening it again restores its layout, with fresh\n  programs.", "end", "Ends 1 session: build running make"),
-		screen("Closes its 2 windows, keeping what runs in them. Opening it again brings them back.", "shelve", "Shelves 1 session, to bring back later: build running make"),
+		screen("Closes its 2 windows, and what runs in them. Opening it again restores its layout, with fresh\n  programs.", "end          ", "Ends 1 session: build running make"),
+		screen("Closes its 2 windows, keeping what runs in them. Opening it again brings them back.", "shelve       ", "Shelves 1 session, to bring back later: build running make"),
 		screen("Closes 2 windows, leaving what runs in them running.", "leave running", "Leaves 1 session running"),
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -57,6 +56,32 @@ func TestCloseFormFateClick(t *testing.T) {
 	want := []spaces.Fate{spaces.FateShelve, spaces.FateLeave, spaces.FateShelve, spaces.FateEnd, spaces.FateLeave}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+// The choice's arrows sit in the same cells whichever fate is chosen, for one session and for several, so
+// a click on an arrow leaves the mouse on it: the words that change go below the choice, and each name is
+// padded to the widest.
+func TestCloseFormFateStill(t *testing.T) {
+	one := &closeSessionForm{th: look.New(true), cfg: config.Config{Provider: []string{"prov"}}, mode: spaces.KeepClosed,
+		sessions: []string{"gr@dev"}, windows: []int{2},
+		closing: map[string][]spaces.ProviderSession{"gr@dev": {{ID: "a", Name: "build", State: "running", Busy: true, Command: "make"}}},
+		fate:    fateChoice{fates: []spaces.Fate{spaces.FateEnd, spaces.FateShelve, spaces.FateLeave}}}
+	several := &closeSessionForm{th: look.New(true), cfg: config.Config{Provider: []string{"prov"}}, mode: spaces.KeepClosed,
+		sessions: []string{"gr@dev", "gr@fix"}, windows: []int{2, 1},
+		closing: map[string][]spaces.ProviderSession{"gr@dev": {{ID: "a", Name: "build", State: "running", Busy: true, Command: "make"}}},
+		fate:    fateChoice{fates: []spaces.Fate{spaces.FateEnd, spaces.FateShelve, spaces.FateLeave}}}
+	for _, f := range []*closeSessionForm{one, several} {
+		f.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
+		var got [][]look.Zone
+		for range 3 {
+			f.View()
+			got = append(got, []look.Zone{f.zones[fatePrevZone][0], f.zones[fateNextZone][0]})
+			f.Update(keyMsg("right"))
+		}
+		if want := [][]look.Zone{got[0], got[0], got[0]}; !reflect.DeepEqual(got, want) {
+			t.Errorf("%v: arrows moved: %v", f.sessions, got)
+		}
 	}
 }
 

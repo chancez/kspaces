@@ -109,8 +109,20 @@ func (f *closeSessionForm) render() string {
 	if f.fate.offered() {
 		kept = f.fate.chosen() == spaces.FateShelve
 	}
+	// The choice goes above what it changes, so its row stays put as the words below it change length.
+	choice := func() {
+		if !f.fate.shown() {
+			return
+		}
+		var sessions []spaces.ProviderSession
+		for _, s := range f.sessions {
+			sessions = append(sessions, f.closing[s]...)
+		}
+		lines = append(append(lines, f.fate.lines(th, width, sessions)...), "")
+	}
 	if len(f.sessions) == 1 {
 		lines = []string{line(look.Heading(verb + " session " + f.sessions[0])), ""}
+		choice()
 		does := closesWhat(f.mode, f.windows[0], kept)
 		if f.fate.chosen() == spaces.FateLeave {
 			does = fmt.Sprintf("Closes %s, leaving what runs in them running.", plural(f.windows[0], "window"))
@@ -127,19 +139,13 @@ func (f *closeSessionForm) render() string {
 			lines = append(lines, line(th.Cut(width, look.Text(s), look.Default(strings.Repeat(" ", names-len(s)+2)), look.Muted(plural(f.windows[i], "window")))...))
 		}
 		lines = append(lines, "")
+		choice()
 		does := closeTheirs(f.mode, kept)
 		if f.fate.chosen() == spaces.FateLeave {
 			does = "Closes their windows, leaving what runs in them running."
 		}
 		text(does)
 		lines = append(lines, "")
-	}
-	if f.fate.shown() {
-		var sessions []spaces.ProviderSession
-		for _, s := range f.sessions {
-			sessions = append(sessions, f.closing[s]...)
-		}
-		lines = append(append(lines, f.fate.lines(th, width, sessions)...), "")
 	}
 	switch {
 	case f.busy:

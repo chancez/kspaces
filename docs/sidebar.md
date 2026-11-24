@@ -489,7 +489,8 @@ for what becomes of the provider's sessions the closing windows show, and for re
 tagged with the worktree, whose directory goes with it: **end**, at first, which kills the running ones and
 removes the ended and shelved ones; **shelve**, which for Close is the provider's keep, so opening the
 session again brings them back, and otherwise its shelve; or **leave running**, which only closes the
-windows. The line under it says how many sessions it does that to, and what a busy one runs, in the error
+windows. It sits above what the form says the choice changes, each name padded to the widest, so its
+arrows stay where they are as it changes. The line under it says how many sessions it does that to, and what a busy one runs, in the error
 color when ending or shelving stops it. Only what the provider allows is offered, and without a provider
 there is no choice; one alone, as a topic space's end, is said as it is. Closing saves the session's file
 and marks its windows before the sessions end, as a multiplexer's client exits with its session and its

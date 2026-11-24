@@ -200,8 +200,8 @@ func TestRemoveFormSessions(t *testing.T) {
 	f.Update(keyMsg("l"))
 	got = append(got, formScreen(f))
 	want := [][]string{
-		screen("end", "Ends 2 sessions: build running make watch"),
-		screen("shelve", "Shelves 2 sessions, to bring back later: build running make watch"),
+		screen("end          ", "Ends 2 sessions: build running make watch"),
+		screen("shelve       ", "Shelves 2 sessions, to bring back later: build running make watch"),
 		screen("leave running", "Leaves 2 sessions running"),
 	}
 	if !reflect.DeepEqual(got, want) {

@@ -559,7 +559,7 @@ func TestCleanupFormFate(t *testing.T) {
 			got = append(got, l)
 		}
 	}
-	want := []string{"  sessions   < end >  left/right change", "             Ends 1 session"}
+	want := []string{"  sessions   < end           >  left/right change", "             Ends 1 session"}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q\nwant %q", got, want)
 	}

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"slices"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -48,7 +49,7 @@ const (
 	fateNextZone = "fate:next"
 )
 
-// lines are the choice's, width cells wide: `sessions   < end >  left/right change`, the arrows and the name
+// lines are the choice's, width cells wide: `sessions   < end           >  left/right change`, the arrows and the name
 // marked for a click, then what the fate chosen does to sessions, in the error color when it ends a busy
 // one. A fate alone, as a topic space's End, is said as it is, with nothing to change. None without fates.
 func (c *fateChoice) lines(th *look.Theme, width int, sessions []spaces.ProviderSession) []string {
@@ -59,7 +60,13 @@ func (c *fateChoice) lines(th *look.Theme, width int, sessions []spaces.Provider
 	line := func(spans ...look.Span) string { return th.Render(look.Plain, th.Cut(width, spans...)...) }
 	choice := []look.Span{look.Text(fateNames[fate])}
 	if c.offered() {
-		choice = slices.Concat(look.Mark(fatePrevZone, look.Text("< ")), look.Mark(fateNextZone, look.Text(fateNames[fate]+" >")),
+		// Each name padded to the widest, so the arrows stay in their columns whichever is chosen.
+		widest := 0
+		for _, f := range c.fates {
+			widest = max(widest, len(fateNames[f]))
+		}
+		name := fateNames[fate] + strings.Repeat(" ", widest-len(fateNames[fate]))
+		choice = slices.Concat(look.Mark(fatePrevZone, look.Text("< ")), look.Mark(fateNextZone, look.Text(name+" >")),
 			[]look.Span{look.Muted("  left/right change")})
 	}
 	out := []string{th.Draw(look.Plain, labelWidth, look.Label("sessions")) + line(choice...)}
