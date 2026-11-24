@@ -6,11 +6,11 @@ package gitstate
 import (
 	"bufio"
 	"fmt"
-	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/chancez/kspaces/internal/gh"
+	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/logs"
 )
 
@@ -49,7 +49,7 @@ func (s State) KnownPR(branch string) (*gh.PR, bool) {
 // ReadStatus runs git status in the worktree at dir. It takes no optional locks, so running it in the
 // background never gets in the way of git run by hand.
 func ReadStatus(dir string) (Status, error) {
-	out, err := logs.Output(exec.Command("git", "--no-optional-locks", "-C", dir, "status", "--porcelain=v2", "--branch"))
+	out, err := git.Ask(logs.Output, "--no-optional-locks", "-C", dir, "status", "--porcelain=v2", "--branch")
 	if err != nil {
 		return Status{}, err
 	}

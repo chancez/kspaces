@@ -46,7 +46,7 @@ func FetchPullHead(root, remote string, number int, branch string) error {
 
 // BranchMerge is the ref the local branch pulls, its branch.NAME.merge, empty when it has none.
 func BranchMerge(root, branch string) string {
-	out, err := logs.Query(exec.Command("git", "-C", root, "config", "--get", "branch."+branch+".merge"))
+	out, err := query("-C", root, "config", "--get", "branch."+branch+".merge")
 	if err != nil {
 		return ""
 	}
@@ -56,7 +56,7 @@ func BranchMerge(root, branch string) string {
 // Remotes are the URLs of the repository's remotes, by name.
 func Remotes(root string) map[string]string {
 	ans := map[string]string{}
-	out, err := logs.Query(exec.Command("git", "-C", root, "config", "--get-regexp", `^remote\..*\.url$`))
+	out, err := query("-C", root, "config", "--get-regexp", `^remote\..*\.url$`)
 	if err != nil {
 		return ans
 	}

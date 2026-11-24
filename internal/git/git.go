@@ -25,7 +25,7 @@ type Worktree struct {
 // ListWorktrees lists the worktrees of the repository at root, the main one first. The error is git's
 // own message, for example when root is not a repository.
 func ListWorktrees(root string) ([]Worktree, error) {
-	out, err := logs.Output(exec.Command("git", "-C", root, "worktree", "list", "--porcelain"))
+	out, err := Ask(logs.Output, "-C", root, "worktree", "list", "--porcelain")
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
 			err = fmt.Errorf("%s", strings.TrimSpace(string(ee.Stderr)))
@@ -99,14 +99,14 @@ func AddWorktree(root, branch, base, dir string) (string, error) {
 
 // BranchExists reports whether the repository at root has a local branch named branch.
 func BranchExists(root, branch string) bool {
-	_, err := logs.Query(exec.Command("git", "-C", root, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch))
+	_, err := query("-C", root, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch)
 	return err == nil
 }
 
 // TopLevel is the top of the work tree dir is in, with symlinks resolved, as git reports it. The error is
 // git's own message, for example when dir is in no repository.
 func TopLevel(dir string) (string, error) {
-	out, err := logs.Query(exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel"))
+	out, err := query("-C", dir, "rev-parse", "--show-toplevel")
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
 			err = fmt.Errorf("%s", strings.TrimSpace(string(ee.Stderr)))
@@ -126,7 +126,7 @@ func CommonDir(dir string) (string, error) {
 // Changes is how many files git status reports in the worktree at dir: changed, staged or untracked.
 // Removing a worktree with any loses them.
 func Changes(dir string) (int, error) {
-	out, err := logs.Output(exec.Command("git", "-C", dir, "status", "--porcelain"))
+	out, err := Ask(logs.Output, "-C", dir, "status", "--porcelain")
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
 			return 0, fmt.Errorf("%s", strings.TrimSpace(string(ee.Stderr)))
@@ -220,7 +220,7 @@ func DeleteBranch(root, branch string, force bool) error {
 func output(args ...string) (string, error) {
 	// Most of what this asks is an answer as an exit status, as show-ref --verify gives: what fails the
 	// user sees, and the sidebar logs then.
-	out, err := logs.Query(exec.Command("git", args...))
+	out, err := query(args...)
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok && len(ee.Stderr) > 0 {
 			return "", fmt.Errorf("%s", strings.TrimSpace(string(ee.Stderr)))
