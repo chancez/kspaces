@@ -186,6 +186,9 @@ type Poller struct {
 	// settle settles the sessions left listed as keeping, see settleKept, given the provider's sessions,
 	// nil when it has not listed, and kitty's windows; nil for never.
 	settle func(cfg config.Config, st *ProviderState, data []kitty.OSWindow)
+	// follow moves the windows of sessions whose space changed, see followSpaces, given the poll; nil for
+	// never.
+	follow func(sh Shared)
 }
 
 // NewPoller is the poller of the kitty kspaces runs in.
@@ -201,6 +204,8 @@ func NewPoller() *Poller {
 			logs.Error("settling the sessions left keeping", err)
 		}
 	}
+	watch, self := &spaceWatch{}, kitty.SelfWindowID()
+	p.follow = func(sh Shared) { followSpaces(watch, sh, self) }
 	return p
 }
 
@@ -252,6 +257,9 @@ func (p *Poller) Poll() Shared {
 				listed = sh.Provider
 			}
 			p.settle(*sh.Config, listed, sh.Windows)
+		}
+		if p.follow != nil {
+			p.follow(sh)
 		}
 	}
 	p.followDock(sh)

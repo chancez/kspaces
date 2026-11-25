@@ -194,6 +194,16 @@ spaces; one no configured space is named after is a topic space, below. Each ses
 | `tags` | the provider's labels; `worktree`, when the space has that worktree, picks the kitty session `open` uses |
 | `windows` | the ids of the windows that show it, which is the provider's to decide: by a window's pid, a user variable, its program, anything W carries |
 
+A session whose `space` changes while windows show it moves them there: a provider's session moved from a
+shell, as `cm space move` does, belongs to the other space now. kitty keeps a window in the kitty session it
+was made in, so a move is a new tab in the space's session, opened as `open` opens a detached row, and the
+old window closed with `kspaces_keep` set, so a watcher ending a window's session on close leaves this one,
+which the new tab shows. The keyboard goes along only from the window that had it; any other opens behind,
+with `--keep-focus`. Only a change moves a window: one already disagreeing with its session's space when the
+sidebar starts stays, as does one whose space's session is not open but restored from its file, which a tab
+added now would keep from restoring. Each window is moved by the sidebar of its own OS window, so several
+sidebars move it once, and a move that fails is logged and not tried again.
+
 A session with no `windows` is detached and listed under its space, by host, unless it is a kept
 session's: a session whose `id` or `name` equals a handle `keep` returned for a kitty session kspaces closed
 or suspended, as `.kept-sessions` lists them, is that kitty session's, whose row stands for it, and comes

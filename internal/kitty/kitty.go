@@ -638,3 +638,33 @@ func Action(args ...string) error {
 	_, err := kitten(append([]string{"action"}, args...)...)
 	return err
 }
+
+// KeyboardWindow is the window with the keyboard: the active window of the active tab of the focused OS
+// window, else of the one focused last. Zero when none is.
+func KeyboardWindow(data []OSWindow) int { return keyboardWindow(data) }
+
+// OSWindowOf is the index in data of the OS window holding the window id, -1 when none does.
+func OSWindowOf(data []OSWindow, id int) int {
+	for i, osw := range data {
+		for _, tab := range osw.Tabs {
+			for _, w := range tab.Windows {
+				if w.ID == id {
+					return i
+				}
+			}
+		}
+	}
+	return -1
+}
+
+// SetWindowVar sets the user variable key to value on the window id.
+func SetWindowVar(id int, key, value string) error {
+	_, err := kitten("set-user-vars", "--match", fmt.Sprintf("id:%d", id), key+"="+value)
+	return err
+}
+
+// CloseWindow closes the window id, as closing it by hand would, so a watcher on close runs for it.
+func CloseWindow(id int) error {
+	_, err := kitten("close-window", "--ignore-no-match", "--match", fmt.Sprintf("id:%d", id))
+	return err
+}
