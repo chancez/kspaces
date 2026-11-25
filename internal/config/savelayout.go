@@ -104,11 +104,11 @@ func SaveLayout(l Layout, replace bool) error {
 	if err != nil {
 		return err
 	}
+	// The last file that has it, as an overlay's takes the place of one before it.
 	at := 0
 	for i, text := range files.texts {
 		if p, err := decode(text); err == nil && slices.ContainsFunc(p.cfg.Layouts, func(x Layout) bool { return x.Name == l.Name }) {
 			at = i
-			break
 		}
 	}
 	return EditFile(files.paths[at], func(text string) (string, error) {

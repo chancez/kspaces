@@ -206,9 +206,11 @@ fetch_timeout = "2m"
 vim = true
 ```
 
-Every key is optional. An unknown key is an error. The `.toml` files in `conf.d` beside kspaces.toml, such as
-a `conf.d/work.toml` kept out of dotfiles, are read after it and add their spaces, groups, commands and layouts; a
-setting in two files is an error. See [docs/kitty.md](docs/kitty.md#more-config-files).
+Every key is optional. An unknown key is an error. The `.toml` files in `conf.d` beside kspaces.toml,
+such as a `conf.d/work.toml` kept out of dotfiles, are read after it and add their spaces, groups, commands
+and layouts; a setting in two files is an error. Last, `kspaces.HOST.toml` beside it is read on that host
+alone and `kspaces.local.toml` on every host, each taking the place of what it sets. See
+[docs/kitty.md](docs/kitty.md#more-config-files).
 
 A repository's own layouts and commands can live with it, rather than in your dotfiles, in `.kspaces.toml`
 at the top of its main worktree, which its linked worktrees share. They are added to kspaces.toml's for that

@@ -57,7 +57,8 @@ func (a *app) rootCommand() *cobra.Command {
 kitty to a worktree's session, creating the session the first time.
 
 Run without a command to show the sidebar. The config is $XDG_CONFIG_HOME/kspaces/kspaces.toml, by
-default ~/.config/kspaces/kspaces.toml, then every .toml file in conf.d beside it, by name.`,
+default ~/.config/kspaces/kspaces.toml, then every .toml file in conf.d beside it, by name, then
+kspaces.ENV.toml beside it for each of $KSPACES_ENV, by default the host's name, and kspaces.local.toml.`,
 		Args:          cobra.NoArgs,
 		Version:       versionOf(version, info, ok),
 		SilenceUsage:  true,

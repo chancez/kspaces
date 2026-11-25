@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -15,6 +16,7 @@ func configDir(t *testing.T, files map[string]string) string {
 	t.Setenv("HOME", "/home/me")
 	base := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", base)
+	t.Setenv(EnvVar, "")
 	dir := filepath.Join(base, "kspaces")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
@@ -235,6 +237,142 @@ func TestSaveSpaceFiles(t *testing.T) {
 	}
 	got, _ := os.ReadFile(filepath.Join(dir, "kspaces.toml"))
 	if want := "layout = \"review\"\nspaces = [\"~/a\", \"~/c\"]\n"; string(got) != want {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+}
+
+// The overlays of the environments, in KSPACES_ENV's order, then kspaces.local.toml, come after the other
+// files and take the place of what they set: a setting, a key of a space, a command or layout called the
+// same. Their spaces are added, and a group listed before stays where it was. An environment not listed
+// is left out.
+func TestLoadOverlays(t *testing.T) {
+	configDir(t, map[string]string{
+		"kspaces.toml":     mainConfig,
+		"conf.d/work.toml": workConfig,
+		"kspaces.mbp.toml": `groups = ["work", "home"]
+spaces = [{ path = "~/home/nas", group = "home" }]
+layout = "shell"
+
+[worktrees]
+dir = ".mbp"
+
+[space.api]
+worktree_layout = "shell"
+
+[sidebar]
+width = 30
+
+[[commands]]
+name = "gr"
+run = ["gr", "--mbp"]
+
+[[layouts]]
+name = "shell"
+tabs = [{ panes = [{}] }]
+`,
+		"kspaces.desk.toml":  "[worktrees]\ndir = \".desk\"\n",
+		"kspaces.other.toml": "spaces = [\"~/other\"]\n",
+		"kspaces.local.toml": "[sidebar]\nwidth = 32\n",
+	})
+	t.Setenv(EnvVar, "desk,mbp")
+	got, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := Parse(`groups = ["work", "tools", "home"]
+spaces = [{ path = "~/gr", group = "tools" }, "~/work/api", { path = "~/work/web", group = "work" }, { path = "~/home/nas", group = "home" }]
+layout = "shell"
+
+[worktrees]
+dir = ".mbp"
+branch_prefix = "pr/me"
+delete_branch = true
+
+[sidebar]
+width = 32
+
+[space.api]
+group = "work"
+worktree_layout = "shell"
+
+[[commands]]
+name = "gr"
+run = ["gr", "--mbp"]
+
+[[layouts]]
+name = "review"
+tabs = [{ panes = [{ command = "gr" }] }]
+
+[[layouts]]
+name = "shell"
+tabs = [{ panes = [{}] }]
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v\nwant %+v", got, want)
+	}
+}
+
+// An overlay is checked as the other files are: what it defines twice itself is an error naming it.
+func TestLoadOverlayErrors(t *testing.T) {
+	dir := configDir(t, map[string]string{
+		"kspaces.toml":     mainConfig,
+		"kspaces.mbp.toml": "[[commands]]\nname = \"x\"\nrun = [\"x\"]\n\n[[commands]]\nname = \"x\"\nrun = [\"y\"]\n",
+	})
+	t.Setenv(EnvVar, "mbp")
+	if _, err := Load(); err == nil || err.Error() != dir+": commands: x is defined twice" {
+		t.Errorf("got %v", err)
+	}
+}
+
+// KSPACES_ENV's names in order, each once, local and empty ones left out; unset, the host's name.
+func TestEnvs(t *testing.T) {
+	host, err := os.Hostname()
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, _, _ = strings.Cut(host, ".")
+	os.Unsetenv(EnvVar)
+	t.Cleanup(func() { os.Unsetenv(EnvVar) })
+	got, err := Envs()
+	if want := []string{host}; err != nil || !reflect.DeepEqual(got, want) {
+		t.Errorf("unset: %q, %v, want %q", got, err, want)
+	}
+	t.Setenv(EnvVar, " work, mbp,,local,work")
+	got, err = Envs()
+	if want := []string{"work", "mbp"}; err != nil || !reflect.DeepEqual(got, want) {
+		t.Errorf("listed: %q, %v, want %q", got, err, want)
+	}
+	t.Setenv(EnvVar, "")
+	if got, err = Envs(); err != nil || got != nil {
+		t.Errorf("empty: %q, %v", got, err)
+	}
+	t.Setenv(EnvVar, "../x")
+	if _, err = Envs(); err == nil || err.Error() != `KSPACES_ENV: "../x" cannot name a config file` {
+		t.Errorf("a path: %v", err)
+	}
+}
+
+// A layout an overlay has in place of kspaces.toml's is saved in the overlay, as it is the one in use.
+func TestSaveLayoutOverlay(t *testing.T) {
+	dir := configDir(t, map[string]string{
+		"kspaces.toml":     "[[layouts]]\nname = \"review\"\ntabs = [{ panes = [{}] }]\n",
+		"kspaces.mbp.toml": "[[layouts]]\nname = \"review\"\ntabs = [{ panes = [{}] }]\n",
+	})
+	t.Setenv(EnvVar, "mbp")
+	if err := SaveLayout(Layout{Name: "review", Tabs: []LayoutTab{{Panes: []Pane{{Command: "", Cwd: "/x"}}}}}, true); err != nil {
+		t.Fatal(err)
+	}
+	a, _ := os.ReadFile(filepath.Join(dir, "kspaces.toml"))
+	b, _ := os.ReadFile(filepath.Join(dir, "kspaces.mbp.toml"))
+	got := []string{string(a), string(b)}
+	want := []string{
+		"[[layouts]]\nname = \"review\"\ntabs = [{ panes = [{}] }]\n",
+		"[[layouts]]\nname = \"review\"\n[[layouts.tabs]]\npanes = [\n  { cwd = \"/x\" },\n]\n",
+	}
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q\nwant %q", got, want)
 	}
 }

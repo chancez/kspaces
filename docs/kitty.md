@@ -492,10 +492,38 @@ An error in one file names that file, and one only the files together have, such
 command none defines, names the directory. Without kspaces.toml the other files are the config.
 
 Edits go to the file they belong to, checked with the other files: adding a space appends it to
-kspaces.toml; saving a layout replaces it in the file that has it, and adds a new one to kspaces.toml.
+kspaces.toml; saving a layout replaces it in the last file that has it, and adds a new one to kspaces.toml.
 Moving a space reorders its own file's `spaces`. The sidebar lists a group's spaces as the files do, one
 file's after another's, so moving a space before one from a file earlier than its own is an error, and
 the files are left as they were.
+
+### Per-host config
+
+Overlays beside kspaces.toml are read after the rest, on the machines they are for:
+
+- `kspaces.ENV.toml` for each environment in `KSPACES_ENV`, comma separated, in order. Unset, the
+  environment is the host's name up to its first dot, so `kspaces.mbp.toml` is read on a host called
+  `mbp.local`. Set it in kitty.conf's `env`, as kitty started from the desktop does not read your shell's.
+- `kspaces.local.toml`, last, on every machine: for what stays out of dotfiles.
+
+An overlay for a host that is not this one is left alone. Commit `kspaces.mbp.toml` with kspaces.toml to
+list spaces on that host alone:
+
+```toml
+# kspaces.mbp.toml
+spaces = [{ path = "~/projects/nas", group = "home" }]
+
+[sidebar]
+width = 32                     # in place of kspaces.toml's
+
+[[commands]]                   # in place of kspaces.toml's gr
+name = "gr"
+run = ["gr", "--wide"]
+```
+
+An overlay adds its `spaces` as another file does, but takes the place of what the files before it set: a
+setting, a key of a space, a command or layout called the same. A group already listed stays where it was.
+A later overlay does the same to an earlier one.
 
 ## Per-space config
 

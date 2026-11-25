@@ -31,7 +31,7 @@ import time
 import tomllib
 
 from kitty.constants import version
-from kitty.fast_data_types import add_timer
+from kitty.fast_data_types import add_timer, get_options
 
 DOCK_VAR = 'kspaces'
 # The user variable of a kspaces popup in a panel.
@@ -65,7 +65,8 @@ _applied = None
 
 
 # config_paths are kspaces' config files: kspaces.toml, then every .toml file in conf.d beside it by name,
-# hidden ones left out, as kspaces reads them.
+# hidden ones left out, then the overlays beside it of KSPACES_ENV's environments, else the host's name, and
+# kspaces.local.toml, as kspaces reads them.
 def config_paths():
     base = os.environ.get('XDG_CONFIG_HOME') or os.path.expanduser('~/.config')
     d = os.path.join(base, 'kspaces')
@@ -73,7 +74,18 @@ def config_paths():
         names = sorted(n for n in os.listdir(os.path.join(d, 'conf.d')) if n.endswith('.toml') and not n.startswith('.'))
     except OSError:
         names = []
-    return [os.path.join(d, 'kspaces.toml')] + [os.path.join(d, 'conf.d', n) for n in names]
+    # kitty.conf's env is set in the sidebar's environment, not kitty's own.
+    envs = get_options().env.get('KSPACES_ENV', os.environ.get('KSPACES_ENV'))
+    if envs is None:
+        envs = socket.gethostname().split('.')[0]
+    overlays = []
+    for env in envs.split(','):
+        env = env.strip()
+        if env and env != 'local' and '/' not in env and not env.startswith('.') and env not in overlays:
+            overlays.append(env)
+    overlays.append('local')
+    return ([os.path.join(d, 'kspaces.toml')] + [os.path.join(d, 'conf.d', n) for n in names] +
+            [os.path.join(d, 'kspaces.%s.toml' % env) for env in overlays])
 
 
 # sidebar_width is the width the sidebar's dock was dragged to, kept in kspaces' state.json, while the
@@ -103,7 +115,7 @@ def sidebar_width():
     return cfg
 
 
-# config_width is [sidebar] width from kspaces' config, from the file that sets it, read again only when
+# config_width is [sidebar] width from kspaces' config, from the last file that sets it, read again only when
 # the files change. kspaces checks the config itself and shows what is wrong with it in the sidebar, so
 # here a value it would reject just keeps the width there was.
 def config_width():
@@ -123,7 +135,6 @@ def config_width():
                 sidebar = tomllib.load(f).get('sidebar', {})
             if isinstance(sidebar, dict) and 'width' in sidebar:
                 width = sidebar['width']
-                break
         if not (isinstance(width, int) and MIN_WIDTH <= width <= MAX_WIDTH):
             width = _width[0]
     except (OSError, ValueError):

@@ -322,10 +322,12 @@ func parse(paths, texts []string) (Config, error) {
 		parts[i] = p
 	}
 	names := make([]string, len(paths))
+	overlays := make([]bool, len(paths))
 	for i, path := range paths {
 		names[i] = cmp.Or(FileName(path), "kspaces.toml")
+		overlays[i] = isOverlay(names[i])
 	}
-	cfg, err := merge(names, parts)
+	cfg, err := merge(names, overlays, parts)
 	if err != nil {
 		if len(paths) > 1 && paths[0] != "" {
 			return Config{}, in(filepath.Dir(paths[0]), err)
@@ -410,15 +412,17 @@ func decode(data string) (decoded, error) {
 // sets, checked as a whole. Their spaces, groups, commands and layouts are listed one file's after
 // another's, and their [space.NAME] tables merged by key. Every other setting, and each key of a space,
 // is one file's to set: set in two, or a command, layout or group in two, it is an error naming both,
-// rather than one silently winning.
-func merge(names []string, parts []decoded) (Config, error) {
+// rather than one silently winning. An overlay, see isOverlay, comes after the others and is the
+// exception: what it sets takes the place of what the files before it set, a command or layout the
+// place of the one called the same, and a group listed before stays where it was.
+func merge(names []string, overlays []bool, parts []decoded) (Config, error) {
 	cfg := Config{Launch: defaultLaunch, Worktrees: Worktrees{Dir: defaultWorktreeDir}, Sidebar: Sidebar{Width: DefaultSidebarWidth, Popup: PopupOverlay}, Git: Git{Timeout: git.DefaultTimeout, FetchTimeout: git.DefaultFetchTimeout}}
 	// The file that set each setting, a space's by "space.NAME.KEY", and each command, layout and group.
 	setBy := map[string]int{}
 	// once records file i setting key, what is called name, or says it is done twice: done is how, as in
 	// "is set", and do as in "set it".
 	once := func(key, name string, i int, done, do string) error {
-		if j, ok := setBy[key]; ok && j != i {
+		if j, ok := setBy[key]; ok && j != i && !overlays[i] {
 			return fmt.Errorf("%s is %s both in %s and in %s; %s it in one", name, done, names[j], names[i], do)
 		}
 		setBy[key] = i
@@ -441,9 +445,15 @@ func merge(names []string, parts []decoded) (Config, error) {
 				return Config{}, fmt.Errorf("groups: %w", err)
 			}
 		}
-		cfg.Commands = append(cfg.Commands, p.cfg.Commands...)
-		cfg.Layouts = append(cfg.Layouts, p.cfg.Layouts...)
-		cfg.Groups = append(cfg.Groups, p.cfg.Groups...)
+		if overlays[i] {
+			cfg.Commands = upsert(cfg.Commands, p.cfg.Commands, func(c Command) string { return c.Name })
+			cfg.Layouts = upsert(cfg.Layouts, p.cfg.Layouts, func(l Layout) string { return l.Name })
+			cfg.Groups = upsert(cfg.Groups, p.cfg.Groups, func(g string) string { return g })
+		} else {
+			cfg.Commands = append(cfg.Commands, p.cfg.Commands...)
+			cfg.Layouts = append(cfg.Layouts, p.cfg.Layouts...)
+			cfg.Groups = append(cfg.Groups, p.cfg.Groups...)
+		}
 		err := mergeSettings(reflect.ValueOf(&cfg).Elem(), reflect.ValueOf(p.cfg), nil, p.md, func(key string) error {
 			return once(key, key, i, "set", "set")
 		})
@@ -497,6 +507,20 @@ func merge(names []string, parts []decoded) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// upsert is have with each of add appended, or in place of the one in have with the same key. An
+// overlay's own twice is still listed twice, for the checks to find.
+func upsert[T any](have, add []T, key func(T) string) []T {
+	before := have[:len(have):len(have)]
+	for _, x := range add {
+		if i := slices.IndexFunc(before, func(y T) bool { return key(y) == key(x) }); i >= 0 {
+			have[i] = x
+			continue
+		}
+		have = append(have, x)
+	}
+	return have
 }
 
 // listed are Config's keys merge lists one file's after another's, or merges by key, rather than sets.
