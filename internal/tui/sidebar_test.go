@@ -1080,3 +1080,43 @@ func TestPageMoves(t *testing.T) {
 		t.Errorf("cursor at %v, want %v", got, want)
 	}
 }
+
+// Focus from a click leaves the list where it was scrolled, so the click lands on the row it was aimed
+// at: kitty sends the focus just before the press. Focus without a click scrolls to the cursor, at the
+// first key or once focusSettle passes.
+func TestFocusByClickKeepsScroll(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 16})
+	e.splitStatus(4)
+	for range 5 {
+		e.m.Update(tea.MouseWheelMsg{X: 4, Y: 3, Button: tea.MouseWheelDown})
+	}
+	e.m.render()
+	offset := e.m.offset
+	x, y := e.zone(fmt.Sprintf(entryZone, e.row("kitty")))
+	e.m.Update(tea.FocusMsg{})
+	e.clickAt(x, y, tea.MouseRight)
+	got := []any{e.m.offset, e.m.cursor, e.m.menu != nil}
+	if want := []any{offset, e.row("kitty"), true}; !reflect.DeepEqual(got, want) {
+		t.Errorf("offset, cursor and menu open after a right click that focused = %v, want %v", got, want)
+	}
+
+	e.m.Update(tea.BlurMsg{})
+	_, cmd := e.m.Update(tea.FocusMsg{})
+	if e.m.offset != offset {
+		t.Fatalf("offset %d at the focus, want %d until it settles", e.m.offset, offset)
+	}
+	e.m.Update(cmd())
+	e.m.render()
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{here + blocked + "dev pr/me/dev"}) {
+		t.Errorf("cursor on %q once the focus settled", got)
+	}
+
+	e.m.Update(tea.BlurMsg{})
+	e.m.offset = offset
+	e.m.Update(tea.FocusMsg{})
+	e.press("k")
+	if got := e.highlighted(); !reflect.DeepEqual(got, []string{"\u25bc " + repoIcon + "gr main"}) {
+		t.Errorf("cursor on %q after k", got)
+	}
+}

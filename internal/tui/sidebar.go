@@ -39,6 +39,11 @@ const hoverIdle = 15 * time.Second
 // shows nothing.
 const rowHoverDelay = 2 * time.Second
 
+// focusSettle is how long after the sidebar takes focus it scrolls to the cursor, unless a click came: kitty
+// sends the focus just before the press that gave it, and scrolling first would move the rows under the
+// mouse.
+const focusSettle = 100 * time.Millisecond
+
 type tickMsg struct{}
 
 // failedMsg is an action run off the UI loop failing, as gh failing to open a PR.
@@ -46,6 +51,11 @@ type failedMsg struct{ err error }
 
 // rowHoverMsg is rowHoverDelay passing since the mouse came to rest on a row, the gen-th time it did.
 type rowHoverMsg struct {
+	gen int
+}
+
+// focusSettledMsg is focusSettle passing since the sidebar took focus, the gen-th time it did.
+type focusSettledMsg struct {
 	gen int
 }
 
@@ -94,8 +104,11 @@ type sidebar struct {
 	failed error
 	// notice is what the last line says when there is no error: that the kitty files are out of date.
 	notice *look.Span
-	// Whether kitty has given the sidebar keyboard focus.
-	focused bool
+	// Whether kitty has given the sidebar keyboard focus, and whether the scroll to the cursor that taking
+	// it asks for waits on focusSettle, the focusGen-th focus's.
+	focused     bool
+	focusScroll bool
+	focusGen    int
 	// When keys arrive without focus, kitty is sending them from another window: kitty.conf's spaces mode
 	// runs `send-key` to the sidebar. The cursor is drawn then too, until remoteAt is a while ago.
 	remote   bool
@@ -185,6 +198,21 @@ func (m *sidebar) cursorToCurrent() {
 		}
 	}
 	m.scrollToCursor()
+}
+
+// focusCursor puts the cursor on the current session as cursorToCurrent does, for the sidebar taking focus.
+// When that would scroll, the scroll waits for focusSettle, which a click before it cancels.
+func (m *sidebar) focusCursor() tea.Cmd {
+	offset, statusOffset := m.offset, m.statusOffset
+	m.cursorToCurrent()
+	if m.offset == offset && m.statusOffset == statusOffset {
+		return nil
+	}
+	m.offset, m.statusOffset = offset, statusOffset
+	m.focusScroll = true
+	m.focusGen++
+	gen := m.focusGen
+	return tea.Tick(focusSettle, func(time.Time) tea.Msg { return focusSettledMsg{gen} })
 }
 
 // poll loads, on the timer.
@@ -301,9 +329,14 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.scrollToCursor()
 	case tea.FocusMsg:
 		m.focused, m.remote = true, false
-		m.cursorToCurrent()
+		return m, m.focusCursor()
+	case focusSettledMsg:
+		if msg.gen == m.focusGen && m.focusScroll {
+			m.focusScroll = false
+			m.scrollToCursor()
+		}
 	case tea.BlurMsg:
-		m.focused = false
+		m.focused, m.focusScroll = false, false
 	case tea.BackgroundColorMsg:
 		m.th.SetDark(msg.IsDark())
 	case tickMsg:
@@ -340,8 +373,10 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))
 		}
 	case tea.MouseWheelMsg:
+		m.focusScroll = false
 		m.wheel(msg)
 	case tea.MouseClickMsg:
+		m.focusScroll = false
 		return m, m.click(msg)
 	case tea.MouseMotionMsg:
 		switch {
@@ -370,6 +405,10 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.unhover()
 		m.addHot, m.sortHot, m.attentionHot, m.pickHot, m.splitHot, m.barHot = false, false, false, false, false, ""
 	case tea.KeyPressMsg:
+		if m.focusScroll {
+			m.focusScroll = false
+			m.scrollToCursor()
+		}
 		if m.press != nil && m.press.drag != nil && msg.String() == "esc" {
 			m.cancelPress()
 			return m, nil
