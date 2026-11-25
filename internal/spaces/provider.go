@@ -28,6 +28,8 @@ const (
 	CapShelve = "shelve"
 	CapRemove = "remove"
 	CapMove   = "move"
+	// CapLayouts is save-layout and load-layouts, see SharedLayout.
+	CapLayouts = "layouts"
 )
 
 // Capabilities are what a provider does, by name.
@@ -359,4 +361,65 @@ func DetachedOf(cfg config.Config, space string) ([]ProviderSession, error) {
 		}
 	}
 	return nil, nil
+}
+
+// LayoutRef names a worktree's shared layout: its space, the host of the sessions it shows, empty for this
+// machine, and its key, the worktree's directory, empty for the space's main worktree.
+type LayoutRef struct {
+	Space string `json:"space"`
+	Host  string `json:"host"`
+	Key   string `json:"key"`
+}
+
+// StoredLayout is a shared layout as the provider has it, at Revision, 0 for none.
+type StoredLayout struct {
+	LayoutRef
+	Revision int64         `json:"revision"`
+	Layout   *SharedLayout `json:"layout,omitempty"`
+}
+
+// errLayoutConflict is a save at a revision the layout is no longer at: another machine saved since.
+var errLayoutConflict = errors.New("the layout was saved by another machine since")
+
+// saveLayout has provider save l as ref's layout, if it is still at revision, and is its new revision.
+// errLayoutConflict when it is not.
+func saveLayout(provider []string, ref LayoutRef, revision int64, l SharedLayout) (int64, error) {
+	var resp struct {
+		Revision int64 `json:"revision"`
+		Conflict bool  `json:"conflict"`
+	}
+	req := struct {
+		LayoutRef
+		Revision int64        `json:"revision"`
+		Layout   SharedLayout `json:"layout"`
+	}{ref, revision, l}
+	if err := askProvider(provider, "save-layout", req, &resp); err != nil {
+		return 0, err
+	}
+	if resp.Conflict {
+		return 0, errLayoutConflict
+	}
+	return resp.Revision, nil
+}
+
+// loadLayouts are the layouts of known the provider has at another revision than the one known gives, by
+// ref: one changed since, saved since there was none, or removed, at revision 0 with no layout.
+func loadLayouts(provider []string, known []StoredLayout) ([]StoredLayout, error) {
+	type ask struct {
+		LayoutRef
+		Revision int64 `json:"revision"`
+	}
+	req := struct {
+		Layouts []ask `json:"layouts"`
+	}{Layouts: []ask{}}
+	for _, k := range known {
+		req.Layouts = append(req.Layouts, ask{k.LayoutRef, k.Revision})
+	}
+	var resp struct {
+		Layouts []StoredLayout `json:"layouts"`
+	}
+	if err := askProvider(provider, "load-layouts", req, &resp); err != nil {
+		return nil, err
+	}
+	return resp.Layouts, nil
 }
