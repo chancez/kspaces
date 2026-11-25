@@ -135,7 +135,13 @@ const (
 	MinPopupLines   = 10
 )
 
-func (s PopupSize) String() string { return fmt.Sprintf("%dx%d", s.Columns, s.Lines) }
+// String is s as COLUMNSxLINES, empty for none.
+func (s PopupSize) String() string {
+	if s == (PopupSize{}) {
+		return ""
+	}
+	return fmt.Sprintf("%dx%d", s.Columns, s.Lines)
+}
 
 // MarshalText writes s as COLUMNSxLINES.
 func (s PopupSize) MarshalText() ([]byte, error) { return []byte(s.String()), nil }

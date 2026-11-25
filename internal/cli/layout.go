@@ -54,7 +54,7 @@ func (a *app) layoutCommand() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "open without the form; a required input not given is an error")
 	cmd.Flags().StringArrayVar(&inputs, "input", nil, "an input's value, as NAME=VALUE; repeat for more")
-	fromFlag(cmd, &window, "the worktree of its session")
+	a.fromFlag(cmd, &window, "the worktree of its session")
 	cmd.MarkFlagsMutuallyExclusive("from", "yes")
 	cmd.MarkFlagsMutuallyExclusive("from", "input")
 	cmd.AddCommand(a.layoutSaveCommand())
@@ -92,7 +92,7 @@ func (a *app) layoutSaveCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&tab, "tab", false, "save this tab alone: the one kspaces runs in, if the session's, else the session's most recently focused")
-	fromFlag(cmd, &window, "the worktree of its session")
+	a.fromFlag(cmd, &window, "the worktree of its session")
 	cmd.MarkFlagsMutuallyExclusive("from", "tab")
 	return cmd
 }

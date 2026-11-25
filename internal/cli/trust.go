@@ -40,7 +40,7 @@ func (a *app) trustCommand() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "trust it as it is without asking")
 	cmd.Flags().BoolVar(&revoke, "revoke", false, "forget it, so it is untrusted until trusted again")
-	fromFlag(cmd, &window, "the space of its session")
+	a.fromFlag(cmd, &window, "the space of its session")
 	cmd.MarkFlagsMutuallyExclusive("yes", "revoke")
 	cmd.MarkFlagsMutuallyExclusive("from", "yes")
 	cmd.MarkFlagsMutuallyExclusive("from", "revoke")

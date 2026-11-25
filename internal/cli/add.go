@@ -43,7 +43,7 @@ func (a *app) addCommand() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "add without asking")
 	cmd.Flags().StringVar(&group, "group", "", "put the space in this group, in the config file that lists its spaces")
-	fromFlag(cmd, &window, "the repository of its directory")
+	a.fromFlag(cmd, &window, "the repository of its directory")
 	cmd.MarkFlagsMutuallyExclusive("from", "yes")
 	return cmd
 }

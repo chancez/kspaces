@@ -56,7 +56,7 @@ func (a *app) removeCommand() *cobra.Command {
 	cmd.Flags().StringArrayVar(&deletePaths, "delete-branch-path", nil, "with --yes, delete the branch of the worktree at this path, as --delete-branch does; repeatable")
 	cmd.Flags().BoolVar(&forceBranch, "force-branch", false, "with --yes and --delete-branch, delete the branches even with commits not merged, losing them")
 	cmd.Flags().StringArrayVar(&forceBranchPaths, "force-branch-path", nil, "with --yes, delete the branch of the worktree at this path even with commits not merged, as --force-branch does; repeatable")
-	fromFlag(cmd, &window, "the worktree of its session")
+	a.fromFlag(cmd, &window, "the worktree of its session")
 	cmd.MarkFlagsMutuallyExclusive("from", "yes")
 	cmd.MarkFlagsMutuallyExclusive("from", "delete-branch")
 	return cmd
@@ -109,7 +109,7 @@ func (a *app) closeCommand() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "close without asking")
 	cmd.Flags().StringVar(&sessions, "sessions", "", "what becomes of the session provider's sessions the windows show, chosen first in the form: end, shelve or leave; the first the provider allows by default")
-	fromFlag(cmd, &window, "its session by default")
+	a.fromFlag(cmd, &window, "its session by default")
 	cmd.MarkFlagsMutuallyExclusive("from", "yes")
 	return cmd
 }
@@ -136,7 +136,7 @@ func (a *app) suspendCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "suspend without asking")
-	fromFlag(cmd, &window, "its session by default")
+	a.fromFlag(cmd, &window, "its session by default")
 	cmd.MarkFlagsMutuallyExclusive("from", "yes")
 	return cmd
 }

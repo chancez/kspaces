@@ -25,7 +25,8 @@ by what runs in it; or all of them. shift+tab in the picker lists the next.
 
 With --from it opens the picker for kitty window WINDOW, in an overlay over it or in a panel as the config's
 [sidebar] popup says, rather than running it here: what kspaces.conf's kspaces_pick does for a panel, as only
-kspaces can fall back to an overlay where kitty has no panels.`,
+kspaces can fall back to an overlay where kitty has no panels. --size sets the panel's size, as COLUMNSxLINES,
+rather than [sidebar.popup_size]'s picker.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			sc, err := tui.ParsePickScope(scope)
@@ -38,7 +39,7 @@ kspaces can fall back to an overlay where kitty has no panels.`,
 			}
 			// A config that does not load opens the overlay, where the picker says what is wrong with it.
 			cfg, _ := config.Load()
-			err = spaces.LaunchPicker(cfg, from, "--scope", scope)
+			err = spaces.LaunchPicker(a.sized(cfg), from, "--scope", scope)
 			// Run by kitty with no window, the note goes to kitty's log.
 			if refused := (*kitty.PanelRefused)(nil); errors.As(err, &refused) {
 				fmt.Fprintln(a.stderr, "kspaces:", err)
@@ -49,5 +50,6 @@ kspaces can fall back to an overlay where kitty has no panels.`,
 	}
 	cmd.Flags().StringVar(&scope, "scope", tui.ScopeSpaces.String(), "list `SCOPE` first: spaces, windows or all")
 	cmd.Flags().IntVar(&from, "from", 0, "open the picker for kitty window `WINDOW`, in a popup")
+	a.sizeFlag(cmd)
 	return cmd
 }

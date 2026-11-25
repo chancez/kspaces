@@ -42,6 +42,6 @@ func (a *app) cleanupCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringArrayVar(&sessions, "session", nil, "a session whose worktree to offer removing, in place of SPACE; repeatable")
-	fromFlag(cmd, &window, "the space of its session")
+	a.fromFlag(cmd, &window, "the space of its session")
 	return cmd
 }

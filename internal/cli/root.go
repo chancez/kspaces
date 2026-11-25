@@ -20,6 +20,8 @@ import (
 type app struct {
 	stdout io.Writer
 	stderr io.Writer
+	// The --size of the panel the command run opens, zero when not given.
+	popupSize config.PopupSize
 }
 
 // Execute runs kspaces with os.Args and returns the exit code.

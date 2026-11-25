@@ -56,7 +56,7 @@ func (a *app) runCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&yes, "yes", false, "run without the form; a required input not given is an error")
 	cmd.Flags().StringVar(&open, "open", "", "where to open it in a session with windows, for this run: "+strings.Join(config.Opens, ", "))
 	cmd.Flags().StringArrayVar(&inputs, "input", nil, "an input's value, as NAME=VALUE; repeat for more")
-	fromFlag(cmd, &window, "the worktree of its session")
+	a.fromFlag(cmd, &window, "the worktree of its session")
 	for _, f := range []string{"yes", "open", "input"} {
 		cmd.MarkFlagsMutuallyExclusive("from", f)
 	}

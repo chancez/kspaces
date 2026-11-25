@@ -705,6 +705,10 @@ popup = "panel"
   list = "100x32"
   picker = "150x40"
   ```
+
+  A mapping can open its own size with `--size COLUMNSxLINES`, which `kspaces pick` and every command a
+  form action runs take with `--from`: `map f7 kspaces_pick --scope=windows --size=160x48`. It sizes a
+  panel only; an overlay is the size of its window.
  A panel is drawn in a rounded border in the accent, `+`, `-` and `|` in ASCII, a form's heading
   set into its top and its buttons and keys on the row above its bottom; the watcher hides its tab bar. An
   overlay is drawn as it always was.
