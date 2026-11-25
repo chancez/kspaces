@@ -283,6 +283,13 @@ taking a layout opened or closed panes, as a window just opened is not its sessi
 lists it, and saving before would close it on the other machine. Taking a layout never
 moves or resizes a window already there, and the tab that has focus keeps it.
 
+**Opening a worktree** loads its layout on every host with sessions in it, by `list`'s `space`, `host` and
+`worktree` tag, though no pane here shows one yet, and takes each as one seen for the first time: what it
+holds opens, and nothing closes. Opening `gr@dev` on a laptop whose first pane is one of its own sessions
+so brings up the tabs a desktop left on its host. A host whose sessions appear once the worktree is open
+here is not loaded: they are listed under the worktree's detached row, and only opening the worktree again
+brings them up.
+
 A save that conflicts loads the layout that won and takes it, then saves again. A provider that fails a
 verb is logged and asked again at the next refresh.
 

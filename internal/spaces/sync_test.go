@@ -3,6 +3,7 @@ package spaces
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -185,15 +186,27 @@ func (m *machine) named(host string) string {
 	return host
 }
 
-// sessions are the provider's sessions as m's windows show them, those of a host it does not reach stale.
+// sessions are the provider's sessions in gr@dev as m's windows show them, and those of the world's hosts
+// no window shows, those of a host it does not reach stale.
 func (m *machine) sessions() []ProviderSession {
 	var out []ProviderSession
+	session := func(id string, windows []int) ProviderSession {
+		h := m.world.host(id)
+		return ProviderSession{ID: id, Name: id, Space: "gr", Host: m.named(h), Stale: !m.reaches(h), State: "running",
+			Tags: map[string]string{"worktree": "dev"}, Windows: windows}
+	}
+	shown := map[string]bool{}
 	for _, t := range m.k.tabs {
 		for _, s := range t {
+			shown[s] = true
 			if !m.k.unlisted[s] {
-				h := m.world.host(s)
-				out = append(out, ProviderSession{ID: s, Name: s, Space: "gr", Host: m.named(h), Stale: !m.reaches(h), State: "running", Windows: []int{m.k.ids[s]}})
+				out = append(out, session(s, []int{m.k.ids[s]}))
 			}
+		}
+	}
+	for _, id := range slices.Sorted(maps.Keys(m.world.hostOf)) {
+		if !shown[id] {
+			out = append(out, session(id, nil))
 		}
 	}
 	return out
@@ -381,7 +394,8 @@ func TestLayoutSyncWaitsForOpenedPanes(t *testing.T) {
 }
 
 // Only a pane showing a session of its kitty session's space is shared: kitty's startup session, whatever
-// its file is named, shows sessions in default, and a window left in another space is that space's.
+// its file is named, shows sessions in default, and a window left in another space is that space's. A
+// worktree with windows showing none is there all the same, with no layouts.
 func TestSharedWorktreesSpace(t *testing.T) {
 	tab := func(id int, session string, windows ...int) kitty.FullTab {
 		ft := kitty.FullTab{ID: id, Layout: "stack"}
@@ -405,7 +419,7 @@ func TestSharedWorktreesSpace(t *testing.T) {
 	want := map[string]sharedWorktree{"gr@dev": {session: "gr@dev", space: "gr", key: "dev", hosts: map[string]sharedPanes{"": {
 		layout: SharedLayout{Version: 1, Sessions: []string{"@b"}, Tabs: []SharedTab{{Layout: "stack", Panes: []SharedPane{{Session: 0}}}}},
 		at:     sharedLocal{Window: map[string]int{"@b": 21}, Tab: map[string]int{"@b": 2}},
-	}}}}
+	}}}, "startup": {session: "startup", space: "startup", hosts: map[string]sharedPanes{}}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("shared %+v\nwant   %+v", got, want)
 	}
@@ -437,5 +451,32 @@ func TestLayoutSyncPerHost(t *testing.T) {
 	got := map[string]string{"white": world.stored("white").Members(), "laptop": world.stored("laptop").Members()}
 	if want := map[string]string{"white": "w1,w2", "laptop": "l1;l2"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("stored %q, want %q", got, want)
+	}
+}
+
+// Opening a worktree loads the layouts of every host with sessions in it, though no pane here shows one,
+// and opens what they hold beside this machine's own panes. A host whose sessions come later is left to
+// the worktree's detached row.
+func TestLayoutSyncLoadsOnOpen(t *testing.T) {
+	world := newFakeWorld()
+	world.hostOf = map[string]string{"w1": "white", "w2": "white", "w3": "white", "l1": "laptop"}
+	now := time.Unix(1000, 0)
+	b := newMachine(t, world, "white", &now, []string{"w1", "w2"}, []string{"w3"})
+	b.pass(t)
+	b.pass(t)
+	a := newMachine(t, world, "laptop", &now, []string{"l1"})
+	a.pass(t)
+	if want := [][]string{{"l1"}, {"w1", "w2"}, {"w3"}}; !reflect.DeepEqual(a.shows(), want) {
+		t.Errorf("laptop shows %q, want %q", a.shows(), want)
+	}
+
+	// black's layout, saved once laptop had the worktree open, does not open there.
+	world.hostOf["k1"] = "black"
+	world.store("black").layouts[LayoutRef{Space: "gr", Host: "black", Key: "dev"}] = StoredLayout{Revision: 1, Layout: new(layoutOf([]string{"k1"}))}
+	for range 3 {
+		a.pass(t)
+	}
+	if want := [][]string{{"l1"}, {"w1", "w2"}, {"w3"}}; !reflect.DeepEqual(a.shows(), want) {
+		t.Errorf("laptop shows %q, want %q", a.shows(), want)
 	}
 }

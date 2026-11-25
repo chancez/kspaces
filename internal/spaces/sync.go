@@ -42,9 +42,14 @@ const (
 type syncState struct {
 	LastPass time.Time `json:"last_pass"`
 	LastLoad time.Time `json:"last_load"`
-	// By the worktree's kitty session, then by the host of the sessions the layout shows, empty for this
-	// machine.
-	Layouts map[string]map[string]*syncEntry `json:"layouts"`
+	// By the worktree's kitty session.
+	Layouts map[string]*syncWorktree `json:"layouts"`
+}
+
+// syncWorktree is what passes know of a worktree with windows: its layouts, by the host of the sessions
+// each shows, empty for this machine.
+type syncWorktree struct {
+	Hosts map[string]*syncEntry `json:"hosts"`
 }
 
 // syncEntry is what a pass knows of a worktree's layout on a host: where it is, the layout last saved or taken, Base,
@@ -162,10 +167,10 @@ func (ls *layoutSync) locked(f func(st *syncState)) error {
 		}
 		return err
 	}
-	st := syncState{Layouts: map[string]map[string]*syncEntry{}}
+	st := syncState{Layouts: map[string]*syncWorktree{}}
 	if b, err := os.ReadFile(ls.path); err == nil {
 		if err := json.Unmarshal(b, &st); err != nil || st.Layouts == nil {
-			st = syncState{Layouts: map[string]map[string]*syncEntry{}}
+			st = syncState{Layouts: map[string]*syncWorktree{}}
 		}
 	}
 	f(&st)
@@ -200,11 +205,11 @@ func (w sharedWorktree) ref(host string) LayoutRef {
 	return LayoutRef{Space: w.space, Host: host, Key: w.key}
 }
 
-// sharedWorktrees are the worktrees of tabs whose panes show a provider session of their space, in
-// sessions, by their kitty session, each pane in the layout of its session's host: a tab showing sessions
-// of two hosts is in both layouts, with that host's panes alone. A pane showing a session of another space
-// is not shared, which leaves out kitty's startup session whatever its file is named, its windows showing
-// sessions in default, and default itself is this machine's alone.
+// sharedWorktrees are the worktrees of tabs with windows, by their kitty session, with the panes that show
+// a provider session of their space, in sessions, each in the layout of its session's host: a tab showing
+// sessions of two hosts is in both layouts, with that host's panes alone. A pane showing a session of
+// another space is not shared, which leaves out kitty's startup session whatever its file is named, its
+// windows showing sessions in default, and default itself is this machine's alone.
 func sharedWorktrees(tabs []kitty.FullTab, sessions []ProviderSession) map[string]sharedWorktree {
 	shows := map[int]ProviderSession{}
 	for _, s := range sessions {
@@ -236,9 +241,6 @@ func sharedWorktrees(tabs []kitty.FullTab, sessions []ProviderSession) map[strin
 				}
 			}
 		}
-		if len(hosts) == 0 {
-			continue
-		}
 		w := sharedWorktree{session: name, space: space, key: dir, hosts: map[string]sharedPanes{}}
 		for host := range hosts {
 			l, at := captureShared(tabs, name, host, mine)
@@ -249,12 +251,13 @@ func sharedWorktrees(tabs []kitty.FullTab, sessions []ProviderSession) map[strin
 	return out
 }
 
-// pass shares the layouts of the worktrees with windows, each host's apart: it forgets a worktree's layout
-// on a host once none of its panes shows one of the host's sessions, so one shown again is seen afresh
-// rather than against panes it no longer has; takes the layouts other machines saved since it last asked,
-// or every one it has not asked about; and saves those whose panes changed and settled. cwd is where a
-// session opened without a directory of its own starts, by the worktree's kitty session, and anchor the
-// window a new tab of a session goes by.
+// pass shares the layouts of the worktrees with windows, each host's apart. It forgets a worktree with none,
+// so one opened again is seen afresh rather than against panes it no longer has, and a worktree's layout on
+// a host once none of its panes shows one of the host's sessions. A worktree it has not seen yet is being
+// opened, so it also loads the layouts of the hosts with sessions in it, in sessions, which no pane here
+// shows yet. It takes the layouts other machines saved since it last asked, or every one it has not asked
+// about, and saves those whose panes changed and settled. cwd is where a session opened without a directory
+// of its own starts, by the worktree's kitty session, and anchor the window a new tab of a session goes by.
 func (ls *layoutSync) pass(cfg config.Config, sessions []ProviderSession, cwd func(session string) string, anchor map[string]int) error {
 	var err error
 	lockErr := ls.locked(func(st *syncState) {
@@ -268,23 +271,33 @@ func (ls *layoutSync) pass(cfg config.Config, sessions []ProviderSession, cwd fu
 			return
 		}
 		shown := sharedWorktrees(tabs, sessions)
-		for name, hosts := range st.Layouts {
-			for host := range hosts {
-				if _, ok := shown[name].hosts[host]; !ok {
-					delete(hosts, host)
-				}
-			}
-			if len(hosts) == 0 {
+		for name, sw := range st.Layouts {
+			w, ok := shown[name]
+			if !ok {
 				delete(st.Layouts, name)
+				continue
+			}
+			for host, e := range sw.Hosts {
+				// One loaded at the worktree's opening is kept until the panes it opened are listed.
+				if _, ok := w.hosts[host]; !ok && e.Revision >= 0 && !ls.now().Before(e.Hold) {
+					delete(sw.Hosts, host)
+				}
 			}
 		}
 		for name, w := range shown {
-			if st.Layouts[name] == nil {
-				st.Layouts[name] = map[string]*syncEntry{}
+			sw := st.Layouts[name]
+			if sw == nil {
+				sw = &syncWorktree{Hosts: map[string]*syncEntry{}}
+				st.Layouts[name] = sw
+				for _, s := range sessions {
+					if s.SpaceName() == w.space && s.Tags["worktree"] == w.key {
+						sw.Hosts[s.Host] = &syncEntry{Ref: w.ref(s.Host), Revision: -1}
+					}
+				}
 			}
 			for host := range w.hosts {
-				if st.Layouts[name][host] == nil {
-					st.Layouts[name][host] = &syncEntry{Ref: w.ref(host), Revision: -1}
+				if sw.Hosts[host] == nil {
+					sw.Hosts[host] = &syncEntry{Ref: w.ref(host), Revision: -1}
 				}
 			}
 		}
@@ -293,7 +306,7 @@ func (ls *layoutSync) pass(cfg config.Config, sessions []ProviderSession, cwd fu
 			w := shown[name]
 			for _, host := range slices.Sorted(maps.Keys(w.hosts)) {
 				if !taken[w.ref(host)] {
-					ls.saveIfChanged(cfg, st.Layouts[name][host], w.session, w.hosts[host])
+					ls.saveIfChanged(cfg, st.Layouts[name].Hosts[host], w.session, w.hosts[host])
 				}
 			}
 		}
@@ -313,8 +326,8 @@ func (ls *layoutSync) take(cfg config.Config, st *syncState, shown map[string]sh
 	byRef := map[LayoutRef]at{}
 	unknown := false
 	for _, name := range slices.Sorted(maps.Keys(st.Layouts)) {
-		for _, host := range slices.Sorted(maps.Keys(st.Layouts[name])) {
-			e := st.Layouts[name][host]
+		for _, host := range slices.Sorted(maps.Keys(st.Layouts[name].Hosts)) {
+			e := st.Layouts[name].Hosts[host]
 			known = append(known, StoredLayout{LayoutRef: e.Ref, Revision: e.Revision})
 			byRef[e.Ref] = at{name, host}
 			unknown = unknown || e.Revision < 0
@@ -335,7 +348,7 @@ func (ls *layoutSync) take(cfg config.Config, st *syncState, shown map[string]sh
 		if !ok {
 			continue
 		}
-		e := st.Layouts[where.name][where.host]
+		e := st.Layouts[where.name].Hosts[where.host]
 		switch {
 		case s.Revision == 0 || s.Layout == nil:
 			// Nothing saved: this machine's panes are saved as the first.
@@ -394,7 +407,8 @@ func (ls *layoutSync) saveIfChanged(cfg config.Config, e *syncEntry, session str
 // One that fails is logged and the rest still go.
 func (ls *layoutSync) apply(cfg config.Config, session string, w sharedPanes, change sharedChange, sessions []ProviderSession, cwd string, anchor int) error {
 	var errs []error
-	windows := maps.Clone(w.at.Window)
+	windows := map[string]int{}
+	maps.Copy(windows, w.at.Window)
 	for _, id := range change.Close {
 		if win, ok := windows[id]; ok {
 			if err := ls.k.Close(win); err != nil {
