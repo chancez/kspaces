@@ -134,6 +134,11 @@ func (f *addSpaceForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return f, nil
 	case tea.KeyPressMsg:
+		var on field
+		if f.focus == 0 {
+			on = &f.path
+		}
+		msg = formKey(f.th, on, msg)
 		if f.focus == 0 && keptBy(&f.path, msg) {
 			break
 		}

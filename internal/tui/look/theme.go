@@ -225,8 +225,9 @@ type Theme struct {
 	elements [numElements]lipgloss.Style
 	surfaces [numSurfaces]surfaceStyle
 	glyphs   Glyphs
-	// vim is whether the text boxes drawn in the theme edit with vim's modes, see SetVim.
-	vim bool
+	// vim is whether the text boxes drawn in the theme edit with vim's modes, see SetVim, and vimNormal
+	// whether they are in normal mode, see SetVimNormal.
+	vim, vimNormal bool
 }
 
 // New is kspaces' theme, drawing in Nerd Font icons, for a dark background or a light one. Its colors are
@@ -303,9 +304,9 @@ func New(isDark bool) *Theme {
 // SetDark makes the theme the one for a dark background or a light one, as the terminal says it has once
 // it answers, keeping its glyphs.
 func (t *Theme) SetDark(isDark bool) {
-	g, vim := t.glyphs, t.vim
+	g, vim, normal := t.glyphs, t.vim, t.vimNormal
 	*t = *New(isDark)
-	t.glyphs, t.vim = g, vim
+	t.glyphs, t.vim, t.vimNormal = g, vim, normal
 }
 
 // SetVim makes the text boxes drawn in the theme edit with vim's modes, as [editor] vim asks. It is the
@@ -314,6 +315,13 @@ func (t *Theme) SetVim(on bool) { t.vim = on }
 
 // Vim is whether the text boxes drawn in the theme edit with vim's modes.
 func (t *Theme) Vim() bool { return t.vim }
+
+// SetVimNormal says the box last edited was left in normal mode, or in insert mode, so the next to have
+// focus goes on in it, as vim's mode is the editor's rather than a buffer's.
+func (t *Theme) SetVimNormal(normal bool) { t.vimNormal = normal }
+
+// VimNormal is whether the box last edited was left in vim's normal mode.
+func (t *Theme) VimNormal() bool { return t.vimNormal }
 
 // style is how el with props draws on surface s.
 func (t *Theme) style(el element, p Prop, s Surface) lipgloss.Style {

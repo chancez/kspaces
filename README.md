@@ -197,7 +197,8 @@ timeout = "30s"
 fetch_timeout = "2m"
 
 # Edit the forms' text boxes with vim's modes. A box starts in insert mode, its mode at its right; esc goes
-# to normal mode, and esc again leaves the form. Enter and tab are the form's in every mode.
+# to normal mode, and esc again leaves the form. In normal mode j and k go on to the field below or above,
+# in the same mode. Enter and tab are the form's in every mode.
 [editor]
 vim = true
 ```

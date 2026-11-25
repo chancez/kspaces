@@ -107,6 +107,7 @@ func (f *moveSessionsForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return f, nil
 	case tea.KeyPressMsg:
+		msg = formKey(f.th, &f.space, msg)
 		if !f.busy && keptBy(&f.space, msg) {
 			break
 		}

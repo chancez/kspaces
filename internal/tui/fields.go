@@ -34,6 +34,8 @@ type field interface {
 	// cursor is the terminal's cursor in the box, from its top left, nil while it draws its own, see
 	// vimKeys.cursor.
 	cursor() *tea.Cursor
+	// formKey is msg as the form takes it, see vimKeys.formKey.
+	formKey(msg tea.KeyPressMsg) tea.KeyPressMsg
 }
 
 // lineField is one line of text, for a branch, a path or a name. It is a text area of one row, which shows
@@ -54,6 +56,12 @@ func newLineField(th *look.Theme, placeholder string) lineField {
 	in.KeyMap.InsertNewline.SetEnabled(false)
 	in.SetStyles(th.AreaStyles())
 	return lineField{Model: in, vim: vimKeys{th: th}}
+}
+
+// Focus gives the box focus, in the vim mode the box before had.
+func (f *lineField) Focus() tea.Cmd {
+	f.vim.focus(&f.Model)
+	return f.Model.Focus()
 }
 
 // SetWidth makes the box width wide, its mode included.
@@ -95,6 +103,8 @@ func (f *lineField) mode() string { return f.vim.mode(&f.Model) }
 
 func (f *lineField) cursor() *tea.Cursor { return f.vim.cursor(&f.Model) }
 
+func (f *lineField) formKey(msg tea.KeyPressMsg) tea.KeyPressMsg { return f.vim.formKey(&f.Model, msg) }
+
 // textField is text that can take several lines, for the inputs of commands and layouts, which go to a
 // program as they are. shift+enter starts a line, or alt+enter or ctrl+j, for a terminal that sends
 // shift+enter as enter, which the form keeps for submitting. The box grows to show the lines, wrapped, up
@@ -120,6 +130,12 @@ func newTextField(th *look.Theme, placeholder string) textField {
 	in.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter", "alt+enter", "ctrl+j"))
 	in.SetStyles(th.AreaStyles())
 	return textField{Model: in, vim: vimKeys{th: th}}
+}
+
+// Focus gives the box focus, in the vim mode the box before had.
+func (f *textField) Focus() tea.Cmd {
+	f.vim.focus(&f.Model)
+	return f.Model.Focus()
 }
 
 // SetWidth makes the box width wide, its mode included.
@@ -165,6 +181,8 @@ func (f *textField) keeps(msg tea.KeyPressMsg) bool {
 func (f *textField) mode() string { return f.vim.mode(&f.Model) }
 
 func (f *textField) cursor() *tea.Cursor { return f.vim.cursor(&f.Model) }
+
+func (f *textField) formKey(msg tea.KeyPressMsg) tea.KeyPressMsg { return f.vim.formKey(&f.Model, msg) }
 
 // keptBy says whether fl, the focused field, nil for a choice, keeps msg from the form's keys.
 func keptBy(fl field, msg tea.KeyPressMsg) bool { return fl != nil && fl.keeps(msg) }

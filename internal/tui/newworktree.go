@@ -510,6 +510,7 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return f, nil
 	case tea.KeyPressMsg:
+		msg = formKey(f.th, f.focused(), msg)
 		if keptBy(f.focused(), msg) {
 			break
 		}

@@ -117,3 +117,80 @@ func TestFieldVimCursor(t *testing.T) {
 		t.Errorf("without vim: %+v", got)
 	}
 }
+
+// modeRow is the row of the form's screen that shows a field's vim mode, and the mode, or -1 when none
+// does, as while a choice has focus.
+func modeRow(f interface{ render() string }) (int, string) {
+	for i, l := range formScreen(f) {
+		for _, mode := range []string{"NORMAL", "INSERT", "VISUAL"} {
+			if strings.HasSuffix(l, " "+mode) {
+				return i, mode
+			}
+		}
+	}
+	return -1, ""
+}
+
+// In normal mode j and k go down and up through the form's fields and choices, as down and up do, each
+// field taking normal mode from the one before. A j that vim waits for, as rj's, is vim's.
+func TestFieldVimNavigate(t *testing.T) {
+	f := newForm(testLayouts(t), clickSpace)
+	f.theme().SetVim(true)
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	typeInto(f, "fix")
+	f.Update(keyMsg("esc"))
+	type at struct {
+		row  int
+		mode string
+	}
+	steps := []struct {
+		keys string
+		want at
+	}{
+		// The branch, the directory, the choice of layout, which shows no mode, then its prompt.
+		{"", at{5, "NORMAL"}},
+		{"j", at{6, "NORMAL"}},
+		{"j", at{-1, ""}},
+		{"j", at{8, "NORMAL"}},
+		{"kkk", at{5, "NORMAL"}},
+		// r takes the j as the character it puts, on the branch's x.
+		{"rj", at{5, "NORMAL"}},
+	}
+	for _, s := range steps {
+		typeInto(f, s.keys)
+		if row, mode := modeRow(f); !reflect.DeepEqual(at{row, mode}, s.want) {
+			t.Errorf("after %q: %v, want %v", s.keys, at{row, mode}, s.want)
+		}
+	}
+	if got, want := f.branch.Value(), "fij"; got != want {
+		t.Errorf("branch %q, want %q", got, want)
+	}
+	// A appends on the branch, and j types there.
+	typeInto(f, "Aj")
+	if got, want := f.branch.Value(), "fijj"; got != want {
+		t.Errorf("branch %q, want %q", got, want)
+	}
+}
+
+// In a field of several lines j and k move between them, and go on to the next field from its last or
+// the one before from its first.
+func TestTextFieldVimNavigate(t *testing.T) {
+	f := newLayoutForm(testLayouts(t), clickSpace, clickWt, clickOpen, "agent", map[string]string{"prompt": "a\nb"})
+	f.theme().SetVim(true)
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	f.Update(keyMsg("tab"))
+	f.Update(keyMsg("esc"))
+	// The prompt's lines are the screen's 4th and 5th, the mode on the first.
+	typeInto(f, "k")
+	if row, mode := modeRow(f); row != 4 || mode != "NORMAL" || f.focused() == nil {
+		t.Errorf("k on the last line: row %d %q, focused %v", row, mode, f.focused())
+	}
+	typeInto(f, "k")
+	if f.focused() != nil {
+		t.Error("k on the first line stayed in the prompt")
+	}
+	typeInto(f, "j")
+	if f.focused() == nil {
+		t.Error("j on the choice did not go to the prompt")
+	}
+}

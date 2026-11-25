@@ -16,6 +16,9 @@ type vimKeys struct {
 	// vim edits area, made for it once the field is in place, as vim keeps the area's address.
 	vim  *vimbubble.Modal
 	area *textarea.Model
+	// owed is set in normal mode while vim waits for more of a command: r for the character it puts, g, d
+	// or c for a motion, or o for the object after ci or di, see formKey.
+	owed rune
 }
 
 // modeRoom is how many cells a field gives up for its mode, drawn after it, see vimKeys.mode.
@@ -76,7 +79,79 @@ func (k *vimKeys) update(area *textarea.Model, msg tea.Msg) (tea.Cmd, bool) {
 	if was == vimbubble.Insert && v.Mode() == vimbubble.Normal {
 		area.SetCursorColumn(max(area.Column()-1, 0))
 	}
+	owed := k.owed
+	k.owed = 0
+	if was == vimbubble.Normal && v.Mode() == vimbubble.Normal {
+		k.owed = owes(owed, press)
+	}
+	k.th.SetVimNormal(v.Mode() != vimbubble.Insert)
 	return cmd, consumed
+}
+
+// focus puts vim in the mode the field that had focus before left, see look.Theme.SetVimNormal: insert, or
+// normal for normal and visual, as a selection is the field's.
+func (k *vimKeys) focus(area *textarea.Model) {
+	v := k.on(area)
+	if v == nil {
+		return
+	}
+	mode := vimbubble.Insert
+	if k.th.VimNormal() {
+		mode = vimbubble.Normal
+	}
+	v.SetMode(mode)
+	k.owed = 0
+}
+
+// owes is what vim waits for after press in normal mode, owed what it waited for before: see vimKeys.owed.
+func owes(owed rune, press tea.KeyPressMsg) rune {
+	if !typesChar(press) {
+		return 0
+	}
+	r := []rune(press.Text)[0]
+	switch {
+	case owed == 0 && (r == 'r' || r == 'g' || r == 'd' || r == 'c'):
+		return r
+	case (owed == 'c' || owed == 'd') && (r == 'i' || r == 'a'):
+		return 'o'
+	}
+	return 0
+}
+
+// formKey is msg as the form takes it: in normal mode, j and k are down and up, which the field keeps to
+// move between its lines and the form takes on its first or last to move to the field above or below. Vim
+// has them while it waits for more of a command, as rj, and in visual mode, where they select.
+func (k *vimKeys) formKey(area *textarea.Model, msg tea.KeyPressMsg) tea.KeyPressMsg {
+	if v := k.on(area); v == nil || v.Mode() != vimbubble.Normal || k.owed != 0 {
+		return msg
+	}
+	return vimArrow(msg)
+}
+
+// formKey is msg as a form takes it with fl, the field with focus, nil for a choice: see vimKeys.formKey.
+// On a choice, while th has vim on, j and k are down and up too, so they go on through the form.
+func formKey(th *look.Theme, fl field, msg tea.KeyPressMsg) tea.KeyPressMsg {
+	if fl != nil {
+		return fl.formKey(msg)
+	}
+	if th.Vim() {
+		return vimArrow(msg)
+	}
+	return msg
+}
+
+// vimArrow is j as down and k as up, as vim moves, and any other key as it is.
+func vimArrow(msg tea.KeyPressMsg) tea.KeyPressMsg {
+	if msg.Mod != 0 {
+		return msg
+	}
+	switch msg.Text {
+	case "j":
+		return tea.KeyPressMsg{Code: tea.KeyDown}
+	case "k":
+		return tea.KeyPressMsg{Code: tea.KeyUp}
+	}
+	return msg
 }
 
 // leaveVisual goes back to normal mode from visual, as a click places the cursor rather than extending
