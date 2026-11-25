@@ -235,3 +235,16 @@ func TestPollerWindowsDuringPoll(t *testing.T) {
 		t.Errorf("provider during the polls\n%+v\nwant\n%+v", during, want)
 	}
 }
+
+// A poll carries the diverged layouts, and windows listed after it keep them until the next.
+func TestPollerDiverged(t *testing.T) {
+	p := newPoller(filepath.Join(t.TempDir(), "kitty.git.json"), func() Shared { return Shared{Config: &config.Config{}} })
+	p.list = func() ([]kitty.OSWindow, error) { return nil, nil }
+	diverged := []Divergence{{Session: "gr@dev", Host: "desktop", LocalTabs: 5, RemoteTabs: 2}}
+	p.diverged = func() []Divergence { return diverged }
+	got := []Shared{p.Poll(), p.Windows()}
+	want := []Shared{{Config: &config.Config{}, Diverged: diverged}, {Config: &config.Config{}, Diverged: diverged}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got\n%+v\nwant\n%+v", got, want)
+	}
+}

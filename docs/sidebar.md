@@ -43,6 +43,12 @@ the git state goes: a lock and `untrusted config` (`?` in Unicode and ASCII) whi
 as it is, or the cross of a broken space and `config error` when it has an error, which `kspaces list`
 shows. A narrower row says `untrusted`, then shows the mark alone.
 
+A worktree whose [shared layout](kitty.md#shared-layouts) on a host has diverged from its panes here ends
+its row with a muted `~ diverged`, after the git state, as does a folded space's row when one of its
+worktrees has. On the hosts tab it is under the host the layout diverged from alone. It is not in the
+status list, which is for what programs say of themselves. See [Shared layouts](#shared-layouts) for
+resolving it.
+
 Sessions that are open or saved but belong to no worktree, such as the one kitty starts with, are listed
 above the spaces.
 

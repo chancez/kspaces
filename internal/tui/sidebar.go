@@ -160,6 +160,8 @@ type sidebar struct {
 	poller    *spaces.Poller
 	// What git and gh say of each worktree, by path, from the poller.
 	git map[string]gitstate.State
+	// The worktrees' layouts diverged from their hosts', from the poller.
+	diverged []spaces.Divergence
 	// The provider's sessions no window shows, by space, see spaces.Snapshot, the spaces whose sessions
 	// show under their head, see detached.go, and what the provider does.
 	detached     map[string]spaces.Detached
@@ -386,7 +388,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.kitty.Statuses = spaces.Shown(m.cfg, m.hidden, m.statuses)
 			m.order = msg.Order
-			m.git = msg.Git
+			m.git, m.diverged = msg.Git, msg.Diverged
 			m.detached, m.caps, m.providerSpaces, m.sessions = msg.Detached, msg.Caps, msg.ProviderSpaces, msg.Sessions
 			m.rebuildRows(at)
 			m.settle()
@@ -542,7 +544,7 @@ func (m *sidebar) leave() tea.Cmd {
 
 // view is what the sidebar knows as a snapshot, for what reads one, as the row actions do.
 func (m *sidebar) view() spaces.Snapshot {
-	return spaces.Snapshot{Config: &m.cfg, Git: m.git, Kitty: m.kitty, Saved: m.saved, Suspended: m.suspended, Keeping: m.keeping,
+	return spaces.Snapshot{Config: &m.cfg, Git: m.git, Diverged: m.diverged, Kitty: m.kitty, Saved: m.saved, Suspended: m.suspended, Keeping: m.keeping,
 		Pending: m.busy, Caps: m.caps, ProviderSpaces: m.providerSpaces}
 }
 

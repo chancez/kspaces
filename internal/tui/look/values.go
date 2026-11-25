@@ -212,6 +212,9 @@ func MissingWorktree(r spaces.Row) Span { return sp(elWorktree, r.Dir()) }
 // Gone stands for a missing worktree's branch, which went with its directory.
 func Gone() Span { return sp(elMuted, "gone") }
 
+// Diverged marks a worktree whose layout on a host diverged from its panes here, see spaces.Divergence.
+func Diverged() []Span { return []Span{sp(elMuted, "~ diverged")} }
+
 // stateGroups name the groups of status entries in a state, in the order the list sorts them.
 var stateGroups = map[string]string{"blocked": "Blocked", "error": "Failed", "done": "Done", "working": "Working", "idle": "Idle"}
 

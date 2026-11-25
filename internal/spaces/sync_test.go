@@ -819,3 +819,30 @@ func TestLayoutSyncResolve(t *testing.T) {
 		})
 	}
 }
+
+// The divergences are each diverged layout's worktree and host, with how many tabs each side has, when
+// the host's was saved, and the user's pick, by session and host.
+func TestDivergences(t *testing.T) {
+	ls := &layoutSync{path: filepath.Join(t.TempDir(), "layouts.json")}
+	since, saved := time.Unix(1000, 0).UTC(), time.Unix(500, 0).UTC()
+	err := ls.locked(func(st *syncState) {
+		st.Layouts = map[string]*syncWorktree{
+			"gr@dev": {Hosts: map[string]*syncEntry{
+				"desktop": {Diverged: &sharedDivergence{Since: since, Local: stackLayout([]string{"a"}, []string{"b"}),
+					Remote: SharedLayout{Saved: saved, Tabs: []SharedTab{{}}}, Resolve: KeepBoth}},
+				"": {},
+			}},
+			"docs": {Hosts: map[string]*syncEntry{"": {Diverged: &sharedDivergence{Since: since}}}},
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []Divergence{
+		{Session: "docs", Since: since},
+		{Session: "gr@dev", Host: "desktop", Since: since, LocalTabs: 2, RemoteTabs: 1, Saved: saved, Resolving: KeepBoth},
+	}
+	if got := ls.divergences(); !reflect.DeepEqual(got, want) {
+		t.Errorf("got  %+v\nwant %+v", got, want)
+	}
+}

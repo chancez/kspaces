@@ -540,6 +540,54 @@ func (ls *layoutSync) Resolve(session, host string, r Resolution) error {
 	})
 }
 
+// Divergence is a worktree's layout on a host diverged from this machine's panes, as the sidebar shows it:
+// the worktree's kitty session, the host, as the provider names it, empty for this machine, and since when.
+type Divergence struct {
+	Session string    `json:"session"`
+	Host    string    `json:"host"`
+	Since   time.Time `json:"since"`
+	// LocalTabs and RemoteTabs are how many tabs each side has, and Saved when the host's was saved, by the
+	// clock of the machine that saved it, zero when it does not say.
+	LocalTabs  int       `json:"local_tabs"`
+	RemoteTabs int       `json:"remote_tabs"`
+	Saved      time.Time `json:"saved,omitzero"`
+	// Resolving is the user's pick, which the next pass applies.
+	Resolving Resolution `json:"resolving,omitempty"`
+}
+
+// divergences are the layouts the last pass found diverged, by session and host. The file is read without
+// the lock: a pass replaces it whole.
+func (ls *layoutSync) divergences() []Divergence {
+	b, err := os.ReadFile(ls.path)
+	if err != nil {
+		return nil
+	}
+	var st syncState
+	if err := json.Unmarshal(b, &st); err != nil {
+		return nil
+	}
+	var out []Divergence
+	for _, name := range slices.Sorted(maps.Keys(st.Layouts)) {
+		hosts := st.Layouts[name].Hosts
+		for _, host := range slices.Sorted(maps.Keys(hosts)) {
+			if d := hosts[host].Diverged; d != nil {
+				out = append(out, Divergence{Session: name, Host: host, Since: d.Since, LocalTabs: len(d.Local.Tabs),
+					RemoteTabs: len(d.Remote.Tabs), Saved: d.Remote.Saved, Resolving: d.Resolve})
+			}
+		}
+	}
+	return out
+}
+
+// Divergences are the diverged layouts of the kitty kspaces runs in.
+func Divergences() []Divergence { return newLayoutSync().divergences() }
+
+// ResolveLayout has the next pass of the kitty kspaces runs in resolve the divergence of session's layout
+// on host as r.
+func ResolveLayout(session, host string, r Resolution) error {
+	return newLayoutSync().Resolve(session, host, r)
+}
+
 // saveIfChanged saves w, panes of session's, as e's layout once they differ from its base and are as the
 // last pass saw them. A conflict leaves the revision unknown, so the next pass takes what was saved and
 // saves again after it.

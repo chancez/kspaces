@@ -46,6 +46,8 @@ type Shared struct {
 	Git map[string]gitstate.State `json:"git,omitempty"`
 	// What the session provider says, which only the sidebar asks; nil without one, see Poller.sessions.
 	Provider *ProviderState `json:"provider,omitempty"`
+	// The worktrees' layouts diverged from their hosts', see layoutSync.
+	Diverged []Divergence `json:"diverged,omitempty"`
 }
 
 // sharedSpace is a Space with its errors as text.
@@ -145,6 +147,7 @@ func (sh Shared) View(self int) Snapshot {
 	}
 	snap.Git = sh.Git
 	snap.Pending = placePending(snap.Spaces, sh.Pending)
+	snap.Diverged = sh.Diverged
 	snap.Detached = detachedBySpace(sh.Provider, toSet(sh.Kept))
 	if sh.Provider != nil {
 		snap.Caps, snap.ProviderSpaces, snap.Sessions = sh.Provider.Caps, sh.Provider.Spaces, sh.Provider.Sessions
@@ -196,6 +199,8 @@ type Poller struct {
 	// share shares the worktrees' layouts through the provider, see layoutSync, given the poll; nil for
 	// never.
 	share func(sh Shared)
+	// diverged are the layouts the last pass found diverged, see Divergences; nil for never.
+	diverged func() []Divergence
 }
 
 // NewPoller is the poller of the kitty kspaces runs in.
@@ -215,6 +220,7 @@ func NewPoller() *Poller {
 	p.follow = func(sh Shared) { followSpaces(watch, sh, self) }
 	ls := newLayoutSync()
 	p.share = func(sh Shared) { shareLayouts(ls, sh, self) }
+	p.diverged = ls.divergences
 	return p
 }
 
@@ -275,6 +281,12 @@ func (p *Poller) Poll() Shared {
 		}
 		if p.share != nil {
 			p.share(sh)
+		}
+		if p.diverged != nil {
+			sh.Diverged = p.diverged()
+			p.lastMu.Lock()
+			p.last.Diverged = sh.Diverged
+			p.lastMu.Unlock()
 		}
 	}
 	p.followDock(sh)
