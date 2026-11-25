@@ -26,7 +26,7 @@ by what runs in it; or all of them. shift+tab in the picker lists the next.
 With --from it opens the picker for kitty window WINDOW, in an overlay over it or in a panel as the config's
 [sidebar] popup says, rather than running it here: what kspaces.conf's kspaces_pick does for a panel, as only
 kspaces can fall back to an overlay where kitty has no panels. --size sets the panel's size, as COLUMNSxLINES,
-rather than [sidebar.popup_size]'s picker.`,
+in cells or percentages of the screen, rather than [sidebar.popup_size]'s picker.`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			sc, err := tui.ParsePickScope(scope)

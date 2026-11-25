@@ -118,15 +118,24 @@ type PopupSizes struct {
 
 // DefaultPopupSizes are the panels' sizes when none is set. A panel does not grow with what it shows, so
 // each is sized for what its popup shows at its longest.
-var DefaultPopupSizes = PopupSizes{Form: PopupSize{90, 24}, List: PopupSize{100, 32}, Picker: PopupSize{120, 32}}
+var DefaultPopupSizes = PopupSizes{
+	Form:   PopupSize{Columns: 90, Lines: 24},
+	List:   PopupSize{Columns: 100, Lines: 32},
+	Picker: PopupSize{Columns: 120, Lines: 32},
+}
 
 // AllPopups is every kind of panel size.
 func AllPopups(size PopupSize) PopupSizes { return PopupSizes{Form: size, List: size, Picker: size} }
 
-// PopupSize is a panel's size in cells, written COLUMNSxLINES, such as "90x24".
+// PopupSize is a panel's size, written COLUMNSxLINES, each in cells or as a percentage of the screen's,
+// such as "90x24" or "60%x70%".
 type PopupSize struct {
 	Columns int
-	Lines   int
+	// ColumnsPercent makes Columns a percentage of the screen's columns.
+	ColumnsPercent bool
+	Lines          int
+	// LinesPercent makes Lines a percentage of the screen's lines.
+	LinesPercent bool
 }
 
 // The smallest panel, which leaves a form room for its fields and buttons.
@@ -135,29 +144,64 @@ const (
 	MinPopupLines   = 10
 )
 
+// Relative says whether s is sized by the screen's size.
+func (s PopupSize) Relative() bool { return s.ColumnsPercent || s.LinesPercent }
+
+// Cells is s in cells on a screen of columns by lines: a percentage no smaller than the smallest panel,
+// and either no larger than the screen.
+func (s PopupSize) Cells(columns, lines int) (int, int) {
+	cells := func(n int, percent bool, screen, least int) int {
+		if percent {
+			n = max(n*screen/100, least)
+		}
+		return min(n, screen)
+	}
+	return cells(s.Columns, s.ColumnsPercent, columns, MinPopupColumns), cells(s.Lines, s.LinesPercent, lines, MinPopupLines)
+}
+
 // String is s as COLUMNSxLINES, empty for none.
 func (s PopupSize) String() string {
 	if s == (PopupSize{}) {
 		return ""
 	}
-	return fmt.Sprintf("%dx%d", s.Columns, s.Lines)
+	dim := func(n int, percent bool) string {
+		if percent {
+			return strconv.Itoa(n) + "%"
+		}
+		return strconv.Itoa(n)
+	}
+	return dim(s.Columns, s.ColumnsPercent) + "x" + dim(s.Lines, s.LinesPercent)
 }
 
 // MarshalText writes s as COLUMNSxLINES.
 func (s PopupSize) MarshalText() ([]byte, error) { return []byte(s.String()), nil }
 
-// UnmarshalText reads COLUMNSxLINES, each no smaller than the smallest panel's.
+// UnmarshalText reads COLUMNSxLINES, each in cells, no fewer than the smallest panel's, or a percentage
+// from 1% to 100%.
 func (s *PopupSize) UnmarshalText(text []byte) error {
-	cols, lines, ok := strings.Cut(string(text), "x")
-	c, cerr := strconv.Atoi(cols)
-	l, lerr := strconv.Atoi(lines)
-	if !ok || cerr != nil || lerr != nil {
-		return fmt.Errorf("popup size %q is not COLUMNSxLINES, such as \"90x24\"", text)
+	dim := func(v string, least int) (int, bool, error) {
+		digits, percent := strings.CutSuffix(v, "%")
+		n, err := strconv.Atoi(digits)
+		switch {
+		case err != nil:
+			return 0, false, fmt.Errorf("popup size %q is not COLUMNSxLINES, such as \"90x24\" or \"60%%x70%%\"", text)
+		case percent && (n < 1 || n > 100):
+			return 0, false, fmt.Errorf("popup size %q has %s, a percentage must be from 1%% to 100%%", text, v)
+		case !percent && n < least:
+			return 0, false, fmt.Errorf("popup size %q is too small, it must be at least %dx%d", text, MinPopupColumns, MinPopupLines)
+		}
+		return n, percent, nil
 	}
-	if c < MinPopupColumns || l < MinPopupLines {
-		return fmt.Errorf("popup size %q is too small, it must be at least %dx%d", text, MinPopupColumns, MinPopupLines)
+	cols, lines, _ := strings.Cut(string(text), "x")
+	c, cp, err := dim(cols, MinPopupColumns)
+	if err != nil {
+		return err
 	}
-	*s = PopupSize{Columns: c, Lines: l}
+	l, lp, err := dim(lines, MinPopupLines)
+	if err != nil {
+		return err
+	}
+	*s = PopupSize{Columns: c, ColumnsPercent: cp, Lines: l, LinesPercent: lp}
 	return nil
 }
 

@@ -587,6 +587,23 @@ func SidebarWidths(data []OSWindow) []int {
 	return out
 }
 
+// ScreenCells is how many columns and lines of window id's cells fit the work area of its monitor, as the
+// kitten at path, kspaces_screen.py, says.
+func ScreenCells(path string, id int) (int, int, error) {
+	out, err := kitten("kitten", "--match", fmt.Sprintf("id:%d", id), path)
+	if err != nil {
+		return 0, 0, err
+	}
+	var screen struct {
+		Columns int `json:"columns"`
+		Lines   int `json:"lines"`
+	}
+	if err := json.Unmarshal(out, &screen); err != nil || screen.Columns <= 0 || screen.Lines <= 0 {
+		return 0, 0, fmt.Errorf("%s gave no screen size for window %d: %q", filepath.Base(path), id, out)
+	}
+	return screen.Columns, screen.Lines, nil
+}
+
 // ScreenText is what window id has on its screen, its colors and styles as SGR sequences.
 func ScreenText(id int) (string, error) {
 	out, err := kitten("get-text", "--match", fmt.Sprintf("id:%d", id), "--ansi", "--extent", "screen")

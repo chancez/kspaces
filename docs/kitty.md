@@ -654,7 +654,8 @@ active tab's. `kspaces_watcher.py`:
 `kspaces_toggle.py` hides and shows the sidebar, and `kspaces_focus.py` moves the keyboard into the
 sidebar, when the current OS window has it, and back. `kspaces_clear_status.py` drops windows' program
 status records without focusing them, for the status list's clear buttons; the sidebar runs it through
-the `kspaces_clear_status` action.
+the `kspaces_clear_status` action. `kspaces_screen.py` says how many cells fit a window's screen, for a
+popup sized as a percentage of it; kspaces runs it with `kitten @ kitten`.
 
 Every two seconds the sidebar runs `kitten @ ls` and `git worktree list` for each space, and in the
 background `git status` and `gh` for the [rows' git state](sidebar.md#spaces). It writes what git and gh
@@ -697,19 +698,24 @@ popup = "panel"
 
   A form is 90 by 24 cells; New worktree, Save as layout, clean up and Trust space config, which list
   what they act on, and Reply, which shows a window's screen, 100 by 32; the picker 120 by 32, room for
-  its preview beside the list. `[sidebar.popup_size]` sets each, as COLUMNSxLINES, at least 40x10:
+  its preview beside the list. `[sidebar.popup_size]` sets each, as COLUMNSxLINES, each in cells, at
+  least 40x10, or as a percentage of the screen, so a size suits a laptop's screen and an ultrawide's:
 
   ```toml
   [sidebar.popup_size]
   form = "90x24"
   list = "100x32"
-  picker = "150x40"
+  picker = "60%x70%"
   ```
 
+  A percentage is of the work area of the monitor the window it is for is on, in that window's cells, as
+  `kspaces_screen.py` reports it, and no less than 40x10. Where that is not known, such as before
+  `kspaces kitty install` has installed it, the popup has its default size, and kspaces' log says why.
+
   A mapping can open its own size with `--size COLUMNSxLINES`, which `kspaces pick` and every command a
-  form action runs take with `--from`: `map f7 kspaces_pick --scope=windows --size=160x48`. It sizes a
+  form action runs take with `--from`: `map f7 kspaces_pick --scope=windows --size=80%x80%`. It sizes a
   panel only; an overlay is the size of its window.
- A panel is drawn in a rounded border in the accent, `+`, `-` and `|` in ASCII, a form's heading
+  A panel is drawn in a rounded border in the accent, `+`, `-` and `|` in ASCII, a form's heading
   set into its top and its buttons and keys on the row above its bottom; the watcher hides its tab bar. An
   overlay is drawn as it always was.
   A panel closes when it loses focus, so none is left behind, unseen, in another window's way; one that is

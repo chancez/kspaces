@@ -27,7 +27,7 @@ func TestFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := names(files), []string{"kspaces.conf", "kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", "kspaces_clear_status.py"}; !reflect.DeepEqual(got, want) {
+	if got, want := names(files), []string{"kspaces.conf", "kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", "kspaces_clear_status.py", "kspaces_screen.py"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("files = %q, want %q", got, want)
 	}
 	watchers := func(files []File) []string {
@@ -48,7 +48,7 @@ func TestFiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := names(files), []string{"kspaces.conf", "kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", "kspaces_clear_status.py", "save_sessions.py"}; !reflect.DeepEqual(got, want) {
+	if got, want := names(files), []string{"kspaces.conf", "kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", "kspaces_clear_status.py", "kspaces_screen.py", "save_sessions.py"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("files with save_sessions = %q, want %q", got, want)
 	}
 	if got, want := watchers(files), []string{"watcher /cfg/kitty/kspaces/save_sessions.py", "watcher /cfg/kitty/kspaces/kspaces_watcher.py"}; !reflect.DeepEqual(got, want) {
@@ -128,7 +128,7 @@ func TestInstallAndStale(t *testing.T) {
 		}
 		return got
 	}
-	if got, want := stale(cfg), []string{"kspaces.conf", "kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", "kspaces_clear_status.py", "save_sessions.py"}; !reflect.DeepEqual(got, want) {
+	if got, want := stale(cfg), []string{"kspaces.conf", "kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", "kspaces_clear_status.py", "kspaces_screen.py", "save_sessions.py"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("before install: %q, want %q", got, want)
 	}
 	if err := Install(cfg, dir); err != nil {
@@ -158,7 +158,7 @@ func TestInstallAndStale(t *testing.T) {
 	for _, e := range entries {
 		left = append(left, e.Name())
 	}
-	if want := []string{"kspaces.conf", "kspaces_clear_status.py", "kspaces_focus.py", "kspaces_toggle.py", "kspaces_watcher.py", "mine.conf"}; !reflect.DeepEqual(left, want) {
+	if want := []string{"kspaces.conf", "kspaces_clear_status.py", "kspaces_focus.py", "kspaces_screen.py", "kspaces_toggle.py", "kspaces_watcher.py", "mine.conf"}; !reflect.DeepEqual(left, want) {
 		t.Errorf("after the second install: %q, want %q", left, want)
 	}
 }

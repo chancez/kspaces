@@ -1,6 +1,7 @@
 package spaces
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -91,12 +92,30 @@ func TestPopups(t *testing.T) {
 	}
 }
 
-// A panel is the size the config sets for its kind, the default for a kind it does not set.
+// A panel is the size the config sets for its kind, the default for a kind it does not set; a size by the
+// screen's is of the window's screen, and the default where that is not known.
 func TestPopupSizes(t *testing.T) {
-	sizes := config.PopupSizes{Form: config.PopupSize{Columns: 80, Lines: 20}, Picker: config.PopupSize{Columns: 150, Lines: 40}}
+	screens := map[int][2]int{11: {430, 88}}
+	t.Cleanup(func(old func(int) (int, int, error)) func() { return func() { screenCells = old } }(screenCells))
+	screenCells = func(window int) (int, int, error) {
+		s, ok := screens[window]
+		if !ok {
+			return 0, 0, errors.New("no such window")
+		}
+		return s[0], s[1], nil
+	}
+	sizes := config.PopupSizes{
+		Form:   config.PopupSize{Columns: 80, Lines: 20},
+		Picker: config.PopupSize{Columns: 60, ColumnsPercent: true, Lines: 70, LinesPercent: true},
+	}
 	cfg := config.Config{Sidebar: config.Sidebar{Popup: config.PopupPanel, PopupSize: sizes}}
-	got := []kitty.Popup{popup(cfg, formPanel), popup(cfg, listPanel), popup(cfg, pickerPanel)}
-	want := []kitty.Popup{{Panel: true, Columns: 80, Lines: 20}, {Panel: true, Columns: 100, Lines: 32}, {Panel: true, Columns: 150, Lines: 40}}
+	got := []kitty.Popup{popup(cfg, formPanel, 11), popup(cfg, listPanel, 11), popup(cfg, pickerPanel, 11), popup(cfg, pickerPanel, 12)}
+	want := []kitty.Popup{
+		{Panel: true, Columns: 80, Lines: 20},
+		{Panel: true, Columns: 100, Lines: 32},
+		{Panel: true, Columns: 258, Lines: 61},
+		{Panel: true, Columns: 120, Lines: 32},
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v\nwant %+v", got, want)
 	}

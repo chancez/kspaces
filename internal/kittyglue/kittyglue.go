@@ -24,11 +24,14 @@ var scripts embed.FS
 // ConfName is the kitty.conf to include, which loads the rest.
 const ConfName = "kspaces.conf"
 
+// ScreenScript says how many cells fit a window's screen, for a popup sized as a percentage of it.
+const ScreenScript = "kspaces_screen.py"
+
 // sessionsScript is the session saver, installed only when the config asks for it.
 const sessionsScript = "save_sessions.py"
 
 // scriptNames are the scripts in files/, in the order they are installed.
-var scriptNames = []string{"kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", "kspaces_clear_status.py", sessionsScript}
+var scriptNames = []string{"kspaces_watcher.py", "kspaces_toggle.py", "kspaces_focus.py", "kspaces_clear_status.py", ScreenScript, sessionsScript}
 
 // owned are the names install writes, and so may remove when cfg no longer wants them.
 var owned = append([]string{ConfName}, scriptNames...)

@@ -85,6 +85,10 @@ group = "work"
 		"[sidebar.popup_size]\nlist = \"90x9\"",
 		"[sidebar.popup_size]\npicker = 120",
 		"[sidebar.popup_size]\nwindow = \"90x24\"",
+		"[sidebar.popup_size]\nform = \"0%x50%\"",
+		"[sidebar.popup_size]\nform = \"101%x50%\"",
+		"[sidebar.popup_size]\nform = \"%x50%\"",
+		"[sidebar.popup_size]\nform = \"50%x9\"",
 		"[git]\ntimeout = \"-1s\"",
 		"[git]\ntimeout = \"soon\"",
 		"[git]\ntimeout = 30", // nanoseconds
@@ -165,5 +169,36 @@ func TestParsePopupSizesAcrossFiles(t *testing.T) {
 	}
 	if _, err := parse([]string{"", ""}, []string{"[sidebar.popup_size]\nform = \"80x20\"", "[sidebar.popup_size]\nform = \"90x24\""}); err == nil {
 		t.Error("form set in two files was accepted")
+	}
+}
+
+// A size is in cells or a percentage of the screen, each way round; a percentage is no smaller than the
+// smallest panel, and either no larger than the screen.
+func TestPopupSizeCells(t *testing.T) {
+	type cells struct{ columns, lines int }
+	for _, c := range []struct {
+		text string
+		size PopupSize
+		// On a screen of 430x88 cells, and of 50x12.
+		big, small cells
+	}{
+		{"90x24", PopupSize{Columns: 90, Lines: 24}, cells{90, 24}, cells{50, 12}},
+		{"60%x70%", PopupSize{Columns: 60, ColumnsPercent: true, Lines: 70, LinesPercent: true}, cells{258, 61}, cells{40, 10}},
+		{"120x50%", PopupSize{Columns: 120, Lines: 50, LinesPercent: true}, cells{120, 44}, cells{50, 10}},
+		{"100%x40", PopupSize{Columns: 100, ColumnsPercent: true, Lines: 40}, cells{430, 40}, cells{50, 12}},
+	} {
+		var got PopupSize
+		if err := got.UnmarshalText([]byte(c.text)); err != nil {
+			t.Fatal(err)
+		}
+		if got != c.size || got.String() != c.text {
+			t.Errorf("%q read as %+v, written %q, want %+v", c.text, got, got.String(), c.size)
+		}
+		var big, small cells
+		big.columns, big.lines = got.Cells(430, 88)
+		small.columns, small.lines = got.Cells(50, 12)
+		if big != c.big || small != c.small {
+			t.Errorf("%q: %v on the big screen, %v on the small one, want %v and %v", c.text, big, small, c.big, c.small)
+		}
 	}
 }
