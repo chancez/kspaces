@@ -211,3 +211,27 @@ func TestPollerSettles(t *testing.T) {
 		t.Errorf("settled with\n%v\nwant\n%v", got, want)
 	}
 }
+
+// kitty's windows listed again while a poll waits on the provider's list keep the provider's last list,
+// so the sidebar does not drop the detached sessions until the poll ends.
+func TestPollerWindowsDuringPoll(t *testing.T) {
+	p := newPoller(filepath.Join(t.TempDir(), "kitty.git.json"), func() Shared {
+		return Shared{Config: &config.Config{Provider: []string{"prov"}}}
+	})
+	p.list = func() ([]kitty.OSWindow, error) { return nil, nil }
+	p.capabilities = func([]string) Capabilities { return Capabilities{CapList: true} }
+	lists := 0
+	var during []*ProviderState
+	p.listSessions = func([]string, []ProviderWindow) (*ProviderState, error) {
+		lists++
+		during = append(during, p.Windows().Provider)
+		return &ProviderState{Sessions: []ProviderSession{{ID: string(rune('0' + lists))}}}, nil
+	}
+	p.Poll()
+	p.Poll()
+	caps := Capabilities{CapList: true}
+	want := []*ProviderState{nil, {Caps: caps, Sessions: []ProviderSession{{ID: "1"}}}}
+	if !reflect.DeepEqual(during, want) {
+		t.Errorf("provider during the polls\n%+v\nwant\n%+v", during, want)
+	}
+}

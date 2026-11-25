@@ -243,6 +243,9 @@ func (p *Poller) Poll() Shared {
 		p.write(sh.Git)
 	}
 	p.lastMu.Lock()
+	// The provider's last list until it lists again below, so windows listed in between, see Windows, do
+	// not drop its sessions.
+	sh.Provider = p.last.Provider
 	sh = p.listed(sh)
 	p.lastMu.Unlock()
 	// After kitty's windows, which the provider says which of its sessions show.
