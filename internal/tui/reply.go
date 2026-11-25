@@ -137,6 +137,7 @@ func (f *replyForm) View() tea.View {
 	v := tea.NewView(frame)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
+	v.Cursor = fieldCursor(&f.in, zones)
 	return v
 }
 

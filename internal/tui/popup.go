@@ -268,6 +268,10 @@ func (p *popup) inPanel(msg tea.Msg) tea.Msg {
 
 func (p *popup) View() tea.View {
 	v := p.inner.View()
+	if p.help != nil {
+		// The list of keys is over the form, and its cursor.
+		v.Cursor = nil
+	}
 	if p.from == 0 {
 		if p.help != nil {
 			v.SetContent(strings.Join(p.sheet(strings.Split(v.Content, "\n"), p.width, p.height), "\n"))
@@ -281,6 +285,9 @@ func (p *popup) View() tea.View {
 			body = p.sheet(body, p.width-4, p.height-2)
 		}
 		v.SetContent(frame(p.th, p.width, p.height, "", body, ""))
+		if v.Cursor != nil {
+			v.Cursor.X, v.Cursor.Y = v.Cursor.X+2, v.Cursor.Y+1
+		}
 		return v
 	}
 	title, body, foot := unboxed(v.Content)
@@ -289,6 +296,13 @@ func (p *popup) View() tea.View {
 		body, foot = p.sheet(body, p.width-4, p.height-2), ""
 	}
 	v.SetContent(frame(p.th, p.width, p.height, title, body, foot))
+	// boxed's row y is the frame's y-1, as inPanel has it the other way, and a body too long for the frame
+	// loses the rows past its bottom.
+	if c := v.Cursor; c != nil {
+		if c.Y--; c.Y < 1 || c.Y >= p.height-2 {
+			v.Cursor = nil
+		}
+	}
 	return v
 }
 

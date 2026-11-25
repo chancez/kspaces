@@ -634,6 +634,7 @@ func (f *newWorktreeForm) View() tea.View {
 	v := tea.NewView(frame)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
+	v.Cursor = fieldCursor(f.focused(), zones)
 	return v
 }
 

@@ -31,6 +31,9 @@ type field interface {
 	keeps(msg tea.KeyPressMsg) bool
 	// mode is the box's vim mode, as NORMAL, or "" without vim, see vimKeys.
 	mode() string
+	// cursor is the terminal's cursor in the box, from its top left, nil while it draws its own, see
+	// vimKeys.cursor.
+	cursor() *tea.Cursor
 }
 
 // lineField is one line of text, for a branch, a path or a name. It is a text area of one row, which shows
@@ -89,6 +92,8 @@ func joinLines(s string) string {
 func (f *lineField) keeps(msg tea.KeyPressMsg) bool { return f.vim.keeps(&f.Model, msg) }
 
 func (f *lineField) mode() string { return f.vim.mode(&f.Model) }
+
+func (f *lineField) cursor() *tea.Cursor { return f.vim.cursor(&f.Model) }
 
 // textField is text that can take several lines, for the inputs of commands and layouts, which go to a
 // program as they are. shift+enter starts a line, or alt+enter or ctrl+j, for a terminal that sends
@@ -158,6 +163,8 @@ func (f *textField) keeps(msg tea.KeyPressMsg) bool {
 }
 
 func (f *textField) mode() string { return f.vim.mode(&f.Model) }
+
+func (f *textField) cursor() *tea.Cursor { return f.vim.cursor(&f.Model) }
 
 // keptBy says whether fl, the focused field, nil for a choice, keeps msg from the form's keys.
 func keptBy(fl field, msg tea.KeyPressMsg) bool { return fl != nil && fl.keeps(msg) }

@@ -170,6 +170,7 @@ func (f *addSpaceForm) View() tea.View {
 	v := tea.NewView(frame)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
+	v.Cursor = fieldCursor(&f.path, zones)
 	return v
 }
 

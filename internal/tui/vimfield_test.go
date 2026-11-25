@@ -76,3 +76,44 @@ func TestLineFieldVim(t *testing.T) {
 		t.Error("esc in normal mode kept the form open")
 	}
 }
+
+// With vim the terminal's cursor is the field's, where it is in the text: a steady bar in insert mode and
+// a steady block in normal mode. A panel draws the form a row higher, in its border, and the list of keys
+// hides it. It has no color, keeping the terminal's. Without vim the field draws its own.
+func TestFieldVimCursor(t *testing.T) {
+	cursor := func(x, y int, shape tea.CursorShape) *tea.Cursor {
+		c := tea.NewCursor(x, y)
+		c.Shape, c.Blink = shape, false
+		return c
+	}
+	f := newLayoutForm(testLayouts(t), clickSpace, clickWt, clickOpen, "agent", nil)
+	f.theme().SetVim(true)
+	p, _ := stubPopup(f, 11, false)
+	p.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	p.Update(keyMsg("tab"))
+	typeInto(p, "fix it")
+	// The prompt's row is the frame's 4th, after the padding, the label and the 6 typed.
+	x := 2 + labelWidth + 6
+	if got, want := f.View().Cursor, cursor(x, 4, tea.CursorBar); !reflect.DeepEqual(got, want) {
+		t.Errorf("insert: %+v, want %+v", got, want)
+	}
+	if got, want := p.View().Cursor, cursor(x, 3, tea.CursorBar); !reflect.DeepEqual(got, want) {
+		t.Errorf("in a panel: %+v, want %+v", got, want)
+	}
+	// Normal mode puts the cursor on the last character, as vim does.
+	p.Update(keyMsg("esc"))
+	if got, want := f.View().Cursor, cursor(x-1, 4, tea.CursorBlock); !reflect.DeepEqual(got, want) {
+		t.Errorf("normal: %+v, want %+v", got, want)
+	}
+	p.Update(tea.KeyPressMsg{Code: '/', Mod: tea.ModCtrl})
+	if got := p.View().Cursor; got != nil {
+		t.Errorf("under the list of keys: %+v", got)
+	}
+
+	f = newLayoutForm(testLayouts(t), clickSpace, clickWt, clickOpen, "agent", nil)
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	f.Update(keyMsg("tab"))
+	if got := f.View().Cursor; got != nil {
+		t.Errorf("without vim: %+v", got)
+	}
+}
