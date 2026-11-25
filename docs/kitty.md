@@ -266,7 +266,8 @@ worktree, which the provider names as it likes; `cm space meta` keys of `kspaces
 provider's. Every save gives a key a new revision, and `revision` 0 is a key with nothing saved. `save-layout`
 writes only when the stored revision is `revision`, and else prints `{"conflict": true}`. `load-layouts`
 prints those of the asked-for layouts whose stored revision is not the one asked with, so asking with the
-revision last seen prints nothing while nothing changed.
+revision last seen prints nothing while nothing changed, and in `unreachable` the hosts that did not
+answer: `{"layouts": [...], "unreachable": ["desktop"]}`.
 
 **Saving.** The sidebar that leads, one per kitty, saves a worktree's layout once the panes it shares have
 been the same for two refreshes in a row and differ from the layout it last saved or took, at the revision
@@ -289,6 +290,29 @@ holds opens, and nothing closes. Opening `gr@dev` on a laptop whose first pane i
 so brings up the tabs a desktop left on its host. A host whose sessions appear once the worktree is open
 here is not loaded: they are listed under the worktree's detached row, and only opening the worktree again
 brings them up.
+
+**Apart.** The layout last saved or taken is the base of a merge only while its host answers. When the host
+stops answering, by `list` marking its sessions `stale` or `load-layouts` naming it `unreachable`, or once it
+has not answered a load for 30 seconds, as when this kitty did not run on a laptop asleep, the base is
+dropped, and the host's layout is neither saved nor loaded until it answers again. A merge against a base
+that old would mix changes made on both sides with no one asking.
+
+Coming back, the host's layout and this machine's panes of its sessions are compared afresh, by which
+sessions each tab shows. The same is agreed. Else kspaces keeps the layout the two last agreed on, which
+tells one side's change from both: when this machine's panes are still what they agreed, the host's layout
+is taken whole, opening and closing panes to match; when the host's is, this machine's panes are saved over
+it; when both changed, the worktree has **diverged** from the host. A host's layout first seen once the
+worktree has been open for ten seconds, as when a pane here attaches one of the host's sessions, has no
+agreement to go by, so any difference is a divergence too: rather than open every tab the host has, or save
+one pane over them. Only a worktree's opening takes a host's layout with nothing agreed, as adds alone.
+
+kspaces does not try to tell which change came first: a disconnected machine's clock and the host's are not
+one, and a pane closing as its session's host went away looks like a pane closed by hand. What the two
+agreed on is all it goes by, and with nothing that says, the user decides.
+
+A diverged layout is neither saved nor taken: each machine keeps showing its own version until it is
+resolved. Should the two come to match again, by a change on
+either side, it is agreed again without asking.
 
 A save that conflicts loads the layout that won and takes it, then saves again. A provider that fails a
 verb is logged and asked again at the next refresh.

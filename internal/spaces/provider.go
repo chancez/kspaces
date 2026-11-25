@@ -402,9 +402,16 @@ func saveLayout(provider []string, ref LayoutRef, revision int64, l SharedLayout
 	return resp.Revision, nil
 }
 
+// LoadedLayouts is what load-layouts says: the layouts asked about, and the hosts that did not answer,
+// whose layouts it does not know.
+type LoadedLayouts struct {
+	Layouts     []StoredLayout `json:"layouts"`
+	Unreachable []string       `json:"unreachable,omitempty"`
+}
+
 // loadLayouts are the layouts of known the provider has at another revision than the one known gives, by
 // ref: one changed since, saved since there was none, or removed, at revision 0 with no layout.
-func loadLayouts(provider []string, known []StoredLayout) ([]StoredLayout, error) {
+func loadLayouts(provider []string, known []StoredLayout) (LoadedLayouts, error) {
 	type ask struct {
 		LayoutRef
 		Revision int64 `json:"revision"`
@@ -415,11 +422,9 @@ func loadLayouts(provider []string, known []StoredLayout) ([]StoredLayout, error
 	for _, k := range known {
 		req.Layouts = append(req.Layouts, ask{k.LayoutRef, k.Revision})
 	}
-	var resp struct {
-		Layouts []StoredLayout `json:"layouts"`
-	}
+	var resp LoadedLayouts
 	if err := askProvider(provider, "load-layouts", req, &resp); err != nil {
-		return nil, err
+		return LoadedLayouts{}, err
 	}
-	return resp.Layouts, nil
+	return resp, nil
 }

@@ -212,17 +212,21 @@ func (m *machine) sessions() []ProviderSession {
 	return out
 }
 
-func (m *machine) load(_ []string, known []StoredLayout) ([]StoredLayout, error) {
-	var out []StoredLayout
+// load is the layouts of known, and the hosts m does not reach as unreachable.
+func (m *machine) load(_ []string, known []StoredLayout) (LoadedLayouts, error) {
+	var out LoadedLayouts
 	for _, k := range known {
 		h := m.real(k.Host)
 		if !m.reaches(h) {
+			if !slices.Contains(out.Unreachable, k.Host) {
+				out.Unreachable = append(out.Unreachable, k.Host)
+			}
 			continue
 		}
 		s := m.world.store(h).layouts[LayoutRef{Space: k.Space, Host: h, Key: k.Key}]
 		s.LayoutRef = k.LayoutRef
 		if s.Revision != k.Revision {
-			out = append(out, s)
+			out.Layouts = append(out.Layouts, s)
 		}
 	}
 	return out, nil
@@ -478,5 +482,253 @@ func TestLayoutSyncLoadsOnOpen(t *testing.T) {
 	}
 	if want := [][]string{{"l1"}, {"w1", "w2"}, {"w3"}}; !reflect.DeepEqual(a.shows(), want) {
 		t.Errorf("laptop shows %q, want %q", a.shows(), want)
+	}
+}
+
+// stackLayout is the layout a fakeShareKitty's tabs of sessions by id capture as.
+func stackLayout(tabs ...[]string) SharedLayout {
+	l := SharedLayout{Version: 1, Sessions: []string{}, Tabs: []SharedTab{}}
+	for _, ids := range tabs {
+		t := SharedTab{Layout: "stack"}
+		for _, id := range ids {
+			t.Panes = append(t.Panes, SharedPane{Session: len(l.Sessions)})
+			l.Sessions = append(l.Sessions, id)
+		}
+		l.Tabs = append(l.Tabs, t)
+	}
+	return l
+}
+
+// savedBy is l as the kitty who saved it.
+func savedBy(who string, l SharedLayout) SharedLayout {
+	l.Writer, l.Kitty = who, who
+	return l
+}
+
+// entry is what m's passes know of gr@dev's layout on host, as m names it.
+func (m *machine) entry(t *testing.T, host string) *syncEntry {
+	t.Helper()
+	var e *syncEntry
+	if err := m.ls.locked(func(st *syncState) {
+		if sw := st.Layouts["gr@dev"]; sw != nil {
+			e = sw.Hosts[host]
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
+// Apart, a machine's base is no longer valid: coming back, what the two last agreed on says which side
+// changed. Only one side's change is that side's layout, taken or saved whole; both sides' is a divergence,
+// neither saved nor taken, each machine keeping its own; and two sides that come to match agree again. A
+// host is apart when its sessions are stale, when load-layouts says it did not answer, and when this kitty
+// did not pass for a while, as on a laptop asleep.
+func TestLayoutSyncApart(t *testing.T) {
+	tests := []struct {
+		name string
+		// away parts laptop from white: offline lists white's sessions stale, unlisted does not, and asleep
+		// runs no passes on laptop.
+		away string
+		// laptop and white are what each does while apart.
+		laptop, white func(m *machine)
+		// wantLaptop and wantWhite are what each shows once laptop is back, stored what white has stored,
+		// and diverged laptop's divergence, its local and remote.
+		wantLaptop, wantWhite [][]string
+		stored                string
+		diverged              *sharedDivergence
+	}{
+		{
+			name:       "white closed a tab",
+			away:       "offline",
+			white:      func(m *machine) { m.k.remove("w3") },
+			wantLaptop: [][]string{{"w1", "w2"}},
+			wantWhite:  [][]string{{"w1", "w2"}},
+			stored:     "w1,w2",
+		},
+		{
+			name:       "laptop closed a tab",
+			away:       "offline",
+			laptop:     func(m *machine) { m.k.remove("w3") },
+			wantLaptop: [][]string{{"w1", "w2"}},
+			wantWhite:  [][]string{{"w1", "w2"}},
+			stored:     "w1,w2",
+		},
+		{
+			name:       "both changed",
+			away:       "offline",
+			laptop:     func(m *machine) { m.k.remove("w2") },
+			white:      func(m *machine) { m.k.tabs = append(m.k.tabs, nil); m.k.add(len(m.k.tabs)-1, "w4") },
+			wantLaptop: [][]string{{"w1"}, {"w3"}},
+			wantWhite:  [][]string{{"w1", "w2"}, {"w3"}, {"w4"}},
+			stored:     "w1,w2;w3;w4",
+			diverged:   &sharedDivergence{Local: stackLayout([]string{"w1"}, []string{"w3"}), Remote: savedBy("white", stackLayout([]string{"w1", "w2"}, []string{"w3"}, []string{"w4"}))},
+		},
+		{
+			name:       "both changed, white not answering load-layouts",
+			away:       "unlisted",
+			laptop:     func(m *machine) { m.k.remove("w2") },
+			white:      func(m *machine) { m.k.tabs = append(m.k.tabs, nil); m.k.add(len(m.k.tabs)-1, "w4") },
+			wantLaptop: [][]string{{"w1"}, {"w3"}},
+			wantWhite:  [][]string{{"w1", "w2"}, {"w3"}, {"w4"}},
+			stored:     "w1,w2;w3;w4",
+			diverged:   &sharedDivergence{Local: stackLayout([]string{"w1"}, []string{"w3"}), Remote: savedBy("white", stackLayout([]string{"w1", "w2"}, []string{"w3"}, []string{"w4"}))},
+		},
+		{
+			name: "both changed, laptop asleep",
+			away: "asleep",
+			// One pass sees the close, which the next would have saved.
+			laptop:     func(m *machine) { m.k.remove("w2"); m.pass(t) },
+			white:      func(m *machine) { m.k.tabs = append(m.k.tabs, nil); m.k.add(len(m.k.tabs)-1, "w4") },
+			wantLaptop: [][]string{{"w1"}, {"w3"}},
+			wantWhite:  [][]string{{"w1", "w2"}, {"w3"}, {"w4"}},
+			stored:     "w1,w2;w3;w4",
+			diverged:   &sharedDivergence{Local: stackLayout([]string{"w1"}, []string{"w3"}), Remote: savedBy("white", stackLayout([]string{"w1", "w2"}, []string{"w3"}, []string{"w4"}))},
+		},
+		{
+			name:       "both made the same change",
+			away:       "offline",
+			laptop:     func(m *machine) { m.k.remove("w3") },
+			white:      func(m *machine) { m.k.remove("w3") },
+			wantLaptop: [][]string{{"w1", "w2"}},
+			wantWhite:  [][]string{{"w1", "w2"}},
+			stored:     "w1,w2",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			world := newFakeWorld()
+			world.hostOf = map[string]string{"w1": "white", "w2": "white", "w3": "white", "w4": "white"}
+			now := time.Unix(1000, 0)
+			b := newMachine(t, world, "white", &now, []string{"w1", "w2"}, []string{"w3"})
+			b.pass(t)
+			b.pass(t)
+			a := newMachine(t, world, "laptop", &now, []string{"w1", "w2"}, []string{"w3"})
+			for range 2 {
+				a.pass(t)
+				b.pass(t)
+			}
+			unlisted := a.load
+			switch tt.away {
+			case "offline":
+				world.offline["laptop"] = true
+			case "unlisted":
+				a.ls.load = func(p []string, known []StoredLayout) (LoadedLayouts, error) {
+					return LoadedLayouts{Unreachable: []string{"white"}}, nil
+				}
+			}
+			if tt.laptop != nil {
+				tt.laptop(a)
+			}
+			if tt.white != nil {
+				tt.white(b)
+			}
+			for range 3 {
+				if tt.away != "asleep" {
+					a.pass(t)
+				}
+				b.pass(t)
+			}
+			now = now.Add(time.Hour)
+			world.offline["laptop"] = false
+			a.ls.load = unlisted
+			for range 4 {
+				a.pass(t)
+				b.pass(t)
+			}
+			if got := a.shows(); !reflect.DeepEqual(got, tt.wantLaptop) {
+				t.Errorf("laptop shows %q, want %q", got, tt.wantLaptop)
+			}
+			if got := b.shows(); !reflect.DeepEqual(got, tt.wantWhite) {
+				t.Errorf("white shows %q, want %q", got, tt.wantWhite)
+			}
+			if got := world.stored("white").Members(); got != tt.stored {
+				t.Errorf("stored %q, want %q", got, tt.stored)
+			}
+			got := a.entry(t, "white").Diverged
+			if got != nil {
+				got.Since = time.Time{}
+			}
+			if !reflect.DeepEqual(got, tt.diverged) {
+				t.Errorf("diverged %+v, want %+v", got, tt.diverged)
+			}
+		})
+	}
+}
+
+// A divergence ends unasked once the two sides come to match: laptop opening what white has agrees with
+// it, and nothing is saved.
+func TestLayoutSyncDivergenceEnds(t *testing.T) {
+	world := newFakeWorld()
+	world.hostOf = map[string]string{"w1": "white", "w2": "white", "w3": "white"}
+	now := time.Unix(1000, 0)
+	b := newMachine(t, world, "white", &now, []string{"w1", "w2"})
+	b.pass(t)
+	b.pass(t)
+	a := newMachine(t, world, "laptop", &now, []string{"w1", "w2"})
+	for range 2 {
+		a.pass(t)
+		b.pass(t)
+	}
+	world.offline["laptop"] = true
+	a.k.remove("w2")
+	b.k.add(0, "w3")
+	for range 3 {
+		a.pass(t)
+		b.pass(t)
+	}
+	world.offline["laptop"] = false
+	for range 2 {
+		a.pass(t)
+	}
+	if a.entry(t, "white").Diverged == nil {
+		t.Fatal("laptop has not diverged")
+	}
+	saves := world.store("white").saves
+	a.k.add(0, "w2")
+	a.k.add(0, "w3")
+	for range 3 {
+		a.pass(t)
+	}
+	if d := a.entry(t, "white").Diverged; d != nil {
+		t.Errorf("diverged %+v once both match", d)
+	}
+	if n := world.store("white").saves - saves; n != 0 {
+		t.Errorf("%d saves once both match", n)
+	}
+}
+
+// A host's layout first seen once the worktree has been open a while has no agreement to go by: the same
+// as its panes here is agreed, and else it is a divergence, rather than opening every tab the host has or
+// saving one pane over them.
+func TestLayoutSyncHostSeenLater(t *testing.T) {
+	world := newFakeWorld()
+	world.hostOf = map[string]string{"l1": "laptop"}
+	now := time.Unix(1000, 0)
+	world.store("white").layouts[LayoutRef{Space: "gr", Host: "white", Key: "dev"}] = StoredLayout{Revision: 3, Layout: new(stackLayout([]string{"w1", "w2"}, []string{"w3"}))}
+	a := newMachine(t, world, "laptop", &now, []string{"l1"})
+	for range 3 {
+		a.pass(t)
+	}
+	// Attached from the worktree's detached row.
+	world.hostOf["w1"] = "white"
+	a.k.tabs = append(a.k.tabs, nil)
+	a.k.add(len(a.k.tabs)-1, "w1")
+	for range 3 {
+		a.pass(t)
+	}
+	if want := [][]string{{"l1"}, {"w1"}}; !reflect.DeepEqual(a.shows(), want) {
+		t.Errorf("laptop shows %q, want %q", a.shows(), want)
+	}
+	got := a.entry(t, "white").Diverged
+	if got != nil {
+		got.Since = time.Time{}
+	}
+	want := &sharedDivergence{Local: stackLayout([]string{"w1"}), Remote: stackLayout([]string{"w1", "w2"}, []string{"w3"})}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("diverged %+v, want %+v", got, want)
+	}
+	if got := world.stored("white").Members(); got != "w1,w2;w3" {
+		t.Errorf("stored %q, want w1,w2;w3", got)
 	}
 }
