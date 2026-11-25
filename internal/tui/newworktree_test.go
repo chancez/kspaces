@@ -797,3 +797,69 @@ label = "Prompt"
 		t.Errorf("created, kept %v", got)
 	}
 }
+
+// With several spaces configured, the form's first field chooses the space: changing it makes the form
+// one for that space, on the tab shown, keeping what was typed for the space left as its draft.
+func TestNewWorktreeFormSpace(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	dir := t.TempDir()
+	var roots []string
+	for _, name := range []string{"dotfiles", "cm"} {
+		r := gittest.At(t, filepath.Join(dir, name))
+		r.Commit("first")
+		roots = append(roots, r.Dir)
+	}
+	cfg := config.Config{Spaces: roots, Worktrees: config.Worktrees{Dir: ".worktrees", BranchPrefix: "pr/me"}}
+	f, err := openNewWorktree(cfg, spaces.LoadSpace(roots[0]), spaces.FromBranch, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	typeInto(f, "fix")
+	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+	f.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
+	if got, want := [2]any{f.space.Root, formScreen(f)}, [2]any{roots[1], []string{"", "  New worktree", "",
+		"  space      < cm >  left/right change  space list", "", "   Branch   Pull request   Issue", "",
+		"  branch     pr/me/", "  directory  .worktrees", backgroundRow, "",
+		"  Name the branch to create or check out, or # for a PR", "",
+		"   Create enter    Cancel esc   tab next field  left/right space  space list", ""}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("switched:\n%q\nwant\n%q", got, want)
+	}
+
+	f.Update(tea.KeyPressMsg{Code: tea.KeyLeft})
+	if got, want := [2]any{f.space.Root, formScreen(f)}, [2]any{roots[0], []string{"", "  New worktree", "",
+		"  space      < dotfiles >  left/right change  space list", "", "   Branch   Pull request   Issue", "",
+		"  branch     pr/me/fix", "  directory  .worktrees/fix", backgroundRow, "", "  Creates pr/me/fix from main", "",
+		"   Create enter    Cancel esc    Clear ctrl+r   tab next field  left/right space  space list", ""}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("switched back:\n%q\nwant\n%q", got, want)
+	}
+}
+
+// The form a space chosen makes keeps the theme the popup set up, so vim's j and k go on moving through the
+// fields after the space is chosen from the list.
+func TestNewWorktreeFormSpaceKeepsVim(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	dir := t.TempDir()
+	var roots []string
+	for _, name := range []string{"dotfiles", "cm"} {
+		r := gittest.At(t, filepath.Join(dir, name))
+		r.Commit("first")
+		roots = append(roots, r.Dir)
+	}
+	f, err := openNewWorktree(config.Config{Spaces: roots}, spaces.LoadSpace(roots[0]), spaces.FromBranch, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.theme().SetVim(true)
+	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
+	f.focus = 0
+	f.refocus()
+	f.Update(keyMsg("space"))
+	f.Update(keyMsg("down"))
+	f.Update(keyMsg("enter"))
+	f.Update(tea.KeyPressMsg{Code: 'j', Text: "j"})
+	if got, want := [3]any{f.space.Root, f.theme().Vim(), f.focus}, [3]any{roots[1], true, 1}; got != want {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}

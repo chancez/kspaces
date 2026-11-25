@@ -90,7 +90,7 @@ func (f *resumeSessionForm) keys() ([]interact.Section, bool) {
 }
 func (f *newWorktreeForm) keys() ([]interact.Section, bool) {
 	t := f.current()
-	return interact.Help(f, theForm.Target(formSubject{})), f.focused() != nil || t.base.listOpen() || t.open.listOpen()
+	return interact.Help(f, theForm.Target(formSubject{})), f.focused() != nil || f.others.listOpen() || t.base.listOpen() || t.open.listOpen()
 }
 func (f *layoutForm) keys() ([]interact.Section, bool) {
 	return interact.Help(f, theLayoutForm.Target(layoutSubject{})), f.focused() != nil || f.layouts.listOpen()

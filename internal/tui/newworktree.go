@@ -110,17 +110,35 @@ func newBaseFields(th *look.Theme, space spaces.Space) choiceFields[string] {
 		nil, false, &noChoice{name: main, detail: "the main worktree's"}, "", nil, nil)
 }
 
+// spaceZone is the zone the choice of space is drawn in, and its label.
+const spaceZone = "space"
+
+// newSpaceFields are the fields that choose the space a new worktree goes in, by root, the one at root
+// chosen: the configured spaces, in order. There is no choice when root is not one of them.
+func newSpaceFields(th *look.Theme, roots []string, root string) choiceFields[string] {
+	if !slices.Contains(roots, root) {
+		roots = nil
+	}
+	return newChoiceFields(th, spaceZone, roots, filepath.Base, func(string) []config.Input { return nil },
+		func(r string) string { return r }, false, nil, filepath.Base(root), nil, nil)
+}
+
 // newWorktreeForm creates a worktree, on a branch to create or check out, on a pull request, or on a
 // branch for an issue, a tab each, and, optionally, where its worktree goes, a layout and a command to run
 // in it, shows what it will do, creates the worktree and switches to its session. The PR and Issue tabs'
 // fields take a number, URL or title, the open ones they match listed below to choose from. It is meant
 // for a kitty popup, as the sidebar is too narrow to type a name and read back the path in.
 type newWorktreeForm struct {
-	th    *look.Theme
-	cfg   config.Config
-	space spaces.Space
-	tab   int
-	tabs  [3]worktreeTab
+	th  *look.Theme
+	cfg config.Config
+	// global is the config without the space's file, which another space chosen reads its own with.
+	global config.Config
+	space  spaces.Space
+	// The choice of space, by root, which changing makes the form one for the space chosen; a choice only
+	// with several spaces configured.
+	others choiceFields[string]
+	tab    int
+	tabs   [3]worktreeTab
 	// The branch tab's branch. Typing #N or a PR's URL in it goes to the PR tab, an issue's URL to the
 	// Issue tab.
 	branch lineField
@@ -163,8 +181,9 @@ func newForm(cfg config.Config, space spaces.Space) *newWorktreeForm {
 	issueBranch := newLineField(th, "")
 	issueBranch.fill(start)
 	f := &newWorktreeForm{th: th, cfg: cfg, space: space, branch: branch, prs: newGHPicker(th, prKind, space),
-		issues: newGHPicker(th, issueKind, space), issueBranch: issueBranch, issueFilled: start, focus: 1,
-		background: state.Load().NewWorktree.InBackground}
+		issues: newGHPicker(th, issueKind, space), issueBranch: issueBranch, issueFilled: start,
+		others: newSpaceFields(th, cfg.Spaces, space.Root), background: state.Load().NewWorktree.InBackground}
+	f.focus = f.tabsAt() + 1
 	bases := newBaseFields(th, space)
 	for i, layout := range [...]string{cfg.LayoutFor(space.Name, true), cfg.PRLayoutFor(space.Name), cfg.IssueLayoutFor(space.Name)} {
 		f.tabs[i] = worktreeTab{
@@ -315,18 +334,22 @@ func (f *newWorktreeForm) create() tea.Cmd {
 	}
 }
 
-// head are the fields before the layout's, in order: the tab strip, nil; the branch, the PR, or the issue
+// head are the fields before the layout's, in order: the choice of space, nil, when there is one; the tab
+// strip, nil; the branch, the PR, or the issue
 // and the branch for it; the base, nil, when there is a choice of one; the directory.
 func (f *newWorktreeForm) head() []field {
 	t := f.current()
 	var out []field
+	if f.others.picks() {
+		out = append(out, nil)
+	}
 	switch f.tab {
 	case tabPR:
-		return []field{nil, f.prs.input(), &t.dir}
+		return append(out, nil, f.prs.input(), &t.dir)
 	case tabIssue:
-		out = []field{nil, f.issues.input(), &f.issueBranch}
+		out = append(out, nil, f.issues.input(), &f.issueBranch)
 	default:
-		out = []field{nil, &f.branch}
+		out = append(out, nil, &f.branch)
 	}
 	if t.base.picks() {
 		out = append(out, nil)
@@ -385,10 +408,21 @@ func (f *newWorktreeForm) refocus() tea.Cmd {
 func (f *newWorktreeForm) nextField() tea.Cmd { return moveFocus(f.fields(), &f.focus, 1) }
 func (f *newWorktreeForm) prevField() tea.Cmd { return moveFocus(f.fields(), &f.focus, -1) }
 
-// onTabs, onBase and onOpen say whether the tab strip, the choice of base or of what the session opens
-// with has focus, onPicker whether the field of a tab that picks a PR or an issue has.
-func (f *newWorktreeForm) onTabs() bool   { return f.focus == 0 }
-func (f *newWorktreeForm) onPicker() bool { return f.shownPicker() != nil && f.focus == 1 }
+// tabsAt is where in fields the tab strip is, after the choice of space when there is one; the tab's
+// first field follows it.
+func (f *newWorktreeForm) tabsAt() int {
+	if f.others.picks() {
+		return 1
+	}
+	return 0
+}
+
+// onSpace, onTabs, onBase and onOpen say whether the choice of space, the tab strip, the choice of base or
+// of what the session opens with has focus, onPicker whether the field of a tab that picks a PR or an
+// issue has.
+func (f *newWorktreeForm) onSpace() bool  { return f.others.picks() && f.focus == 0 }
+func (f *newWorktreeForm) onTabs() bool   { return f.focus == f.tabsAt() }
+func (f *newWorktreeForm) onPicker() bool { return f.shownPicker() != nil && f.focus == f.tabsAt()+1 }
 func (f *newWorktreeForm) onBase() bool {
 	return f.tab != tabPR && f.current().base.picks() && f.focus == f.baseAt()
 }
@@ -403,7 +437,9 @@ func (f *newWorktreeForm) onBackground() bool { return f.focus == len(f.fields()
 func (f *newWorktreeForm) toggleBackground() { f.background = !f.background }
 
 // onChoice says whether a choice has focus, which left and right change.
-func (f *newWorktreeForm) onChoice() bool { return f.onTabs() || f.onBase() || f.onOpen() }
+func (f *newWorktreeForm) onChoice() bool {
+	return f.onSpace() || f.onTabs() || f.onBase() || f.onOpen()
+}
 
 // showTab shows tab, focus on field at, and lists the open ones the first time it is a tab that picks.
 func (f *newWorktreeForm) showTab(tab, at int) tea.Cmd {
@@ -432,8 +468,11 @@ func (f *newWorktreeForm) cycleOpen(delta int) tea.Cmd {
 // cycleChoice changes the choice that has focus.
 func (f *newWorktreeForm) cycleChoice(delta int) tea.Cmd {
 	switch {
+	case f.onSpace():
+		f.others.cycle(delta)
+		return f.switchSpace()
 	case f.onTabs():
-		return f.showTab((f.tab+delta+len(f.tabs))%len(f.tabs), 0)
+		return f.showTab((f.tab+delta+len(f.tabs))%len(f.tabs), f.tabsAt())
 	case f.onBase():
 		return f.cycleBase(delta)
 	}
@@ -442,9 +481,12 @@ func (f *newWorktreeForm) cycleChoice(delta int) tea.Cmd {
 
 // openList opens the list of the choice that has focus.
 func (f *newWorktreeForm) openList() {
-	if t := f.current(); f.onBase() {
+	switch t := f.current(); {
+	case f.onSpace():
+		f.others.openList()
+	case f.onBase():
 		t.base.openList()
-	} else {
+	default:
 		t.open.openList()
 	}
 }
@@ -459,7 +501,7 @@ func (f *newWorktreeForm) movePick(delta int) tea.Cmd {
 // and moves on to the field below, which closes the rows.
 func (f *newWorktreeForm) confirmPick(i int) tea.Cmd {
 	cmd := f.shownPicker().confirm(i)
-	f.focus = 2
+	f.focus = f.tabsAt() + 2
 	return tea.Batch(cmd, f.follow(), f.refocus())
 }
 
@@ -468,6 +510,12 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// While a list is open, keys and the mouse are its.
 	if isInput(msg) {
 		switch {
+		case f.others.listOpen():
+			cmd, picked := f.others.updateList(msg, f.zones)
+			if picked {
+				return f, tea.Batch(cmd, f.switchSpace())
+			}
+			return f, cmd
 		case t.base.listOpen():
 			cmd, picked := t.base.updateList(msg, f.zones)
 			if picked {
@@ -532,7 +580,7 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		for i := range f.tabs {
 			if clickedChoice(f.zones, fmt.Sprintf(tabZone, i), msg) {
-				return f, f.showTab(i, 0)
+				return f, f.showTab(i, f.tabsAt())
 			}
 		}
 		if f.onPicker() {
@@ -541,6 +589,11 @@ func (f *newWorktreeForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return f, f.confirmPick(i)
 				}
 			}
+		}
+		if f.others.picks() && clickedChoice(f.zones, spaceZone, msg) {
+			f.others.openList()
+			f.focus = 0
+			return f, moveFocus(f.fields(), &f.focus, 0)
 		}
 		if f.tab != tabPR && clickedChoice(f.zones, baseZone, msg) {
 			t.base.openList()
@@ -588,12 +641,12 @@ func (f *newWorktreeForm) follow() tea.Cmd {
 			f.branch.fill(start)
 			f.typed = f.branch.Value()
 			f.prs.field.fill(rest)
-			cmds = append(cmds, f.showTab(tabPR, 1))
+			cmds = append(cmds, f.showTab(tabPR, f.tabsAt()+1))
 		case spaces.IsIssueURL(rest):
 			f.branch.fill(start)
 			f.typed = f.branch.Value()
 			f.issues.field.fill(rest)
-			cmds = append(cmds, f.showTab(tabIssue, 1))
+			cmds = append(cmds, f.showTab(tabIssue, f.tabsAt()+1))
 		}
 	}
 	cmds = append(cmds, f.prs.refollow(), f.issues.refollow())
@@ -668,7 +721,16 @@ func (f *newWorktreeForm) render() string {
 	muted := func(s string) string { return line(th.Cut(width, look.Muted(s))...) }
 	t := f.current()
 	branch, _ := f.plan()
-	lines := []string{line(look.Heading("New worktree in " + f.space.Name)), "", f.tabStrip(width), ""}
+	heading := "New worktree in " + f.space.Name
+	if f.others.picks() {
+		heading = "New worktree"
+	}
+	lines := []string{line(look.Heading(heading)), ""}
+	spaceAt := len(lines)
+	if f.others.picks() {
+		lines = append(append(lines, f.others.lines(f.onSpace(), width)...), "")
+	}
+	lines = append(lines, f.tabStrip(width), "")
 	if p := f.shownPicker(); p != nil {
 		lines = append(lines, p.lines(th, f.onPicker(), width)...)
 	} else {
@@ -722,7 +784,8 @@ func (f *newWorktreeForm) render() string {
 		lines = append(lines, "")
 	}
 	f.buttons = controls[*newWorktreeForm]{}
-	if t.base.listOpen() || t.open.listOpen() {
+	if f.others.listOpen() || t.base.listOpen() || t.open.listOpen() {
+		lines = f.others.drawList(lines, spaceAt, width, f.height)
 		lines = t.base.drawList(lines, baseAt, width, f.height)
 		lines = t.open.drawList(lines, openAt, width, f.height)
 		return boxed(append(lines, line(listHints()...)))
@@ -733,6 +796,8 @@ func (f *newWorktreeForm) render() string {
 		control{action: actFormClear, label: "Clear"})
 	hints := []look.Span{look.Text("  "), look.Key("tab"), look.KeyDesc(" next field")}
 	switch {
+	case f.onSpace():
+		hints = append(hints, choiceHints("space")...)
 	case f.onTabs():
 		hints = append(hints, look.Text("  "), look.Key("left/right"), look.KeyDesc(" tab"))
 	case f.onPicker() && f.shownPicker().matched() > 1:
@@ -798,7 +863,7 @@ func startOn[V, L any](f *newWorktreeForm, tab int, p *ghPicker[V, L], arg strin
 		}
 		p.field.fill(arg)
 	}
-	f.tab, f.focus = tab, 1
+	f.tab, f.focus = tab, f.tabsAt()+1
 	f.refocus()
 	f.follow()
 	return nil
@@ -867,7 +932,7 @@ func (f *newWorktreeForm) restore(d map[string]string) tea.Cmd {
 		}
 		t.open.restore(d, fmt.Sprintf("%d/open", i))
 	}
-	return f.showTab(f.tab, 1)
+	return f.showTab(f.tab, f.tabsAt()+1)
 }
 
 // openNewWorktree is the new worktree form for space, with the config as the space sees it, its draft
@@ -876,6 +941,7 @@ func (f *newWorktreeForm) restore(d map[string]string) tea.Cmd {
 func openNewWorktree(cfg config.Config, space spaces.Space, from spaces.From, arg, base string) (*newWorktreeForm, error) {
 	return withDraft(draftKey("new worktree", []string{space.Root}, nil), func(saved map[string]string) (*newWorktreeForm, error) {
 		f := newForm(space.ConfigOf(cfg), space)
+		f.global = cfg
 		f.restore(saved)
 		err := f.startFrom(base)
 		switch {
@@ -887,6 +953,36 @@ func openNewWorktree(cfg config.Config, space spaces.Space, from spaces.From, ar
 		}
 		return f, err
 	})
+}
+
+// switchSpace makes the form one for the space chosen, when it is another, keeping what was typed for the
+// space it was for as that one's draft and restoring the other's, on the tab shown with focus on the
+// choice of space. A space that cannot be read is not chosen, the form saying why.
+func (f *newWorktreeForm) switchSpace() tea.Cmd {
+	root, _ := f.others.chosen()
+	if root == f.space.Root {
+		return nil
+	}
+	space, err := spaces.Find(f.global, root)
+	var next *newWorktreeForm
+	if err == nil {
+		next, err = openNewWorktree(f.global, space, spaces.FromBranch, "", "")
+	}
+	if err != nil {
+		f.others.choose(filepath.Base(f.space.Root))
+		f.err = err
+		return nil
+	}
+	keepDraft(f)
+	tab, width, height, background := f.tab, f.width, f.height, f.background
+	// The popup set the theme up, with vim and the background's darkness, once; next's fields draw in its.
+	*next.th = *f.th
+	*f = *next
+	f.background = background
+	if width > 0 {
+		f.Update(tea.WindowSizeMsg{Width: width, Height: height})
+	}
+	return tea.Batch(f.showTab(tab, 0), f.Init())
 }
 
 // RunNewWorktree runs the new worktree form, see openNewWorktree, meant for a kitty popup, until the

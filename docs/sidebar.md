@@ -364,6 +364,11 @@ line.
 the form's first field: `left` and `right` while it has focus, or a click on a tab, switch tabs. Each tab
 keeps its own fields, so switching loses nothing typed. Create creates from the tab shown.
 
+With several spaces configured, a `space` choice above the strip picks the space the worktree goes in, so a
+form opened from one space creates a worktree in another. It starts on the space the form was opened for,
+and changing it makes the form one for the space chosen, on the tab shown: what was typed for the space
+left is kept as its draft, and the other's draft, if it has one, is restored.
+
 The branch tab has a branch field, which starts with `worktrees.branch_prefix/`, and a directory field,
 empty for the default: `worktrees.dir` under the space's root, named after the branch. An existing branch is
 checked out; a new one is created from what the main worktree has checked out. When the space has other
