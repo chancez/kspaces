@@ -163,13 +163,16 @@ PROVIDER shelve        {"session": ID}
 PROVIDER remove        {"session": ID}
 PROVIDER move          {"session": ID, "space": N}
 PROVIDER remove-space  {"space": N}
+PROVIDER save-layout   {"space": N, "host": H, "key": K, "revision": R, "layout": L}  prints {"revision": R} or {"conflict": true}
+PROVIDER load-layouts  {"layouts": [{"space": N, "host": H, "key": K, "revision": R}...]}  prints {"layouts": [{"space": N, "host": H, "key": K, "revision": R, "layout": L}...]}
 ```
 
 Every verb exits non-zero on failure, its stderr the error, which kspaces shows. A verb with no output
 prints nothing or `{}`.
 
 **Capabilities.** `capabilities` names what the provider does: `keep` (for `keep` and `forget`), `list`,
-`open`, `kill`, `shelve`, `remove`, `move` and `remove-space`. kspaces offers only what is named: a provider without
+`open`, `kill`, `shelve`, `remove`, `move`, `remove-space` and `layouts` (for `save-layout` and
+`load-layouts`, see [Shared layouts](#shared-layouts)). kspaces offers only what is named: a provider without
 `shelve` never shows Shelve. It is asked once per sidebar, and again at `r`. A provider that fails
 `capabilities` is taken to have `keep` alone, which is what a program written as a keeper does.
 
@@ -231,6 +234,53 @@ no space, as a topic space: one kitty session of its name, opened with a shell t
 its detached sessions listed as any space's are.
 
 Without a provider, or one without `list`, there are no detached sessions and no topic spaces.
+
+### Shared layouts
+
+With a provider that names `layouts`, a worktree's tabs are one state shared by every machine showing it,
+as a multiplexer's windows are by every client attached to them. Close a tab or a split on one machine and
+the other closes it; open one and the other opens it, showing the same session. It takes a few seconds,
+not at once: kspaces looks for a change at each refresh.
+
+**What is shared** is the panes that show the provider's sessions on one host, `H`, the host most of the
+worktree's panes show: a pane showing another host's session, or none, such as a window running something
+outside the provider, stays this machine's own. A layout `L` is kspaces' own JSON, which the provider
+stores and gives back unread but for `sessions`:
+
+```json
+{"version": 1, "writer": "laptop", "sessions": ["@a7k2m9x4", "@q3p8z1c0"],
+ "tabs": [{"title": "", "layout": "splits", "panes": [{"session": 0}, {"session": 1, "split": "right", "of": 1, "size": 35}]}]}
+```
+
+`sessions` holds the provider's ids of the sessions the panes show, each pane naming its session by index,
+and the provider rewrites them, so the stored layout names sessions as their host does and each machine is
+given them as it reaches that host: an id kspaces has as `server:@a7k2m9x4` is stored as `@a7k2m9x4`. A
+pane's `split`, `of` and `size` are a [layout](#layouts) pane's. `writer` is the machine that saved it. Nothing
+in it is a path, a kitty window id, or a command to run: a session is opened with `open`, and a command a
+pane ran is still running in its session.
+
+**Keys and revisions.** `space` is the worktree's space and `key` its directory, empty for the space's main
+worktree, which the provider names as it likes; `cm space meta` keys of `kspaces/layout/KEY` are the cm
+provider's. Every save gives a key a new revision, and `revision` 0 is a key with nothing saved. `save-layout`
+writes only when the stored revision is `revision`, and else prints `{"conflict": true}`. `load-layouts`
+prints those of the asked-for layouts whose stored revision is not the one asked with, so asking with the
+revision last seen prints nothing while nothing changed.
+
+**Saving.** The sidebar that leads, one per kitty, saves a worktree's layout once the panes it shares have
+been the same for two refreshes in a row and differ from the layout it last saved or took, at the revision
+it last saw.
+
+**Taking another machine's.** At every other refresh the leading sidebar loads the layouts of the worktrees
+it shows. One saved by another machine is taken as a three-way merge of the panes by session, against the
+layout last saved or taken: a session the other machine added opens, as a split of the pane it split from
+when this machine shows that one, else as a new tab of the worktree's kitty session; a session it removed
+closes, its window marked `kspaces_keep` first so a watcher ending a window's session on close leaves it,
+as what became of the session is the other machine's doing. A session this machine added or removed since
+stays as this machine has it, and is saved over the other's at the next refresh. Taking a layout never
+moves or resizes a window already there, and the tab that has focus keeps it.
+
+A save that conflicts loads the layout that won and takes it, then saves again. A provider that fails a
+verb is logged and asked again at the next refresh.
 
 ## Running commands
 
