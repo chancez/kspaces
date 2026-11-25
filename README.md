@@ -89,7 +89,7 @@ map f4 kspaces_toggle
 [docs/kitty.md](docs/kitty.md) has the rest: the actions to map, keeping the files up to date, the session
 saver, commands and layouts.
 
-Then list your spaces in `~/.config/kspaces/config.toml`:
+Then list your spaces in `~/.config/kspaces/kspaces.toml`:
 
 ```toml
 # Repositories, in the sidebar's manual order, which moving a space there rewrites. ~/ is expanded. An
@@ -206,13 +206,13 @@ fetch_timeout = "2m"
 vim = true
 ```
 
-Every key is optional. An unknown key is an error. Other `.toml` files beside config.toml, such as a
+Every key is optional. An unknown key is an error. Other `.toml` files beside kspaces.toml, such as a
 `work.toml` kept out of dotfiles, are read after it and add their spaces, groups, commands and layouts; a
 setting in two files is an error. See [docs/kitty.md](docs/kitty.md#more-config-files).
 
 A repository's own layouts and commands can live with it, rather than in your dotfiles, in `.kspaces.toml`
-at the top of its main worktree, which its linked worktrees share. They are added to config.toml's for that
-space alone, a name it has taking config.toml's one's place, and it can set the space's `layout`,
+at the top of its main worktree, which its linked worktrees share. They are added to kspaces.toml's for that
+space alone, a name it has taking kspaces.toml's one's place, and it can set the space's `layout`,
 `worktree_layout`, `pr_layout`, `issue_layout` and `[worktrees]`:
 
 ```toml

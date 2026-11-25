@@ -22,7 +22,7 @@ func TestLayoutSave(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(cfgDir, "kspaces"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(cfgDir, "kspaces", "config.toml"), []byte(fmt.Sprintf("spaces = [%q]\n", r.Dir)), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(cfgDir, "kspaces", "kspaces.toml"), []byte(fmt.Sprintf("spaces = [%q]\n", r.Dir)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	// A kitten whose kitty has no windows.

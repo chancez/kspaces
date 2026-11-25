@@ -104,7 +104,7 @@ sessions` and `Hide suspended sessions`, each ticked while its filter is on, whi
 
 ## Groups
 
-With spaces in [groups](kitty.md#spaces-and-sessions), set in config.toml, the spaces in no group come
+With spaces in [groups](kitty.md#spaces-and-sessions), set in kspaces.toml, the spaces in no group come
 first, under no header, after the sessions in no space; then each group, in `groups`' order, those it
 does not list after by name. A group has a header row above its spaces, drawn as a divider rather than a
 row: a rule in the column of the spaces' fold triangles, the group's name in capitals, its fold icon,
@@ -219,7 +219,7 @@ to the next way, as `s` does; a right click opens the list's menu, the three tic
 
 | Mode | Icon | Order |
 |---|---|---|
-| Manual | bars; a triple bar in Unicode, `=` in ASCII | the spaces as config.toml lists them, and each space's linked worktrees as they were moved, any not moved yet after them in git's order |
+| Manual | bars; a triple bar in Unicode, `=` in ASCII | the spaces as kspaces.toml lists them, and each space's linked worktrees as they were moved, any not moved yet after them in git's order |
 | Activity | a clock; a clock face in Unicode, `@` in ASCII | the session focused most recently first, a space by its most recent session; sessions with no windows last, in manual order |
 | Status | a warning sign; `!` in Unicode and ASCII | the most urgent status first, as the status list ranks them, blocked, failed, done, working, idle, then none; a space by its most urgent session, ties by activity |
 
@@ -243,7 +243,7 @@ while a filter is on, nor by dragging in the [select mode](#selecting), where a 
 `J` move a space among the spaces of its group, or of none, and do nothing past the first or the last of
 them. Dragging a space onto another group's space, or onto its header, first in it, moves the space into
 that group; onto a session in no space, first in no group. Groups are not reordered by moving, only by
-`groups` in config.toml. Moving a space rewrites the order of `spaces` in config.toml, or in the
+`groups` in kspaces.toml. Moving a space rewrites the order of `spaces` in kspaces.toml, or in the
 [config file](kitty.md#more-config-files) that lists it, as text, each entry with the comments on the lines
 right above it and after it on its line, through a symlinked config to its target, each group's spaces
 together as the list shows them. Moving it into another group rewrites its entry too, a path becoming
@@ -255,7 +255,7 @@ space's order, by the worktrees' directories, in `$XDG_STATE_HOME/kspaces/state.
 every sidebar.
 
 Moving in activity or status switches to manual, starting from the order shown: the spaces are written to
-config.toml as they were shown and every space's worktrees saved as they were shown, then the move is
+kspaces.toml as they were shown and every space's worktrees saved as they were shown, then the move is
 made.
 
 ## Selecting
@@ -327,7 +327,7 @@ group, and Add space.
 | Session | Open without layout | `o` | switch to the session, opening one tab rather than its [default layout](kitty.md#layouts); on a worktree whose session has no windows and no saved file that would restore it, with a default layout |
 | Session | Run | `R` | run a configured command in the worktree's session, in a form; with `[[commands]]` configured |
 | Session | Open layout | `L` | add a configured layout's tabs, or one shell tab, to the worktree's session, in a form; with `[[layouts]]` configured |
-| Session | Save as layout | | save the session's tabs as a layout in config.toml, in a form; on a worktree's session with windows open |
+| Session | Save as layout | | save the session's tabs as a layout in kspaces.toml, in a form; on a worktree's session with windows open |
 | Session | Close session | `c` | close every window of the session, on a session with windows open; with the session saver, keeping it to open again |
 | Session | Suspend session | `z` | stop what runs in the session's windows and close them, keeping them to resume, on a session with windows open; with the session saver |
 | Session | Reply | `t` | write to the window of a status entry without switching to it, in a form; on a status entry |
@@ -491,7 +491,7 @@ the form keeps its layout and inputs, as the run form does.
 **Save as layout** saves the session's tabs, as kitty has them, as a [layout](kitty.md#saving-a-layout):
 a `name` field, then `save`, `every tab` at first or `this tab`, which is the active tab for its
 own session, else the session's most recently focused. `save to` says where: `SPACE's .kspaces.toml`, the
-space's [own config](kitty.md#per-space-config), at first, or `the global config`, config.toml. A space
+space's [own config](kitty.md#per-space-config), at first, or `the global config`, kspaces.toml. A space
 file that is not there yet is made, and a box below, `keep out of git (adds it to .git/info/exclude)`,
 ticked at first, `space` or a click to change, adds it to the repository's `info/exclude`; one that is
 there but not trusted is refused, and the form says so under the field. Below them a line for each pane of
@@ -502,7 +502,7 @@ else, with a `run` field holding its command line, a template, to edit; or `shel
 its prompt. Save adds the layout at the end of the file as text, so the rest of it stays as it was, and
 writes through a symlink to its target; a space file kspaces writes is trusted as written. A name the file
 has already asks whether to replace it, `y` or `n`; Replace puts the new layout where the old one's lines
-were. A layout saved to the space's file under a name config.toml has takes that one's place in the space.
+were. A layout saved to the space's file under a name kspaces.toml has takes that one's place in the space.
 `kspaces layout save [NAME] [PATH]` opens the same form for the worktree PATH, or the current directory, is
 in, its name filled in, with `--tab` for this tab at first: the one kspaces runs in, if it is the
 session's. Left without saving, the form keeps what it has for the worktree, NAME and `--tab`, as the new
@@ -559,7 +559,7 @@ otherwise how many commits only the branch has, which are lost. The branch goes 
 never deleted. If git refuses after the worktree is gone, as `-d` does a branch its upstream lacks, kitty
 shows why and the worktree stays removed.
 
-With `delete_branch = true` under `[worktrees]`, in config.toml or the space's `.kspaces.toml`, the box
+With `delete_branch = true` under `[worktrees]`, in kspaces.toml or the space's `.kspaces.toml`, the box
 starts ticked when deleting loses nothing, merged or by its PR, and unticked, saying the commits are lost,
 when it would lose some, so the option never drops work unasked. It only sets where the forms start, this
 one opened from the sidebar or by `kspaces remove PATH`, Clean up worktrees and the select mode's Remove:
@@ -617,7 +617,7 @@ one of its spaces' rows, that group at first, else `none`. Add appends the root 
 file's comments and layout stay as they were, and writes through a symlinked config to its target: in a
 group as `{ path = "~/src/x", group = "work" }`, in the config file that lists the most of the group's
 spaces, whatever its name, so a `work.toml` holding the work group's spaces gets the new one, else in
-config.toml, which the form names when it is another file. Every sidebar shows the new space at its next
+kspaces.toml, which the form names when it is another file. Every sidebar shows the new space at its next
 refresh. `kspaces add [PATH] --group NAME` opens the form on a group. Left without adding, the form keeps
 its path and group for the next time it opens on the same PATH and group.
 

@@ -28,7 +28,7 @@ func TestTrust(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(cfgDir, "kspaces"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(cfgDir, "kspaces", "config.toml"), []byte(fmt.Sprintf("spaces = [%q, %q]\n", r.Dir, other.Dir)), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(cfgDir, "kspaces", "kspaces.toml"), []byte(fmt.Sprintf("spaces = [%q, %q]\n", r.Dir, other.Dir)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	file := filepath.Join(r.Dir, config.SpaceFileName)

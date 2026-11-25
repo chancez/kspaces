@@ -22,7 +22,7 @@ func TestPopupSizeFlag(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfg := "spaces = []\n[sidebar]\npopup = \"panel\"\n[sidebar.popup_size]\nform = \"80x20\"\n"
-	if err := os.WriteFile(filepath.Join(config, "kspaces", "config.toml"), []byte(cfg), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(config, "kspaces", "kspaces.toml"), []byte(cfg), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", config)

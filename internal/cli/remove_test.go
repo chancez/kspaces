@@ -48,7 +48,7 @@ func TestRemoveDeleteBranch(t *testing.T) {
 	}
 	r.Git("merge", "-q", "--no-edit", "merged", "merged2")
 	calls, _ := fakeRemoval(t, r.Dir)
-	cfgFile := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "kspaces", "config.toml")
+	cfgFile := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "kspaces", "kspaces.toml")
 	cfgText, err := os.ReadFile(cfgFile)
 	if err != nil {
 		t.Fatal(err)
@@ -180,7 +180,7 @@ func fakeRemoval(t *testing.T, root string) (func() []string, string) {
 	if err := os.MkdirAll(filepath.Join(config, "kspaces"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(config, "kspaces", "config.toml"), []byte(toml), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(config, "kspaces", "kspaces.toml"), []byte(toml), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", config)

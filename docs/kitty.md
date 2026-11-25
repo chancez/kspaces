@@ -38,7 +38,7 @@ groups = ["work", "personal"]  # the order of the groups; any other after them, 
 spaces = [{ path = "~/projects/gr", group = "work" }]
 ```
 
-A space with no `group` is in none, and is listed before the groups, under no header. Only config.toml
+A space with no `group` is in none, and is listed before the groups, under no header. Only kspaces.toml
 says a space's group: a group is about how every space is shown, so a space's
 [own config](#per-space-config) setting `group` is an error. `groups` cannot name a group twice; a group
 it names that no space is in is left out.
@@ -143,7 +143,7 @@ another, are a session provider's: a program the config names, which kspaces run
 request on its stdin, and which prints JSON on its stdout.
 
 ```toml
-provider = ["kspaces-provider-cm"]   # config.toml only, not a space's own config
+provider = ["kspaces-provider-cm"]   # kspaces.toml only, not a space's own config
 ```
 
 `keeper` is deprecated: it is `provider`'s earlier name, still read as `provider` so an older config keeps
@@ -234,7 +234,7 @@ Without a provider, or one without `list`, there are no detached sessions and no
 
 ## Running commands
 
-Commands are what the new worktree form and a worktree's **Run** can start in a session, from config.toml
+Commands are what the new worktree form and a worktree's **Run** can start in a session, from kspaces.toml
 or a space's [own config](#per-space-config):
 
 ```toml
@@ -445,7 +445,7 @@ the `command` its `list` says that session runs, and its `cwd` when it says one;
 window's foreground, when that is not a shell; else the shell at its prompt.
 
 The layout goes at the end of the file it is saved to, a space's [own config](#per-space-config) or
-config.toml, as a `[[layouts]]` block, its panes inline a line each, and the rest of the file is kept byte
+kspaces.toml, as a `[[layouts]]` block, its panes inline a line each, and the rest of the file is kept byte
 for byte. Replacing a layout puts the block where the old one's lines were, from its `[[layouts]]` to the
 next table that is not one of its own, keeping the comments right above that table; that needs the
 layouts to be `[[layouts]]` tables, not an inline `layouts = [...]`. The result is parsed back and must
@@ -459,28 +459,28 @@ a program does when it starts again, are not kept.
 
 ## More config files
 
-The config can be split across files: config.toml, then every other `.toml` file beside it in
+The config can be split across files: kspaces.toml, then every other `.toml` file beside it in
 `~/.config/kspaces`, by name, hidden ones left out. A `work.toml` kept out of dotfiles can add a job's spaces,
-groups, commands and layouts, and config.toml stays the same on every machine:
+groups, commands and layouts, and kspaces.toml stays the same on every machine:
 
 ```toml
-# work.toml, beside config.toml
+# work.toml, beside kspaces.toml
 spaces = [
   { path = "~/projects/work/api", group = "work" },
   { path = "~/projects/work/web", group = "work" },
 ]
 
-[space.api]                    # a key config.toml's [space.api] does not set
+[space.api]                    # a key kspaces.toml's [space.api] does not set
 worktree_layout = "review"
 
-[[layouts]]                    # can run config.toml's commands, and config.toml can open it
+[[layouts]]                    # can run kspaces.toml's commands, and kspaces.toml can open it
 name = "review"
 tabs = [{ panes = [{ command = "gr" }] }]
 ```
 
 They add up as one file saying all of it would:
 
-- `spaces`, `groups`, `[[commands]]` and `[[layouts]]` are listed one file's after another's. config.toml's
+- `spaces`, `groups`, `[[commands]]` and `[[layouts]]` are listed one file's after another's. kspaces.toml's
   `groups` can name a group only another file has spaces in: `groups = ["work", "tools"]` puts `work` first
   where `work.toml` exists, and a group no space is in is left out elsewhere.
 - `[space.NAME]` tables, and inline `spaces` entries, are merged by key.
@@ -489,10 +489,10 @@ They add up as one file saying all of it would:
   it is an error naming both, rather than one silently winning.
 
 An error in one file names that file, and one only the files together have, such as a layout running a
-command none defines, names the directory. Without config.toml the other files are the config.
+command none defines, names the directory. Without kspaces.toml the other files are the config.
 
 Edits go to the file they belong to, checked with the other files: adding a space appends it to
-config.toml; saving a layout replaces it in the file that has it, and adds a new one to config.toml.
+kspaces.toml; saving a layout replaces it in the file that has it, and adds a new one to kspaces.toml.
 Moving a space reorders its own file's `spaces`. The sidebar lists a group's spaces as the files do, one
 file's after another's, so moving a space before one from a file earlier than its own is an error, and
 the files are left as they were.
@@ -500,7 +500,7 @@ the files are left as they were.
 ## Per-space config
 
 Some layouts and commands belong to one repository, and a work repository's should not end up in
-config.toml, which is often in dotfiles. A space can have its own, in `.kspaces.toml` at the top of its
+kspaces.toml, which is often in dotfiles. A space can have its own, in `.kspaces.toml` at the top of its
 main worktree; its linked worktrees use the main worktree's, as it is on disk. Commit it, or keep it to
 yourself in `.git/info/exclude`.
 
@@ -510,7 +510,7 @@ worktree_layout = "agent"
 pr_layout = "review"
 issue_layout = "fix"
 
-[worktrees]                 # in place of config.toml's
+[worktrees]                 # in place of kspaces.toml's
 branch_prefix = "pr/me"
 
 [[commands]]
@@ -523,16 +523,16 @@ tabs = [{ panes = [{ command = "test" }, { command = "claude", split = "right" }
 ```
 
 It can have `[[layouts]]`, `[[commands]]`, `layout`, `worktree_layout`, `pr_layout`, `issue_layout` and
-`[worktrees]`'s `dir`, `branch_prefix` and `delete_branch`, checked as config.toml's are; anything else is
+`[worktrees]`'s `dir`, `branch_prefix` and `delete_branch`, checked as kspaces.toml's are; anything else is
 an error naming the key, `spaces`, `launch`, `sessions`, `groups`, `[sidebar]`, `[kitty]` and `[space.NAME]`
-included, which only config.toml has, and so is `group`, which is the space's `[space.NAME]`'s. For
+included, which only kspaces.toml has, and so is `group`, which is the space's `[space.NAME]`'s. For
 that space alone, in its forms, its rows' menus, opening its worktrees and `kspaces layout` and `kspaces
-run` in them, its layouts and commands are added to config.toml's, one called as one of config.toml's in
+run` in them, its layouts and commands are added to kspaces.toml's, one called as one of kspaces.toml's in
 that one's place, and a layout of either can run a command of either. Its `layout` and `worktree_layout`
 come first, then the space's `[space.NAME]`'s, then the top-level `layout`; a linked worktree's falls back
 on the file's own `layout` before `[space.NAME]`'s. Its `pr_layout` and `issue_layout` come before
 `[space.NAME]`'s, then the top-level ones, then the linked worktree's default. Its worktree settings are
-used in place of config.toml's they name. Other spaces never see any of it.
+used in place of kspaces.toml's they name. Other spaces never see any of it.
 
 A file with an error is left out, and only for its space: the space's row says `config error`, and
 `kspaces list` what it is.
@@ -544,11 +544,11 @@ whenever the file changes, it is left out and the space's row has a lock and `un
 git state goes. **Trust space config**, in the menu of the space's rows, and `kspaces trust [PATH]`, for the
 space PATH is in, or the current directory's, open a form showing what the file adds: each command and the
 line it runs, each layout and what each of its panes runs, and the settings it sets, saying which take
-the place of config.toml's. Trust trusts that content. `--yes` trusts the file as it is without asking,
+the place of kspaces.toml's. Trust trusts that content. `--yes` trusts the file as it is without asking,
 and `--revoke` forgets it. A file kspaces writes itself, saving a layout to it, is trusted as written.
 
 Saving a layout to a space's file, as [Save as layout](sidebar.md#the-menu) does at first, edits it as
-text the way config.toml is edited, checked merged with config.toml. A file that is not there is made; a
+text the way kspaces.toml is edited, checked merged with kspaces.toml. A file that is not there is made; a
 file that is there but not trusted is refused until trusted, as saving would trust what is in it unseen.
 Making the file adds `/.kspaces.toml` to the repository's `info/exclude`, in its common git directory, so
 git leaves it out, unless the form's box says not to; the line is added once.

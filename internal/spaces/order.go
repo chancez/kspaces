@@ -14,7 +14,7 @@ import (
 type SortMode string
 
 const (
-	// SortManual is config.toml's order of spaces and the order linked worktrees were moved into, see
+	// SortManual is kspaces.toml's order of spaces and the order linked worktrees were moved into, see
 	// Order.Worktrees; the sessions in no space by name.
 	SortManual SortMode = "manual"
 	// SortActivity puts the session focused most recently first, a space by its most recent session.
@@ -76,7 +76,7 @@ type Order struct {
 	// Worktrees is the manual order of linked worktrees, by space root: their directory names. Those it
 	// does not name follow in git's order.
 	Worktrees map[string][]string
-	// Groups is the order of the groups, config.toml's groups: those it does not list follow, by name.
+	// Groups is the order of the groups, kspaces.toml's groups: those it does not list follow, by name.
 	// Spaces in no group come before them all, and each group's spaces are in the mode's order.
 	Groups []string
 	// Focused is when each session was last focused, see kitty.State.Focused.

@@ -128,7 +128,7 @@ func TestSaveLayout(t *testing.T) {
 	if err := os.WriteFile(target, []byte(savedCommands), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	link := filepath.Join(dir, "config", "kspaces", "config.toml")
+	link := filepath.Join(dir, "config", "kspaces", "kspaces.toml")
 	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -329,7 +329,7 @@ func TestMoveKeysInGroup(t *testing.T) {
 	}
 }
 
-// groupsConfig is groupsFixture's spaces as config.toml lists them, each with its group.
+// groupsConfig is groupsFixture's spaces as kspaces.toml lists them, each with its group.
 const groupsConfig = "# Mine.\nspaces = [\n  { path = \"/src/gr\", group = \"work\" }, # work\n  # the terminal\n" +
 	"  { path = \"/src/kitty\", group = \"personal\" },\n  { path = \"/src/docs\", group = \"work\" },\n  \"/src/broken\",\n]\n"
 

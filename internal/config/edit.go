@@ -67,7 +67,7 @@ func spaceValue(root, group string) string {
 
 // SaveSpace adds root to the spaces, in group, empty for none, see AddSpace and EditFile, in the file
 // that lists group's spaces, see groupFile, checked merged with the other config files. A missing
-// config.toml is created.
+// kspaces.toml is created.
 func SaveSpace(root, group string) (err error) {
 	defer func(start time.Time) { logs.Action("add space", start, err, "root", root, "group", group) }(time.Now())
 	files, cfg, err := readMerged()
@@ -113,7 +113,7 @@ func readMerged() (configFiles, Config, error) {
 }
 
 // groupFile is the index in files of the file a space in group, empty for none, goes in: the one that
-// lists the most of the group's spaces, but except, the first of those, else config.toml. The files are
+// lists the most of the group's spaces, but except, the first of those, else kspaces.toml. The files are
 // told apart by what they list, not by their names: work.toml listing the work group's spaces is where
 // another work space goes, as local.toml would be. cfg is the files merged, which says each space's group.
 func groupFile(files configFiles, cfg Config, group, except string) (int, error) {

@@ -80,7 +80,7 @@ func TestBrokenSpaceFile(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "kspaces"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "kspaces", "config.toml"), []byte(text), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "kspaces", "kspaces.toml"), []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	file := filepath.Join(broken.Dir, config.SpaceFileName)

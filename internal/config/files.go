@@ -9,23 +9,27 @@ import (
 	"slices"
 )
 
-// The config can be in more than one file: config.toml, and every other .toml file beside it, such as a
+// The config can be in more than one file: kspaces.toml, and every other .toml file beside it, such as a
 // work.toml kept out of dotfiles that adds a job's spaces and commands. merge says how they add up.
 
 // configFiles are the config files Load reads, in order, and their texts.
 type configFiles struct {
 	paths []string
 	texts []string
-	// What reading config.toml failed with when it is not there, which reads as empty.
+	// What reading kspaces.toml failed with when it is not there, which reads as empty.
 	missing error
 }
 
-// readFiles reads config.toml, then every other .toml file in its directory by name, hidden ones left
-// out. A missing config.toml reads as empty, see configFiles.missing.
+// readFiles reads kspaces.toml, then every other .toml file in its directory by name, hidden ones left
+// out. A missing kspaces.toml reads as empty, see configFiles.missing.
 func readFiles() (configFiles, error) {
 	path, err := filePath()
 	if err != nil {
 		return configFiles{}, err
+	}
+	// kspaces.toml's earlier name, which read as one of the other files would conflict with it.
+	if _, err := os.Stat(filepath.Join(filepath.Dir(path), "config.toml")); err == nil {
+		return configFiles{}, fmt.Errorf("%s: the config is kspaces.toml now; rename config.toml to it", filepath.Dir(path))
 	}
 	var files configFiles
 	data, err := os.ReadFile(path)

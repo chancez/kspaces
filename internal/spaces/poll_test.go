@@ -59,7 +59,7 @@ func TestSharedView(t *testing.T) {
 			Config: &cfg, Spaces: spaces,
 			Others: []Space{{Name: "notes", Worktrees: []Worktree{{Session: "notes"}}}},
 			Folded: map[string]bool{}, Hidden: map[string]bool{}, Saved: map[string]bool{"gr": true, "notes": true, "gr@gone": true}, Suspended: map[string]bool{}, Keeping: sh.Keeping, Kitty: st,
-			// Nothing saved: manual, with kitty's times, and config.toml's groups.
+			// Nothing saved: manual, with kitty's times, and kspaces.toml's groups.
 			Order: Order{Mode: SortManual, Worktrees: map[string][]string{}, Groups: []string{"work", "home"}, Focused: st.Focused},
 		}
 	}
@@ -70,7 +70,7 @@ func TestSharedView(t *testing.T) {
 	}
 
 	// A config that could not be read is all there is to show.
-	if got, want := (Shared{Err: "config.toml: unknown keys: space"}).View(11), (Snapshot{Err: errors.New("config.toml: unknown keys: space")}); !reflect.DeepEqual(got, want) {
+	if got, want := (Shared{Err: "kspaces.toml: unknown keys: space"}).View(11), (Snapshot{Err: errors.New("kspaces.toml: unknown keys: space")}); !reflect.DeepEqual(got, want) {
 		t.Errorf("broken config: %#v, want %#v", got, want)
 	}
 }

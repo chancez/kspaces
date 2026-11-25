@@ -198,7 +198,7 @@ func TestSaveSpace(t *testing.T) {
 	if err := os.WriteFile(target, []byte("spaces = [\"~/a\"] # mine\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	link := filepath.Join(dir, "config", "kspaces", "config.toml")
+	link := filepath.Join(dir, "config", "kspaces", "kspaces.toml")
 	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +229,7 @@ func TestSaveSpace(t *testing.T) {
 		data, _ := os.ReadFile(target)
 		return file{dest, info.Mode().Perm(), string(data), names(dotfiles), names(filepath.Dir(link))}
 	}
-	want := file{target, 0o600, "spaces = [\"~/a\", \"/src/b\"] # mine\n", []string{"kspaces.toml"}, []string{"config.toml"}}
+	want := file{target, 0o600, "spaces = [\"~/a\", \"/src/b\"] # mine\n", []string{"kspaces.toml"}, []string{"kspaces.toml"}}
 	if got := read(); !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v\nwant %+v", got, want)
 	}
@@ -241,19 +241,19 @@ func TestSaveSpace(t *testing.T) {
 	if err := SaveSpace("/home/me/c", ""); err != nil {
 		t.Fatal(err)
 	}
-	if data, err := os.ReadFile(filepath.Join(dir, "fresh", "kspaces", "config.toml")); err != nil || string(data) != "spaces = [\"~/c\"]\n" {
+	if data, err := os.ReadFile(filepath.Join(dir, "fresh", "kspaces", "kspaces.toml")); err != nil || string(data) != "spaces = [\"~/c\"]\n" {
 		t.Errorf("a new config: %q, %v", data, err)
 	}
 }
 
 // A space in a group goes in the file that lists the most of the group's spaces, whatever its name, as
 // an inline table naming the group; one in no group, or in a group no file lists a space of, goes in
-// config.toml.
+// kspaces.toml.
 func TestSaveSpaceGroup(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("HOME", "/home/me")
 	t.Setenv("XDG_CONFIG_HOME", dir)
-	main := filepath.Join(dir, "kspaces", "config.toml")
+	main := filepath.Join(dir, "kspaces", "kspaces.toml")
 	local := filepath.Join(dir, "kspaces", "local.toml")
 	if err := os.MkdirAll(filepath.Dir(main), 0o755); err != nil {
 		t.Fatal(err)
@@ -392,7 +392,7 @@ func TestSaveSpacesOrder(t *testing.T) {
 	if err := os.WriteFile(target, []byte("spaces = [\n  \"~/a\", # mine\n  \"/src/b\",\n]\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	link := filepath.Join(dir, "config", "kspaces", "config.toml")
+	link := filepath.Join(dir, "config", "kspaces", "kspaces.toml")
 	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
 		t.Fatal(err)
 	}

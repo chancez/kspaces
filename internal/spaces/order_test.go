@@ -49,7 +49,7 @@ func TestOrderModes(t *testing.T) {
 		held map[string]int
 		want []string
 	}{
-		// config.toml's order, gr's worktrees as moved, b after them in git's order.
+		// kspaces.toml's order, gr's worktrees as moved, b after them in git's order.
 		{SortManual, nil, []string{"default", "scratch", "", "gr", "gr@c", "gr@a", "gr@b", "gr@gone", "", "web", "", "kitty", "", "api", "", "docs", "docs@x"}},
 		{"", nil, []string{"default", "scratch", "", "gr", "gr@c", "gr@a", "gr@b", "gr@gone", "", "web", "", "kitty", "", "api", "", "docs", "docs@x"}},
 		// gr by its missing worktree's focus; web and api never focused, last in manual order, as is gr@c.

@@ -90,7 +90,7 @@ func TestSaveLayoutMenu(t *testing.T) {
 func saveEnv(t *testing.T, name string, only bool) (*saveLayoutForm, string) {
 	t.Helper()
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	path := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "kspaces", "config.toml")
+	path := filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "kspaces", "kspaces.toml")
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
 	}

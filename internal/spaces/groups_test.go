@@ -9,7 +9,7 @@ import (
 	"github.com/chancez/kspaces/internal/status"
 )
 
-// groupFixture is a session in no space and spaces in config.toml's order: gr and api in work, kitty in
+// groupFixture is a session in no space and spaces in kspaces.toml's order: gr and api in work, kitty in
 // personal, docs in play and lab in art, neither of which groups lists, and web and notes in none.
 func groupFixture() ([]Space, []Space, Order) {
 	others := []Space{{Name: "default", Worktrees: []Worktree{{Session: "default"}}}}

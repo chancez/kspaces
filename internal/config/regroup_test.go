@@ -14,12 +14,12 @@ import (
 // table sets is refused.
 func TestMoveSpace(t *testing.T) {
 	dir := configDir(t, map[string]string{
-		"config.toml": "spaces = [\n  \"~/a\",\n  # the reviewer\n  { path = \"~/gr\", group = \"tools\" }, # mine\n  \"~/b\",\n]\n",
-		"local.toml":  "spaces = [\n  { path = \"~/w1\", group = \"work\" },\n]\n",
+		"kspaces.toml": "spaces = [\n  \"~/a\",\n  # the reviewer\n  { path = \"~/gr\", group = \"tools\" }, # mine\n  \"~/b\",\n]\n",
+		"local.toml":   "spaces = [\n  { path = \"~/w1\", group = \"work\" },\n]\n",
 	})
 	read := func() []string {
 		var out []string
-		for _, name := range []string{"config.toml", "local.toml"} {
+		for _, name := range []string{"kspaces.toml", "local.toml"} {
 			data, err := os.ReadFile(filepath.Join(dir, name))
 			if err != nil {
 				t.Fatal(err)
@@ -39,12 +39,12 @@ func TestMoveSpace(t *testing.T) {
 			"spaces = [\n  \"~/b\",\n  # the reviewer\n  { path = \"~/gr\", group = \"tools\" }, # mine\n]\n",
 			"spaces = [\n  { path = \"~/a\", group = \"work\" },\n  { path = \"~/w1\", group = \"work\" },\n]\n",
 		}},
-		// gr out of tools, staying in config.toml with its comments, a path again.
+		// gr out of tools, staying in kspaces.toml with its comments, a path again.
 		{"/home/me/gr", "", []string{"/home/me/gr", "/home/me/b", "/home/me/a", "/home/me/w1"}, []string{
 			"spaces = [\n  # the reviewer\n  \"~/gr\", # mine\n  \"~/b\",\n]\n",
 			"spaces = [\n  { path = \"~/a\", group = \"work\" },\n  { path = \"~/w1\", group = \"work\" },\n]\n",
 		}},
-		// w1 into tools, which no file lists a space of now: to config.toml.
+		// w1 into tools, which no file lists a space of now: to kspaces.toml.
 		{"/home/me/w1", "tools", []string{"/home/me/gr", "/home/me/b", "/home/me/a", "/home/me/w1"}, []string{
 			"spaces = [\n  # the reviewer\n  \"~/gr\", # mine\n  \"~/b\",\n  { path = \"~/w1\", group = \"tools\" },\n]\n",
 			"spaces = [\n  { path = \"~/a\", group = \"work\" },\n]\n",
@@ -58,8 +58,8 @@ func TestMoveSpace(t *testing.T) {
 		}
 	}
 
-	configDir(t, map[string]string{"config.toml": "spaces = [\"~/a\", \"~/b\"]\n\n[space.a]\ngroup = \"work\"\n"})
-	if err := MoveSpace("/home/me/a", "", []string{"/home/me/a", "/home/me/b"}); err == nil || err.Error() != "a's group is set in [space.a] in config.toml; change it there" {
+	configDir(t, map[string]string{"kspaces.toml": "spaces = [\"~/a\", \"~/b\"]\n\n[space.a]\ngroup = \"work\"\n"})
+	if err := MoveSpace("/home/me/a", "", []string{"/home/me/a", "/home/me/b"}); err == nil || err.Error() != "a's group is set in [space.a] in kspaces.toml; change it there" {
 		t.Errorf("a group a table sets: %v", err)
 	}
 }

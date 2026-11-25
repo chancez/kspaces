@@ -354,7 +354,7 @@ func TestActionErrorStays(t *testing.T) {
 	fail()
 	tick()
 	got = append(got, e.screen())
-	e.m.Update(spaces.Snapshot{Err: errors.New("config.toml: unknown keys: space")})
+	e.m.Update(spaces.Snapshot{Err: errors.New("kspaces.toml: unknown keys: space")})
 	got = append(got, e.screen())
 	e.press("down", "up")
 	got = append(got, e.screen())
@@ -367,7 +367,7 @@ func TestActionErrorStays(t *testing.T) {
 	want := [][]string{
 		saying("no pull request found"),
 		saying("no pull request found"),
-		saying("config.toml: unknown keys: sp\u2026"),
+		saying("kspaces.toml: unknown keys: s\u2026"),
 		before,
 		before,
 	}

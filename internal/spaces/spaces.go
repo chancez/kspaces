@@ -33,7 +33,7 @@ type Space struct {
 	Name      string
 	Root      string
 	Worktrees []Worktree
-	// The group the sidebar lists it under, as config.toml's [space.NAME] says; empty for none.
+	// The group the sidebar lists it under, as kspaces.toml's [space.NAME] says; empty for none.
 	Group string
 	// Missing are sessions named after a linked worktree of this space that git no longer lists, as when
 	// one is removed while its session still has windows: open or saved, with no path. See placeSessions.

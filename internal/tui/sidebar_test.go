@@ -947,9 +947,9 @@ func TestMoreIndicators(t *testing.T) {
 // A broken config shows on the last line rather than ending the sidebar.
 func TestErrorOnLastLine(t *testing.T) {
 	e := newSidebarEnv(t)
-	e.m.Update(spaces.Snapshot{Err: errors.New("config.toml: unknown keys: space")})
+	e.m.Update(spaces.Snapshot{Err: errors.New("kspaces.toml: unknown keys: space")})
 	lines := e.screen()
-	if got := lines[len(lines)-1]; got != "config.toml: unknown keys: sp\u2026" {
+	if got := lines[len(lines)-1]; got != "kspaces.toml: unknown keys: s\u2026" {
 		t.Errorf("last line %q", got)
 	}
 	if !e.has("\u25bc " + repoIcon + "gr main") {

@@ -178,14 +178,14 @@ func TestSortMenu(t *testing.T) {
 	}
 }
 
-// orderConfig is a config.toml listing the fixture's spaces with comments, in a config directory of the
+// orderConfig is a kspaces.toml listing the fixture's spaces with comments, in a config directory of the
 // test's own.
 const orderConfig = "# Mine.\nspaces = [\n  \"/src/gr\", # work\n  # the terminal\n  \"/src/kitty\",\n  \"/src/docs\",\n  \"/src/broken\",\n]\n"
 
 // newConfig writes text as the config, and returns a function that reads it back.
 func newConfig(t *testing.T, text string) func() string {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "kspaces", "config.toml")
+	path := filepath.Join(t.TempDir(), "kspaces", "kspaces.toml")
 	t.Setenv("XDG_CONFIG_HOME", filepath.Dir(filepath.Dir(path)))
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		t.Fatal(err)
@@ -208,7 +208,7 @@ func savedOrder() map[string][]string {
 }
 
 // K and J move the cursor's row up and down, sent from another window too: a linked worktree within its
-// space, saved in the state directory, and a space, in config.toml with its comments. Moving in an
+// space, saved in the state directory, and a space, in kspaces.toml with its comments. Moving in an
 // automatic mode switches to manual, from the order shown.
 func TestMoveKeys(t *testing.T) {
 	e := newOrderEnv(t)
@@ -320,7 +320,7 @@ func (e *sidebarEnv) letGo(y int) tea.Cmd {
 }
 
 // Dragging a space moves it among the spaces, the rows showing where it goes as it goes with the dragged
-// row lit; letting go keeps it in config.toml with its comments. A row taller than the dragged one is
+// row lit; letting go keeps it in kspaces.toml with its comments. A row taller than the dragged one is
 // moved past only once the mouse is past where it would land.
 func TestDragSpace(t *testing.T) {
 	e := newOrderEnv(t)
@@ -407,7 +407,7 @@ func TestDragWorktree(t *testing.T) {
 	}
 }
 
-// Dragging in an automatic mode switches to manual, from the order shown: config.toml's spaces and every
+// Dragging in an automatic mode switches to manual, from the order shown: kspaces.toml's spaces and every
 // space's worktrees as they were shown, then the move.
 func TestDragSwitchesToManual(t *testing.T) {
 	e := newOrderEnv(t)

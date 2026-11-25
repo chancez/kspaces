@@ -19,7 +19,7 @@ import (
 	"github.com/chancez/kspaces/internal/git"
 )
 
-// Config is what ~/.config/kspaces/config.toml says, with the other config files merged in, see readFiles:
+// Config is what ~/.config/kspaces/kspaces.toml says, with the other config files merged in, see readFiles:
 //
 //	spaces = ["~/projects/gr", "~/projects/kitty"]
 //	groups = ["work", "personal"]
@@ -275,17 +275,17 @@ const defaultWorktreeDir = ".worktrees"
 
 func filePath() (string, error) {
 	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
-		return filepath.Join(dir, "kspaces", "config.toml"), nil
+		return filepath.Join(dir, "kspaces", "kspaces.toml"), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("finding the home directory: %w", err)
 	}
-	return filepath.Join(home, ".config", "kspaces", "config.toml"), nil
+	return filepath.Join(home, ".config", "kspaces", "kspaces.toml"), nil
 }
 
 // Load reads the config files, see readFiles, merged as parse merges them. Without any, the error is
-// config.toml's, fs.ErrNotExist.
+// kspaces.toml's, fs.ErrNotExist.
 func Load() (Config, error) {
 	files, err := readFiles()
 	if err != nil {
@@ -304,7 +304,7 @@ func Parse(data string) (Config, error) {
 }
 
 // parse reads the config the texts of the files at paths make, in order, see merge. Each error names the
-// file it is in: one file's own the file, and one of them merged the directory, or config.toml when it is
+// file it is in: one file's own the file, and one of them merged the directory, or kspaces.toml when it is
 // the only file. A path "" names nothing, as for Parse.
 func parse(paths, texts []string) (Config, error) {
 	in := func(path string, err error) error {
@@ -323,7 +323,7 @@ func parse(paths, texts []string) (Config, error) {
 	}
 	names := make([]string, len(paths))
 	for i, path := range paths {
-		names[i] = cmp.Or(filepath.Base(path), "config.toml")
+		names[i] = cmp.Or(filepath.Base(path), "kspaces.toml")
 	}
 	cfg, err := merge(names, parts)
 	if err != nil {

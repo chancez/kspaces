@@ -27,7 +27,7 @@ func TestOpenNoLayout(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(config, "kspaces"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(config, "kspaces", "config.toml"), []byte(toml), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(config, "kspaces", "kspaces.toml"), []byte(toml), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("XDG_CONFIG_HOME", config)

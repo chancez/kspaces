@@ -212,7 +212,7 @@ func dirs(wts []spaces.Worktree) []string {
 // refuses, as a group a [space.NAME] table sets, puts the rows back.
 func (m *sidebar) keep(a arrangement, r spaces.Row) tea.Cmd {
 	automatic := m.sortMode() != spaces.SortManual
-	// config.toml's order as the manual mode shows it, each group's spaces together: a move that leaves
+	// kspaces.toml's order as the manual mode shows it, each group's spaces together: a move that leaves
 	// it as it is, as of a worktree, need not rewrite the file only to group them there too.
 	var listed []string
 	for _, row := range spaces.BuildRows(nil, m.spaces, nil, nil, spaces.Order{Groups: m.order.Groups}) {

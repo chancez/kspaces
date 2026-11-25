@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// Saving a layout edits config.toml as text, as AddSpace does: the layout is a [[layouts]] block of its
+// Saving a layout edits kspaces.toml as text, as AddSpace does: the layout is a [[layouts]] block of its
 // own, at the end or in place of the one it replaces, and the rest of the file is kept byte for byte.
 
 // AddLayout is the config text with l, a layout as Parse gives it, written as a [[layouts]] block at the
@@ -97,7 +97,7 @@ func layoutNames(ls []Layout) []string {
 	return names
 }
 
-// SaveLayout adds l to config.toml, or replaces the one called the same when replace says to, in the
+// SaveLayout adds l to kspaces.toml, or replaces the one called the same when replace says to, in the
 // config file that has it, see AddLayout and EditFile, checked merged with the other config files.
 func SaveLayout(l Layout, replace bool) error {
 	files, err := readFiles()

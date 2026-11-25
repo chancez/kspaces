@@ -29,7 +29,7 @@ func addSpaceEnv(t *testing.T) (home, config string) {
 		}
 	}
 	gittest.At(t, filepath.Join(home, "repo"))
-	config = filepath.Join(home, ".config", "kspaces", "config.toml")
+	config = filepath.Join(home, ".config", "kspaces", "kspaces.toml")
 	if err := os.WriteFile(config, []byte("# Mine.\nspaces = [\n  \"~/other\", # old\n]\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +137,7 @@ func TestAddSpaceWithoutAsking(t *testing.T) {
 }
 
 // With spaces in groups the form chooses one, the group it was opened from at first, and says the file the
-// space goes in, the one listing the group's spaces, when it is not config.toml; left and right change
+// space goes in, the one listing the group's spaces, when it is not kspaces.toml; left and right change
 // the group, none among them.
 func TestAddSpaceFormGroup(t *testing.T) {
 	home, config := addSpaceEnv(t)

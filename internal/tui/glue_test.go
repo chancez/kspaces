@@ -23,7 +23,7 @@ func TestCheckGlue(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(cfgHome, "kspaces"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(cfgHome, "kspaces", "config.toml"), []byte(s), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(cfgHome, "kspaces", "kspaces.toml"), []byte(s), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

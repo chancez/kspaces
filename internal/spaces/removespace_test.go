@@ -11,14 +11,14 @@ import (
 )
 
 // Removing a configured space ends the provider's sessions in it, closes its kitty sessions and forgets
-// their files, takes it out of config.toml, its repository kept, and has the provider remove its space.
+// their files, takes it out of kspaces.toml, its repository kept, and has the provider remove its space.
 func TestRemoveConfiguredSpace(t *testing.T) {
 	r := gittest.New(t)
 	r.Commit("first")
 	name := filepath.Base(r.Dir)
 	home := t.TempDir()
 	t.Setenv("XDG_CONFIG_HOME", home)
-	cfgPath := filepath.Join(home, "kspaces", "config.toml")
+	cfgPath := filepath.Join(home, "kspaces", "kspaces.toml")
 	if err := os.MkdirAll(filepath.Dir(cfgPath), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestRemoveConfiguredSpace(t *testing.T) {
 	}
 	data, _ := os.ReadFile(cfgPath)
 	if got, want := string(data), "spaces = [\n  \"/src/kitty\",\n]\n"; got != want {
-		t.Errorf("config.toml %q, want %q", got, want)
+		t.Errorf("kspaces.toml %q, want %q", got, want)
 	}
 	if _, err := os.Stat(filepath.Join(sessions, name+"@old.kitty-session")); !os.IsNotExist(err) {
 		t.Errorf("the saved session is still there: %v", err)

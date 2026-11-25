@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// spaceEntries is the spaces list as config.toml has it: each entry a path, or an inline table of a path
+// spaceEntries is the spaces list as kspaces.toml has it: each entry a path, or an inline table of a path
 // and what a [space.NAME] table says of the space, which reads better than a table each for a setting or
 // two:
 //

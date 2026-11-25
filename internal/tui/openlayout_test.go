@@ -710,7 +710,7 @@ func TestOpenWithoutLayoutMenu(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(toml), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "kspaces.toml"), []byte(toml), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	load := func(cfg config.Config) {
