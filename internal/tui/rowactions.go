@@ -52,7 +52,7 @@ func onEntry(a *rowAction) *interact.Action[*sidebar, entrySubject] {
 
 // newWorktreeApplies is whether a worktree can be created in a row's space: one configured and read.
 func newWorktreeApplies(_ spaces.Snapshot, r spaces.Row) bool {
-	return !r.Other && !r.Missing && r.Space.Err == nil
+	return !r.Other && !r.Absent() && r.Space.Err == nil
 }
 
 // rowBranch is the branch of the linked worktree r is the row of, which a new worktree made from its row
@@ -102,7 +102,7 @@ var (
 		desc:    "remove worktree",
 		section: sectionWorktree,
 		// Only a linked worktree: the main one is the repository itself.
-		applies: func(_ spaces.Snapshot, r spaces.Row) bool { return !r.Main && !r.Missing && r.Worktree != nil },
+		applies: func(_ spaces.Snapshot, r spaces.Row) bool { return !r.Main && !r.Absent() && r.Worktree != nil },
 		ask: func(snap spaces.Snapshot, r spaces.Row) error {
 			return spaces.AskRemoveWorktree(*snap.Config, snap.Kitty, r.Worktree.Path)
 		},
@@ -117,7 +117,7 @@ var (
 		},
 		section: sectionWorktree,
 		// Not on a missing worktree: its directory, where gh would run, is gone.
-		applies: func(snap spaces.Snapshot, r spaces.Row) bool { return !r.Missing && rowPR(snap, r) != nil },
+		applies: func(snap spaces.Snapshot, r spaces.Row) bool { return !r.Absent() && rowPR(snap, r) != nil },
 		ask: func(snap spaces.Snapshot, r spaces.Row) error {
 			return gh.Browse(r.Worktree.Path, rowPR(snap, r).Number)
 		},
@@ -129,7 +129,7 @@ var (
 		desc:    "run a command",
 		section: sectionSession,
 		applies: func(snap spaces.Snapshot, r spaces.Row) bool {
-			return !r.Other && !r.Missing && r.Worktree != nil && len(r.Space.ConfigOf(*snap.Config).Commands) > 0
+			return !r.Other && !r.Absent() && r.Worktree != nil && len(r.Space.ConfigOf(*snap.Config).Commands) > 0
 		},
 		ask: func(snap spaces.Snapshot, r spaces.Row) error {
 			name := r.Space.ConfigOf(*snap.Config).Commands[0].Name
@@ -143,7 +143,7 @@ var (
 		desc:    "open a layout",
 		section: sectionSession,
 		applies: func(snap spaces.Snapshot, r spaces.Row) bool {
-			return !r.Other && !r.Missing && r.Worktree != nil && len(r.Space.ConfigOf(*snap.Config).Layouts) > 0
+			return !r.Other && !r.Absent() && r.Worktree != nil && len(r.Space.ConfigOf(*snap.Config).Layouts) > 0
 		},
 		ask: func(snap spaces.Snapshot, r spaces.Row) error {
 			cfg := r.Space.ConfigOf(*snap.Config)
@@ -159,7 +159,7 @@ var (
 		section: sectionSession,
 		// A worktree's session with windows to save, whose cwds are templates of the worktree's.
 		applies: func(snap spaces.Snapshot, r spaces.Row) bool {
-			return !r.Other && !r.Missing && r.Worktree != nil && snap.Kitty.Windows[r.Worktree.Session] > 0
+			return !r.Other && !r.Absent() && r.Worktree != nil && snap.Kitty.Windows[r.Worktree.Session] > 0
 		},
 		ask: func(snap spaces.Snapshot, r spaces.Row) error {
 			return spaces.AskSaveLayout(*snap.Config, snap.Kitty, r.Worktree.Path)

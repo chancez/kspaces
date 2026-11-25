@@ -20,7 +20,24 @@ import (
 // each, which enter or a click opens in a tab of the space, see spaces.OpenSession. They start hidden, and are
 // shown again only by hand, as a long-lived space collects many.
 
-// toggleDetached shows or hides the detached sessions of the space named space under their head.
+// toggleDetachedAt shows or hides the detached sessions under row i, their head: a space's, or on the hosts
+// tab a space's on one host, see openKey.
+func (m *sidebar) toggleDetachedAt(i int) {
+	r := m.rows[i]
+	m.toggleDetached(openKey(r.ByHost, r.Host, r.Detached.Of.Name))
+}
+
+// openKey names the space whose detached sessions show in detachedOpen: its name, or on the hosts tab its
+// name on host, which shows and hides them there alone.
+func openKey(byHost bool, host, space string) string {
+	if !byHost {
+		return space
+	}
+	return "host:" + host + ":" + space
+}
+
+// toggleDetached shows or hides the detached sessions of the space named space under their head, by
+// openKey.
 func (m *sidebar) toggleDetached(space string) {
 	if m.detachedOpen == nil {
 		m.detachedOpen = map[string]bool{}
@@ -45,10 +62,10 @@ func (m *sidebar) openDetachedCmd(r spaces.DetachedRow) tea.Cmd {
 	}
 }
 
-// detachedCount is how many sessions d has, on this machine alone `14 detached`, else by host,
-// `local 3, server 9`.
-func detachedCount(d spaces.Detached) string {
-	if len(d.Hosts) == 1 && d.Hosts[0].Host == "" {
+// detachedCount is how many sessions d has, on this machine alone, or on the hosts tab under the one host
+// it lists, `14 detached`, else by host, `local 3, server 9`.
+func detachedCount(d spaces.Detached, byHost bool) string {
+	if len(d.Hosts) == 1 && (d.Hosts[0].Host == "" || byHost) {
 		return fmt.Sprintf("%d detached", len(d.Hosts[0].Sessions))
 	}
 	var parts []string
@@ -78,7 +95,7 @@ func (m *sidebar) renderDetached(i int) string {
 	switch {
 	case r.Head():
 		caret := look.Mark(fmt.Sprintf(caretZone, i), look.Caret(!r.Expanded)...)
-		spans = append(append(indent, caret...), look.Muted(detachedCount(r.All)))
+		spans = append(append(indent, caret...), look.Muted(detachedCount(r.All, m.rows[i].ByHost)))
 	case r.HostRow:
 		spans = append(indent, look.NoCaret(), look.Muted(hostName(r.Host)))
 	default:
@@ -90,6 +107,9 @@ func (m *sidebar) renderDetached(i int) string {
 		faint := s.State != "running"
 		head := append(append(indent, look.NoCaret()), look.RowIcon(look.RowOther, state, false, false)...)
 		rest := []look.Span{look.Text(s.Name), look.Muted(" " + spaces.StateWords(s))}
+		if s.Stale {
+			rest = append(rest, look.Muted(" stale"))
+		}
 		if what := cmp.Or(strings.TrimSpace(s.Title), strings.TrimSpace(s.Command)); what != "" {
 			rest = append(rest, look.Muted(" "+what))
 		}
@@ -124,13 +144,21 @@ func sessionKey(space string, s spaces.ProviderSession) string {
 // them.
 func (m *sidebar) tickedDetached() []spaces.ProviderSession {
 	var out []spaces.ProviderSession
+	for _, s := range m.tickable() {
+		if m.ticked[sessionKey(s.SpaceName(), s)] {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// tickable are the sessions the select mode can tick, the detached ones, by space, then host, as the rows
+// list them.
+func (m *sidebar) tickable() []spaces.ProviderSession {
+	var out []spaces.ProviderSession
 	for _, space := range slices.Sorted(maps.Keys(m.detached)) {
 		for _, h := range m.detached[space].Hosts {
-			for _, s := range h.Sessions {
-				if m.ticked[sessionKey(space, s)] {
-					out = append(out, s)
-				}
-			}
+			out = append(out, h.Sessions...)
 		}
 	}
 	return out
@@ -169,12 +197,8 @@ func (m *sidebar) moveSelected() tea.Cmd {
 	return m.launch(func(cfg config.Config, st kitty.State) error { return spaces.AskMoveProviderSessions(cfg, st, ids...) },
 		func(m *sidebar) bool {
 			listed := map[string]bool{}
-			for space, d := range m.detached {
-				for _, h := range d.Hosts {
-					for _, s := range h.Sessions {
-						listed[sessionKey(space, s)] = true
-					}
-				}
+			for _, s := range m.tickable() {
+				listed[sessionKey(s.SpaceName(), s)] = true
 			}
 			return slices.ContainsFunc(keys, func(k string) bool { return !listed[k] })
 		})

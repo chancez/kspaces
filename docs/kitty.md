@@ -186,6 +186,7 @@ spaces; one no configured space is named after is a topic space, below. Each ses
 | `name` | what the sidebar shows it as |
 | `space` | the space it is in; empty is `default` |
 | `host` | the machine it runs on, empty for this one |
+| `stale` | optional: its host did not answer, so this is what it last said; the hosts tab marks it |
 | `state` | `running`, `exited`, `shelved` or `dead`; only `running` is offered Kill and Shelve, only the others Remove |
 | `busy` | whether a command is running, which a confirmation says |
 | `title`, `command` | what the row shows after its name: the title, else the command; `command` is also what a layout saved from a window showing it runs |

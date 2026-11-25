@@ -23,6 +23,9 @@ type Worktree struct {
 	Session string
 	// Locked is set with git worktree lock, which keeps git from removing it.
 	Locked bool
+	// Host is the host that has it when no worktree here does: its sessions run there, tagged with its
+	// directory, and it has no Path. Only the hosts tab lists one, see HostViews.
+	Host string
 }
 
 // Space is a repository and its worktrees. The first worktree is the main one.

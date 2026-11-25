@@ -28,6 +28,11 @@ type Row struct {
 	Group *Group
 	// A row of a space's provider sessions no window shows, which has no Space either, see WithDetached.
 	Detached *DetachedRow
+	// A row of the hosts tab, see HostView: Host is the host whose part it is in, empty for this machine,
+	// and HostHeader the host's own row, which heads that part and is nothing else.
+	ByHost     bool
+	Host       string
+	HostHeader bool
 }
 
 // DetachedRow is a row of a space's provider sessions no window shows: their group's head, standing for them all, a
@@ -59,13 +64,24 @@ type Group struct {
 
 // Blank reports whether r is the blank line between spaces, which is no entry.
 func (r Row) Blank() bool {
-	return r.Space == nil && r.Group == nil && r.Detached == nil
+	return r.Space == nil && r.Group == nil && r.Detached == nil && !r.HostHeader
 }
 
-// Dir names a linked worktree's row: its directory, or for a missing one the directory its session is
-// named after, as git no longer has its path.
+// Elsewhere reports whether r is a worktree only another host has, see Worktree.Host.
+func (r Row) Elsewhere() bool {
+	return r.Worktree != nil && r.Worktree.Host != ""
+}
+
+// Absent reports whether r's worktree has no directory here: a missing one, or one only another host has.
+// Nothing that works in the directory applies to it.
+func (r Row) Absent() bool {
+	return r.Missing || r.Elsewhere()
+}
+
+// Dir names a linked worktree's row: its directory, or for a missing one, or one only another host has, the
+// directory its session is named after, as git has no path for it.
 func (r Row) Dir() string {
-	if r.Missing {
+	if r.Absent() {
 		return strings.TrimPrefix(r.Worktree.Session, r.Space.Name+"@")
 	}
 	return filepath.Base(r.Worktree.Path)
@@ -253,6 +269,8 @@ type Snapshot struct {
 	// The provider's sessions no kitty window shows, by space, which is a configured space's name or a
 	// session's in no space; nil without a provider that lists them. Only the sidebar asks.
 	Detached map[string]Detached
+	// Every session the provider lists, those windows show too, for the hosts tab, see HostRows.
+	Sessions []ProviderSession
 	// What the session provider does, see Capabilities; nil without one.
 	Caps Capabilities
 	// The provider's spaces, nil without a provider that lists them. Only the sidebar asks.

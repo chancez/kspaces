@@ -64,6 +64,8 @@ type Sidebar struct {
 	WidthOver int `json:"widthOver,omitempty"`
 	// Filters are the spaces list's filters on.
 	Filters Filters `json:"filters"`
+	// Hosts is the hosts tab showing rather than the spaces tab.
+	Hosts bool `json:"hosts,omitempty"`
 }
 
 // Filters are the spaces list's filters that can be on: the query is not kept.

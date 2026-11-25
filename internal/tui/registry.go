@@ -33,6 +33,9 @@ type detachedSubject struct {
 	row   spaces.DetachedRow
 }
 
+// hostSubject is a host's row on the hosts tab, by the host, empty for this machine.
+type hostSubject struct{ host string }
+
 // groupFilterSubject is a group in the spaces list's menu, which shows or hides it.
 type groupFilterSubject struct{ name string }
 
@@ -161,11 +164,22 @@ var (
 		Section: sectionSession,
 		// A missing worktree only while its session has windows: opening one with none would make it
 		// afresh in a directory that is gone.
+		// One only another host has while one of its sessions there can be opened, or its kitty session has
+		// windows, as it has no directory to start one in.
 		Applies: func(m *sidebar, s entrySubject) bool {
-			return s.row.Worktree != nil && (!s.row.Missing || m.isOpen(s.row.Worktree))
+			switch {
+			case s.row.Worktree == nil:
+				return false
+			case s.row.Elsewhere():
+				return m.isOpen(s.row.Worktree) || m.caps[spaces.CapOpen] && len(m.hostSessionsOf(s.row.Worktree.Host, *s.row.Space, s.row.Worktree.Session)) > 0
+			}
+			return !s.row.Missing || m.isOpen(s.row.Worktree)
 		},
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
+			if wt := *s.row.Worktree; s.row.Elsewhere() && !m.isOpen(&wt) {
+				return m.openDetachedCmd(spaces.DetachedRow{Of: s.row.Space, Session: &m.hostSessionsOf(wt.Host, *s.row.Space, wt.Session)[0]})
+			}
 			return m.openOrResumeCmd(*s.row.Worktree, spaces.OpenOptions{})
 		},
 	}
@@ -174,7 +188,7 @@ var (
 		Section: sectionSession,
 		// Only where the default layout would open: elsewhere it opens just as Open does.
 		Applies: func(m *sidebar, s entrySubject) bool {
-			return !s.row.Other && !s.row.Missing && s.row.Worktree != nil &&
+			return !s.row.Other && !s.row.Absent() && s.row.Worktree != nil &&
 				spaces.OpensDefaultLayout(m.cfg, m.kitty, *s.row.Space, *s.row.Worktree)
 		},
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
@@ -236,6 +250,22 @@ var (
 		Section: sectionSpace,
 		Applies: func(m *sidebar, _ groupSubject) bool { return !m.selecting },
 		Run:     func(m *sidebar, s groupSubject) tea.Cmd { m.tickRow(spaces.GroupKey(s.name)); return nil },
+	}
+)
+
+// A host's row on the hosts tab'.
+var (
+	actFoldHost = &interact.Action[*sidebar, hostSubject]{
+		Title:   "Fold host",
+		Section: "Host",
+		Applies: func(m *sidebar, s hostSubject) bool { return !m.filtering && !m.hostsFolded[s.host] },
+		Run:     func(m *sidebar, s hostSubject) tea.Cmd { m.toggleHost(s.host); return nil },
+	}
+	actUnfoldHost = &interact.Action[*sidebar, hostSubject]{
+		Title:   "Unfold host",
+		Section: "Host",
+		Applies: func(m *sidebar, s hostSubject) bool { return !m.filtering && m.hostsFolded[s.host] },
+		Run:     func(m *sidebar, s hostSubject) tea.Cmd { m.toggleHost(s.host); return nil },
 	}
 )
 
@@ -308,13 +338,13 @@ var (
 		Title:   "Show sessions",
 		Section: sectionSpace,
 		Applies: func(_ *sidebar, s detachedSubject) bool { return s.row.Head() && !s.row.Expanded },
-		Run:     func(m *sidebar, s detachedSubject) tea.Cmd { m.toggleDetached(s.row.Of.Name); return nil },
+		Run:     func(m *sidebar, s detachedSubject) tea.Cmd { m.toggleDetachedAt(s.index); return nil },
 	}
 	actHideDetached = &interact.Action[*sidebar, detachedSubject]{
 		Title:   "Hide sessions",
 		Section: sectionSpace,
 		Applies: func(_ *sidebar, s detachedSubject) bool { return s.row.Head() && s.row.Expanded },
-		Run:     func(m *sidebar, s detachedSubject) tea.Cmd { m.toggleDetached(s.row.Of.Name); return nil },
+		Run:     func(m *sidebar, s detachedSubject) tea.Cmd { m.toggleDetachedAt(s.index); return nil },
 	}
 )
 
@@ -438,6 +468,13 @@ var actAwakeOnly = paneAction("suspended filter", (*sidebar).toggleAwake)
 
 // actOpenPicker opens the picker in a popup, as kitty.conf's kspaces_pick mapping does.
 var actOpenPicker = paneAction("picker", (*sidebar).openPicker)
+
+// actSwitchTab shows the other tab, see hosts.go, as a click on its title does.
+var actSwitchTab = &interact.Action[*sidebar, paneSubject]{
+	Title:   "other tab",
+	Applies: func(m *sidebar, _ paneSubject) bool { return m.caps[spaces.CapList] },
+	Run:     func(m *sidebar, _ paneSubject) tea.Cmd { m.switchTab(); return nil },
+}
 
 // actCycleSort goes on to the next sort mode, as a left click on the sort button does.
 var actCycleSort = paneAction("sort", func(m *sidebar) tea.Cmd { m.setSort(m.sortMode().Next()); return nil })
@@ -1248,6 +1285,7 @@ var (
 
 	spacesList         *interact.Place[*sidebar, entrySubject]
 	groupHeaders       *interact.Place[*sidebar, groupSubject]
+	hostHeaders        *interact.Place[*sidebar, hostSubject]
 	detachedRows       *interact.Place[*sidebar, detachedSubject]
 	theGroups          *interact.Place[*sidebar, groupFilterSubject]
 	statusList         *interact.Place[*sidebar, statusSubject]
@@ -1325,6 +1363,14 @@ func init() {
 	interact.Via(groupKind, func(s groupSubject) (spacesSubject, bool) { return spacesSubject{group: s.name}, true }, spacesKind)
 	groupHeaders = interact.List(groupKind)
 
+	hostKind := interact.NewKind(func(s hostSubject) string { return hostName(s.host) }, actFoldHost, actUnfoldHost)
+	hostKind.Bind(actFoldHost, "space", "fold or unfold the host", "space")
+	hostKind.Bind(actUnfoldHost, "", "", "space")
+	interact.Via(hostKind, func(hostSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
+	hostHeaders = interact.List(hostKind)
+	hostHeaders.Bind(actFoldHost, "enter/l", "fold or unfold", "enter", "l")
+	hostHeaders.Bind(actUnfoldHost, "", "", "enter", "l")
+
 	detachedKind = interact.NewKind(func(s detachedSubject) string {
 		if s.row.Session != nil {
 			return s.row.Session.Name
@@ -1353,7 +1399,7 @@ func init() {
 
 	paneKind = interact.NewKind(func(paneSubject) string { return "Sidebar" },
 		actDown, actUp, actHalfDown, actHalfUp, actPageDown, actPageUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit,
-		actAttend, actClearFinished, actFilter, actAttention, actOpenOnly, actAwakeOnly, actOpenPicker, actCycleSort, actMoveUp, actMoveDown, actSelect, actHelp)
+		actAttend, actClearFinished, actFilter, actAttention, actOpenOnly, actAwakeOnly, actOpenPicker, actCycleSort, actMoveUp, actMoveDown, actSelect, actSwitchTab, actHelp)
 	paneKind.Bind(actDown, "j/k", "down/up", "j", "down")
 	paneKind.Bind(actUp, "", "", "k", "up")
 	paneKind.Bind(actHalfDown, "ctrl+d/u", "half page down/up", "ctrl+d")
@@ -1378,6 +1424,7 @@ func init() {
 	paneKind.Bind(actMoveUp, "K/J", "move the row up/down", "K")
 	paneKind.Bind(actMoveDown, "", "", "J")
 	paneKind.Bind(actSelect, "v", "select rows to act on", "v")
+	paneKind.Bind(actSwitchTab, "tab", "switch between the spaces and hosts tabs", "tab")
 	paneKind.Bind(actHelp, "?", "list keys", append([]string{"?"}, helpKeys...)...)
 	interact.Via(paneKind, func(paneSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	thePane = interact.List(paneKind)
@@ -1658,6 +1705,8 @@ func (m *sidebar) errorTarget() (interact.Target[*sidebar], bool) {
 // there: a blank row between groups is none.
 func (m *sidebar) entryTarget(i int) (interact.Target[*sidebar], bool) {
 	switch {
+	case i >= 0 && i < len(m.rows) && m.rows[i].HostHeader:
+		return hostHeaders.Target(hostSubject{host: m.rows[i].Host}), true
 	case i >= 0 && i < len(m.rows) && m.rows[i].Group != nil:
 		return groupHeaders.Target(groupSubject{name: m.rows[i].Group.Name}), true
 	case i >= 0 && i < len(m.rows) && m.rows[i].Detached != nil:

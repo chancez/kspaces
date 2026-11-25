@@ -44,7 +44,7 @@ func TestDetachedRows(t *testing.T) {
 	head := "  \u25b6 2 detached"
 	list := func(gr ...string) []string {
 		return append(append([]string{
-			spacesTitle,
+			tabsTitle,
 			"",
 			"  " + termIcon + "default",
 			"  \u25b6 1 detached",

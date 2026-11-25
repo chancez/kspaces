@@ -48,7 +48,7 @@ func (m *sidebar) dragTo(y int) {
 		m.paintTo(y)
 		return
 	}
-	if p == nil || m.selecting || m.narrowed() || !movable(p.row) {
+	if p == nil || m.selecting || m.narrowed() || m.showingHosts() || !movable(p.row) {
 		return
 	}
 	i := m.rowAtY(y)
@@ -204,7 +204,7 @@ func (m *sidebar) release(x, y int) tea.Cmd {
 	}
 	m.cursor = i
 	t, _ := m.entryTarget(i)
-	return runFirst(m, t, actOpenWorktree, actFoldGroup, actUnfoldGroup, actOpenDetached, actShowDetached, actHideDetached)
+	return runFirst(m, t, actOpenWorktree, actFoldGroup, actUnfoldGroup, actFoldHost, actUnfoldHost, actOpenDetached, actShowDetached, actHideDetached)
 }
 
 // cancelPress lets go of the press, and puts the rows back where a drag found them.

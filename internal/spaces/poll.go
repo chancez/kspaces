@@ -143,7 +143,7 @@ func (sh Shared) View(self int) Snapshot {
 	snap.Git = sh.Git
 	snap.Detached = detachedBySpace(sh.Provider, toSet(sh.Kept))
 	if sh.Provider != nil {
-		snap.Caps, snap.ProviderSpaces = sh.Provider.Caps, sh.Provider.Spaces
+		snap.Caps, snap.ProviderSpaces, snap.Sessions = sh.Provider.Caps, sh.Provider.Spaces, sh.Provider.Sessions
 	}
 	return snap
 }

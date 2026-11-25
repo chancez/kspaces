@@ -243,6 +243,9 @@ const here = "\u258e "
 // add button in the last of the 30 columns.
 const spacesTitle = "SPACES" + "                 " + "\uf002 \uf0b0 \uf0c9 \uf067"
 
+// tabsTitle is spacesTitle with the tabs a provider that lists sessions gives, see hosts.go.
+const tabsTitle = "SPACES HOSTS" + "           " + "\uf002 \uf0b0 \uf0c9 \uf067"
+
 // filteredTitle is spacesTitle with the filters on named after SPACES, as summary names them.
 func filteredTitle(summary string) string {
 	return "SPACES " + summary + strings.Repeat(" ", 16-len(summary)) + "\uf002 \uf0b0 \uf0c9 \uf067"

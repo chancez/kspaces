@@ -196,6 +196,8 @@ type ProviderSession struct {
 	Space string `json:"space"`
 	// Host is the machine it runs on, empty for this one.
 	Host string `json:"host,omitempty"`
+	// Stale is the host not answering, so the session is as the host last said it was.
+	Stale bool `json:"stale,omitempty"`
 	// State is running, exited, shelved or dead.
 	State string `json:"state"`
 	// Busy is a command running rather than the shell at its prompt.

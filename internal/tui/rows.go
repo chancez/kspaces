@@ -71,6 +71,8 @@ func (m *sidebar) renderRow(i int) string {
 	switch {
 	case r.Group != nil:
 		return m.renderHeader(i)
+	case r.HostHeader:
+		return m.renderHostHeader(i)
 	case r.Detached != nil:
 		return m.renderDetached(i)
 	case r.Space == nil:
@@ -78,7 +80,7 @@ func (m *sidebar) renderRow(i int) string {
 	}
 	kind, label := look.RowSpace, look.Space(*r.Space)
 	switch {
-	case r.Missing:
+	case r.Absent():
 		kind, label = look.RowWorktree, look.MissingWorktree(r)
 	case !r.Main:
 		kind, label = look.RowWorktree, look.Worktree(*r.Worktree)
@@ -126,7 +128,7 @@ func (m *sidebar) renderRow(i int) string {
 	room := max(width-th.Width(head...), 0)
 	// The git state takes the right end, after a space, and the branch what is left between. A space whose
 	// own config is not in use says so there instead, on its own row.
-	gitRow := r.Worktree != nil && !r.Folded && !r.Other && !r.Missing
+	gitRow := r.Worktree != nil && !r.Folded && !r.Other && !r.Absent()
 	var pieces gitRowPieces
 	if gitRow {
 		pieces = gitPieces(m.git[r.Worktree.Path])
@@ -180,7 +182,13 @@ func (m *sidebar) renderRow(i int) string {
 func (m *sidebar) renderHeader(i int) string {
 	r, width, th := m.rows[i], m.contentWidth(), m.th
 	current := rowHolds(r, m.kitty.Current)
+	// On the hosts tab a group is inside its host, whose row has the rule, so it is indented instead and
+	// has none: a rule across the sidebar read as a divider between hosts.
+	nested := r.ByHost
 	start := []look.Span{th.GroupRule(th.Width(look.NoCaret()))}
+	if nested {
+		start = []look.Span{look.NoCaret()}
+	}
 	name := look.GroupHeader(r.Group.Name)
 	if current {
 		start, name = look.CurrentEdge(), name.With(look.Strong)
@@ -192,7 +200,7 @@ func (m *sidebar) renderHeader(i int) string {
 	}
 	room := max(width-th.Width(lead...)-th.Width(fold...), 0)
 	spans := append(append(lead, th.Cut(room, name)...), fold...)
-	if rest := width - th.Width(spans...); rest > 0 {
+	if rest := width - th.Width(spans...); rest > 0 && !nested {
 		if len(fold) == 0 {
 			spans, rest = append(spans, look.Muted(" ")), rest-1
 		}

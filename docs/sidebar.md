@@ -192,6 +192,24 @@ nothing says so. A list that fails leaves the last one that did not showing, so 
 under the sidebar blanks nothing; after three failures in a row it is asked again a minute later, or at
 `r`.
 
+### The hosts tab
+
+With a provider that lists sessions the title is two tabs, `SPACES HOSTS`. `tab`, or a click on the other
+tab, switches between them, and the choice is kept across restarts. The hosts tab lists the spaces tab's
+rows by host: a row for each host, `local` first and then the rest by name, and under it what the spaces
+tab would list of that host. This machine has the whole list. Another host has the spaces and the
+sessions in no space it runs a session in: a space keeps its own row and, of its linked worktrees, those
+its sessions there are tagged with, and a worktree only that host has is listed after them by its
+directory. Each host's detached sessions are under their own `N detached` row, which shows and hides them
+there alone. `space` or a click on its caret folds a host's row, not kept across restarts. A host's row has
+the rule across the sidebar that a group's header has on the spaces tab, and a group's header under a host
+has none, so a group reads as inside its host rather than as the next one.
+
+A row does what it does on the spaces tab, so a worktree listed under several hosts opens the same kitty
+session from each. `enter` on a worktree only another host has opens a tab of one of its sessions there,
+in a kitty session of its name. The filters narrow each host's rows as they narrow the spaces tab's, and
+a host they leave nothing of is left out. Rows do not move on the hosts tab, by drag or by `K` and `J`.
+
 ## Order
 
 The button left of the plus on the SPACES title shows how the list is sorted, and a click on it goes on
@@ -678,6 +696,7 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `s` | sort the list the next way; see [Order](#order) |
 | `K` / `J` | move the cursor's space within its group, or linked worktree within its space, up / down |
 | `v` | select rows to act on; see [Selecting](#selecting) |
+| `tab` | switch between the spaces and hosts tabs; see [The hosts tab](#the-hosts-tab) |
 | `space`, `A` | in the select mode, tick the cursor's row, every row shown |
 | `x`, `c`, `z`, `F`, `R`, `M` | in the select mode, remove, close, suspend, forget, run in, move what is ticked |
 | `r` | refresh, which also happens every two seconds |

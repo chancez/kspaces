@@ -208,24 +208,10 @@ func (m *sidebar) setRows() {
 // keeps its place, as it did before the rows changed.
 func (m *sidebar) rebuildRows(at cursorPos) {
 	key, entry := at.key, at.entry
-	if m.filtering {
-		m.rows = filterRows(spaces.BuildRows(m.others, m.listed(), nil, m.hidden, m.rowOrder()), m.filter.Value())
+	if m.showingHosts() {
+		m.rows = m.hostRows()
 	} else {
-		m.rows = spaces.BuildRows(m.others, m.listed(), m.folded, m.hidden, m.rowOrder())
-	}
-	if m.attending {
-		m.rows = spaces.AttentionRows(m.rows, m.kitty.Statuses)
-	}
-	if m.openOnly {
-		m.rows = spaces.OpenRows(m.rows, m.kitty.Sessions)
-	}
-	if m.awakeOnly {
-		m.rows = spaces.AwakeRows(m.rows, m.suspended)
-	}
-	// The provider's sessions no window shows are not what the query, the attention filter or the open filter
-	// look for, and a drag moves only the rows it knows.
-	if !m.filtering && !m.attending && !m.openOnly && (m.press == nil || m.press.drag == nil) {
-		m.rows = spaces.WithDetached(m.rows, m.detached, m.detachedOpen)
+		m.rows = m.listRows(m.others, m.listed(), m.detached, m.detachedOpen)
 	}
 	m.pruneTicks()
 	if entry >= 0 {
@@ -262,10 +248,46 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 	}
 }
 
+// listRows are the rows of others and spaces, all of them or the filters', with the detached sessions of
+// detached after their spaces' rows, those of the spaces in open under their head, while no filter
+// narrows the rows.
+func (m *sidebar) listRows(others, list []spaces.Space, detached map[string]spaces.Detached, open map[string]bool) []spaces.Row {
+	var rows []spaces.Row
+	if m.filtering {
+		rows = filterRows(spaces.BuildRows(others, list, nil, m.hidden, m.rowOrder()), m.filter.Value())
+	} else {
+		rows = spaces.BuildRows(others, list, m.folded, m.hidden, m.rowOrder())
+	}
+	if m.attending {
+		rows = spaces.AttentionRows(rows, m.kitty.Statuses)
+	}
+	if m.openOnly {
+		rows = spaces.OpenRows(rows, m.kitty.Sessions)
+	}
+	if m.awakeOnly {
+		rows = spaces.AwakeRows(rows, m.suspended)
+	}
+	// The provider's sessions no window shows are not what the query, the attention filter or the open filter
+	// look for, and a drag moves only the rows it knows.
+	if !m.filtering && !m.attending && !m.openOnly && (m.press == nil || m.press.drag == nil) {
+		rows = spaces.WithDetached(rows, detached, open)
+	}
+	return rows
+}
+
 // rowKey names the entry a row is, the same across refreshes and filters: its session, for a space whose
 // worktrees could not be listed its root, for a group's header the group's key in the folded file, and for
-// a detached session's row, see detachedKey, one no session's name can be. The blank row is none.
+// a detached session's row, see detachedKey, one no session's name can be, each on the hosts tab under its
+// host's. The blank row is none.
 func rowKey(r spaces.Row) string {
+	// The hosts tab can list a worktree under several hosts, each its own entry.
+	if r.ByHost {
+		if r.HostHeader {
+			return "host:" + r.Host
+		}
+		r.ByHost = false
+		return "host:" + r.Host + ":" + rowKey(r)
+	}
 	switch {
 	case r.Detached != nil:
 		return detachedKey(*r.Detached)

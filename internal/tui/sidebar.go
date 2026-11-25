@@ -164,6 +164,11 @@ type sidebar struct {
 	caps         spaces.Capabilities
 	// providerSpaces are the provider's spaces, for removing a topic space.
 	providerSpaces []string
+	// The hosts tab, see hosts.go: whether it shows, every session the provider lists, and the host's and
+	// space's rows folded there, by spaces.HostKey.
+	hostsTab    bool
+	sessions    []spaces.ProviderSession
+	hostsFolded map[string]bool
 }
 
 func newSidebar(self int) *sidebar {
@@ -181,6 +186,7 @@ func newSidebar(self int) *sidebar {
 		attending:  filters.Attention,
 		openOnly:   filters.Open,
 		awakeOnly:  filters.Awake,
+		hostsTab:   spaces.LoadHostsTab(),
 	}
 }
 
@@ -367,7 +373,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.kitty.Statuses = spaces.Shown(m.cfg, m.hidden, m.statuses)
 			m.order = msg.Order
 			m.git = msg.Git
-			m.detached, m.caps, m.providerSpaces = msg.Detached, msg.Caps, msg.ProviderSpaces
+			m.detached, m.caps, m.providerSpaces, m.sessions = msg.Detached, msg.Caps, msg.ProviderSpaces, msg.Sessions
 			m.rebuildRows(at)
 			m.settle()
 			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))
@@ -557,10 +563,10 @@ func (m *sidebar) titleLine(width int) string {
 	buttons := append(look.Mark(attentionZone, look.AttentionButton(m.attending || m.openOnly || m.awakeOnly, m.attentionHot)), look.Default(" "))
 	buttons = append(append(buttons, look.Mark(sortZone, look.SortButton(m.order.Mode, m.sortHot))...), look.Default(" "))
 	buttons = append(buttons, look.Mark(addZone, look.AddButton(m.addHot))...)
-	if withPick := append(append(look.Mark(pickZone, look.PickButton(m.pickHot)), look.Default(" ")), buttons...); th.Width(look.Title("SPACES"))+1+th.Width(withPick...) <= width {
+	if withPick := append(append(look.Mark(pickZone, look.PickButton(m.pickHot)), look.Default(" ")), buttons...); th.Width(m.tabTitle()...)+1+th.Width(withPick...) <= width {
 		buttons = withPick
 	}
-	title := th.Cut(max(width-th.Width(buttons...), 0), look.Title("SPACES"))
+	title := th.Cut(max(width-th.Width(buttons...), 0), m.tabTitle()...)
 	if summary := m.filterSummary(); summary != "" {
 		withSummary := append(append([]look.Span{}, title...), look.Default(" "), look.Muted(summary))
 		if th.Width(withSummary...)+1+th.Width(buttons...) <= width {
