@@ -252,7 +252,8 @@ kspaces new [SPACE]      create a worktree, in a form; --from-pr on its Pull req
   --from-issue, --issue  --from-issue on its Issue tab, --issue N on issue N; --base B starts a new branch
   --base                 from local branch B
 kspaces run NAME [PATH...]  run a configured command in the worktrees at PATH or the current directory,
-  --input K=V, --yes     in a form, with inputs filled in; --yes without asking
+  --input K=V, --yes     in a form, with inputs filled in; --yes without asking, --background without
+  --background           switching to the session
 kspaces layout NAME [PATH]  open a configured layout's tabs in the worktree's session, in a form, as run
 kspaces layout save [NAME] [PATH]  save the session's tabs as a layout, choosing what each pane runs in a
   --tab                  form; --tab saves only this tab

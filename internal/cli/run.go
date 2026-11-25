@@ -14,10 +14,11 @@ import (
 
 func (a *app) runCommand() *cobra.Command {
 	var (
-		yes    bool
-		open   string
-		inputs []string
-		window int
+		yes        bool
+		background bool
+		open       string
+		inputs     []string
+		window     int
 	)
 	cmd := &cobra.Command{
 		Use:   "run NAME [PATH...]",
@@ -48,16 +49,20 @@ func (a *app) runCommand() *cobra.Command {
 				return err
 			}
 			if yes {
-				return tui.RunCommandNow(cfg, dirs, args[0], values, open)
+				return tui.RunCommandNow(cfg, dirs, args[0], values, open, background)
+			}
+			if background {
+				return fmt.Errorf("--background needs --yes")
 			}
 			return tui.RunCommandForm(cmd.Context(), cfg, dirs, args[0], values, open)
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "run without the form; a required input not given is an error")
+	cmd.Flags().BoolVar(&background, "background", false, "with --yes, leave the focus where it is rather than switching to the session")
 	cmd.Flags().StringVar(&open, "open", "", "where to open it in a session with windows, for this run: "+strings.Join(config.Opens, ", "))
 	cmd.Flags().StringArrayVar(&inputs, "input", nil, "an input's value, as NAME=VALUE; repeat for more")
 	a.fromFlag(cmd, &window, "the worktree of its session")
-	for _, f := range []string{"yes", "open", "input"} {
+	for _, f := range []string{"yes", "background", "open", "input"} {
 		cmd.MarkFlagsMutuallyExclusive("from", f)
 	}
 	return cmd

@@ -163,21 +163,21 @@ func (f *runForm) run() tea.Cmd {
 	}
 	f.busy, f.err = true, nil
 	targets, open := f.targets, f.open
-	return func() tea.Msg { return ranMsg{runIn(targets, cmd.Name, values, open)} }
+	return func() tea.Msg { return ranMsg{runIn(targets, cmd.Name, values, open, false)} }
 }
 
 // runIn runs the command called name in each of targets, as its own config has it, with the inputs of
-// values it has, opening where open says, or where configured when empty. In several it stays in this
-// window rather than switching to each session, see spaces.Run.Stay; one failing does not stop the rest,
-// and the error says which failed and why, one line each.
-func runIn(targets []runTarget, name string, values map[string]string, open string) error {
+// values it has, opening where open says, or where configured when empty. In several, or with
+// background, it stays in this window rather than switching to each session, see spaces.Run.Stay; one
+// failing does not stop the rest, and the error says which failed and why, one line each.
+func runIn(targets []runTarget, name string, values map[string]string, open string, background bool) error {
 	// Read now: the sessions may have gained or lost windows since a form opened.
 	st, err := kitty.LoadState(kitty.SelfWindowID())
 	if err != nil {
 		return err
 	}
 	if len(targets) == 1 {
-		return targets[0].run(st, name, values, open, false)
+		return targets[0].run(st, name, values, open, background)
 	}
 	var errs []error
 	for _, t := range targets {
@@ -413,9 +413,10 @@ func (f *runForm) restore(d map[string]string) tea.Cmd {
 	return moveFocus(f.fields(), &f.focus, 0)
 }
 
-// RunCommandNow runs the command called name in the worktrees dirs are in, with inputs, without asking. A
-// required input that is not given, and has no default, is an error.
-func RunCommandNow(global config.Config, dirs []string, name string, inputs map[string]string, open string) error {
+// RunCommandNow runs the command called name in the worktrees dirs are in, with inputs, without asking,
+// and without switching to the session with background. A required input that is not given, and has no
+// default, is an error.
+func RunCommandNow(global config.Config, dirs []string, name string, inputs map[string]string, open string, background bool) error {
 	targets, cmd, err := findRun(global, dirs, name, inputs, open, false)
 	if err != nil {
 		return err
@@ -424,5 +425,5 @@ func RunCommandNow(global config.Config, dirs []string, name string, inputs map[
 	if _, err := spaces.NewRun(cmd, inputs, spaces.BuiltinVars(first.space, first.wt, spaces.WorktreeLinks(first.space, first.wt))); err != nil {
 		return err
 	}
-	return runIn(targets, name, inputs, open)
+	return runIn(targets, name, inputs, open, background)
 }

@@ -307,7 +307,8 @@ it, and restoring the session runs it again with the same inputs.
 `kspaces run NAME [PATH...]` opens the same form for the worktree PATH, or the current directory, is in, with
 `--input NAME=VALUE` filling inputs in, a value's newlines kept, as in `--input "prompt=$(cat task.md)"`,
 and `--open=WHERE` overriding `open` once. `--yes` runs it without the form, refusing a required input
-that is empty. Several PATHs run it in each worktree, as the [sidebar](sidebar.md) says of Run.
+that is empty, and `--background` with it leaves the focus where it is: no switch, and the launch is
+`--keep-focus`. Several PATHs run it in each worktree, as the [sidebar](sidebar.md) says of Run.
 
 ## Layouts
 

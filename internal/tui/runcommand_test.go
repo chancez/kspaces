@@ -225,17 +225,19 @@ func TestRunCommandNow(t *testing.T) {
 	}
 	var got []string
 	for _, c := range []struct {
-		name   string
-		inputs map[string]string
-		open   string
+		name       string
+		inputs     map[string]string
+		open       string
+		background bool
 	}{
-		{"claude", nil, ""},
-		{"claude", map[string]string{"model": "opus"}, ""},
-		{"gr", nil, "sideways"},
-		{"nope", nil, ""},
-		{"gr", nil, "overlay"},
+		{"claude", nil, "", false},
+		{"claude", map[string]string{"model": "opus"}, "", false},
+		{"gr", nil, "sideways", false},
+		{"nope", nil, "", false},
+		{"gr", nil, "overlay", false},
+		{"gr", nil, "", true},
 	} {
-		got = append(got, errString(RunCommandNow(cfg, []string{sub}, c.name, c.inputs, c.open)))
+		got = append(got, errString(RunCommandNow(cfg, []string{sub}, c.name, c.inputs, c.open, c.background)))
 	}
 	want := []string{
 		"claude needs Prompt",
@@ -243,17 +245,23 @@ func TestRunCommandNow(t *testing.T) {
 		`--open is "sideways", it must be one of tab, split, hsplit, vsplit, overlay, window`,
 		"no command nope in the config",
 		"<nil>",
+		"<nil>",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %q\nwant %q", got, want)
 	}
-	if got, want := calls(), slices.Concat([]string{
-		"@", "action", "goto_session", wt.Session + ".kitty-session", "--",
-		"@", "action", "--match=id:7", "launch", "--type=overlay", "--next-to=id:7", "--cwd=" + wt.Path}, inSession(wt.Session), []string{
+	env := []string{
 		"--env=KSPACES_SPACE=" + filepath.Base(root), "--env=KSPACES_ROOT=" + root, "--env=KSPACES_WORKTREE=" + wt.Path,
 		"--env=KSPACES_BRANCH=fix", "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=" + wt.Session, "--env=KSPACES_PR=", "--env=KSPACES_ISSUE=",
-		"gr", "--",
-	}); !reflect.DeepEqual(got, want) {
+	}
+	// In the background there is no goto_session, and the launch keeps the focus.
+	if got, want := calls(), slices.Concat([]string{
+		"@", "action", "goto_session", wt.Session + ".kitty-session", "--",
+		"@", "action", "--match=id:7", "launch", "--type=overlay", "--next-to=id:7", "--cwd=" + wt.Path}, inSession(wt.Session), env,
+		[]string{"gr", "--",
+			"@", "action", "--match=id:7", "launch", "--type=window", "--location=split", "--next-to=id:7", "--cwd=" + wt.Path},
+		inSession(wt.Session), []string{"--keep-focus"}, env, []string{"--hold", "gr", "--"},
+	); !reflect.DeepEqual(got, want) {
 		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
 	}
 }
@@ -316,7 +324,7 @@ func TestRunSeveral(t *testing.T) {
 	if got := calls(); !reflect.DeepEqual(got, ran) {
 		t.Errorf("kitten ran as\n%q\nwant\n%q", got, ran)
 	}
-	if err := RunCommandNow(cfg, []string{wts[0].Path, wts[1].Path}, "gr", nil, ""); err != nil {
+	if err := RunCommandNow(cfg, []string{wts[0].Path, wts[1].Path}, "gr", nil, "", false); err != nil {
 		t.Fatal(err)
 	}
 	if got, want := calls(), slices.Concat(ran, ran); !reflect.DeepEqual(got, want) {
