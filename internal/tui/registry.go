@@ -384,10 +384,15 @@ func paneAction(title string, run func(m *sidebar) tea.Cmd) *interact.Action[*si
 
 // The sidebar's own: moves, leaving, refreshing, and the cursor's menu.
 var (
-	actDown   = paneAction("down", func(m *sidebar) tea.Cmd { m.moveCursor(1); return nil })
-	actUp     = paneAction("up", func(m *sidebar) tea.Cmd { m.moveCursor(-1); return nil })
-	actTop    = paneAction("top", func(m *sidebar) tea.Cmd { m.cursor = 0; m.scrollToCursor(); return nil })
-	actBottom = paneAction("bottom", func(m *sidebar) tea.Cmd {
+	actDown = paneAction("down", func(m *sidebar) tea.Cmd { m.moveCursor(1); return nil })
+	actUp   = paneAction("up", func(m *sidebar) tea.Cmd { m.moveCursor(-1); return nil })
+	// The page moves go by the list the cursor is in, as less and vim's do.
+	actHalfDown = paneAction("half page down", func(m *sidebar) tea.Cmd { m.moveCursor(max(m.pageRows()/2, 1)); return nil })
+	actHalfUp   = paneAction("half page up", func(m *sidebar) tea.Cmd { m.moveCursor(-max(m.pageRows()/2, 1)); return nil })
+	actPageDown = paneAction("page down", func(m *sidebar) tea.Cmd { m.moveCursor(m.pageRows()); return nil })
+	actPageUp   = paneAction("page up", func(m *sidebar) tea.Cmd { m.moveCursor(-m.pageRows()); return nil })
+	actTop      = paneAction("top", func(m *sidebar) tea.Cmd { m.cursor = 0; m.scrollToCursor(); return nil })
+	actBottom   = paneAction("bottom", func(m *sidebar) tea.Cmd {
 		m.cursor = max(m.numEntries()-1, 0)
 		m.scrollToCursor()
 		return nil
@@ -1347,10 +1352,14 @@ func init() {
 	statusList.Bind(actOpenWindow, "enter/l", "open", "enter", "l")
 
 	paneKind = interact.NewKind(func(paneSubject) string { return "Sidebar" },
-		actDown, actUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit,
+		actDown, actUp, actHalfDown, actHalfUp, actPageDown, actPageUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit,
 		actAttend, actClearFinished, actFilter, actAttention, actOpenOnly, actAwakeOnly, actOpenPicker, actCycleSort, actMoveUp, actMoveDown, actSelect, actHelp)
 	paneKind.Bind(actDown, "j/k", "down/up", "j", "down")
 	paneKind.Bind(actUp, "", "", "k", "up")
+	paneKind.Bind(actHalfDown, "ctrl+d/u", "half page down/up", "ctrl+d")
+	paneKind.Bind(actHalfUp, "", "", "ctrl+u")
+	paneKind.Bind(actPageDown, "ctrl+f/b", "page down/up", "ctrl+f", "pgdown")
+	paneKind.Bind(actPageUp, "", "", "ctrl+b", "pgup")
 	paneKind.Bind(actTop, "g/G", "top/bottom", "g", "home")
 	paneKind.Bind(actBottom, "", "", "G", "end")
 	paneKind.Bind(actLeave, "esc/q", "leave", "esc", "q")

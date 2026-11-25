@@ -1061,3 +1061,22 @@ func TestPickButton(t *testing.T) {
 		t.Errorf("P launched %q, want %q", got, want)
 	}
 }
+
+// ctrl+d and ctrl+u move half the list the cursor is in, ctrl+f and ctrl+b all of it, past the blank row
+// between spaces and no further than the ends.
+func TestPageMoves(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(tea.WindowSizeMsg{Width: 30, Height: 20})
+	e.splitStatus(6)
+	// gr@dev, with 9 rows of spaces and 6 of statuses.
+	e.press("g", "j", "j")
+	var got []int
+	for _, k := range []string{"ctrl+d", "ctrl+d", "ctrl+u", "ctrl+f", "ctrl+b", "ctrl+b", "ctrl+b"} {
+		e.press(k)
+		got = append(got, e.m.cursor)
+	}
+	// 7 and 9 are blank, 11 on are statuses.
+	if want := []int{8, 12, 8, 14, 8, 0, 0}; !reflect.DeepEqual(got, want) {
+		t.Errorf("cursor at %v, want %v", got, want)
+	}
+}

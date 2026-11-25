@@ -644,6 +644,8 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | Key | Does |
 |---|---|
 | `j` / `k` | down / up |
+| `ctrl+d` / `ctrl+u` | half a page down / up, in the list the cursor is in |
+| `ctrl+f` / `ctrl+b`, `pgdown` / `pgup` | a page down / up |
 | `g` / `G` | first / last row |
 | `enter` / `l` | open |
 | `space` | fold or unfold the space's worktrees, on a group's header the group's spaces, or on a space's detached sessions' row show or hide them |

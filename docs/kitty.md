@@ -767,6 +767,8 @@ switches.
 map --new-mode spaces --on-unknown passthrough_and_end f6
 map --mode spaces j kspaces_key j
 map --mode spaces k kspaces_key k
+map --mode spaces ctrl+d kspaces_key ctrl+d
+map --mode spaces ctrl+u kspaces_key ctrl+u
 map --mode spaces enter combine : kspaces_key enter : pop_keyboard_mode
 map --mode spaces esc combine : kspaces_key esc : pop_keyboard_mode
 ```

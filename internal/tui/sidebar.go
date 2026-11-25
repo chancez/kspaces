@@ -430,15 +430,41 @@ func (m *sidebar) scrollToCursor() {
 	m.scrollSpacesToCursor()
 }
 
-// moveCursor moves by delta entries, stepping over the blank row between spaces.
+// moveCursor moves by delta entries, no further than the first or last, stepping over the blank row
+// between spaces: on past it, or back when it is the last one that way.
 func (m *sidebar) moveCursor(delta int) {
-	for i := m.cursor + delta; i >= 0 && i < m.numEntries(); i += delta {
-		if i >= len(m.rows) || !m.rows[i].Blank() {
-			m.cursor = i
-			break
+	if delta == 0 {
+		return
+	}
+	step := 1
+	if delta < 0 {
+		step = -1
+	}
+	n := m.numEntries()
+	blank := func(i int) bool { return i < len(m.rows) && m.rows[i].Blank() }
+	target := min(max(m.cursor+delta, 0), n-1)
+	i := target
+	for i >= 0 && i < n && blank(i) {
+		i += step
+	}
+	if i < 0 || i >= n {
+		i = target - step
+		for i*step > m.cursor*step && blank(i) {
+			i -= step
 		}
 	}
+	if i*step > m.cursor*step {
+		m.cursor = i
+	}
 	m.scrollToCursor()
+}
+
+// pageRows is how many entries the list the cursor is in shows at once.
+func (m *sidebar) pageRows() int {
+	if m.cursor >= len(m.rows) {
+		return m.layout().status
+	}
+	return m.layout().spaces
 }
 
 // leave gives keyboard focus back to the window the sidebar took it from.
