@@ -254,8 +254,8 @@ func TestSaveSpaceGroup(t *testing.T) {
 	t.Setenv("HOME", "/home/me")
 	t.Setenv("XDG_CONFIG_HOME", dir)
 	main := filepath.Join(dir, "kspaces", "kspaces.toml")
-	local := filepath.Join(dir, "kspaces", "local.toml")
-	if err := os.MkdirAll(filepath.Dir(main), 0o755); err != nil {
+	local := filepath.Join(dir, "kspaces", "conf.d", "local.toml")
+	if err := os.MkdirAll(filepath.Dir(local), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	write := func(path, text string) {

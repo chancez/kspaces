@@ -459,12 +459,12 @@ a program does when it starts again, are not kept.
 
 ## More config files
 
-The config can be split across files: kspaces.toml, then every other `.toml` file beside it in
-`~/.config/kspaces`, by name, hidden ones left out. A `work.toml` kept out of dotfiles can add a job's spaces,
+The config can be split across files: `~/.config/kspaces/kspaces.toml`, then every `.toml` file in
+`~/.config/kspaces/conf.d`, by name, hidden ones left out. A `conf.d/work.toml` kept out of dotfiles can add a job's spaces,
 groups, commands and layouts, and kspaces.toml stays the same on every machine:
 
 ```toml
-# work.toml, beside kspaces.toml
+# conf.d/work.toml
 spaces = [
   { path = "~/projects/work/api", group = "work" },
   { path = "~/projects/work/web", group = "work" },
@@ -482,7 +482,7 @@ They add up as one file saying all of it would:
 
 - `spaces`, `groups`, `[[commands]]` and `[[layouts]]` are listed one file's after another's. kspaces.toml's
   `groups` can name a group only another file has spaces in: `groups = ["work", "tools"]` puts `work` first
-  where `work.toml` exists, and a group no space is in is left out elsewhere.
+  where `conf.d/work.toml` exists, and a group no space is in is left out elsewhere.
 - `[space.NAME]` tables, and inline `spaces` entries, are merged by key.
 - Every other setting, `launch`, `sessions`, `layout`, a key of `[worktrees]`, `[sidebar]` or `[kitty]`, and
   each key of a space, is one file's to set. Set in two files, or a command, layout or group defined in two,

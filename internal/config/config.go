@@ -323,7 +323,7 @@ func parse(paths, texts []string) (Config, error) {
 	}
 	names := make([]string, len(paths))
 	for i, path := range paths {
-		names[i] = cmp.Or(filepath.Base(path), "kspaces.toml")
+		names[i] = cmp.Or(FileName(path), "kspaces.toml")
 	}
 	cfg, err := merge(names, parts)
 	if err != nil {

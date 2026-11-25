@@ -249,7 +249,7 @@ right above it and after it on its line, through a symlinked config to its targe
 together as the list shows them. Moving it into another group rewrites its entry too, a path becoming
 `{ path = "~/src/x", group = "work" }` and a table's group changing or going, and moves the entry, with its
 comments, to the config file that lists the most of that group's spaces, as **Add space** picks the file,
-so a space dragged into the group a `work.toml` holds goes there. A group set in a `[space.NAME]` table
+so a space dragged into the group a `conf.d/work.toml` holds goes there. A group set in a `[space.NAME]` table
 stays that table's: dragging the space out of it says to change it there. Moving a worktree keeps its
 space's order, by the worktrees' directories, in `$XDG_STATE_HOME/kspaces/state.json`. Either moves the order of
 every sidebar.
@@ -616,7 +616,7 @@ below it puts the new space in one, `none` or the groups in the sidebar's order:
 one of its spaces' rows, that group at first, else `none`. Add appends the root to `spaces` as text, so the
 file's comments and layout stay as they were, and writes through a symlinked config to its target: in a
 group as `{ path = "~/src/x", group = "work" }`, in the config file that lists the most of the group's
-spaces, whatever its name, so a `work.toml` holding the work group's spaces gets the new one, else in
+spaces, whatever its name, so a `conf.d/work.toml` holding the work group's spaces gets the new one, else in
 kspaces.toml, which the form names when it is another file. Every sidebar shows the new space at its next
 refresh. `kspaces add [PATH] --group NAME` opens the form on a group. Left without adding, the form keeps
 its path and group for the next time it opens on the same PATH and group.

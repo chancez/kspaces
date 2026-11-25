@@ -195,7 +195,7 @@ func (f *addSpaceForm) render() string {
 		if g := f.chosenGroup(); g != "" {
 			says += ", in " + g
 		}
-		if name := filepath.Base(f.file); f.file != "" && name != "kspaces.toml" {
+		if name := config.FileName(f.file); f.file != "" && name != "kspaces.toml" {
 			says += ", in " + name
 		}
 		lines = append(lines, line(th.Cut(width, look.Muted(says))...))

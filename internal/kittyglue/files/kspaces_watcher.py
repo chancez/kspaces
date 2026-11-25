@@ -64,16 +64,16 @@ _dragged = (None, None, None)
 _applied = None
 
 
-# config_paths are kspaces' config files: kspaces.toml, then every other .toml file beside it by name,
+# config_paths are kspaces' config files: kspaces.toml, then every .toml file in conf.d beside it by name,
 # hidden ones left out, as kspaces reads them.
 def config_paths():
     base = os.environ.get('XDG_CONFIG_HOME') or os.path.expanduser('~/.config')
     d = os.path.join(base, 'kspaces')
     try:
-        names = sorted(n for n in os.listdir(d) if n.endswith('.toml') and not n.startswith('.') and n != 'kspaces.toml')
+        names = sorted(n for n in os.listdir(os.path.join(d, 'conf.d')) if n.endswith('.toml') and not n.startswith('.'))
     except OSError:
         names = []
-    return [os.path.join(d, n) for n in ['kspaces.toml'] + names]
+    return [os.path.join(d, 'kspaces.toml')] + [os.path.join(d, 'conf.d', n) for n in names]
 
 
 # sidebar_width is the width the sidebar's dock was dragged to, kept in kspaces' state.json, while the

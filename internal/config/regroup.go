@@ -41,7 +41,7 @@ func MoveSpace(root, group string, order []string) (err error) {
 			return fmt.Errorf("%s: %w", files.paths[i], err)
 		}
 		if p.md.IsDefined("space", name, "group") {
-			return fmt.Errorf("%s's group is set in [space.%s] in %s; change it there", name, name, filepath.Base(files.paths[i]))
+			return fmt.Errorf("%s's group is set in [space.%s] in %s; change it there", name, name, FileName(files.paths[i]))
 		}
 		if j := slices.Index(p.cfg.Spaces, root); j >= 0 && from < 0 {
 			from, k = i, j

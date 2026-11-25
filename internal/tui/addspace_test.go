@@ -141,7 +141,10 @@ func TestAddSpaceWithoutAsking(t *testing.T) {
 // the group, none among them.
 func TestAddSpaceFormGroup(t *testing.T) {
 	home, config := addSpaceEnv(t)
-	local := filepath.Join(filepath.Dir(config), "local.toml")
+	local := filepath.Join(filepath.Dir(config), "conf.d", "local.toml")
+	if err := os.MkdirAll(filepath.Dir(local), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(local, []byte("spaces = [{ path = \"~/w1\", group = \"work\" }]\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -164,7 +167,7 @@ func TestAddSpaceFormGroup(t *testing.T) {
 	f.Update(tea.KeyPressMsg{Code: tea.KeyRight})
 	choice := "  left/right group  space list"
 	want := [][]string{
-		screen("< work >", "Adds ~/repo to the spaces, in work, in local.toml", ""),
+		screen("< work >", "Adds ~/repo to the spaces, in work, in conf.d/local.toml", ""),
 		screen("< none >  left/right change  space list", "Adds ~/repo to the spaces", choice),
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -186,7 +189,10 @@ func TestAddSpaceFormGroup(t *testing.T) {
 // h and l change a choice, as left and right do, and type in a text field.
 func TestAddSpaceFormGroupHL(t *testing.T) {
 	home, config := addSpaceEnv(t)
-	local := filepath.Join(filepath.Dir(config), "local.toml")
+	local := filepath.Join(filepath.Dir(config), "conf.d", "local.toml")
+	if err := os.MkdirAll(filepath.Dir(local), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(local, []byte("spaces = [{ path = \"~/w1\", group = \"work\" }]\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

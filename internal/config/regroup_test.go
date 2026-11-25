@@ -14,12 +14,12 @@ import (
 // table sets is refused.
 func TestMoveSpace(t *testing.T) {
 	dir := configDir(t, map[string]string{
-		"kspaces.toml": "spaces = [\n  \"~/a\",\n  # the reviewer\n  { path = \"~/gr\", group = \"tools\" }, # mine\n  \"~/b\",\n]\n",
-		"local.toml":   "spaces = [\n  { path = \"~/w1\", group = \"work\" },\n]\n",
+		"kspaces.toml":      "spaces = [\n  \"~/a\",\n  # the reviewer\n  { path = \"~/gr\", group = \"tools\" }, # mine\n  \"~/b\",\n]\n",
+		"conf.d/local.toml": "spaces = [\n  { path = \"~/w1\", group = \"work\" },\n]\n",
 	})
 	read := func() []string {
 		var out []string
-		for _, name := range []string{"kspaces.toml", "local.toml"} {
+		for _, name := range []string{"kspaces.toml", "conf.d/local.toml"} {
 			data, err := os.ReadFile(filepath.Join(dir, name))
 			if err != nil {
 				t.Fatal(err)

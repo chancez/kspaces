@@ -20,6 +20,9 @@ func configDir(t *testing.T, files map[string]string) string {
 		t.Fatal(err)
 	}
 	for name, text := range files {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755); err != nil {
+			t.Fatal(err)
+		}
 		if err := os.WriteFile(filepath.Join(dir, name), []byte(text), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -59,12 +62,12 @@ tabs = [{ panes = [{ command = "gr" }] }]
 // names from another, a layout running another's command, found. Hidden and other files are left out.
 func TestLoadFiles(t *testing.T) {
 	configDir(t, map[string]string{
-		"kspaces.toml":      mainConfig,
-		"work.toml":         workConfig,
-		"extra.toml":        "groups = [\"extra\"]\n",
-		".kspaces.toml.123": "nope = 1\n",
-		".hidden.toml":      "nope = 1\n",
-		"notes.txt":         "nope",
+		"kspaces.toml":        mainConfig,
+		"conf.d/work.toml":    workConfig,
+		"conf.d/extra.toml":   "groups = [\"extra\"]\n",
+		".kspaces.toml.123":   "nope = 1\n",
+		"conf.d/.hidden.toml": "nope = 1\n",
+		"notes.txt":           "nope",
 	})
 	got, err := Load()
 	if err != nil {
@@ -101,7 +104,7 @@ tabs = [{ panes = [{ command = "gr" }] }]
 
 // Without kspaces.toml the other files are the config; without any file, it is missing.
 func TestLoadFilesWithoutMain(t *testing.T) {
-	configDir(t, map[string]string{"work.toml": "spaces = [\"~/api\"]\n"})
+	configDir(t, map[string]string{"conf.d/work.toml": "spaces = [\"~/api\"]\n"})
 	got, err := Load()
 	if err != nil {
 		t.Fatal(err)
@@ -116,12 +119,20 @@ func TestLoadFilesWithoutMain(t *testing.T) {
 	}
 }
 
-// A config.toml, kspaces.toml's earlier name, is an error saying to rename it.
+// A config.toml, kspaces.toml's earlier name, is an error saying to rename it, and another file beside
+// kspaces.toml one saying to move it into conf.d.
 func TestLoadFilesLegacy(t *testing.T) {
-	dir := configDir(t, map[string]string{"config.toml": "spaces = [\"~/api\"]\n"})
-	_, err := Load()
-	if want := dir + ": the config is kspaces.toml now; rename config.toml to it"; err == nil || err.Error() != want {
-		t.Errorf("got %v, want %s", err, want)
+	for _, c := range []struct {
+		name string
+		want string
+	}{
+		{"config.toml", "the config is kspaces.toml now; rename config.toml to it"},
+		{"work.toml", "move work.toml into conf.d, where the other config files are read from"},
+	} {
+		dir := configDir(t, map[string]string{c.name: "spaces = [\"~/api\"]\n"})
+		if _, err := Load(); err == nil || err.Error() != dir+": "+c.want {
+			t.Errorf("%s: %v", c.name, err)
+		}
 	}
 }
 
@@ -135,20 +146,20 @@ func TestLoadFilesErrors(t *testing.T) {
 		own  bool
 		want string
 	}{
-		{"launch = [\"x\"]\n[worktrees]\ndir = \"w\"\n", false, "worktrees.dir is set both in kspaces.toml and in work.toml; set it in one"},
-		{"[space.gr]\ngroup = \"work\"\n", false, "gr's group is set both in kspaces.toml and in work.toml; set it in one"},
-		{"spaces = [{ path = \"~/other/gr\", group = \"work\" }]\n", false, "gr's group is set both in kspaces.toml and in work.toml; set it in one"},
-		{"[[commands]]\nname = \"gr\"\nrun = [\"x\"]\n", false, "commands: gr is defined both in kspaces.toml and in work.toml; define it in one"},
-		{"groups = [\"tools\"]\n", false, "groups: tools is listed both in kspaces.toml and in work.toml; list it in one"},
+		{"launch = [\"x\"]\n[worktrees]\ndir = \"w\"\n", false, "worktrees.dir is set both in kspaces.toml and in conf.d/work.toml; set it in one"},
+		{"[space.gr]\ngroup = \"work\"\n", false, "gr's group is set both in kspaces.toml and in conf.d/work.toml; set it in one"},
+		{"spaces = [{ path = \"~/other/gr\", group = \"work\" }]\n", false, "gr's group is set both in kspaces.toml and in conf.d/work.toml; set it in one"},
+		{"[[commands]]\nname = \"gr\"\nrun = [\"x\"]\n", false, "commands: gr is defined both in kspaces.toml and in conf.d/work.toml; define it in one"},
+		{"groups = [\"tools\"]\n", false, "groups: tools is listed both in kspaces.toml and in conf.d/work.toml; list it in one"},
 		{"[[layouts]]\nname = \"review\"\ntabs = [{ panes = [{ command = \"nope\" }] }]\n", false,
 			`layouts: review: tab 1 pane 1: command is "nope", no command has that name`},
 		{"[space.vim]\ngroup = \"work\"\n", false, "space.vim: no space is named vim"},
 		{"nope = 1\n", true, "unknown keys: nope"},
 	} {
-		dir := configDir(t, map[string]string{"kspaces.toml": main, "work.toml": c.work})
+		dir := configDir(t, map[string]string{"kspaces.toml": main, "conf.d/work.toml": c.work})
 		where := dir
 		if c.own {
-			where = filepath.Join(dir, "work.toml")
+			where = filepath.Join(dir, "conf.d/work.toml")
 		}
 		if _, err := Load(); err == nil || err.Error() != where+": "+c.want {
 			t.Errorf("%q: %v", c.work, err)
@@ -161,10 +172,10 @@ func TestLoadFilesErrors(t *testing.T) {
 func TestSaveSpacesOrderFiles(t *testing.T) {
 	main := "groups = [\"work\"]\nspaces = [\"~/a\", { path = \"~/b\", group = \"work\" }]\n"
 	work := "spaces = [{ path = \"~/c\", group = \"work\" }, \"~/d\", { path = \"~/e\", group = \"work\" }]\n"
-	dir := configDir(t, map[string]string{"kspaces.toml": main, "work.toml": work})
+	dir := configDir(t, map[string]string{"kspaces.toml": main, "conf.d/work.toml": work})
 	read := func() []string {
 		a, _ := os.ReadFile(filepath.Join(dir, "kspaces.toml"))
-		b, _ := os.ReadFile(filepath.Join(dir, "work.toml"))
+		b, _ := os.ReadFile(filepath.Join(dir, "conf.d/work.toml"))
 		return []string{string(a), string(b)}
 	}
 	// The sidebar's order: the spaces in no group, then work's, e moved before c.
@@ -174,7 +185,7 @@ func TestSaveSpacesOrderFiles(t *testing.T) {
 		t.Errorf("within files: %v\n%q\nwant %q", err, got, want)
 	}
 	err = SaveSpacesOrder([]string{"/home/me/a", "/home/me/d", "/home/me/e", "/home/me/b", "/home/me/c"})
-	if err == nil || err.Error() != "e cannot go before b: it is in work.toml, whose spaces come after kspaces.toml's" {
+	if err == nil || err.Error() != "e cannot go before b: it is in conf.d/work.toml, whose spaces come after kspaces.toml's" {
 		t.Errorf("across files: %v", err)
 	}
 	if got := read(); !reflect.DeepEqual(got, want) {
@@ -186,8 +197,8 @@ func TestSaveSpacesOrderFiles(t *testing.T) {
 // files: kspaces.toml's layout can run work.toml's command.
 func TestSaveLayoutFiles(t *testing.T) {
 	dir := configDir(t, map[string]string{
-		"kspaces.toml": "spaces = [\"~/a\"]\n",
-		"work.toml":    "[[commands]]\nname = \"gr\"\nrun = [\"gr\"]\n\n[[layouts]]\nname = \"review\"\ntabs = [{ panes = [{}] }]\n",
+		"kspaces.toml":     "spaces = [\"~/a\"]\n",
+		"conf.d/work.toml": "[[commands]]\nname = \"gr\"\nrun = [\"gr\"]\n\n[[layouts]]\nname = \"review\"\ntabs = [{ panes = [{}] }]\n",
 	})
 	l := Layout{Name: "review", Tabs: []LayoutTab{{Panes: []Pane{{Command: "gr"}}}}}
 	if err := SaveLayout(l, true); err != nil {
@@ -198,7 +209,7 @@ func TestSaveLayoutFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	a, _ := os.ReadFile(filepath.Join(dir, "kspaces.toml"))
-	b, _ := os.ReadFile(filepath.Join(dir, "work.toml"))
+	b, _ := os.ReadFile(filepath.Join(dir, "conf.d/work.toml"))
 	got := []string{string(a), string(b)}
 	want := []string{
 		"spaces = [\"~/a\"]\n\n[[layouts]]\nname = \"new\"\n[[layouts.tabs]]\npanes = [\n  { command = \"gr\" },\n]\n",
@@ -213,8 +224,8 @@ func TestSaveLayoutFiles(t *testing.T) {
 // other files, which can say it is a space already.
 func TestSaveSpaceFiles(t *testing.T) {
 	dir := configDir(t, map[string]string{
-		"kspaces.toml": "layout = \"review\"\nspaces = [\"~/a\"]\n",
-		"work.toml":    "spaces = [\"~/b\"]\n\n[[layouts]]\nname = \"review\"\ntabs = [{ panes = [{}] }]\n",
+		"kspaces.toml":     "layout = \"review\"\nspaces = [\"~/a\"]\n",
+		"conf.d/work.toml": "spaces = [\"~/b\"]\n\n[[layouts]]\nname = \"review\"\ntabs = [{ panes = [{}] }]\n",
 	})
 	if err := SaveSpace("/home/me/b", ""); err == nil || err.Error() != filepath.Join(dir, "kspaces.toml")+": ~/b is already a space" {
 		t.Errorf("listed by work.toml: %v", err)

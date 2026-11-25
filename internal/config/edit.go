@@ -114,8 +114,9 @@ func readMerged() (configFiles, Config, error) {
 
 // groupFile is the index in files of the file a space in group, empty for none, goes in: the one that
 // lists the most of the group's spaces, but except, the first of those, else kspaces.toml. The files are
-// told apart by what they list, not by their names: work.toml listing the work group's spaces is where
-// another work space goes, as local.toml would be. cfg is the files merged, which says each space's group.
+// told apart by what they list, not by their names: conf.d/work.toml listing the work group's spaces is
+// where another work space goes, as conf.d/local.toml would be. cfg is the files merged, which says each
+// space's group.
 func groupFile(files configFiles, cfg Config, group, except string) (int, error) {
 	best, most := 0, 0
 	for i, text := range files.texts {

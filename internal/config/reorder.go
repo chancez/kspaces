@@ -133,7 +133,7 @@ func orderedTexts(paths, texts, order []string) ([]string, error) {
 		for k, a := range want[g] {
 			if b := got[g][k]; a != b {
 				return nil, fmt.Errorf("%s cannot go before %s: it is in %s, whose spaces come after %s's", filepath.Base(a), filepath.Base(b),
-					filepath.Base(paths[fileOf[a]]), filepath.Base(paths[fileOf[b]]))
+					FileName(paths[fileOf[a]]), FileName(paths[fileOf[b]]))
 			}
 		}
 	}

@@ -7,10 +7,14 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
-// The config can be in more than one file: kspaces.toml, and every other .toml file beside it, such as a
-// work.toml kept out of dotfiles that adds a job's spaces and commands. merge says how they add up.
+// The config can be in more than one file: kspaces.toml, then every .toml file in conf.d beside it, such
+// as a work.toml kept out of dotfiles that adds a job's spaces and commands. merge says how they add up.
+
+// fragmentsDir is the directory beside kspaces.toml the other config files are in.
+const fragmentsDir = "conf.d"
 
 // configFiles are the config files Load reads, in order, and their texts.
 type configFiles struct {
@@ -20,16 +24,27 @@ type configFiles struct {
 	missing error
 }
 
-// readFiles reads kspaces.toml, then every other .toml file in its directory by name, hidden ones left
-// out. A missing kspaces.toml reads as empty, see configFiles.missing.
+// readFiles reads kspaces.toml, then every .toml file in conf.d by name, hidden ones left out. A missing
+// kspaces.toml reads as empty, see configFiles.missing. Another .toml file beside kspaces.toml is an
+// error, as it was read before conf.d was.
 func readFiles() (configFiles, error) {
 	path, err := filePath()
 	if err != nil {
 		return configFiles{}, err
 	}
-	// kspaces.toml's earlier name, which read as one of the other files would conflict with it.
-	if _, err := os.Stat(filepath.Join(filepath.Dir(path), "config.toml")); err == nil {
-		return configFiles{}, fmt.Errorf("%s: the config is kspaces.toml now; rename config.toml to it", filepath.Dir(path))
+	dir := filepath.Dir(path)
+	beside, err := tomlFiles(dir)
+	if err != nil {
+		return configFiles{}, err
+	}
+	for _, other := range beside {
+		switch name := filepath.Base(other); {
+		case name == "config.toml":
+			// kspaces.toml's earlier name.
+			return configFiles{}, fmt.Errorf("%s: the config is kspaces.toml now; rename config.toml to it", dir)
+		case other != path:
+			return configFiles{}, fmt.Errorf("%s: move %s into %s, where the other config files are read from", dir, name, fragmentsDir)
+		}
 	}
 	var files configFiles
 	data, err := os.ReadFile(path)
@@ -40,14 +55,11 @@ func readFiles() (configFiles, error) {
 		return configFiles{}, fmt.Errorf("reading the config: %w", err)
 	}
 	files.paths, files.texts = []string{path}, []string{string(data)}
-	others, err := filepath.Glob(filepath.Join(filepath.Dir(path), "*.toml"))
+	fragments, err := tomlFiles(filepath.Join(dir, fragmentsDir))
 	if err != nil {
 		return configFiles{}, err
 	}
-	for _, other := range others {
-		if other == path || filepath.Base(other)[0] == '.' {
-			continue
-		}
+	for _, other := range fragments {
 		data, err := os.ReadFile(other)
 		if err != nil {
 			return configFiles{}, fmt.Errorf("reading the config: %w", err)
@@ -56,6 +68,26 @@ func readFiles() (configFiles, error) {
 		files.texts = append(files.texts, string(data))
 	}
 	return files, nil
+}
+
+// tomlFiles are the .toml files in dir, by name, hidden ones left out; none for a missing dir.
+func tomlFiles(dir string) ([]string, error) {
+	paths, err := filepath.Glob(filepath.Join(dir, "*.toml"))
+	if err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(paths, func(p string) bool { return strings.HasPrefix(filepath.Base(p), ".") }), nil
+}
+
+// FileName is the config file at path as errors and forms name it: its path in the config directory, such
+// as conf.d/work.toml, or its name outside it.
+func FileName(path string) string {
+	if main, err := filePath(); err == nil {
+		if rel, err := filepath.Rel(filepath.Dir(main), path); err == nil && !strings.HasPrefix(rel, "..") {
+			return rel
+		}
+	}
+	return filepath.Base(path)
 }
 
 // with is the config the files make with file i's text as text, and file i as decode reads it, for an
