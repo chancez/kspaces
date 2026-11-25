@@ -7,9 +7,7 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textarea"
-	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/chancez/kspaces/internal/tui/look"
 )
@@ -31,45 +29,47 @@ type field interface {
 	keeps(msg tea.KeyPressMsg) bool
 }
 
-// lineField is one line of text, which scrolls sideways, for a branch, a path or a name.
-type lineField struct{ textinput.Model }
+// lineField is one line of text, for a branch, a path or a name. It is a text area of one row, which shows
+// the part of a long value the cursor is in, so it edits as a textField does.
+type lineField struct{ textarea.Model }
 
 // newLineField is a line field in th's styles showing placeholder while empty.
 func newLineField(th *look.Theme, placeholder string) lineField {
-	in := newInput(th, "")
+	in := textarea.New()
+	in.Prompt = ""
+	in.ShowLineNumbers = false
 	in.Placeholder = placeholder
+	in.SetHeight(1)
+	// Enter is the form's, to submit: the text is one line.
+	in.KeyMap.InsertNewline.SetEnabled(false)
+	in.SetStyles(th.AreaStyles())
 	return lineField{in}
 }
 
 func (f *lineField) fill(s string) {
-	f.SetValue(s)
-	f.CursorEnd()
+	f.SetValue(joinLines(s))
+	f.MoveToEnd()
 }
 
 func (f *lineField) update(msg tea.Msg) tea.Cmd {
+	if p, ok := msg.(tea.PasteMsg); ok {
+		msg = tea.PasteMsg{Content: joinLines(p.Content)}
+	}
 	var cmd tea.Cmd
 	f.Model, cmd = f.Model.Update(msg)
 	return cmd
 }
 
-// place puts the cursor on the character at cell x, or after the last, when the whole value shows. One too
-// long for the box may be scrolled, which the box does not say, so the cursor goes to its end.
-func (f *lineField) place(x, _ int) {
-	v := f.Value()
-	if ansi.StringWidth(v) > f.Width() {
-		f.CursorEnd()
-		return
-	}
-	at := 0
-	for _, r := range v {
-		w := ansi.StringWidth(string(r))
-		if x < w {
-			break
-		}
-		x -= w
-		at++
-	}
-	f.SetCursor(at)
+// place puts the cursor where the click lands, which textarea works out through wrapping.
+func (f *lineField) place(x, y int) {
+	f.BeginSelection(x, y)
+	f.EndSelection()
+}
+
+// joinLines is s with its line breaks as spaces, as a text input takes a paste, so a line field's text
+// stays one line.
+func joinLines(s string) string {
+	return strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(s)
 }
 
 func (*lineField) keeps(tea.KeyPressMsg) bool { return false }

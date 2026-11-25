@@ -11,6 +11,7 @@ import (
 	"github.com/chancez/kspaces/internal/gittest"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/tui/look"
 )
 
 var (
@@ -68,7 +69,8 @@ func TestLayoutFormClickField(t *testing.T) {
 }
 
 // A click on any of the new worktree form's fields focuses it: the branch, the directory and a layout's
-// input. The branch, too long for its box, may be scrolled, so a click in it puts the cursor at its end.
+// input. The branch, too long for its box, wraps, the box showing the row the cursor is on, and a click in
+// it puts the cursor where it lands on that row.
 func TestNewWorktreeFormClickField(t *testing.T) {
 	f := newForm(testLayouts(t), clickSpace)
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
@@ -90,8 +92,9 @@ func TestNewWorktreeFormClickField(t *testing.T) {
 	typeInto(f, long)
 	clickInto(t, f, "branch", labelWidth+2)
 	typeInto(f, "Y")
-	branch := "fe" + long + "ixY"
-	if got, want := formScreen(f), screen("  branch     "+branch[len(branch)-54:], "  directory  here", "  Creates "+branch[:57]+"\u2026", ""); !reflect.DeepEqual(got, want) {
+	// The box's first row is the first 54 of the branch, its width, and the click is 2 into the second.
+	branch := "fe" + long[:54] + "Y" + long[54:] + "ix"
+	if got, want := formScreen(f), screen("  branch     "+branch[54:], "  directory  here", "  Creates "+branch[:57]+"\u2026", ""); !reflect.DeepEqual(got, want) {
 		t.Errorf("long branch:\n%q\nwant\n%q", got, want)
 	}
 }
@@ -242,5 +245,18 @@ func TestTextFieldScrolls(t *testing.T) {
 	f.Update(downKey)
 	if got, want := formScreen(f), screen(3, true); !reflect.DeepEqual(got, want) {
 		t.Errorf("down from the last line:\n%q\nwant\n%q", got, want)
+	}
+}
+
+// A line field keeps its text to one line: what fills it and what is pasted into it have their line breaks
+// as spaces, and enter is left to the form.
+func TestLineFieldOneLine(t *testing.T) {
+	f := newLineField(look.New(true), "")
+	f.Focus()
+	f.fill("a\nb")
+	f.update(tea.PasteMsg{Content: " c\r\nd"})
+	f.update(keyMsg("enter"))
+	if got, want := f.Value(), "a b c d"; got != want {
+		t.Errorf("value %q, want %q", got, want)
 	}
 }
