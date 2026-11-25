@@ -251,6 +251,9 @@ kspaces recent           switch to the session used before this one, as alt-tab 
 kspaces new [SPACE]      create a worktree, in a form; --from-pr on its Pull request tab, --pr N on PR N,
   --from-issue, --issue  --from-issue on its Issue tab, --issue N on issue N; --base B starts a new branch
   --base                 from local branch B
+  --yes, --branch B      --yes without the form, on --branch B, --pr or --issue, printing its path;
+  --layout, --command    --layout, --command or -- ARGS opens it with, --input fills in, --background
+  --input, --background  without switching to it
 kspaces run NAME [PATH...]  run a configured command in the worktrees at PATH or the current directory,
   --input K=V, --yes     in a form, with inputs filled in; --yes without asking, --background without
   --background           switching to the session

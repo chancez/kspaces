@@ -454,17 +454,24 @@ func RunCommandNow(global config.Config, dirs []string, name string, inputs map[
 }
 
 // RunArgsNow runs argv, a command line no config names, in the worktrees dirs are in, as RunCommandNow
-// runs a configured command: in a new tab, or where open says, the shell started once it exits. Its
-// words are passed on as they are, braces and all, rather than as a template.
+// runs a configured command: in a new tab, or where open says, the shell started once it exits. See
+// literalCommand.
 func RunArgsNow(global config.Config, dirs, argv []string, open string, background bool) error {
 	targets, err := findTargets(global, dirs, open)
 	if err != nil {
 		return err
 	}
+	cmd := literalCommand(argv)
+	return runEach(targets, func(runTarget) (config.Command, error) { return cmd, nil }, nil, open, background)
+}
+
+// literalCommand is a command that runs argv as it is, its braces escaped so no word is a template, in a
+// new tab.
+func literalCommand(argv []string) config.Command {
 	literal := strings.NewReplacer("{", "{{", "}", "}}")
 	cmd := config.Command{Name: argv[0], Open: config.OpenTab}
 	for _, arg := range argv {
 		cmd.Run = append(cmd.Run, literal.Replace(arg))
 	}
-	return runEach(targets, func(runTarget) (config.Command, error) { return cmd, nil }, nil, open, background)
+	return cmd
 }

@@ -454,6 +454,14 @@ the window the form was opened from, so a prompt or a command runs while you car
 each left on the pane opened last rather than its `focus` pane. The box starts as it was for the last
 worktree the form created.
 
+`kspaces new [SPACE] --yes` creates the worktree without the form, as Create would, and prints its path:
+on `--branch NAME`, after the configured prefix unless it starts with it, on `--pr N`, or on `--issue N`,
+its branch named after the issue unless `--branch` names one. `--dir` and `--base` are the form's fields.
+The session opens with the form's first `open with`, or `--layout NAME`, `--command NAME`, or the command
+line after `--`, as [`kspaces run`](kitty.md#running-commands) runs one; `--input NAME=VALUE` fills in an
+input, and a required one not given, or a layout or command not configured, creates nothing.
+`--background` is the box.
+
 An input's field takes several lines, for a prompt: `shift+enter` starts a new one, as do `alt+enter` and
 `ctrl+j`, for a terminal that sends `shift+enter` as `enter`, and `enter` still submits the form. The field
 grows to show its lines, a long one wrapped, up to six, then scrolls with the cursor, and the rows below it
