@@ -5,26 +5,39 @@ import (
 	"github.com/chancez/kspaces/internal/kitty"
 )
 
-// panelSize is a panel's size in cells. A panel does not grow with what it shows, so each is sized for
-// what its popup shows at its longest.
-type panelSize struct{ columns, lines int }
+// panelSize is which of the config's panel sizes a popup has, by what it shows.
+type panelSize int
 
-var (
+const (
 	// A form of a few fields or a question.
-	formPanel = panelSize{90, 24}
-	// A form that lists what it acts on: the tabs a layout saves, the worktrees a clean up removes, what a
-	// space's own config adds.
-	listPanel = panelSize{100, 32}
-	// The picker, wide enough for its preview beside the list.
-	pickerPanel = panelSize{120, 32}
+	formPanel panelSize = iota
+	// A form that lists what it acts on.
+	listPanel
+	// The picker.
+	pickerPanel
 )
 
-// popup is where cfg opens a popup of size.
+// of is the size of sizes this one is.
+func (size panelSize) of(sizes config.PopupSizes) config.PopupSize {
+	switch size {
+	case listPanel:
+		return sizes.List
+	case pickerPanel:
+		return sizes.Picker
+	}
+	return sizes.Form
+}
+
+// popup is where cfg opens a popup of size, the default for a size it has none of.
 func popup(cfg config.Config, size panelSize) kitty.Popup {
 	if cfg.Sidebar.Popup != config.PopupPanel {
 		return kitty.Popup{}
 	}
-	return kitty.Popup{Panel: true, Columns: size.columns, Lines: size.lines}
+	s := size.of(cfg.Sidebar.PopupSize)
+	if s == (config.PopupSize{}) {
+		s = size.of(config.DefaultPopupSizes)
+	}
+	return kitty.Popup{Panel: true, Columns: s.Columns, Lines: s.Lines}
 }
 
 // launchForm opens the form args run, such as `new ROOT`, in a popup of size for the window of st's tab.

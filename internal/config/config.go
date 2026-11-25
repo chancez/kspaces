@@ -3,12 +3,14 @@ package config
 
 import (
 	"cmp"
+	"encoding"
 	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +34,11 @@ import (
 //	[sidebar]
 //	width = 28
 //	popup = "overlay"
+//
+//	[sidebar.popup_size]
+//	form = "90x24"
+//	list = "100x32"
+//	picker = "120x32"
 //
 //	[kitty]
 //	auto_install = true
@@ -93,7 +100,66 @@ type Sidebar struct {
 	Width int `toml:"width"`
 	// Where the forms and the picker open: PopupOverlay or PopupPanel.
 	Popup string `toml:"popup"`
+	// The size of each kind of panel, DefaultPopupSizes' for one unset; an overlay is the size of the
+	// window it is over.
+	PopupSize PopupSizes `toml:"popup_size"`
 }
+
+// PopupSizes are the panels' sizes, by what they show.
+type PopupSizes struct {
+	// A form of a few fields or a question.
+	Form PopupSize `toml:"form"`
+	// A form that lists what it acts on: the tabs a layout saves, the worktrees a clean up removes, what a
+	// space's own config adds.
+	List PopupSize `toml:"list"`
+	// The picker, wide enough for its preview beside the list.
+	Picker PopupSize `toml:"picker"`
+}
+
+// DefaultPopupSizes are the panels' sizes when none is set. A panel does not grow with what it shows, so
+// each is sized for what its popup shows at its longest.
+var DefaultPopupSizes = PopupSizes{Form: PopupSize{90, 24}, List: PopupSize{100, 32}, Picker: PopupSize{120, 32}}
+
+// AllPopups is every kind of panel size.
+func AllPopups(size PopupSize) PopupSizes { return PopupSizes{Form: size, List: size, Picker: size} }
+
+// PopupSize is a panel's size in cells, written COLUMNSxLINES, such as "90x24".
+type PopupSize struct {
+	Columns int
+	Lines   int
+}
+
+// The smallest panel, which leaves a form room for its fields and buttons.
+const (
+	MinPopupColumns = 40
+	MinPopupLines   = 10
+)
+
+func (s PopupSize) String() string { return fmt.Sprintf("%dx%d", s.Columns, s.Lines) }
+
+// MarshalText writes s as COLUMNSxLINES.
+func (s PopupSize) MarshalText() ([]byte, error) { return []byte(s.String()), nil }
+
+// UnmarshalText reads COLUMNSxLINES, each no smaller than the smallest panel's.
+func (s *PopupSize) UnmarshalText(text []byte) error {
+	cols, lines, ok := strings.Cut(string(text), "x")
+	c, cerr := strconv.Atoi(cols)
+	l, lerr := strconv.Atoi(lines)
+	if !ok || cerr != nil || lerr != nil {
+		return fmt.Errorf("popup size %q is not COLUMNSxLINES, such as \"90x24\"", text)
+	}
+	if c < MinPopupColumns || l < MinPopupLines {
+		return fmt.Errorf("popup size %q is too small, it must be at least %dx%d", text, MinPopupColumns, MinPopupLines)
+	}
+	*s = PopupSize{Columns: c, Lines: l}
+	return nil
+}
+
+// Set is UnmarshalText, for a command line flag.
+func (s *PopupSize) Set(v string) error { return s.UnmarshalText([]byte(v)) }
+
+// Type is what a command line flag's help calls the value.
+func (s *PopupSize) Type() string { return "COLUMNSxLINES" }
 
 // The places a form or the picker can open: an overlay over the window it is for, or a kitty panel, an
 // OS window of its own of a fixed size, centered on the screen.
@@ -376,6 +442,8 @@ var listed = []string{"commands", "layouts", "groups", "space"}
 
 // mergeSettings sets each setting of dst, a Config or a table of it at key, that md says src sets, after
 // set says it can be: the keys of tables, such as sidebar.width, each a setting.
+var textUnmarshaler = reflect.TypeFor[encoding.TextUnmarshaler]()
+
 func mergeSettings(dst, src reflect.Value, key []string, md toml.MetaData, set func(key string) error) error {
 	for i := range dst.NumField() {
 		f := dst.Type().Field(i)
@@ -384,7 +452,8 @@ func mergeSettings(dst, src reflect.Value, key []string, md toml.MetaData, set f
 			continue
 		}
 		k := append(slices.Clone(key), tag)
-		if f.Type.Kind() == reflect.Struct {
+		// A struct read from text, such as a popup size, is one setting.
+		if f.Type.Kind() == reflect.Struct && !reflect.PointerTo(f.Type).Implements(textUnmarshaler) {
 			if err := mergeSettings(dst.Field(i), src.Field(i), k, md, set); err != nil {
 				return err
 			}

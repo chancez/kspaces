@@ -27,6 +27,9 @@ delete_branch = true
 width = 40
 popup = "panel"
 
+[sidebar.popup_size]
+picker = "150x40"
+
 [kitty]
 auto_install = true
 
@@ -47,7 +50,7 @@ group = "work"
 		Launch:      []string{"kitten", "my_launch.py"},
 		SessionsDir: filepath.Join(home, ".local/share/kitty/sessions"),
 		Worktrees:   Worktrees{Dir: ".worktrees", BranchPrefix: "pr/me", DeleteBranch: true},
-		Sidebar:     Sidebar{Width: 40, Popup: PopupPanel},
+		Sidebar:     Sidebar{Width: 40, Popup: PopupPanel, PopupSize: PopupSizes{Picker: PopupSize{Columns: 150, Lines: 40}}},
 		Kitty:       Kitty{AutoInstall: true},
 		Git:         Git{Timeout: time.Minute},
 		Space:       map[string]SpaceSettings{"gr": {Group: "work"}},
@@ -76,6 +79,12 @@ group = "work"
 		"[sidebar]\nwidth = 121",
 		"[sidebar]\npopup = \"window\"",
 		"[sidebar]\npopup = \"\"",
+		"[sidebar.popup_size]\nform = \"90\"",
+		"[sidebar.popup_size]\nform = \"90x\"",
+		"[sidebar.popup_size]\nform = \"39x24\"",
+		"[sidebar.popup_size]\nlist = \"90x9\"",
+		"[sidebar.popup_size]\npicker = 120",
+		"[sidebar.popup_size]\nwindow = \"90x24\"",
 		"[git]\ntimeout = \"-1s\"",
 		"[git]\ntimeout = \"soon\"",
 		"[git]\ntimeout = 30", // nanoseconds
@@ -141,5 +150,20 @@ func TestParseProvider(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got  %q\nwant %q", got, want)
+	}
+}
+
+// Each popup size is one setting: two files may set different ones, not the same one.
+func TestParsePopupSizesAcrossFiles(t *testing.T) {
+	got, err := parse([]string{"", ""}, []string{"[sidebar.popup_size]\nform = \"80x20\"", "[sidebar.popup_size]\npicker = \"150x40\""})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := PopupSizes{Form: PopupSize{Columns: 80, Lines: 20}, Picker: PopupSize{Columns: 150, Lines: 40}}
+	if got.Sidebar.PopupSize != want {
+		t.Errorf("got %+v, want %+v", got.Sidebar.PopupSize, want)
+	}
+	if _, err := parse([]string{"", ""}, []string{"[sidebar.popup_size]\nform = \"80x20\"", "[sidebar.popup_size]\nform = \"90x24\""}); err == nil {
+		t.Error("form set in two files was accepted")
 	}
 }

@@ -90,3 +90,14 @@ func TestPopups(t *testing.T) {
 		}
 	}
 }
+
+// A panel is the size the config sets for its kind, the default for a kind it does not set.
+func TestPopupSizes(t *testing.T) {
+	sizes := config.PopupSizes{Form: config.PopupSize{Columns: 80, Lines: 20}, Picker: config.PopupSize{Columns: 150, Lines: 40}}
+	cfg := config.Config{Sidebar: config.Sidebar{Popup: config.PopupPanel, PopupSize: sizes}}
+	got := []kitty.Popup{popup(cfg, formPanel), popup(cfg, listPanel), popup(cfg, pickerPanel)}
+	want := []kitty.Popup{{Panel: true, Columns: 80, Lines: 20}, {Panel: true, Columns: 100, Lines: 32}, {Panel: true, Columns: 150, Lines: 40}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v\nwant %+v", got, want)
+	}
+}

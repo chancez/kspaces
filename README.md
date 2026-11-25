@@ -176,6 +176,13 @@ pr_layout = "review"
 width = 28
 popup = "overlay"
 
+# A panel's size in cells, COLUMNSxLINES, by what it shows: a form, a form that lists what it acts on,
+# and the picker. An overlay is the size of the window it is over.
+[sidebar.popup_size]
+form = "90x24"
+list = "100x32"
+picker = "120x32"
+
 # Rewrite the installed kitty files when another kspaces is installed, and install the session saver.
 [kitty]
 auto_install = true

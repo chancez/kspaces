@@ -695,9 +695,17 @@ popup = "panel"
          --var=kspaces_form=1 --var=kspaces_popup=1 --env KSPACES_FROM=ID ...
   ```
 
-  A form is 90 by 24 cells; Save as layout, clean up and Trust space config, which list what they act on,
-  and Reply, which shows a window's screen, 100 by 32; the picker 120 by 32, room for its preview beside
-  the list. A panel is drawn in a rounded border in the accent, `+`, `-` and `|` in ASCII, a form's heading
+  A form is 90 by 24 cells; New worktree, Save as layout, clean up and Trust space config, which list
+  what they act on, and Reply, which shows a window's screen, 100 by 32; the picker 120 by 32, room for
+  its preview beside the list. `[sidebar.popup_size]` sets each, as COLUMNSxLINES, at least 40x10:
+
+  ```toml
+  [sidebar.popup_size]
+  form = "90x24"
+  list = "100x32"
+  picker = "150x40"
+  ```
+ A panel is drawn in a rounded border in the accent, `+`, `-` and `|` in ASCII, a form's heading
   set into its top and its buttons and keys on the row above its bottom; the watcher hides its tab bar. An
   overlay is drawn as it always was.
   A panel closes when it loses focus, so none is left behind, unseen, in another window's way; one that is
