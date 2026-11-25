@@ -276,11 +276,22 @@ layout last saved or taken: a session the other machine added opens, as a split 
 when this machine shows that one, else as a new tab of the worktree's kitty session; a session it removed
 closes, its window marked `kspaces_keep` first so a watcher ending a window's session on close leaves it,
 as what became of the session is the other machine's doing. A session this machine added or removed since
-stays as this machine has it, and is saved over the other's at the next refresh. Taking a layout never
+stays as this machine has it, and is saved over the other's at a later refresh: not for ten seconds after
+taking a layout opened or closed panes, as a window just opened is not its session's until the provider
+lists it, and saving before would close it on the other machine. Taking a layout never
 moves or resizes a window already there, and the tab that has focus keeps it.
 
 A save that conflicts loads the layout that won and takes it, then saves again. A provider that fails a
 verb is logged and asked again at the next refresh.
+
+What changes a layout is which sessions each tab shows. A split moved or resized is saved with the next
+change but is none itself, as taking a layout only opens and closes panes, and two screens size their
+splits apart. Only a worktree with windows here shares its layout: closing its last tab does not close
+the worktree on the other machines, and once it has none its layout is forgotten, so opening it again takes
+what is stored without closing anything it opened with. Only a pane showing a session of its kitty
+session's space is shared: kitty's startup session, whatever its file is named, shows sessions in
+`default`, which is this machine's alone, and a window left in another space is that space's.
+One kitty's sidebars share one pass, under a lock, which keeps what it knows beside the git states' file.
 
 ## Running commands
 

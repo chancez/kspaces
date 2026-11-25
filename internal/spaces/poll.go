@@ -193,6 +193,9 @@ type Poller struct {
 	// follow moves the windows of sessions whose space changed, see followSpaces, given the poll; nil for
 	// never.
 	follow func(sh Shared)
+	// share shares the worktrees' layouts through the provider, see layoutSync, given the poll; nil for
+	// never.
+	share func(sh Shared)
 }
 
 // NewPoller is the poller of the kitty kspaces runs in.
@@ -210,6 +213,8 @@ func NewPoller() *Poller {
 	}
 	watch, self := &spaceWatch{}, kitty.SelfWindowID()
 	p.follow = func(sh Shared) { followSpaces(watch, sh, self) }
+	ls := newLayoutSync()
+	p.share = func(sh Shared) { shareLayouts(ls, sh, self) }
 	return p
 }
 
@@ -267,6 +272,9 @@ func (p *Poller) Poll() Shared {
 		}
 		if p.follow != nil {
 			p.follow(sh)
+		}
+		if p.share != nil {
+			p.share(sh)
 		}
 	}
 	p.followDock(sh)
