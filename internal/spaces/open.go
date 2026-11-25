@@ -25,8 +25,14 @@ type OpenOptions struct {
 // OpenWorktree switches to the worktree's session. When it has no windows, the session is restored from its
 // saved file if that opens any, and otherwise opened with its default layout, see freshLayout, unless
 // opts.NoLayout, or with one tab in the worktree, or in the home directory for a session in no space. A
-// default layout that needs inputs is not opened: the tab is, and the error says so.
+// default layout that needs inputs is not opened: the tab is, and the error says so. A worktree another
+// process is creating or removing is refused, see MarkPending.
 func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree, opts OpenOptions) error {
+	if wt.Path != "" {
+		if err := CheckPending(wt.Path); err != nil {
+			return err
+		}
+	}
 	if st.Home != 0 {
 		// Hand this tab's focus back to its own window before leaving, so coming back to the tab lands
 		// there rather than in the sidebar, which took focus when it was clicked or focused to pick.
@@ -427,7 +433,8 @@ func CanRemove(space Space, wt Worktree) error {
 // changes if opts.Force. The session goes first so nothing still runs in the directory as it is deleted,
 // and its saved file goes too, so it is not restored. With opts.DeleteBranch the branch goes last, with
 // git branch -d when merged and -D only with opts.ForceBranch; a branch that cannot go keeps the worktree
-// too, but one git refuses after the worktree is removed is a *BranchError.
+// too, but one git refuses after the worktree is removed is a *BranchError. The worktree is marked pending
+// throughout, see MarkPending.
 func RemoveWorktree(cfg config.Config, space Space, wt Worktree, opts RemoveOptions) (err error) {
 	defer func(start time.Time) {
 		logs.Action("remove worktree", start, err, "space", space.Name, "dir", wt.Path, "force", opts.Force, "delete_branch", opts.DeleteBranch)
@@ -435,6 +442,11 @@ func RemoveWorktree(cfg config.Config, space Space, wt Worktree, opts RemoveOpti
 	if err := CanRemove(space, wt); err != nil {
 		return err
 	}
+	unmark, err := MarkPending(PendingRemove, space.Root, wt.Path, wt.Branch)
+	if err != nil {
+		return err
+	}
+	defer unmark()
 	var branch Branch
 	if opts.DeleteBranch {
 		var err error
