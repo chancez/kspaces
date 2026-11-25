@@ -317,6 +317,8 @@ type Snapshot struct {
 	Kitty   kitty.State
 	// What git and gh say of each worktree, by path, as far as the leading sidebar knows.
 	Git map[string]gitstate.State
+	// The worktrees being created or removed, by path, see placePending.
+	Pending map[string]PendingOp
 	// The provider's sessions no kitty window shows, by space, which is a configured space's name or a
 	// session's in no space; nil without a provider that lists them. Only the sidebar asks.
 	Detached map[string]Detached

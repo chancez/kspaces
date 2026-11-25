@@ -29,6 +29,9 @@ const (
 	GlyphGone
 	// GlyphSuspended marks a suspended session: its windows closed, what ran in them kept to resume.
 	GlyphSuspended
+	// GlyphCreating and GlyphRemoving mark a worktree being created or removed, see spaces.MarkPending.
+	GlyphCreating
+	GlyphRemoving
 	// GlyphSpace, GlyphWorktree and GlyphOther head the rows of a space, a linked worktree and a session in
 	// no space.
 	GlyphSpace
@@ -105,6 +108,8 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphBroken:           "x",
 		GlyphGone:             "x",
 		GlyphSuspended:        "z",
+		GlyphCreating:         "+",
+		GlyphRemoving:         "~",
 		GlyphSpace:            "#",
 		GlyphWorktree:         "-",
 		GlyphOther:            "$",
@@ -155,6 +160,8 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphBroken:           "\u2717",
 		GlyphGone:             "\u2715", // multiplication x
 		GlyphSuspended:        "\u2016", // double vertical line
+		GlyphCreating:         "\u25cc", // dotted circle
+		GlyphRemoving:         "\u2296", // circled minus
 		GlyphSpace:            "\u25a0", // black square
 		GlyphWorktree:         "\u2514", // box drawings up and right
 		GlyphOther:            "\u25aa", // black small square
@@ -208,6 +215,8 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphBroken:      "\uf00d", // times
 		GlyphGone:        "\uf127", // chain-broken
 		GlyphSuspended:   "\uf04c", // pause
+		GlyphCreating:    "\uf252", // hourglass-half
+		GlyphRemoving:    "\uf1f8", // trash
 		GlyphSpace:       "\uf401", // repo
 		GlyphWorktree:    "\ue725", // git-branch
 		GlyphOther:       "\uf120", // terminal

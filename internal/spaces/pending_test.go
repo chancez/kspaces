@@ -147,3 +147,31 @@ func TestPendingRefused(t *testing.T) {
 		t.Fatalf("RemoveWorktree() = %v, want %s", err, want)
 	}
 }
+
+// A mark is placed on the worktree git lists at its path, and a worktree being created that git does not
+// list yet is added to its space.
+func TestPlacePending(t *testing.T) {
+	spaces := []Space{
+		{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Branch: "main", Session: "gr"}, {Path: "/src/gr/.worktrees/dev", Branch: "dev", Session: "gr@dev"}}},
+		{Name: "kitty", Root: "/src/kitty", Worktrees: []Worktree{{Path: "/src/kitty", Branch: "master", Session: "kitty"}}},
+	}
+	listed := spaces[0].Worktrees
+	marks := []Pending{
+		{Op: PendingRemove, Path: "/src/gr/.worktrees/dev"},
+		{Op: PendingCreate, Root: "/src/kitty", Path: "/src/kitty/.worktrees/fix", Branch: "fix"},
+		// Removing what git no longer lists shows nothing.
+		{Op: PendingRemove, Path: "/src/gr/.worktrees/gone"},
+	}
+	got := placePending(spaces, marks)
+	want := map[string]PendingOp{"/src/gr/.worktrees/dev": PendingRemove, "/src/kitty/.worktrees/fix": PendingCreate}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("placePending() = %v, want %v", got, want)
+	}
+	wantSpaces := []Space{
+		{Name: "gr", Root: "/src/gr", Worktrees: listed},
+		{Name: "kitty", Root: "/src/kitty", Worktrees: []Worktree{{Path: "/src/kitty", Branch: "master", Session: "kitty"}, {Path: "/src/kitty/.worktrees/fix", Branch: "fix", Session: "kitty@fix"}}},
+	}
+	if !reflect.DeepEqual(spaces, wantSpaces) {
+		t.Fatalf("spaces = %+v, want %+v", spaces, wantSpaces)
+	}
+}

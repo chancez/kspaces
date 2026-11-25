@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"syscall"
 	"time"
 
@@ -170,6 +172,16 @@ func LoadPending() map[string]Pending {
 	return out
 }
 
+// pendingList is LoadPending in order of path, as a poll keeps it.
+func pendingList() []Pending {
+	pending := LoadPending()
+	var out []Pending
+	for _, path := range slices.Sorted(maps.Keys(pending)) {
+		out = append(out, pending[path])
+	}
+	return out
+}
+
 func readPending(file string) (Pending, bool) {
 	data, err := os.ReadFile(file)
 	if err != nil {
@@ -205,4 +217,35 @@ func writePending(dir string, p Pending) error {
 		return err
 	}
 	return os.Rename(tmp.Name(), pendingFile(dir, p.Path))
+}
+
+// placePending is what is under way in the worktrees of spaces, by their paths as git lists them, from
+// marks. A worktree being created that git does not list yet is added to its space, so its row shows from
+// the start. The spaces are the view's own copies, see Shared.View.
+func placePending(spaces []Space, marks []Pending) map[string]PendingOp {
+	if len(marks) == 0 {
+		return nil
+	}
+	out := map[string]PendingOp{}
+	for _, p := range marks {
+		listed := false
+		for i := range spaces {
+			for _, wt := range spaces[i].Worktrees {
+				if wt.Path != "" && (wt.Path == p.Path || pendingPath(wt.Path) == p.Path) {
+					out[wt.Path], listed = p.Op, true
+				}
+			}
+		}
+		if listed || p.Op != PendingCreate {
+			continue
+		}
+		for i, s := range spaces {
+			if s.Root == p.Root && s.Err == nil {
+				spaces[i].Worktrees = append(slices.Clone(s.Worktrees), LinkedWorktree(s, p.Branch, p.Path))
+				out[p.Path] = p.Op
+				break
+			}
+		}
+	}
+	return out
 }

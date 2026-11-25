@@ -75,6 +75,15 @@ func KeepingMarker(suspending bool) []Span {
 	return DimIf(true, marker(elMuted, GlyphWorking)...)
 }
 
+// PendingMarker marks a worktree being created, or with removing, removed, in the busy color: it cannot be
+// opened until it is done.
+func PendingMarker(removing bool) []Span {
+	if removing {
+		return marker(elBusy, GlyphRemoving)
+	}
+	return marker(elBusy, GlyphCreating)
+}
+
 // Caret heads a space with linked worktrees: pointing down while they are shown, right when folded.
 func Caret(folded bool) []Span {
 	g := GlyphOpen

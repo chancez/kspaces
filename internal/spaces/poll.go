@@ -37,6 +37,8 @@ type Shared struct {
 	Keeping map[string]KeepMode `json:"keeping,omitempty"`
 	// What the provider kept of the kept sessions, see keptHandles.
 	Kept []string `json:"kept,omitempty"`
+	// The worktrees being created or removed, see MarkPending.
+	Pending []Pending `json:"pending,omitempty"`
 	// kitty's windows, as `kitten @ ls` lists them, and why they could not be listed.
 	Windows  []kitty.OSWindow `json:"windows,omitempty"`
 	KittyErr string           `json:"kitty_err,omitempty"`
@@ -92,6 +94,7 @@ func loadSpaces() Shared {
 	sh.Suspended = suspendedSessions(cfg.SessionsDir)
 	sh.Keeping = keepingSessions(cfg.SessionsDir)
 	sh.Kept = slices.Sorted(maps.Keys(keptHandles(cfg.SessionsDir)))
+	sh.Pending = pendingList()
 	return sh
 }
 
@@ -141,6 +144,7 @@ func (sh Shared) View(self int) Snapshot {
 		snap.Err = errors.New(sh.KittyErr)
 	}
 	snap.Git = sh.Git
+	snap.Pending = placePending(snap.Spaces, sh.Pending)
 	snap.Detached = detachedBySpace(sh.Provider, toSet(sh.Kept))
 	if sh.Provider != nil {
 		snap.Caps, snap.ProviderSpaces, snap.Sessions = sh.Provider.Caps, sh.Provider.Spaces, sh.Provider.Sessions
@@ -270,7 +274,8 @@ func (p *Poller) Poll() Shared {
 }
 
 // Windows is the latest poll with kitty's windows listed again: a `kitten @ ls` alone, for when only they
-// have changed, as when focus moves to another session. Before the first poll it polls.
+// have changed, as when focus moves to another session, and the pending worktrees read again, as when a
+// form that closed has started removing one. Before the first poll it polls.
 func (p *Poller) Windows() Shared {
 	p.lastMu.Lock()
 	if !p.have {
@@ -278,7 +283,11 @@ func (p *Poller) Windows() Shared {
 		return p.Poll()
 	}
 	defer p.lastMu.Unlock()
-	return p.listed(p.last)
+	sh := p.last
+	if sh.Config != nil {
+		sh.Pending = pendingList()
+	}
+	return p.listed(sh)
 }
 
 // listed lists kitty's windows into sh, and keeps it as the latest. lastMu is held.

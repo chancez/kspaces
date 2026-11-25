@@ -10,6 +10,12 @@ space, a branch for a linked worktree, a terminal for a session in no space, or 
 worktrees could not be listed. The most urgent status of the row's sessions replaces the icon. The icon is
 green when the session has windows open; the row is faint when it has none, its icon a pause sign (`z` in
 ASCII, a double bar in Unicode) once the session is [suspended](kitty.md#closing-and-suspending-sessions).
+A worktree being created has an hourglass (`+` in ASCII, a dotted circle in Unicode) and one being removed
+a trash can (`~` in ASCII, a circled minus in Unicode), in the accent, over its status. A new worktree's
+row shows from when the form or `kspaces new` starts making it. Until it is done the row offers no action:
+opening it, from the sidebar, the picker or `kspaces open`, says it is being created or removed. Whatever
+creates or removes a worktree marks it so in `pending/` in the state directory, a file naming the process,
+which is ignored once that process is gone.
 The sidebar's own session's
 row is marked at its left edge, where a caret goes, by a thin bar in the accent (`|` in ASCII), or by its
 caret in the accent on a space's row, and its name is bold: a bar across the row would read as the

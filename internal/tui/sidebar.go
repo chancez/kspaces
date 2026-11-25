@@ -78,7 +78,9 @@ type sidebar struct {
 	suspended map[string]bool
 	// Sessions being suspended or closed, see spaces.Snapshot.
 	keeping map[string]spaces.KeepMode
-	kitty   kitty.State
+	// Worktrees being created or removed, by path, see spaces.Snapshot.
+	busy  map[string]spaces.PendingOp
+	kitty kitty.State
 	// kitty's statuses, hidden groups' too, which kitty.Statuses leaves out, see spaces.Shown.
 	statuses []status.Status
 	rows     []spaces.Row
@@ -275,8 +277,15 @@ func (m *sidebar) openWorktreeCmd(wt spaces.Worktree, opts spaces.OpenOptions) t
 }
 
 // openOrResumeCmd opens wt's session as openWorktreeCmd does, unless it is suspended with no windows:
-// then it asks first in the resume session form, as resuming brings back all it ran.
+// then it asks first in the resume session form, as resuming brings back all it ran. A worktree being
+// created or removed is not opened, see spaces.MarkPending: asked now, as the last poll may not know.
 func (m *sidebar) openOrResumeCmd(wt spaces.Worktree, opts spaces.OpenOptions) tea.Cmd {
+	if wt.Path != "" {
+		if err := spaces.CheckPending(wt.Path); err != nil {
+			m.failed = err
+			return nil
+		}
+	}
 	if !m.suspended[wt.Session] || m.isOpen(&wt) {
 		return m.openWorktreeCmd(wt, opts)
 	}
@@ -369,7 +378,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Where the cursor is goes by the rows and entries it was drawn on, before they change.
 			at := m.cursorAt()
 			m.cfg, m.spaces, m.others, m.folded, m.saved, m.suspended, m.keeping, m.kitty = *msg.Config, msg.Spaces, msg.Others, msg.Folded, msg.Saved, msg.Suspended, msg.Keeping, msg.Kitty
-			m.hidden, m.statuses = msg.Hidden, msg.Kitty.Statuses
+			m.hidden, m.statuses, m.busy = msg.Hidden, msg.Kitty.Statuses, msg.Pending
 			m.kitty.Statuses = spaces.Shown(m.cfg, m.hidden, m.statuses)
 			m.order = msg.Order
 			m.git = msg.Git
@@ -529,7 +538,7 @@ func (m *sidebar) leave() tea.Cmd {
 // view is what the sidebar knows as a snapshot, for what reads one, as the row actions do.
 func (m *sidebar) view() spaces.Snapshot {
 	return spaces.Snapshot{Config: &m.cfg, Git: m.git, Kitty: m.kitty, Saved: m.saved, Suspended: m.suspended, Keeping: m.keeping,
-		Caps: m.caps, ProviderSpaces: m.providerSpaces}
+		Pending: m.busy, Caps: m.caps, ProviderSpaces: m.providerSpaces}
 }
 
 func (m *sidebar) isOpen(wt *spaces.Worktree) bool {

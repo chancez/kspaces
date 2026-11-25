@@ -32,7 +32,8 @@ func onEntry(a *rowAction) *interact.Action[*sidebar, entrySubject] {
 	act := &interact.Action[*sidebar, entrySubject]{
 		Title:   a.title,
 		Section: a.section,
-		Applies: func(m *sidebar, s entrySubject) bool { return a.applies(m.view(), s.row) },
+		// Nothing is done to a worktree being created or removed, see spaces.MarkPending.
+		Applies: func(m *sidebar, s entrySubject) bool { return !m.isBusy(s.row) && a.applies(m.view(), s.row) },
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			snap, r := m.view(), s.row
@@ -48,6 +49,11 @@ func onEntry(a *rowAction) *interact.Action[*sidebar, entrySubject] {
 		act.Name = func(m *sidebar, s entrySubject) string { return a.name(m.view(), s.row) }
 	}
 	return act
+}
+
+// isBusy says whether r is the row of a worktree being created or removed.
+func (m *sidebar) isBusy(r spaces.Row) bool {
+	return r.Worktree != nil && r.Worktree.Path != "" && m.busy[r.Worktree.Path] != ""
 }
 
 // newWorktreeApplies is whether a worktree can be created in a row's space: one configured and read.
