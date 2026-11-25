@@ -337,6 +337,9 @@ func (f *saveLayoutForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return f, nil
 	case tea.KeyPressMsg:
+		if in := f.focused().in; in != nil && !f.confirm && keptBy(in, msg) {
+			break
+		}
 		cmd, ok := runOn(f, msg, theSaveForm.Target(saveSubject{}))
 		if ok || f.confirm {
 			return f, cmd

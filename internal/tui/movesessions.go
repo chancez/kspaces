@@ -107,6 +107,9 @@ func (f *moveSessionsForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return f, nil
 	case tea.KeyPressMsg:
+		if !f.busy && keptBy(&f.space, msg) {
+			break
+		}
 		if cmd, ok := runOn(f, msg, theMoveForm.Target(moveSubject{})); ok {
 			return f, cmd
 		}

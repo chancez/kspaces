@@ -8,8 +8,10 @@ require (
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/BurntSushi/toml v1.6.0
 	github.com/charmbracelet/x/ansi v0.11.9
+	github.com/guygrigsby/vimbubble/v2 v2.0.0-20260909172522-60c478e36763
 	github.com/sahilm/fuzzy v0.1.3
 	github.com/spf13/cobra v1.10.2
+	golang.org/x/sys v0.47.0
 )
 
 require (
@@ -29,5 +31,4 @@ require (
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/xo/terminfo v1.0.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
 )

@@ -225,6 +225,8 @@ type Theme struct {
 	elements [numElements]lipgloss.Style
 	surfaces [numSurfaces]surfaceStyle
 	glyphs   Glyphs
+	// vim is whether the text boxes drawn in the theme edit with vim's modes, see SetVim.
+	vim bool
 }
 
 // New is kspaces' theme, drawing in Nerd Font icons, for a dark background or a light one. Its colors are
@@ -301,10 +303,17 @@ func New(isDark bool) *Theme {
 // SetDark makes the theme the one for a dark background or a light one, as the terminal says it has once
 // it answers, keeping its glyphs.
 func (t *Theme) SetDark(isDark bool) {
-	g := t.glyphs
+	g, vim := t.glyphs, t.vim
 	*t = *New(isDark)
-	t.glyphs = g
+	t.glyphs, t.vim = g, vim
 }
+
+// SetVim makes the text boxes drawn in the theme edit with vim's modes, as [editor] vim asks. It is the
+// theme's as every box is made with it, and those already made take it up.
+func (t *Theme) SetVim(on bool) { t.vim = on }
+
+// Vim is whether the text boxes drawn in the theme edit with vim's modes.
+func (t *Theme) Vim() bool { return t.vim }
 
 // style is how el with props draws on surface s.
 func (t *Theme) style(el element, p Prop, s Surface) lipgloss.Style {

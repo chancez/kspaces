@@ -56,7 +56,7 @@ type spaceFileWorktrees struct {
 // globalOnly are the global config's keys a space file cannot have: they are about every space, or name
 // spaces, which a space's own file has no say in. group is a space table's, there for a file that sets it
 // at its top, as it sets its layouts.
-var globalOnly = []string{"spaces", "launch", "sessions", "provider", "keeper", "sidebar", "kitty", "space", "groups", "group"}
+var globalOnly = []string{"spaces", "launch", "sessions", "provider", "keeper", "sidebar", "kitty", "editor", "space", "groups", "group"}
 
 // ParseSpaceFile reads a space file, its commands checked as the global config's are. Its layouts are
 // checked when merged, by Config.WithSpace, as they can run the global config's commands. A key it does

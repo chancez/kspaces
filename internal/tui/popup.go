@@ -10,6 +10,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/tui/interact"
 	"github.com/chancez/kspaces/internal/tui/look"
@@ -369,6 +370,7 @@ func (p *popup) leave() error {
 func runPopup(ctx context.Context, m popupModel) error {
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGHUP)
 	defer stop()
+	m.theme().SetVim(editorVim())
 	p := newPopup(m, kitty.PanelFrom())
 	_, err := tea.NewProgram(p, tea.WithContext(ctx)).Run()
 	if f, ok := p.inner.(drafting); ok {
@@ -378,6 +380,13 @@ func runPopup(ctx context.Context, m popupModel) error {
 		return err
 	}
 	return p.leave()
+}
+
+// editorVim is whether the forms' text boxes edit with vim's modes, as [editor] vim says. A config that
+// cannot be read leaves them without, as the form says why when it needs the config.
+func editorVim() bool {
+	cfg, err := config.Load()
+	return err == nil && cfg.Editor.Vim
 }
 
 // shiftMouse is msg moved by dx, dy when it is the mouse's, else msg.

@@ -74,6 +74,7 @@ type Config struct {
 	Sidebar   Sidebar   `toml:"sidebar"`
 	Kitty     Kitty     `toml:"kitty"`
 	Git       Git       `toml:"git"`
+	Editor    Editor    `toml:"editor"`
 	// Commands to run in a worktree, see Command.
 	Commands []Command `toml:"commands"`
 	// Layouts to open in a session, see Layout.
@@ -226,6 +227,13 @@ type Kitty struct {
 	// SaveSessions installs the session saver, which saves each kitty session to its own file in kitty's
 	// sessions directory and restores them at startup.
 	SaveSessions bool `toml:"save_sessions"`
+}
+
+// Editor is how the forms' text boxes edit.
+type Editor struct {
+	// Vim edits with vim's modes, starting in insert: esc goes to normal mode, and esc again leaves the
+	// form.
+	Vim bool `toml:"vim"`
 }
 
 // Git is how kspaces runs git.

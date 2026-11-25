@@ -195,6 +195,11 @@ save_sessions = true
 [git]
 timeout = "30s"
 fetch_timeout = "2m"
+
+# Edit the forms' text boxes with vim's modes. A box starts in insert mode, its mode at its right; esc goes
+# to normal mode, and esc again leaves the form. Enter and tab are the form's in every mode.
+[editor]
+vim = true
 ```
 
 Every key is optional. An unknown key is an error. Other `.toml` files beside config.toml, such as a

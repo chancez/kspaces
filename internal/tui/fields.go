@@ -8,6 +8,7 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/chancez/kspaces/internal/tui/look"
 )
@@ -16,6 +17,7 @@ import (
 type field interface {
 	Focus() tea.Cmd
 	Blur()
+	Focused() bool
 	View() string
 	Value() string
 	SetWidth(int)
@@ -27,11 +29,16 @@ type field interface {
 	place(x, y int)
 	// keeps says whether the box takes msg rather than the form, as up and down between its lines.
 	keeps(msg tea.KeyPressMsg) bool
+	// mode is the box's vim mode, as NORMAL, or "" without vim, see vimKeys.
+	mode() string
 }
 
 // lineField is one line of text, for a branch, a path or a name. It is a text area of one row, which shows
 // the part of a long value the cursor is in, so it edits as a textField does.
-type lineField struct{ textarea.Model }
+type lineField struct {
+	textarea.Model
+	vim vimKeys
+}
 
 // newLineField is a line field in th's styles showing placeholder while empty.
 func newLineField(th *look.Theme, placeholder string) lineField {
@@ -43,8 +50,11 @@ func newLineField(th *look.Theme, placeholder string) lineField {
 	// Enter is the form's, to submit: the text is one line.
 	in.KeyMap.InsertNewline.SetEnabled(false)
 	in.SetStyles(th.AreaStyles())
-	return lineField{in}
+	return lineField{Model: in, vim: vimKeys{th: th}}
 }
+
+// SetWidth makes the box width wide, its mode included.
+func (f *lineField) SetWidth(width int) { f.Model.SetWidth(max(width-f.vim.room(), 1)) }
 
 func (f *lineField) fill(s string) {
 	f.SetValue(joinLines(s))
@@ -55,6 +65,9 @@ func (f *lineField) update(msg tea.Msg) tea.Cmd {
 	if p, ok := msg.(tea.PasteMsg); ok {
 		msg = tea.PasteMsg{Content: joinLines(p.Content)}
 	}
+	if cmd, ok := f.vim.update(&f.Model, msg); ok {
+		return cmd
+	}
 	var cmd tea.Cmd
 	f.Model, cmd = f.Model.Update(msg)
 	return cmd
@@ -62,6 +75,7 @@ func (f *lineField) update(msg tea.Msg) tea.Cmd {
 
 // place puts the cursor where the click lands, which textarea works out through wrapping.
 func (f *lineField) place(x, y int) {
+	f.vim.leaveVisual(&f.Model)
 	f.BeginSelection(x, y)
 	f.EndSelection()
 }
@@ -72,13 +86,18 @@ func joinLines(s string) string {
 	return strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(s)
 }
 
-func (*lineField) keeps(tea.KeyPressMsg) bool { return false }
+func (f *lineField) keeps(msg tea.KeyPressMsg) bool { return f.vim.keeps(&f.Model, msg) }
+
+func (f *lineField) mode() string { return f.vim.mode(&f.Model) }
 
 // textField is text that can take several lines, for the inputs of commands and layouts, which go to a
 // program as they are. shift+enter starts a line, or alt+enter or ctrl+j, for a terminal that sends
 // shift+enter as enter, which the form keeps for submitting. The box grows to show the lines, wrapped, up
 // to textLines, then scrolls with the cursor.
-type textField struct{ textarea.Model }
+type textField struct {
+	textarea.Model
+	vim vimKeys
+}
 
 // textLines is the most lines a text field shows.
 const textLines = 6
@@ -95,8 +114,11 @@ func newTextField(th *look.Theme, placeholder string) textField {
 	in.MaxContentHeight = 10000
 	in.KeyMap.InsertNewline = key.NewBinding(key.WithKeys("shift+enter", "alt+enter", "ctrl+j"))
 	in.SetStyles(th.AreaStyles())
-	return textField{in}
+	return textField{Model: in, vim: vimKeys{th: th}}
 }
+
+// SetWidth makes the box width wide, its mode included.
+func (f *textField) SetWidth(width int) { f.Model.SetWidth(max(width-f.vim.room(), 1)) }
 
 func (f *textField) fill(s string) {
 	f.SetValue(s)
@@ -104,6 +126,9 @@ func (f *textField) fill(s string) {
 }
 
 func (f *textField) update(msg tea.Msg) tea.Cmd {
+	if cmd, ok := f.vim.update(&f.Model, msg); ok {
+		return cmd
+	}
 	var cmd tea.Cmd
 	f.Model, cmd = f.Model.Update(msg)
 	return cmd
@@ -111,6 +136,7 @@ func (f *textField) update(msg tea.Msg) tea.Cmd {
 
 // place puts the cursor where the click lands, which textarea works out through wrapping and scrolling.
 func (f *textField) place(x, y int) {
+	f.vim.leaveVisual(&f.Model)
 	f.BeginSelection(x, y)
 	f.EndSelection()
 }
@@ -118,6 +144,9 @@ func (f *textField) place(x, y int) {
 // keeps up and down while they move between the box's lines, so only up on its first and down on its
 // last go on to the form, to the field above or below.
 func (f *textField) keeps(msg tea.KeyPressMsg) bool {
+	if f.vim.keeps(&f.Model, msg) {
+		return true
+	}
 	li := f.LineInfo()
 	switch msg.String() {
 	case "up":
@@ -127,6 +156,8 @@ func (f *textField) keeps(msg tea.KeyPressMsg) bool {
 	}
 	return false
 }
+
+func (f *textField) mode() string { return f.vim.mode(&f.Model) }
 
 // keptBy says whether fl, the focused field, nil for a choice, keeps msg from the form's keys.
 func keptBy(fl field, msg tea.KeyPressMsg) bool { return fl != nil && fl.keeps(msg) }
@@ -142,13 +173,22 @@ func newlineHints(fl field) []look.Span {
 // fieldZone is the zone fl's row is drawn in: its address, as every field has its own.
 func fieldZone(fl field) string { return fmt.Sprintf("field:%p", fl) }
 
-// fieldLines draw fl after its label, labelWidth cells, a line for each of its box's, in width cells. Each
-// is marked as fl's zone, so a click on the label or in the box finds it, see clickedField.
+// fieldLines draw fl after its label, labelWidth cells, a line for each of its box's, in width cells, and
+// its vim mode at the right of the first while it has focus. Each is marked as fl's zone, so a click on the
+// label or in the box finds it, see clickedField.
 func fieldLines(th *look.Theme, label string, fl field, width int) []string {
 	head := th.DrawCut(look.Plain, labelWidth-1, look.Label(label)) + " "
+	mode := fl.mode()
+	if !fl.Focused() {
+		mode = ""
+	}
 	var out []string
 	for _, row := range strings.Split(fl.View(), "\n") {
 		line := head + row
+		if mode != "" {
+			line += strings.Repeat(" ", max(width-modeRoom-ansi.StringWidth(line), 0)) + th.Render(look.Plain, look.Muted(" "+mode))
+			mode = ""
+		}
 		out = append(out, th.DrawZone(fieldZone(fl), look.Plain, width, look.Styled(func(color.Color) string { return line })))
 		head = strings.Repeat(" ", labelWidth)
 	}

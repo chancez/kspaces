@@ -37,6 +37,9 @@ auto_install = true
 timeout = "1m"
 fetch_timeout = 0
 
+[editor]
+vim = true
+
 [space.gr]
 group = "work"
 `
@@ -53,6 +56,7 @@ group = "work"
 		Sidebar:     Sidebar{Width: 40, Popup: PopupPanel, PopupSize: PopupSizes{Picker: PopupSize{Columns: 150, Lines: 40}}},
 		Kitty:       Kitty{AutoInstall: true},
 		Git:         Git{Timeout: time.Minute},
+		Editor:      Editor{Vim: true},
 		Space:       map[string]SpaceSettings{"gr": {Group: "work"}},
 		Groups:      []string{"personal", "work"},
 	}
