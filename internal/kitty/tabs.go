@@ -82,6 +82,7 @@ func (s *Split) UnmarshalJSON(data []byte) error {
 // FullWindow is a window in `kitten @ ls`, with what runs in it.
 type FullWindow struct {
 	ID            int               `json:"id"`
+	Title         string            `json:"title"`
 	IsActive      bool              `json:"is_active"`
 	SessionName   string            `json:"session_name"`
 	Cwd           string            `json:"cwd"`
