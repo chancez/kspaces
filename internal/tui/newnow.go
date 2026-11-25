@@ -80,6 +80,12 @@ func NewWorktreeNow(global config.Config, space spaces.Space, n NewWorktree) (sp
 		return spaces.Worktree{}, err
 	}
 
+	// Marked until the session is open, so nothing else opens it in a directory half checked out.
+	unmark, err := spaces.MarkPending(spaces.PendingCreate, space.Root, dir, branch)
+	if err != nil {
+		return spaces.Worktree{}, err
+	}
+	defer unmark()
 	var wt spaces.Worktree
 	switch {
 	case n.PR != "":

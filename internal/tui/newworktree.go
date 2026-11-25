@@ -279,6 +279,11 @@ func (f *newWorktreeForm) create() tea.Cmd {
 	if err := state.Update(func(s *state.State) { s.NewWorktree.InBackground = background }); err != nil {
 		logs.Error("saving the open in background box", err)
 	}
+	// The worktree is marked until its session is open, so nothing else opens it in a directory half
+	// checked out.
+	mark := func(branch, dir string) (func(), error) {
+		return spaces.MarkPending(spaces.PendingCreate, space.Root, dir, branch)
+	}
 	open := func(wt spaces.Worktree, links spaces.Links) error {
 		if layout != nil {
 			layout.Links = links
@@ -299,7 +304,13 @@ func (f *newWorktreeForm) create() tea.Cmd {
 			if err != nil {
 				return createdMsg{err}
 			}
-			wt, err := spaces.CreatePRWorktree(space, pr, spaces.WorktreeDir(cfg, space.Root, pr.Branch, dir))
+			path := spaces.WorktreeDir(cfg, space.Root, pr.Branch, dir)
+			unmark, err := mark(pr.Branch, path)
+			if err != nil {
+				return createdMsg{err}
+			}
+			defer unmark()
+			wt, err := spaces.CreatePRWorktree(space, pr, path)
 			if err != nil {
 				return createdMsg{err}
 			}
@@ -318,6 +329,11 @@ func (f *newWorktreeForm) create() tea.Cmd {
 					return createdMsg{err}
 				}
 			}
+			unmark, err := mark(branch, dir)
+			if err != nil {
+				return createdMsg{err}
+			}
+			defer unmark()
 			wt, err := spaces.CreateIssueWorktree(space, ref.Number, branch, base, dir)
 			if err != nil {
 				return createdMsg{err}
@@ -326,6 +342,11 @@ func (f *newWorktreeForm) create() tea.Cmd {
 		}
 	}
 	return func() tea.Msg {
+		unmark, err := mark(branch, dir)
+		if err != nil {
+			return createdMsg{err}
+		}
+		defer unmark()
 		wt, err := spaces.CreateWorktreeFrom(space, branch, base, dir)
 		if err != nil {
 			return createdMsg{err}

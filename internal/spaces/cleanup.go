@@ -178,8 +178,12 @@ func AskRemoveSessions(cfg config.Config, st kitty.State, sessions []string) err
 
 // RemoveAllInBackground runs `kspaces remove --yes` for the worktrees at paths, one after another, each as
 // opts has it, and then ends sessions, the missing worktrees', with EndSession, as a kitty background
-// process.
+// process. The worktrees are marked pending before it starts, as RemoveInBackground's.
 func RemoveAllInBackground(paths []string, opts map[string]RemoveOptions, sessions []string) error {
+	unmark, err := markRemoving(paths)
+	if err != nil {
+		return err
+	}
 	args := []string{"remove", "--yes"}
 	for _, s := range sessions {
 		args = append(args, "--forget-session", s)
@@ -196,5 +200,9 @@ func RemoveAllInBackground(paths []string, opts map[string]RemoveOptions, sessio
 			args = append(args, "--force-branch-path", p)
 		}
 	}
-	return kitty.LaunchBackground(append(append(args, "--"), paths...)...)
+	if err := kitty.LaunchBackground(append(append(args, "--"), paths...)...); err != nil {
+		unmark()
+		return err
+	}
+	return nil
 }

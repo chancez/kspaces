@@ -238,12 +238,25 @@ func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string, dele
 // then ends sessions, missing worktrees' whose directories are gone, with spaces.EndSession, for the
 // background process the forms start. It has no screen, so failures are shown in kitty as well as
 // returned; one failing does not stop the rest, and a branch git refuses to delete leaves its worktree
-// removed.
+// removed. Each is marked pending from the start, not only while its turn comes, see spaces.MarkPending.
 func RemoveWorktrees(cfg config.Config, paths []string, opts map[string]spaces.RemoveOptions, sessions []string) error {
 	var failed []string
 	branches := 0
+	marked := map[string]error{}
 	for _, path := range paths {
-		space, wt, err := spaces.FindWorktree(cfg, path)
+		unmark, err := spaces.MarkPending(spaces.PendingRemove, "", path, "")
+		if err == nil {
+			defer unmark()
+		}
+		marked[path] = err
+	}
+	for _, path := range paths {
+		err := marked[path]
+		var space spaces.Space
+		var wt spaces.Worktree
+		if err == nil {
+			space, wt, err = spaces.FindWorktree(cfg, path)
+		}
 		if err == nil {
 			err = spaces.RemoveWorktree(cfg, space, wt, opts[path])
 		}

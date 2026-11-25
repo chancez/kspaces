@@ -473,8 +473,13 @@ func RemoveWorktree(cfg config.Config, space Space, wt Worktree, opts RemoveOpti
 }
 
 // RemoveInBackground runs `kspaces remove --yes` for the worktree at path as a kitty background process.
-// Removing closes the worktree's windows, and the form that asked may be over one of them.
+// Removing closes the worktree's windows, and the form that asked may be over one of them. The worktree
+// is marked pending before the process starts, which takes the mark over, see MarkPending.
 func RemoveInBackground(path string, opts RemoveOptions) error {
+	unmark, err := markRemoving([]string{path})
+	if err != nil {
+		return err
+	}
 	args := []string{"remove", "--yes"}
 	if opts.Force {
 		args = append(args, "--force")
@@ -485,5 +490,29 @@ func RemoveInBackground(path string, opts RemoveOptions) error {
 	if opts.DeleteBranch && opts.ForceBranch {
 		args = append(args, "--force-branch")
 	}
-	return kitty.LaunchBackground(append(args, path)...)
+	if err := kitty.LaunchBackground(append(args, path)...); err != nil {
+		unmark()
+		return err
+	}
+	return nil
+}
+
+// markRemoving marks the worktrees at paths pending removal, see MarkPending, and returns what unmarks
+// them all. When one cannot be marked none is.
+func markRemoving(paths []string) (unmark func(), err error) {
+	var unmarks []func()
+	unmark = func() {
+		for _, u := range unmarks {
+			u()
+		}
+	}
+	for _, path := range paths {
+		u, err := MarkPending(PendingRemove, "", path, "")
+		if err != nil {
+			unmark()
+			return nil, err
+		}
+		unmarks = append(unmarks, u)
+	}
+	return unmark, nil
 }
