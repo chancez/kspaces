@@ -35,7 +35,6 @@ func sharedTabs(t *testing.T) []kitty.FullTab {
 
 // A worktree's shared layout is its panes that show the host's sessions, the splits tree as those panes
 // alone would have it; a pane showing nothing of the provider's, or another host's session, is left out.
-// The host is the one most of its panes show.
 func TestCaptureShared(t *testing.T) {
 	tabs := sharedTabs(t)
 	shows := map[int]ProviderSession{
@@ -44,11 +43,7 @@ func TestCaptureShared(t *testing.T) {
 		21: {ID: "server:@d", Host: "server"},
 		31: {ID: "server:@e", Host: "server"},
 	}
-	host, ok := sharedHost(tabs, "gr@dev", shows)
-	if host != "server" || !ok {
-		t.Fatalf("host %q %v, want server", host, ok)
-	}
-	got, at := captureShared(tabs, "gr@dev", host, shows)
+	got, at := captureShared(tabs, "gr@dev", "server", shows)
 	want := SharedLayout{Version: 1, Sessions: []string{"server:@a", "server:@c", "server:@d"}, Tabs: []SharedTab{
 		{Panes: []SharedPane{{Session: 0}, {Session: 1, Split: "below", Of: 1, Size: 30}}},
 		{Title: "logs", Layout: "stack", Panes: []SharedPane{{Session: 2}}},
@@ -69,9 +64,6 @@ func TestCaptureShared(t *testing.T) {
 	got, _ = captureShared(tabs, "gr@dev", "server", shows)
 	if want := `[{"panes":[{"session":"server:@a"}]},{"title":"logs","layout":"stack","panes":[{"session":"server:@d"}]}]`; got.Shape() != want {
 		t.Errorf("shape %s, want %s", got.Shape(), want)
-	}
-	if _, ok := sharedHost(tabs, "gr@dev", map[int]ProviderSession{}); ok {
-		t.Error("a worktree showing no provider session has a host")
 	}
 }
 

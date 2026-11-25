@@ -3,7 +3,6 @@ package spaces
 import (
 	"cmp"
 	"encoding/json"
-	"maps"
 	"slices"
 
 	"github.com/chancez/kspaces/internal/config"
@@ -11,8 +10,8 @@ import (
 )
 
 // A worktree's tabs are shared by every machine showing it, through the provider, as a multiplexer's windows
-// are by its attached clients: see Shared layouts in docs/kitty.md. What is shared is the panes that show
-// the provider's sessions on one host, which is all a layout names, so a pane's place is the session it
+// are by its attached clients: see Shared layouts in docs/kitty.md. What is shared is, for each host, the panes
+// that show the provider's sessions on it, which is all a layout names, so a pane's place is the session it
 // shows and nothing on one machine needs meaning on another.
 
 // SharedLayout is a worktree's shared panes, as the provider stores them. Its JSON is the provider's
@@ -99,30 +98,6 @@ func (l SharedLayout) Shape() string {
 type sharedLocal struct {
 	Window map[string]int
 	Tab    map[string]int
-}
-
-// sharedHost is the host most of session's panes show a provider session of, this machine's on a tie,
-// else the first by name. ok is false when none shows one.
-func sharedHost(tabs []kitty.FullTab, session string, shows map[int]ProviderSession) (string, bool) {
-	count := map[string]int{}
-	for _, tab := range tabs {
-		for _, w := range tab.Windows {
-			if s, ok := shows[w.ID]; ok && w.SessionName == session && !w.Own() {
-				count[s.Host]++
-			}
-		}
-	}
-	if len(count) == 0 {
-		return "", false
-	}
-	hosts := slices.Sorted(maps.Keys(count))
-	best := hosts[0]
-	for _, h := range hosts {
-		if count[h] > count[best] {
-			best = h
-		}
-	}
-	return best, true
 }
 
 // captureShared is the layout of session's panes that show a provider session on host, in tabs, by shows,

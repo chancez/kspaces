@@ -1,6 +1,7 @@
 package spaces
 
 import (
+	"cmp"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -64,19 +65,6 @@ func (k *fakeShareKitty) fullTabs() ([]kitty.FullTab, error) {
 	return out, nil
 }
 
-// sessions are the provider's sessions as k's windows show them.
-func (k *fakeShareKitty) sessions() []ProviderSession {
-	var out []ProviderSession
-	for _, t := range k.tabs {
-		for _, s := range t {
-			if !k.unlisted[s] {
-				out = append(out, ProviderSession{ID: s, Name: s, Space: "gr", Host: "server", State: "running", Windows: []int{k.ids[s]}})
-			}
-		}
-	}
-	return out
-}
-
 func (k *fakeShareKitty) Launch(_ string, args []string) (int, error) {
 	s := args[len(args)-1]
 	if slices.Contains(args, "--type=tab") {
@@ -111,16 +99,114 @@ func (k *fakeShareKitty) Close(id int) error {
 // remove closes s's window as a user would.
 func (k *fakeShareKitty) remove(s string) { _ = k.Close(k.ids[s]) }
 
-// fakeStore is the provider's stored layouts, by ref.
+// fakeStore is a host's stored layouts, by ref with the host's own name.
 type fakeStore struct {
 	layouts map[LayoutRef]StoredLayout
 	saves   int
 }
 
-func (f *fakeStore) load(_ []string, known []StoredLayout) ([]StoredLayout, error) {
+// fakeWorld is the hosts machines share layouts through: each one's store, the host of each session,
+// "server" for one not named, and which are offline, reaching no other.
+type fakeWorld struct {
+	stores  map[string]*fakeStore
+	hostOf  map[string]string
+	offline map[string]bool
+}
+
+func newFakeWorld() *fakeWorld {
+	return &fakeWorld{stores: map[string]*fakeStore{}, hostOf: map[string]string{}, offline: map[string]bool{}}
+}
+
+// store is host's store.
+func (f *fakeWorld) store(host string) *fakeStore {
+	if f.stores[host] == nil {
+		f.stores[host] = &fakeStore{layouts: map[LayoutRef]StoredLayout{}}
+	}
+	return f.stores[host]
+}
+
+// host is session id's host.
+func (f *fakeWorld) host(id string) string {
+	return cmp.Or(f.hostOf[id], "server")
+}
+
+// stored is the layout of gr@dev stored on host.
+func (f *fakeWorld) stored(host string) SharedLayout {
+	l := f.store(host).layouts[LayoutRef{Space: "gr", Host: host, Key: "dev"}].Layout
+	if l == nil {
+		return SharedLayout{}
+	}
+	return *l
+}
+
+// machine is a kitty on host self sharing gr@dev's layout through world, which names a host as self does.
+type machine struct {
+	k     *fakeShareKitty
+	ls    *layoutSync
+	now   *time.Time
+	self  string
+	world *fakeWorld
+}
+
+func newMachine(t *testing.T, world *fakeWorld, self string, now *time.Time, tabs ...[]string) *machine {
+	k := newFakeShareKitty("gr@dev", tabs...)
+	m := &machine{k: k, now: now, self: self, world: world}
+	m.ls = &layoutSync{
+		path:   filepath.Join(t.TempDir(), "layouts.json"),
+		kitty:  self,
+		writer: self,
+		now:    func() time.Time { return *now },
+		tabs:   k.fullTabs,
+		load:   m.load,
+		save:   m.save,
+		open: func(_ []string, s ProviderSession) ([]string, string, error) {
+			return []string{"attach", s.ID}, "", nil
+		},
+		k: k,
+	}
+	return m
+}
+
+// real is the host m names host, its own for none.
+func (m *machine) real(host string) string {
+	return cmp.Or(host, m.self)
+}
+
+// reaches reports whether m reaches host.
+func (m *machine) reaches(host string) bool {
+	return host == m.self || !m.world.offline[m.self] && !m.world.offline[host]
+}
+
+// named is host as m names it, empty for its own.
+func (m *machine) named(host string) string {
+	if host == m.self {
+		return ""
+	}
+	return host
+}
+
+// sessions are the provider's sessions as m's windows show them, those of a host it does not reach stale.
+func (m *machine) sessions() []ProviderSession {
+	var out []ProviderSession
+	for _, t := range m.k.tabs {
+		for _, s := range t {
+			if !m.k.unlisted[s] {
+				h := m.world.host(s)
+				out = append(out, ProviderSession{ID: s, Name: s, Space: "gr", Host: m.named(h), Stale: !m.reaches(h), State: "running", Windows: []int{m.k.ids[s]}})
+			}
+		}
+	}
+	return out
+}
+
+func (m *machine) load(_ []string, known []StoredLayout) ([]StoredLayout, error) {
 	var out []StoredLayout
 	for _, k := range known {
-		s := f.layouts[k.LayoutRef]
+		h := m.real(k.Host)
+		if !m.reaches(h) {
+			continue
+		}
+		s := m.world.store(h).layouts[LayoutRef{Space: k.Space, Host: h, Key: k.Key}]
 		s.LayoutRef = k.LayoutRef
 		if s.Revision != k.Revision {
 			out = append(out, s)
@@ -129,69 +215,55 @@ func (f *fakeStore) load(_ []string, known []StoredLayout) ([]StoredLayout, erro
 	return out, nil
 }
 
-func (f *fakeStore) save(_ []string, ref LayoutRef, revision int64, l SharedLayout) (int64, error) {
-	s := f.layouts[ref]
+func (m *machine) save(_ []string, ref LayoutRef, revision int64, l SharedLayout) (int64, error) {
+	h := m.real(ref.Host)
+	if !m.reaches(h) {
+		return 0, fmt.Errorf("%s does not answer", h)
+	}
+	store := m.world.store(h)
+	key := LayoutRef{Space: ref.Space, Host: h, Key: ref.Key}
+	s := store.layouts[key]
 	if s.Revision != revision {
 		return 0, errLayoutConflict
 	}
-	f.saves++
-	s = StoredLayout{LayoutRef: ref, Revision: s.Revision + 1, Layout: &l}
-	f.layouts[ref] = s
+	store.saves++
+	s = StoredLayout{LayoutRef: key, Revision: s.Revision + 1, Layout: &l}
+	store.layouts[key] = s
 	return s.Revision, nil
-}
-
-// machine is a kitty sharing gr@dev's layout through store.
-type machine struct {
-	k   *fakeShareKitty
-	ls  *layoutSync
-	now *time.Time
-}
-
-func newMachine(t *testing.T, name string, store *fakeStore, now *time.Time, tabs ...[]string) *machine {
-	k := newFakeShareKitty("gr@dev", tabs...)
-	ls := &layoutSync{
-		path:   filepath.Join(t.TempDir(), "layouts.json"),
-		kitty:  name,
-		writer: name,
-		now:    func() time.Time { return *now },
-		tabs:   k.fullTabs,
-		load:   store.load,
-		save:   store.save,
-		open: func(_ []string, s ProviderSession) ([]string, string, error) {
-			return []string{"attach", s.ID}, "", nil
-		},
-		k: k,
-	}
-	return &machine{k: k, ls: ls, now: now}
 }
 
 // pass runs a pass of m a while after the last one.
 func (m *machine) pass(t *testing.T) {
 	t.Helper()
 	*m.now = m.now.Add(5 * time.Second)
-	if err := m.ls.pass(config.Config{}, m.k.sessions(), func(string) string { return "/src/gr/dev" }, map[string]int{}); err != nil {
+	if err := m.ls.pass(config.Config{}, m.sessions(), func(string) string { return "/src/gr/dev" }, map[string]int{}); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// shows is m's tabs with a pane, each the sessions it shows.
+func (m *machine) shows() [][]string {
+	var got [][]string
+	for _, tab := range m.k.tabs {
+		if len(tab) > 0 {
+			got = append(got, tab)
+		}
+	}
+	return got
 }
 
 // Two machines showing one worktree converge on one state: a split and a tab opened on one open on the
 // other, one closed closes, each saved once it settles and taken at the next load, and nothing saved back
 // once both agree.
 func TestLayoutSync(t *testing.T) {
-	store := &fakeStore{layouts: map[LayoutRef]StoredLayout{}}
+	world := newFakeWorld()
 	now := time.Unix(1000, 0)
-	a := newMachine(t, "laptop", store, &now, []string{"s1", "s2"})
-	b := newMachine(t, "desktop", store, &now, []string{"s1"})
+	a := newMachine(t, world, "laptop", &now, []string{"s1", "s2"})
+	b := newMachine(t, world, "desktop", &now, []string{"s1"})
 	both := func(want ...[]string) {
 		t.Helper()
 		for _, m := range []*machine{a, b} {
-			var got [][]string
-			for _, tab := range m.k.tabs {
-				if len(tab) > 0 {
-					got = append(got, tab)
-				}
-			}
-			if !reflect.DeepEqual(got, want) {
+			if got := m.shows(); !reflect.DeepEqual(got, want) {
 				t.Errorf("%s has %q, want %q", m.ls.writer, got, want)
 			}
 		}
@@ -221,13 +293,13 @@ func TestLayoutSync(t *testing.T) {
 	both([]string{"s1"}, []string{"s3"})
 
 	// Agreeing, neither saves again.
-	saves := store.saves
+	saves := world.store("server").saves
 	for range 3 {
 		a.pass(t)
 		b.pass(t)
 	}
-	if store.saves != saves {
-		t.Errorf("%d saves once both agreed", store.saves-saves)
+	if n := world.store("server").saves - saves; n != 0 {
+		t.Errorf("%d saves once both agreed", n)
 	}
 	both([]string{"s1"}, []string{"s3"})
 }
@@ -235,12 +307,12 @@ func TestLayoutSync(t *testing.T) {
 // A worktree this machine stops showing is forgotten, so showing it again takes the stored layout's
 // sessions without closing what it opened with.
 func TestLayoutSyncForgets(t *testing.T) {
-	store := &fakeStore{layouts: map[LayoutRef]StoredLayout{}}
+	world := newFakeWorld()
 	now := time.Unix(1000, 0)
-	a := newMachine(t, "laptop", store, &now, []string{"s1", "s2"})
+	a := newMachine(t, world, "laptop", &now, []string{"s1", "s2"})
 	a.pass(t)
 	a.pass(t)
-	b := newMachine(t, "desktop", store, &now, []string{"s1"})
+	b := newMachine(t, world, "desktop", &now, []string{"s1"})
 	b.pass(t)
 	b.k.remove("s1")
 	b.k.remove("s2")
@@ -257,10 +329,10 @@ func TestLayoutSyncForgets(t *testing.T) {
 // Two machines changing before either sees the other keep both changes: the second to save takes the
 // first's, then saves the two together.
 func TestLayoutSyncBothChange(t *testing.T) {
-	store := &fakeStore{layouts: map[LayoutRef]StoredLayout{}}
+	world := newFakeWorld()
 	now := time.Unix(1000, 0)
-	a := newMachine(t, "laptop", store, &now, []string{"s1"})
-	b := newMachine(t, "desktop", store, &now, []string{"s1"})
+	a := newMachine(t, world, "laptop", &now, []string{"s1"})
+	b := newMachine(t, world, "desktop", &now, []string{"s1"})
 	for range 2 {
 		a.pass(t)
 		b.pass(t)
@@ -288,10 +360,10 @@ func TestLayoutSyncBothChange(t *testing.T) {
 // A pane opened by taking another machine's layout is not saved as removed while the provider has yet to
 // list its window, which would close it on the other machine.
 func TestLayoutSyncWaitsForOpenedPanes(t *testing.T) {
-	store := &fakeStore{layouts: map[LayoutRef]StoredLayout{}}
+	world := newFakeWorld()
 	now := time.Unix(1000, 0)
-	a := newMachine(t, "laptop", store, &now, []string{"s1", "s2"})
-	b := newMachine(t, "desktop", store, &now, []string{"s1"})
+	a := newMachine(t, world, "laptop", &now, []string{"s1", "s2"})
+	b := newMachine(t, world, "desktop", &now, []string{"s1"})
 	a.pass(t)
 	a.pass(t)
 	b.pass(t)
@@ -299,11 +371,11 @@ func TestLayoutSyncWaitsForOpenedPanes(t *testing.T) {
 	b.k.unlisted = map[string]bool{"s2": true}
 	for range 3 {
 		now = now.Add(3 * time.Second)
-		if err := b.ls.pass(config.Config{}, b.k.sessions(), func(string) string { return "" }, nil); err != nil {
+		if err := b.ls.pass(config.Config{}, b.sessions(), func(string) string { return "" }, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if got := store.layouts[LayoutRef{Space: "gr", Host: "server", Key: "dev"}].Layout.Members(); got != "s1,s2" {
+	if got := world.stored("server").Members(); got != "s1,s2" {
 		t.Errorf("stored %q, want s1,s2", got)
 	}
 }
@@ -330,7 +402,40 @@ func TestSharedWorktreesSpace(t *testing.T) {
 		{ID: "@d", Windows: []int{31}},
 	}
 	got := sharedWorktrees(tabs, sessions)
-	if len(got) != 1 || got["gr@dev"].layout.Members() != "@b" {
-		t.Errorf("shared %+v, want gr@dev showing @b alone", got)
+	want := map[string]sharedWorktree{"gr@dev": {session: "gr@dev", space: "gr", key: "dev", hosts: map[string]sharedPanes{"": {
+		layout: SharedLayout{Version: 1, Sessions: []string{"@b"}, Tabs: []SharedTab{{Layout: "stack", Panes: []SharedPane{{Session: 0}}}}},
+		at:     sharedLocal{Window: map[string]int{"@b": 21}, Tab: map[string]int{"@b": 2}},
+	}}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("shared %+v\nwant   %+v", got, want)
+	}
+}
+
+// A tab showing sessions of two hosts is in each host's layout with that host's panes alone, each stored on
+// its host: a split of one host's session opens beside that host's pane, and a tab of another's opens as a
+// tab.
+func TestLayoutSyncPerHost(t *testing.T) {
+	world := newFakeWorld()
+	world.hostOf = map[string]string{"w1": "white", "w2": "white", "l1": "laptop", "l2": "laptop"}
+	now := time.Unix(1000, 0)
+	a := newMachine(t, world, "laptop", &now, []string{"w1", "l1"})
+	b := newMachine(t, world, "white", &now, []string{"w1", "l1"})
+	for range 2 {
+		a.pass(t)
+		b.pass(t)
+	}
+	a.k.add(0, "w2")
+	a.k.tabs = append(a.k.tabs, nil)
+	a.k.add(len(a.k.tabs)-1, "l2")
+	for range 3 {
+		a.pass(t)
+		b.pass(t)
+	}
+	if want := [][]string{{"w1", "l1", "w2"}, {"l2"}}; !reflect.DeepEqual(b.shows(), want) {
+		t.Errorf("white shows %q, want %q", b.shows(), want)
+	}
+	got := map[string]string{"white": world.stored("white").Members(), "laptop": world.stored("laptop").Members()}
+	if want := map[string]string{"white": "w1,w2", "laptop": "l1;l2"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("stored %q, want %q", got, want)
 	}
 }

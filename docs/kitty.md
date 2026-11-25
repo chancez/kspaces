@@ -242,10 +242,12 @@ as a multiplexer's windows are by every client attached to them. Close a tab or 
 the other closes it; open one and the other opens it, showing the same session. It takes a few seconds,
 not at once: kspaces looks for a change at each refresh.
 
-**What is shared** is the panes that show the provider's sessions on one host, `H`, the host most of the
-worktree's panes show: a pane showing another host's session, or none, such as a window running something
-outside the provider, stays this machine's own. A layout `L` is kspaces' own JSON, which the provider
-stores and gives back unread but for `sessions`:
+**What is shared** is one layout per worktree and host: the panes that show the provider's sessions on host
+`H` make the worktree's layout on `H`, which the provider stores on `H`. A tab showing sessions of two hosts
+is in both layouts, with each host's panes alone, and a pane opened from `H`'s layout splits from a pane
+showing one of `H`'s sessions. A pane showing none, such as a window running something outside the
+provider, stays this machine's own. A layout `L` is kspaces' own JSON, which the provider stores and gives
+back unread but for `sessions`:
 
 ```json
 {"version": 1, "writer": "laptop", "sessions": ["@a7k2m9x4", "@q3p8z1c0"],
@@ -288,7 +290,9 @@ What changes a layout is which sessions each tab shows. A split moved or resized
 change but is none itself, as taking a layout only opens and closes panes, and two screens size their
 splits apart. Only a worktree with windows here shares its layout: closing its last tab does not close
 the worktree on the other machines, and once it has none its layout is forgotten, so opening it again takes
-what is stored without closing anything it opened with. Only a pane showing a session of its kitty
+what is stored without closing anything it opened with. Likewise a worktree's layout on a host is
+forgotten once no pane here shows one of the host's sessions: closing the last does not close the host's
+panes on the other machines. Only a pane showing a session of its kitty
 session's space is shared: kitty's startup session, whatever its file is named, shows sessions in
 `default`, which is this machine's alone, and a window left in another space is that space's.
 One kitty's sidebars share one pass, under a lock, which keeps what it knows beside the git states' file.
