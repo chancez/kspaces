@@ -82,13 +82,26 @@ type syncEntry struct {
 	Diverged *sharedDivergence `json:"diverged,omitempty"`
 }
 
-// sharedDivergence is a worktree's layout on a host and its panes here, having diverged: since when, and
-// each side as the last pass saw it.
+// sharedDivergence is a worktree's layout on a host and its panes here, having diverged: since when, each
+// side as the last pass saw it, and how the user asked to resolve it, for the next pass to.
 type sharedDivergence struct {
-	Since  time.Time    `json:"since"`
-	Local  SharedLayout `json:"local"`
-	Remote SharedLayout `json:"remote"`
+	Since   time.Time    `json:"since"`
+	Local   SharedLayout `json:"local"`
+	Remote  SharedLayout `json:"remote"`
+	Resolve Resolution   `json:"resolve,omitempty"`
 }
+
+// Resolution is how the user resolves a diverged layout, as a whole.
+type Resolution string
+
+const (
+	// UseLocal saves this machine's panes over the host's layout, which the other machines then take.
+	UseLocal Resolution = "local"
+	// UseRemote takes the host's layout here, opening and closing panes to match.
+	UseRemote Resolution = "remote"
+	// KeepBoth opens what the host's layout has that this machine does not, and saves the two together.
+	KeepBoth Resolution = "both"
+)
 
 // agree makes l what e and its host agree on.
 func (e *syncEntry) agree(l *SharedLayout) {
@@ -189,6 +202,11 @@ var errBusy = errors.New("another sidebar is sharing layouts")
 // locked runs f under the layouts file's lock, with what the file holds, and writes back what f leaves.
 // errBusy when another holds it.
 func (ls *layoutSync) locked(f func(st *syncState)) error {
+	return ls.lock(syscall.LOCK_EX|syscall.LOCK_NB, f)
+}
+
+// lock is locked with how, which may wait for the lock.
+func (ls *layoutSync) lock(how int, f func(st *syncState)) error {
 	if err := os.MkdirAll(filepath.Dir(ls.path), 0o700); err != nil {
 		return err
 	}
@@ -197,7 +215,7 @@ func (ls *layoutSync) locked(f func(st *syncState)) error {
 		return err
 	}
 	defer lock.Close()
-	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+	if err := syscall.Flock(int(lock.Fd()), how); err != nil {
 		if errors.Is(err, syscall.EWOULDBLOCK) {
 			return errBusy
 		}
@@ -357,7 +375,24 @@ func (ls *layoutSync) pass(cfg config.Config, sessions []ProviderSession, cwd fu
 				}
 			}
 		}
+		resolved := map[LayoutRef]bool{}
+		for _, name := range slices.Sorted(maps.Keys(st.Layouts)) {
+			for host, e := range st.Layouts[name].Hosts {
+				if e.Diverged == nil || e.Diverged.Resolve == "" || down[host] {
+					continue
+				}
+				w := shown[name]
+				change := ls.resolve(e)
+				if !change.Empty() {
+					if err := ls.apply(cfg, w.session, w.hosts[host], change, sessions, cwd(name), anchor[name]); err != nil {
+						logs.Error(fmt.Sprintf("resolving the layout of %s", name), err)
+					}
+					resolved[e.Ref] = true
+				}
+			}
+		}
 		taken := ls.take(cfg, st, shown, down, sessions, cwd, anchor)
+		maps.Copy(taken, resolved)
 		for _, name := range slices.Sorted(maps.Keys(shown)) {
 			w := shown[name]
 			for _, host := range slices.Sorted(maps.Keys(w.hosts)) {
@@ -393,13 +428,14 @@ func (ls *layoutSync) take(cfg config.Config, st *syncState, shown map[string]sh
 			unknown = unknown || e.Revision < 0
 		}
 	}
+	taken := map[LayoutRef]bool{}
 	if len(known) == 0 || !unknown && ls.now().Sub(st.LastLoad) < loadEvery {
-		return nil
+		return taken
 	}
 	got, err := ls.load(cfg.Provider, known)
 	if err != nil {
 		logs.Error("loading the shared layouts", err)
-		return nil
+		return taken
 	}
 	st.LastLoad = ls.now()
 	for _, where := range byRef {
@@ -410,7 +446,6 @@ func (ls *layoutSync) take(cfg config.Config, st *syncState, shown map[string]sh
 			e.Answered = ls.now()
 		}
 	}
-	taken := map[LayoutRef]bool{}
 	for _, s := range got.Layouts {
 		where, ok := byRef[s.LayoutRef]
 		if !ok || slices.Contains(got.Unreachable, where.host) {
@@ -473,6 +508,38 @@ func (ls *layoutSync) decide(e *syncEntry, local SharedLayout, remote *SharedLay
 	return sharedChange{}
 }
 
+// resolve resolves e's divergence as the user asked, agreeing on the host's layout as the base, and is what
+// it does to e's panes: UseLocal changes none, which differ from the base and so are saved at once;
+// UseRemote takes the host's layout whole; KeepBoth opens what it has that the panes do not, which are
+// saved once they settle.
+func (ls *layoutSync) resolve(e *syncEntry) sharedChange {
+	d := e.Diverged
+	e.agree(&d.Remote)
+	switch d.Resolve {
+	case UseLocal:
+		e.Pending = d.Local.Members()
+	case UseRemote:
+		e.Hold = ls.now().Add(settleAfterTake)
+		return mergeShared(&d.Local, d.Local, d.Remote)
+	case KeepBoth:
+		e.Hold = ls.now().Add(settleAfterTake)
+		return mergeShared(nil, d.Local, d.Remote)
+	}
+	return sharedChange{}
+}
+
+// Resolve asks the next pass to resolve the divergence of session's layout on host, as the provider names
+// it, as r. Nothing when it has not diverged.
+func (ls *layoutSync) Resolve(session, host string, r Resolution) error {
+	return ls.lock(syscall.LOCK_EX, func(st *syncState) {
+		if sw := st.Layouts[session]; sw != nil {
+			if e := sw.Hosts[host]; e != nil && e.Diverged != nil {
+				e.Diverged.Resolve = r
+			}
+		}
+	})
+}
+
 // saveIfChanged saves w, panes of session's, as e's layout once they differ from its base and are as the
 // last pass saw them. A conflict leaves the revision unknown, so the next pass takes what was saved and
 // saves again after it.
@@ -491,7 +558,7 @@ func (ls *layoutSync) saveIfChanged(cfg config.Config, e *syncEntry, session str
 		return
 	}
 	l := w.layout
-	l.Writer, l.Kitty = ls.writer, ls.kitty
+	l.Writer, l.Kitty, l.Saved = ls.writer, ls.kitty, ls.now()
 	rev, err := ls.save(cfg.Provider, e.Ref, e.Revision, l)
 	switch {
 	case errors.Is(err, errLayoutConflict):

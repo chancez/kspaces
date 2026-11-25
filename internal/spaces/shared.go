@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"encoding/json"
 	"slices"
+	"time"
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
@@ -22,6 +23,8 @@ type SharedLayout struct {
 	// this kitty saved from one another kitty did.
 	Writer string `json:"writer,omitempty"`
 	Kitty  string `json:"kitty,omitempty"`
+	// Saved is when it was saved, by the writer's clock.
+	Saved time.Time `json:"saved,omitzero"`
 	// Sessions are the provider's ids of the sessions the panes show, each pane naming one by index.
 	Sessions []string    `json:"sessions"`
 	Tabs     []SharedTab `json:"tabs"`

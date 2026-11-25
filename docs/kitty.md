@@ -250,14 +250,14 @@ provider, stays this machine's own. A layout `L` is kspaces' own JSON, which the
 back unread but for `sessions`:
 
 ```json
-{"version": 1, "writer": "laptop", "sessions": ["@a7k2m9x4", "@q3p8z1c0"],
+{"version": 1, "writer": "laptop", "saved": "2026-11-25T21:52:55Z", "sessions": ["@a7k2m9x4", "@q3p8z1c0"],
  "tabs": [{"title": "", "layout": "splits", "panes": [{"session": 0}, {"session": 1, "split": "right", "of": 1, "size": 35}]}]}
 ```
 
 `sessions` holds the provider's ids of the sessions the panes show, each pane naming its session by index,
 and the provider rewrites them, so the stored layout names sessions as their host does and each machine is
 given them as it reaches that host: an id kspaces has as `server:@a7k2m9x4` is stored as `@a7k2m9x4`. A
-pane's `split`, `of` and `size` are a [layout](#layouts) pane's. `writer` is the machine that saved it. Nothing
+pane's `split`, `of` and `size` are a [layout](#layouts) pane's. `writer` is the machine that saved it, and `saved` when, by its clock. Nothing
 in it is a path, a kitty window id, or a command to run: a session is opened with `open`, and a command a
 pane ran is still running in its session.
 
@@ -310,9 +310,13 @@ kspaces does not try to tell which change came first: a disconnected machine's c
 one, and a pane closing as its session's host went away looks like a pane closed by hand. What the two
 agreed on is all it goes by, and with nothing that says, the user decides.
 
-A diverged layout is neither saved nor taken: each machine keeps showing its own version until it is
-resolved. Should the two come to match again, by a change on
-either side, it is agreed again without asking.
+A diverged layout is neither saved nor taken: each machine keeps showing its own version until the user
+resolves it, as a whole, from the worktree's row in the sidebar. Use this machine's saves this machine's
+panes over the host's layout, which the other machines then take. Use the host's takes the host's layout
+here, opening and closing panes to match. Keep both opens what the host's layout has that this machine
+does not, and saves the two together, which the other machines then take. A pane closed in resolving
+only has its window closed, marked `kspaces_keep` first: its session keeps running. Should the two come to
+match again, by a change on either side, it is agreed again without asking.
 
 A save that conflicts loads the layout that won and takes it, then saves again. A provider that fails a
 verb is logged and asked again at the next refresh.

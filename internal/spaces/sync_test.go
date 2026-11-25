@@ -519,6 +519,19 @@ func (m *machine) entry(t *testing.T, host string) *syncEntry {
 	return e
 }
 
+// diverged is m's divergence from gr@dev's layout on host, nil for none, with the times it holds, which
+// depend on when the passes ran, left out.
+func (m *machine) diverged(t *testing.T, host string) *sharedDivergence {
+	t.Helper()
+	e := m.entry(t, host)
+	if e == nil || e.Diverged == nil {
+		return nil
+	}
+	d := *e.Diverged
+	d.Since, d.Local.Saved, d.Remote.Saved = time.Time{}, time.Time{}, time.Time{}
+	return &d
+}
+
 // Apart, a machine's base is no longer valid: coming back, what the two last agreed on says which side
 // changed. Only one side's change is that side's layout, taken or saved whole; both sides' is a divergence,
 // neither saved nor taken, each machine keeping its own; and two sides that come to match agree again. A
@@ -645,10 +658,7 @@ func TestLayoutSyncApart(t *testing.T) {
 			if got := world.stored("white").Members(); got != tt.stored {
 				t.Errorf("stored %q, want %q", got, tt.stored)
 			}
-			got := a.entry(t, "white").Diverged
-			if got != nil {
-				got.Since = time.Time{}
-			}
+			got := a.diverged(t, "white")
 			if !reflect.DeepEqual(got, tt.diverged) {
 				t.Errorf("diverged %+v, want %+v", got, tt.diverged)
 			}
@@ -720,15 +730,92 @@ func TestLayoutSyncHostSeenLater(t *testing.T) {
 	if want := [][]string{{"l1"}, {"w1"}}; !reflect.DeepEqual(a.shows(), want) {
 		t.Errorf("laptop shows %q, want %q", a.shows(), want)
 	}
-	got := a.entry(t, "white").Diverged
-	if got != nil {
-		got.Since = time.Time{}
-	}
+	got := a.diverged(t, "white")
 	want := &sharedDivergence{Local: stackLayout([]string{"w1"}), Remote: stackLayout([]string{"w1", "w2"}, []string{"w3"})}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("diverged %+v, want %+v", got, want)
 	}
 	if got := world.stored("white").Members(); got != "w1,w2;w3" {
 		t.Errorf("stored %q, want w1,w2;w3", got)
+	}
+}
+
+// A divergence is resolved as the user picks, as a whole: this machine's version saved over the host's,
+// the host's taken here, or both kept, saved together; either way both machines converge.
+func TestLayoutSyncResolve(t *testing.T) {
+	tests := []struct {
+		resolve               Resolution
+		wantLaptop, wantWhite [][]string
+		stored                string
+	}{
+		{
+			resolve:    UseLocal,
+			wantLaptop: [][]string{{"w1"}, {"w3"}, {"w5"}},
+			wantWhite:  [][]string{{"w1"}, {"w3"}, {"w5"}},
+			stored:     "w1;w3;w5",
+		},
+		{
+			resolve:    UseRemote,
+			wantLaptop: [][]string{{"w1", "w2"}, {"w3"}, {"w4"}},
+			wantWhite:  [][]string{{"w1", "w2"}, {"w3"}, {"w4"}},
+			stored:     "w1,w2;w3;w4",
+		},
+		{
+			resolve:    KeepBoth,
+			wantLaptop: [][]string{{"w1", "w2"}, {"w3"}, {"w5"}, {"w4"}},
+			wantWhite:  [][]string{{"w1", "w2"}, {"w3"}, {"w4"}, {"w5"}},
+			stored:     "w1,w2;w3;w4;w5",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.resolve), func(t *testing.T) {
+			world := newFakeWorld()
+			world.hostOf = map[string]string{"w1": "white", "w2": "white", "w3": "white", "w4": "white", "w5": "white"}
+			now := time.Unix(1000, 0)
+			b := newMachine(t, world, "white", &now, []string{"w1", "w2"}, []string{"w3"})
+			b.pass(t)
+			b.pass(t)
+			a := newMachine(t, world, "laptop", &now, []string{"w1", "w2"}, []string{"w3"})
+			for range 2 {
+				a.pass(t)
+				b.pass(t)
+			}
+			world.offline["laptop"] = true
+			a.k.remove("w2")
+			a.k.tabs = append(a.k.tabs, nil)
+			a.k.add(len(a.k.tabs)-1, "w5")
+			b.k.tabs = append(b.k.tabs, nil)
+			b.k.add(len(b.k.tabs)-1, "w4")
+			for range 3 {
+				a.pass(t)
+				b.pass(t)
+			}
+			world.offline["laptop"] = false
+			for range 2 {
+				a.pass(t)
+			}
+			if a.diverged(t, "white") == nil {
+				t.Fatal("laptop has not diverged")
+			}
+			if err := a.ls.Resolve("gr@dev", "white", tt.resolve); err != nil {
+				t.Fatal(err)
+			}
+			for range 5 {
+				a.pass(t)
+				b.pass(t)
+			}
+			if got := a.shows(); !reflect.DeepEqual(got, tt.wantLaptop) {
+				t.Errorf("laptop shows %q, want %q", got, tt.wantLaptop)
+			}
+			if got := b.shows(); !reflect.DeepEqual(got, tt.wantWhite) {
+				t.Errorf("white shows %q, want %q", got, tt.wantWhite)
+			}
+			if got := world.stored("white").Members(); got != tt.stored {
+				t.Errorf("stored %q, want %q", got, tt.stored)
+			}
+			if d := a.diverged(t, "white"); d != nil {
+				t.Errorf("diverged %+v once resolved", d)
+			}
+		})
 	}
 }
