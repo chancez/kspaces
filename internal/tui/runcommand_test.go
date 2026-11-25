@@ -430,3 +430,40 @@ func TestRunFormDraft(t *testing.T) {
 		t.Errorf("cleared, kept %v", got)
 	}
 }
+
+// kspaces run -- ARGS runs a command line no config names in a new tab, its braces as typed, and in the
+// background without switching to the session.
+func TestRunArgsNow(t *testing.T) {
+	root := mainRepo(t)
+	cfg := testCommands(t)
+	cfg.Spaces = []string{root}
+	space := spaces.LoadSpace(root)
+	wt, err := spaces.CreateWorktree(space, "fix", filepath.Join(root, ".worktrees", "fix"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := fakeKittenLs(t, lsWith(wt.Session))
+	argv := []string{"find", ".", "-exec", "echo", "{}", "{branch}", ";"}
+	got := []string{
+		errString(RunArgsNow(cfg, []string{wt.Path}, argv, "sideways", false)),
+		errString(RunArgsNow(cfg, []string{wt.Path}, argv, "", false)),
+		errString(RunArgsNow(cfg, []string{wt.Path}, []string{"go", "test"}, "split", true)),
+	}
+	want := []string{`--open is "sideways", it must be one of tab, split, hsplit, vsplit, overlay, window`, "<nil>", "<nil>"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %q\nwant %q", got, want)
+	}
+	env := []string{
+		"--env=KSPACES_SPACE=" + filepath.Base(root), "--env=KSPACES_ROOT=" + root, "--env=KSPACES_WORKTREE=" + wt.Path,
+		"--env=KSPACES_BRANCH=fix", "--env=KSPACES_BASE=main", "--env=KSPACES_SESSION=" + wt.Session, "--env=KSPACES_PR=", "--env=KSPACES_ISSUE=",
+	}
+	if got, want := calls(), slices.Concat([]string{
+		"@", "action", "goto_session", wt.Session + ".kitty-session", "--",
+		"@", "action", "--match=id:7", "launch", "--type=tab", "--cwd=" + wt.Path}, inSession(wt.Session), env,
+		[]string{"--hold", "find", ".", "-exec", "echo", "{}", "{branch}", ";", "--",
+			"@", "action", "--match=id:7", "launch", "--type=window", "--location=split", "--next-to=id:7", "--cwd=" + wt.Path},
+		inSession(wt.Session), []string{"--keep-focus"}, env, []string{"--hold", "go", "test", "--"},
+	); !reflect.DeepEqual(got, want) {
+		t.Errorf("kitten ran as\n%q\nwant\n%q", got, want)
+	}
+}

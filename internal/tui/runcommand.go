@@ -166,34 +166,50 @@ func (f *runForm) run() tea.Cmd {
 	return func() tea.Msg { return ranMsg{runIn(targets, cmd.Name, values, open, false)} }
 }
 
-// runIn runs the command called name in each of targets, as its own config has it, with the inputs of
-// values it has, opening where open says, or where configured when empty. In several, or with
+// runIn runs the command called name in each of targets, as its own config has it, see runNamed, with
+// the inputs of values it has, opening where open says, or where configured when empty. In several, or with
 // background, it stays in this window rather than switching to each session, see spaces.Run.Stay; one
 // failing does not stop the rest, and the error says which failed and why, one line each.
 func runIn(targets []runTarget, name string, values map[string]string, open string, background bool) error {
+	return runEach(targets, runNamed(name), values, open, background)
+}
+
+// runNamed looks up the command called name in a target's config.
+func runNamed(name string) func(runTarget) (config.Command, error) {
+	return func(t runTarget) (config.Command, error) {
+		cmd, ok := t.cfg.Command(name)
+		if !ok {
+			return config.Command{}, fmt.Errorf("no command %s in the config", name)
+		}
+		return cmd, nil
+	}
+}
+
+// runEach runs the command command gives for each of targets, as runIn does.
+func runEach(targets []runTarget, command func(runTarget) (config.Command, error), values map[string]string, open string, background bool) error {
 	// Read now: the sessions may have gained or lost windows since a form opened.
 	st, err := kitty.LoadState(kitty.SelfWindowID())
 	if err != nil {
 		return err
 	}
 	if len(targets) == 1 {
-		return targets[0].run(st, name, values, open, background)
+		return targets[0].run(st, command, values, open, background)
 	}
 	var errs []error
 	for _, t := range targets {
-		if err := t.run(st, name, values, open, true); err != nil {
+		if err := t.run(st, command, values, open, true); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", t.wt.Session, err))
 		}
 	}
 	return errors.Join(errs...)
 }
 
-// run runs t's command called name with the inputs of values it has, the rest at their defaults with t's
-// built-ins, see runIn.
-func (t runTarget) run(st kitty.State, name string, values map[string]string, open string, stay bool) error {
-	cmd, ok := t.cfg.Command(name)
-	if !ok {
-		return fmt.Errorf("no command %s in the config", name)
+// run runs the command command gives for t with the inputs of values it has, the rest at their defaults
+// with t's built-ins, see runIn.
+func (t runTarget) run(st kitty.State, command func(runTarget) (config.Command, error), values map[string]string, open string, stay bool) error {
+	cmd, err := command(t)
+	if err != nil {
+		return err
 	}
 	inputs := map[string]string{}
 	for _, in := range cmd.Inputs {
@@ -328,20 +344,9 @@ func (f *runForm) render() string {
 // with pick, the first they all have stands in for name when not every one has it, as the sidebar asks
 // for the first worktree's first command.
 func findRun(global config.Config, dirs []string, name string, inputs map[string]string, open string, pick bool) ([]runTarget, config.Command, error) {
-	if open != "" && !slices.Contains(config.Opens, open) {
-		return nil, config.Command{}, fmt.Errorf("--open is %q, it must be one of %s", open, strings.Join(config.Opens, ", "))
-	}
-	var targets []runTarget
-	for _, dir := range dirs {
-		top, err := git.TopLevel(dir)
-		if err != nil {
-			return nil, config.Command{}, err
-		}
-		space, wt, err := spaces.FindWorktree(global, top)
-		if err != nil {
-			return nil, config.Command{}, err
-		}
-		targets = append(targets, runTarget{cfg: space.ConfigOf(global), space: space, wt: wt})
+	targets, err := findTargets(global, dirs, open)
+	if err != nil {
+		return nil, config.Command{}, err
 	}
 	cmds := commonCommands(targets)
 	i := slices.IndexFunc(cmds, func(c config.Command) bool { return c.Name == name })
@@ -362,6 +367,26 @@ func findRun(global config.Config, dirs []string, name string, inputs map[string
 		}
 	}
 	return targets, cmd, nil
+}
+
+// findTargets are the worktrees dirs are in, with open checked to be one of config.Opens or empty.
+func findTargets(global config.Config, dirs []string, open string) ([]runTarget, error) {
+	if open != "" && !slices.Contains(config.Opens, open) {
+		return nil, fmt.Errorf("--open is %q, it must be one of %s", open, strings.Join(config.Opens, ", "))
+	}
+	var targets []runTarget
+	for _, dir := range dirs {
+		top, err := git.TopLevel(dir)
+		if err != nil {
+			return nil, err
+		}
+		space, wt, err := spaces.FindWorktree(global, top)
+		if err != nil {
+			return nil, err
+		}
+		targets = append(targets, runTarget{cfg: space.ConfigOf(global), space: space, wt: wt})
+	}
+	return targets, nil
 }
 
 // RunCommandForm runs the run form for the command called name in the worktrees dirs are in, its inputs
@@ -426,4 +451,20 @@ func RunCommandNow(global config.Config, dirs []string, name string, inputs map[
 		return err
 	}
 	return runIn(targets, name, inputs, open, background)
+}
+
+// RunArgsNow runs argv, a command line no config names, in the worktrees dirs are in, as RunCommandNow
+// runs a configured command: in a new tab, or where open says, the shell started once it exits. Its
+// words are passed on as they are, braces and all, rather than as a template.
+func RunArgsNow(global config.Config, dirs, argv []string, open string, background bool) error {
+	targets, err := findTargets(global, dirs, open)
+	if err != nil {
+		return err
+	}
+	literal := strings.NewReplacer("{", "{{", "}", "}}")
+	cmd := config.Command{Name: argv[0], Open: config.OpenTab}
+	for _, arg := range argv {
+		cmd.Run = append(cmd.Run, literal.Replace(arg))
+	}
+	return runEach(targets, func(runTarget) (config.Command, error) { return cmd, nil }, nil, open, background)
 }

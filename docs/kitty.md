@@ -310,6 +310,11 @@ and `--open=WHERE` overriding `open` once. `--yes` runs it without the form, ref
 that is empty, and `--background` with it leaves the focus where it is: no switch, and the launch is
 `--keep-focus`. Several PATHs run it in each worktree, as the [sidebar](sidebar.md) says of Run.
 
+`kspaces run [PATH...] -- ARGS...` runs the command line ARGS, which no config names, the same way without
+a form: in a new tab, or where `--open` says, `--hold` keeping the shell once it exits so its output stays
+in view. Its words are passed on as typed, braces too, with no inputs or placeholders; `--background` works
+as with `--yes`.
+
 ## Layouts
 
 A layout is tabs split into panes, each running a command, a command line or your shell, which kspaces

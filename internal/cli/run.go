@@ -21,10 +21,13 @@ func (a *app) runCommand() *cobra.Command {
 		window     int
 	)
 	cmd := &cobra.Command{
-		Use:   "run NAME [PATH...]",
-		Short: "Run the configured command NAME in the worktrees at PATH, the current directory's by default, after filling in its inputs in a form",
+		Use:   "run NAME [PATH...] | run [PATH...] -- ARGS...",
+		Short: "Run the configured command NAME in the worktrees at PATH, the current directory's by default, after filling in its inputs in a form, or the command line ARGS without one",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if dash := cmd.ArgsLenAtDash(); dash >= 0 {
+				return a.runArgs(args[:dash], args[dash:], open, background, window != 0 || yes || len(inputs) > 0)
+			}
 			if window != 0 && len(args) > 1 {
 				return fmt.Errorf("--from runs the command in the window's worktree; give no PATH")
 			}
@@ -58,7 +61,7 @@ func (a *app) runCommand() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "run without the form; a required input not given is an error")
-	cmd.Flags().BoolVar(&background, "background", false, "with --yes, leave the focus where it is rather than switching to the session")
+	cmd.Flags().BoolVar(&background, "background", false, "with --yes or a command after --, leave the focus where it is rather than switching to the session")
 	cmd.Flags().StringVar(&open, "open", "", "where to open it in a session with windows, for this run: "+strings.Join(config.Opens, ", "))
 	cmd.Flags().StringArrayVar(&inputs, "input", nil, "an input's value, as NAME=VALUE; repeat for more")
 	a.fromFlag(cmd, &window, "the worktree of its session")
@@ -66,6 +69,25 @@ func (a *app) runCommand() *cobra.Command {
 		cmd.MarkFlagsMutuallyExclusive("from", f)
 	}
 	return cmd
+}
+
+// runArgs runs argv, the words after --, in the worktrees at dirs, the current directory's by default.
+// It has no form and no inputs, so configured says one of those was asked for.
+func (a *app) runArgs(dirs, argv []string, open string, background, configured bool) error {
+	switch {
+	case len(argv) == 0:
+		return fmt.Errorf("no command after --")
+	case configured:
+		return fmt.Errorf("a command after -- takes no --from, --yes or --input")
+	}
+	if len(dirs) == 0 {
+		dirs = []string{"."}
+	}
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	return tui.RunArgsNow(cfg, dirs, argv, open, background)
 }
 
 // parseInputs is the --input flags, NAME=VALUE each, by name.
