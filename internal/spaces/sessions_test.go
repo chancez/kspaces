@@ -149,30 +149,36 @@ func TestPollerSessions(t *testing.T) {
 	})
 }
 
-// A space's detached sessions follow its rows: a head, then, expanded, each session, under its host's row
-// when they run on several. A folded space has none.
+// A space's detached sessions follow the row of their worktree, the one their worktree tag names, else the
+// main one's: a head, then, expanded, each session, under its host's row when they run on several. A
+// folded space has none.
 func TestWithDetached(t *testing.T) {
 	gr := Space{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Session: "gr"}, {Path: "/src/gr/dev", Session: "gr@dev"}}}
 	docs := Space{Name: "docs", Root: "/src/docs", Worktrees: []Worktree{{Path: "/src/docs", Session: "docs"}, {Path: "/src/docs/x", Session: "docs@x"}}}
 	notes := Space{Name: "notes", Worktrees: []Worktree{{Session: "notes"}}}
 	a, b, c := ProviderSession{ID: "a"}, ProviderSession{ID: "b", Host: "server"}, ProviderSession{ID: "c"}
-	grD := Detached{Hosts: []HostSessions{{Sessions: []ProviderSession{a}}, {Host: "server", Sessions: []ProviderSession{b}}}}
+	d := ProviderSession{ID: "d", Tags: map[string]string{"worktree": "dev"}}
+	e := ProviderSession{ID: "e", Tags: map[string]string{"worktree": "gone"}}
+	grD := Detached{Hosts: []HostSessions{{Sessions: []ProviderSession{a, d, e}}, {Host: "server", Sessions: []ProviderSession{b}}}}
 	notesD := Detached{Hosts: []HostSessions{{Sessions: []ProviderSession{c}}}}
 	detached := map[string]Detached{"gr": grD, "docs": notesD, "notes": notesD}
 	rows := BuildRows([]Space{notes}, []Space{gr, docs}, map[string]bool{"/src/docs": true}, nil, Order{})
 	got := WithDetached(rows, detached, map[string]bool{"gr": true})
 	s := func(i int) *Space { return rows[i].Space }
+	main := Detached{Hosts: []HostSessions{{Sessions: []ProviderSession{a, e}}, {Host: "server", Sessions: []ProviderSession{b}}}}
 	want := []Row{
 		rows[0],
-		{Detached: &DetachedRow{Of: s(0), All: notesD}},
+		{Detached: &DetachedRow{Of: s(0), Worktree: "notes", All: notesD}},
 		{},
 		rows[2],
+		{Detached: &DetachedRow{Of: s(2), Worktree: "gr", All: main, Expanded: true}},
+		{Detached: &DetachedRow{Of: s(2), Worktree: "gr", HostRow: true}},
+		{Detached: &DetachedRow{Of: s(2), Worktree: "gr", Session: &a}},
+		{Detached: &DetachedRow{Of: s(2), Worktree: "gr", Session: &e}},
+		{Detached: &DetachedRow{Of: s(2), Worktree: "gr", Host: "server", HostRow: true}},
+		{Detached: &DetachedRow{Of: s(2), Worktree: "gr", Host: "server", Session: &b}},
 		rows[3],
-		{Detached: &DetachedRow{Of: s(2), All: grD, Expanded: true}},
-		{Detached: &DetachedRow{Of: s(2), HostRow: true}},
-		{Detached: &DetachedRow{Of: s(2), Session: &a}},
-		{Detached: &DetachedRow{Of: s(2), Host: "server", HostRow: true}},
-		{Detached: &DetachedRow{Of: s(2), Host: "server", Session: &b}},
+		{Detached: &DetachedRow{Of: s(2), Worktree: "gr@dev", All: Detached{Hosts: []HostSessions{{Sessions: []ProviderSession{d}}}}}},
 		{},
 		rows[5],
 	}

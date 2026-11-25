@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui/look"
@@ -43,8 +44,10 @@ func (m *sidebar) hostRows() []spaces.Row {
 	var out []spaces.Row
 	for _, v := range spaces.HostViews(m.others, m.listed(), m.sessions, m.detached) {
 		open := map[string]bool{}
-		for space := range v.Detached {
-			open[space] = m.detachedOpen[openKey(true, v.Host, space)]
+		for key := range m.detachedOpen {
+			if wt, ok := strings.CutPrefix(key, openKey(true, v.Host, "")); ok {
+				open[wt] = true
+			}
 		}
 		rows := m.listRows(v.Others, v.Spaces, v.Detached, open)
 		if len(rows) == 0 && m.narrowed() {

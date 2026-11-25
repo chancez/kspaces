@@ -15,8 +15,8 @@ import (
 	"github.com/chancez/kspaces/internal/spaces"
 )
 
-// detachedFixture is the fixture with provider sessions no window shows: two in gr, one in docs, which is folded,
-// and one in default.
+// detachedFixture is the fixture with provider sessions no window shows: two in gr's fix, one in docs, which is
+// folded, and one in default.
 func detachedFixture() spaces.Snapshot {
 	snap := fixture(time.Now())
 	snap.Config = &config.Config{Launch: []string{"launch"}, Provider: []string{"prov"}}
@@ -24,7 +24,7 @@ func detachedFixture() spaces.Snapshot {
 	snap.Detached = map[string]spaces.Detached{
 		"gr": {Hosts: []spaces.HostSessions{{Sessions: []spaces.ProviderSession{
 			{ID: "a1", Name: "build", Space: "gr", State: "running", Busy: true, Command: "make watch", Tags: map[string]string{"worktree": "fix"}},
-			{ID: "b2", Name: "@b2", Space: "gr", State: "shelved", Title: "claude"},
+			{ID: "b2", Name: "@b2", Space: "gr", State: "shelved", Title: "claude", Tags: map[string]string{"worktree": "fix"}},
 		}}}},
 		"docs":    {Hosts: []spaces.HostSessions{{Sessions: []spaces.ProviderSession{{ID: "c3", Name: "notes", Space: "docs", State: "exited"}}}}},
 		"default": {Hosts: []spaces.HostSessions{{Sessions: []spaces.ProviderSession{{ID: "d4", Name: "scratch", State: "running", Status: "blocked"}}}}},
@@ -32,9 +32,9 @@ func detachedFixture() spaces.Snapshot {
 	return snap
 }
 
-// A space's provider sessions no window shows are a row after its own, of how many, but a folded space's;
-// space shows them under it and hides them again. enter on one opens it in a tab of the sidebar's own
-// session, which is the space's, running what the provider says opens it.
+// A space's provider sessions no window shows are a row after their worktree's, of how many, but a folded
+// space's; space shows them under it and hides them again. enter on one opens it in a tab of the worktree
+// its tag names, which has no windows, so the tab is its first, running what the provider says opens it.
 func TestDetachedRows(t *testing.T) {
 	e := newSidebarEnv(t)
 	calls := fakeKittenCalls(t)
@@ -76,9 +76,9 @@ func TestDetachedRows(t *testing.T) {
 	cmd()
 	want := [][]string{
 		{"@", "focus-window", "--match", "id:11"},
-		{"@", "action", "goto_session", "gr@dev.kitty-session"},
-		{"@", "action", "--match=id:11", "launch", "--type=tab", "--cwd=/src/gr/.worktrees/dev", "--add-to-session=gr@dev",
-			"--var=kspaces_space=gr", "--var=kspaces_worktree=dev", "mux", "attach", "b2"},
+		{"@", "action", "launch", "--type=tab", "--cwd=/src/gr/.worktrees/fix", "--add-to-session=gr@fix",
+			"--var=kspaces_space=gr", "--var=kspaces_worktree=fix", "mux", "attach", "b2"},
+		{"@", "action", "goto_session", "gr@fix.kitty-session"},
 	}
 	if got := calls(); !reflect.DeepEqual(got, want) {
 		t.Errorf("enter ran\n%q\nwant\n%q", got, want)

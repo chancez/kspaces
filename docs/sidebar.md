@@ -142,9 +142,10 @@ wrapper that runs each window in a cm session, filed by the [launch
 variables](kitty.md#spaces-and-sessions) under the space of its kitty session: `kspaces-provider-cm`
 answers for it, and a window shows the session its cm client is attached to.
 
-A space's sessions that no kitty window shows are listed after the space's rows, under a row of how many
-there are, `14 detached`, or by host once the provider lists more than one machine, `local 3, server 9`.
-The sessions a window shows are where their windows are, and not listed again. `space` on the row, or a
+A space's sessions that no kitty window shows are listed after the row of the worktree they are in, the
+one their `worktree` tag names, else the space's main worktree, as one from before tagging or from outside
+kspaces is. They are under a row of how many there are, `14 detached`, or by host once the provider lists
+more than one machine, `local 3, server 9`. The sessions a window shows are where their windows are, and not listed again. `space` on the row, or a
 click on it or its caret, shows them under it, by name, under a row for each host when there are several,
 and again hides them; they start hidden, and showing them is not kept across restarts. A session's row has
 its name, what it is doing in a word, `busy` while a command runs, else `running`, `shelved`, `exited` or
@@ -170,8 +171,8 @@ What a row offers is what the provider does, as its `capabilities` say, asked on
   session's own left out, `down` and `up` choose one, and `enter` moves to it or, with none chosen, to the
   name as typed, a new space, which the provider creates. This is how sessions that all landed in `default`
   are filed where they belong.
-- `p` on the row of how many opens **Clean up sessions**, listing the space's detached sessions, each with a
-  box, ticked at first for those that exited or died, not for a shelved one, which was ended to come back,
+- `p` on a row of how many opens **Clean up sessions**, listing all of the space's detached sessions, each
+  with a box, ticked at first for those that exited or died, not for a shelved one, which was ended to come back,
   nor a running one, which may be someone's work, and a busy one says what it runs. `y` kills the ticked
   running ones and removes the ticked ended ones; one the provider refuses is said in the form, which
   stays, and the rest still go.

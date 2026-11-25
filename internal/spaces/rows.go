@@ -38,8 +38,10 @@ type Row struct {
 // DetachedRow is a row of a space's provider sessions no window shows: their group's head, standing for them all, a
 // host's heading its sessions when they run on several, or one session.
 type DetachedRow struct {
-	// Of is the space the sessions are in, as its row has it.
-	Of *Space
+	// Of is the space the sessions are in, as its row has it, and Worktree the session of the worktree
+	// they are in, whose row they follow, see detachedUnder.
+	Of       *Space
+	Worktree string
 	// On the head: all of them, and whether they show under it.
 	All      Detached
 	Expanded bool
@@ -136,17 +138,18 @@ func BuildRows(others, spaces []Space, folded, hidden map[string]bool, order Ord
 	return rows
 }
 
-// WithDetached is rows with the provider's sessions no window shows, detached by space, after the rows of the
-// space they are in: a head row standing for them, then, for a space in expanded, by name, a row for each,
-// under a row for its host when they run on several. A folded space's are left out with its worktrees, as
-// are a folded group's, whose spaces have no rows. The rows point into copies of the sessions.
+// WithDetached is rows with the provider's sessions no window shows, detached by space, each after the row
+// of the worktree it is in, see detachedUnder: a head row standing for them, then, for a worktree in
+// expanded, by its session's name, a row for each, under a row for its host when they run on several. A
+// folded space's are left out with its worktrees, as are a folded group's, whose spaces have no rows. The
+// rows point into copies of the sessions.
 func WithDetached(rows []Row, detached map[string]Detached, expanded map[string]bool) []Row {
 	if len(detached) == 0 {
 		return rows
 	}
 	var out []Row
 	var folded bool
-	for i, r := range rows {
+	for _, r := range rows {
 		out = append(out, r)
 		if r.Space == nil {
 			continue
@@ -155,21 +158,69 @@ func WithDetached(rows []Row, detached map[string]Detached, expanded map[string]
 			folded = r.Folded
 		}
 		d, ok := detached[r.Space.Name]
-		if folded || !ok || d.Count() == 0 || i+1 < len(rows) && rows[i+1].Space == r.Space {
+		if folded || !ok {
 			continue
 		}
-		open := expanded[r.Space.Name]
-		out = append(out, Row{Detached: &DetachedRow{Of: r.Space, All: d, Expanded: open}})
+		wt := mainSession(*r.Space)
+		if !r.Main {
+			wt = r.Worktree.Session
+		}
+		d = detachedUnder(*r.Space, d)[wt]
+		if d.Count() == 0 {
+			continue
+		}
+		open := expanded[wt]
+		out = append(out, Row{Detached: &DetachedRow{Of: r.Space, Worktree: wt, All: d, Expanded: open}})
 		if !open {
 			continue
 		}
 		for _, h := range d.Hosts {
 			if len(d.Hosts) > 1 {
-				out = append(out, Row{Detached: &DetachedRow{Of: r.Space, Host: h.Host, HostRow: true}})
+				out = append(out, Row{Detached: &DetachedRow{Of: r.Space, Worktree: wt, Host: h.Host, HostRow: true}})
 			}
 			for _, sess := range slices.Clone(h.Sessions) {
-				out = append(out, Row{Detached: &DetachedRow{Of: r.Space, Host: h.Host, Session: &sess}})
+				out = append(out, Row{Detached: &DetachedRow{Of: r.Space, Worktree: wt, Host: h.Host, Session: &sess}})
 			}
+		}
+	}
+	return out
+}
+
+// mainSession is the session of space's main worktree, empty for a space whose worktrees could not be
+// listed.
+func mainSession(space Space) string {
+	if len(space.Worktrees) == 0 {
+		return ""
+	}
+	return space.Worktrees[0].Session
+}
+
+// detachedUnder splits d, space's detached sessions, by the worktree each is in, by that worktree's
+// session: the linked or missing one its worktree tag names, when space has it, else the main one, as a
+// session from before tagging or from outside kspaces is.
+func detachedUnder(space Space, d Detached) map[string]Detached {
+	has := map[string]bool{}
+	for _, wt := range slices.Concat(space.Worktrees, space.Missing) {
+		has[wt.Session] = true
+	}
+	out := map[string]Detached{}
+	for _, h := range d.Hosts {
+		by := map[string][]ProviderSession{}
+		var order []string
+		for _, s := range h.Sessions {
+			wt := mainSession(space)
+			if dir := s.Tags["worktree"]; dir != "" && has[space.Name+"@"+dir] {
+				wt = space.Name + "@" + dir
+			}
+			if by[wt] == nil {
+				order = append(order, wt)
+			}
+			by[wt] = append(by[wt], s)
+		}
+		for _, wt := range order {
+			o := out[wt]
+			o.Hosts = append(o.Hosts, HostSessions{Host: h.Host, Sessions: by[wt]})
+			out[wt] = o
 		}
 	}
 	return out

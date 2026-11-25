@@ -20,23 +20,23 @@ import (
 // each, which enter or a click opens in a tab of the space, see spaces.OpenSession. They start hidden, and are
 // shown again only by hand, as a long-lived space collects many.
 
-// toggleDetachedAt shows or hides the detached sessions under row i, their head: a space's, or on the hosts
-// tab a space's on one host, see openKey.
+// toggleDetachedAt shows or hides the detached sessions under row i, their head: a worktree's, or on the
+// hosts tab a worktree's on one host, see openKey.
 func (m *sidebar) toggleDetachedAt(i int) {
 	r := m.rows[i]
-	m.toggleDetached(openKey(r.ByHost, r.Host, r.Detached.Of.Name))
+	m.toggleDetached(openKey(r.ByHost, r.Host, r.Detached.Worktree))
 }
 
-// openKey names the space whose detached sessions show in detachedOpen: its name, or on the hosts tab its
-// name on host, which shows and hides them there alone.
-func openKey(byHost bool, host, space string) string {
+// openKey names the worktree whose detached sessions show in detachedOpen: its session, or on the hosts
+// tab its session on host, which shows and hides them there alone.
+func openKey(byHost bool, host, worktree string) string {
 	if !byHost {
-		return space
+		return worktree
 	}
-	return "host:" + host + ":" + space
+	return "host:" + host + ":" + worktree
 }
 
-// toggleDetached shows or hides the detached sessions of the space named space under their head, by
+// toggleDetached shows or hides the detached sessions under the head of the worktree named by key, see
 // openKey.
 func (m *sidebar) toggleDetached(space string) {
 	if m.detachedOpen == nil {
@@ -122,17 +122,18 @@ func (m *sidebar) renderDetached(i int) string {
 	return th.DrawZone(fmt.Sprintf(entryZone, i), surface, width, th.Cut(width, spans...)...)
 }
 
-// detachedKey names a row of a space's detached sessions, see rowKey: detached:SPACE for the head,
-// detached:SPACE:HOST for a host, detached:SPACE:HOST:ID for a session, see sessionKey. A kitty session's
+// detachedKey names a row of a worktree's detached sessions, see rowKey: detached:WORKTREE for the head, by
+// the worktree's session, detached:WORKTREE:HOST for a host, detached:SPACE:HOST:ID for a session, see
+// sessionKey. A kitty session's
 // name could be any of these, but a session kspaces names never starts detached:.
 func detachedKey(r spaces.DetachedRow) string {
 	switch {
 	case r.HostRow:
-		return "detached:" + r.Of.Name + ":" + r.Host
+		return "detached:" + r.Worktree + ":" + r.Host
 	case r.Session != nil:
 		return sessionKey(r.Of.Name, *r.Session)
 	}
-	return "detached:" + r.Of.Name
+	return "detached:" + r.Worktree
 }
 
 // sessionKey names s, a detached session of space, as its row and the select mode's ticks do.
