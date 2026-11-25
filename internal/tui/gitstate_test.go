@@ -169,7 +169,7 @@ func TestLongNameGivesWayToPRChecks(t *testing.T) {
 // The picker's preview of a worktree says what git and gh say of it, once they have: a PR's checks and
 // review in words, when it has them.
 func TestPickerPreviewGitState(t *testing.T) {
-	m := newPicker(0)
+	m := newPicker(0, ScopeSpaces)
 	m.Update(tea.WindowSizeMsg{Width: 40, Height: 26})
 	snap := gitFixture()
 	snap.Git["/src/kitty"] = gitstate.State{Status: &gitstate.Status{Upstream: "origin/master"}, PRAt: time.Now()}

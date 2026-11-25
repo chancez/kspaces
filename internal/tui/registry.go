@@ -682,6 +682,11 @@ var (
 		Run:     func(m *picker, _ pickerSubject) tea.Cmd { return m.choose(spaces.OpenOptions{NoLayout: true}) },
 	}
 	actPickQuit = quit[*picker, pickerSubject]()
+	// actPickScope lists the next scope.
+	actPickScope = &interact.Action[*picker, pickerSubject]{
+		Title: "next scope",
+		Run:   do[*picker, pickerSubject]((*picker).nextScope),
+	}
 	// actPickMenu opens the menu of the entry under the cursor.
 	actPickMenu = &interact.Action[*picker, pickerSubject]{
 		Title: "actions",
@@ -1400,13 +1405,14 @@ func init() {
 	helpKind.Bind(actHelpQuit, "ctrl+c", "quit", "ctrl+c")
 	theHelp = interact.List(helpKind)
 
-	pickerKind = interact.NewKind(func(pickerSubject) string { return "Picker" }, actPickDown, actPickUp, actPick, actPickPlain, actPickMenu, actPickQuit)
+	pickerKind = interact.NewKind(func(pickerSubject) string { return "Picker" }, actPickDown, actPickUp, actPick, actPickPlain, actPickMenu, actPickScope, actPickQuit)
 	pickerKind.Bind(actPickDown, "down/up", "down/up", "down", "ctrl+n", "ctrl+j")
 	pickerKind.Bind(actPickUp, "", "", "up", "ctrl+p", "ctrl+k")
 	pickerKind.Bind(actPick, "enter", "switch", "enter")
 	// alt+enter for a terminal that sends shift+enter as enter, as a form's newline takes it.
 	pickerKind.Bind(actPickPlain, "shift+enter", "switch without layout", "shift+enter", "alt+enter")
 	pickerKind.Bind(actPickMenu, "tab", "actions", "tab")
+	pickerKind.Bind(actPickScope, "shift+tab", "next scope", "shift+tab")
 	pickerKind.Bind(actPickQuit, "esc", "cancel", "esc", "ctrl+c")
 	thePicker = interact.List(pickerKind)
 

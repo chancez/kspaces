@@ -14,7 +14,7 @@ import (
 
 // newPickEnv is a picker 40 cells wide and 26 high showing fixture, the preview below the list.
 func newPickEnv() *picker {
-	m := newPicker(0)
+	m := newPicker(0, ScopeSpaces)
 	m.Update(tea.WindowSizeMsg{Width: 40, Height: 26})
 	m.Update(fixture(time.Now()))
 	return m
@@ -102,7 +102,7 @@ func TestPickMenu(t *testing.T) {
 
 // A status entry's menu opens it or replies to it. Near the bottom the menu goes above the entry's row.
 func TestPickMenuStatus(t *testing.T) {
-	m := newPicker(0)
+	m := newPicker(0, ScopeSpaces)
 	m.Update(tea.WindowSizeMsg{Width: 40, Height: 8})
 	m.Update(fixture(time.Now()))
 	pressCode(m, tea.KeyTab)

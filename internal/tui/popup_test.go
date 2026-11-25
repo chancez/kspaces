@@ -160,7 +160,7 @@ func TestPopupLeavePicker(t *testing.T) {
 // a choice that fails leaves it showing why, with the keyboard back.
 func TestPickerInPanel(t *testing.T) {
 	fakeKittenCalls(t)
-	m := newPicker(0)
+	m := newPicker(0, ScopeSpaces)
 	p, focused := stubPopup(m, 11, true)
 	p.Update(tea.WindowSizeMsg{Width: 40, Height: 26})
 	p.Update(fixture(time.Now()))

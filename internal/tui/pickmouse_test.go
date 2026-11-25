@@ -52,7 +52,7 @@ func TestPickMenuMouse(t *testing.T) {
 // A left click on an entry switches to it, as enter does, beside the preview too; the wheel moves the
 // cursor and closes the menu.
 func TestPickMouse(t *testing.T) {
-	m := newPicker(0)
+	m := newPicker(0, ScopeSpaces)
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 16})
 	m.Update(fixture(time.Now()))
 	m.render()
@@ -80,7 +80,7 @@ func TestPickMouse(t *testing.T) {
 // In a panel the picker fills the frame inside its border and padding, so the mouse it hears is from
 // inside them.
 func TestPopupMouseInFrame(t *testing.T) {
-	p := newPopup(newPicker(0), 11)
+	p := newPopup(newPicker(0, ScopeSpaces), 11)
 	got := []tea.Msg{
 		p.inPanel(tea.MouseClickMsg{X: 5, Y: 4, Button: tea.MouseLeft}),
 		p.inPanel(tea.MouseWheelMsg{X: 2, Y: 1, Button: tea.MouseWheelDown}),

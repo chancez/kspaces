@@ -277,7 +277,7 @@ func TestForgetSessionsForm(t *testing.T) {
 // The picker lists missing worktrees with the gone marker, its preview says their directory is gone, and
 // one with no windows is not opened.
 func TestPickerMissingWorktrees(t *testing.T) {
-	m := newPicker(0)
+	m := newPicker(0, ScopeSpaces)
 	m.Update(tea.WindowSizeMsg{Width: 40, Height: 26})
 	m.Update(missingFixture("/sessions"))
 	want := []string{

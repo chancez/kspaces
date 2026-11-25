@@ -857,7 +857,7 @@ func TestPickWithoutLayout(t *testing.T) {
 	}
 	snap := fixture(time.Now())
 	snap.Config = &cfg
-	m := newPicker(0)
+	m := newPicker(0, ScopeSpaces)
 	m.getText = func(int) (string, error) { return "", nil }
 	m.Update(tea.WindowSizeMsg{Width: 50, Height: 6})
 	m.Update(snap)

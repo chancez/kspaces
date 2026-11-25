@@ -58,7 +58,8 @@ func formHome(st kitty.State, self int) int {
 func (m *picker) pickTarget() (interact.Target[*picker], bool) {
 	it, ok := m.chosen()
 	switch {
-	case !ok:
+	case !ok, it.pane != nil:
+		// A window has nothing to do but switch to it.
 		return interact.Target[*picker]{}, false
 	case it.status != nil:
 		return thePickStatuses.Target(pickStatusSubject{status: *it.status}), true

@@ -62,9 +62,12 @@ func (m *picker) screenWindow() int {
 	}
 	st := m.snap.Kitty
 	id := 0
-	if it.status != nil {
+	switch {
+	case it.status != nil:
 		id = it.status.Window
-	} else {
+	case it.pane != nil:
+		id = it.pane.Window
+	default:
 		id = st.Screens[it.row.Worktree.Session]
 	}
 	if id == m.self || st.Own[id] {

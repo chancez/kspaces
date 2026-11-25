@@ -399,7 +399,7 @@ func TestAddSpaceInGroup(t *testing.T) {
 
 // The picker names a grouped space's entries after its group, so a query finds them by it.
 func TestPickerGroups(t *testing.T) {
-	m := newPicker(0)
+	m := newPicker(0, ScopeSpaces)
 	m.Update(tea.WindowSizeMsg{Width: 40, Height: 40})
 	m.Update(groupsFixture())
 	got := pickerScreen(m)[6:13]

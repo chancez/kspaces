@@ -144,7 +144,7 @@ func TestPopupHelp(t *testing.T) {
 // In the picker ? lists its keys while the query is empty, and is typed into one that is not, where ctrl+/
 // lists them; with the menu open it lists the menu's keys and its items'.
 func TestPickerHelp(t *testing.T) {
-	m := newPicker(0)
+	m := newPicker(0, ScopeSpaces)
 	p, _ := stubPopup(m, 0, true)
 	p.Update(tea.WindowSizeMsg{Width: 60, Height: 26})
 	p.Update(fixture(time.Now()))
@@ -164,10 +164,11 @@ func TestPickerHelp(t *testing.T) {
 		strings.Repeat("─", 60),
 		"KEYS" + strings.Repeat(" ", 49) + "? close",
 		"─ Picker " + strings.Repeat("─", 51),
-		" down/up down/up",
-		" enter   switch",
-		" tab     actions",
-		" esc     cancel",
+		" down/up   down/up",
+		" enter     switch",
+		" tab       actions",
+		" shift+tab next scope",
+		" esc       cancel",
 	}
 	if got := sheet(); !reflect.DeepEqual(got, want) {
 		t.Errorf("the picker's keys:\n%q\nwant\n%q", got, want)

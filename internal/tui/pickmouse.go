@@ -8,7 +8,7 @@ import (
 	"github.com/chancez/kspaces/internal/spaces"
 )
 
-// The picker's mouse: a left click on an entry switches to it, as enter does, and a right click opens its
+// The picker's mouse: a left click on a scope lists it, a left click on an entry switches to it, as enter does, and a right click opens its
 // menu, see pickmenu.go. The wheel moves the cursor. While the menu is open the mouse lights the item under
 // it, a left click on one runs it, and any other click closes the menu, a right click on an entry opening
 // that entry's instead.
@@ -66,6 +66,12 @@ func (m *picker) mouse(msg tea.MouseMsg) tea.Cmd {
 			}
 			m.menu = nil
 			if msg.Button != tea.MouseRight {
+				return nil
+			}
+		}
+		for i := range scopeNames {
+			if msg.Button == tea.MouseLeft && m.inZone(fmt.Sprintf(pickScopeZone, i), msg.X, msg.Y) {
+				m.setScope(PickScope(i))
 				return nil
 			}
 		}

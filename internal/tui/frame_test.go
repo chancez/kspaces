@@ -95,7 +95,7 @@ func TestFormInOverlay(t *testing.T) {
 
 // The picker lays itself out inside the border, a cell in from its sides, filling it.
 func TestPickerInPanelFrame(t *testing.T) {
-	m := newPicker(0)
+	m := newPicker(0, ScopeSpaces)
 	p, _ := stubPopup(m, 11, false)
 	p.Update(tea.WindowSizeMsg{Width: 120, Height: 32})
 	p.Update(fixture(time.Now()))

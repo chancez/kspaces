@@ -37,7 +37,7 @@ func screenWindows(m *picker) []int {
 // windows none, and neither the picker's own window nor another of kspaces'. Below the list only an entry
 // with few details leaves room for a screen.
 func TestPickerScreenWindow(t *testing.T) {
-	m := newPicker(30)
+	m := newPicker(30, ScopeSpaces)
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 	m.Update(screenFixture())
 	// gr@dev, scratch, docs@notes and default's statuses, then default, gr, gr / dev, gr / fix, kitty, docs
@@ -97,7 +97,7 @@ func TestPickerScreenFollows(t *testing.T) {
 		20: "$ claude\n\x1b[33mwants permission to run\x1b[m a command that is longer than the preview\n\n",
 		22: "$ make\n",
 	}}
-	m := newPicker(30)
+	m := newPicker(30, ScopeSpaces)
 	m.getText = screens.get
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 16})
 	_, first := m.Update(screenFixture())
@@ -149,7 +149,7 @@ func TestPickerScreenFollows(t *testing.T) {
 			"   id deploy",
 			"   working build",
 		}, shown...)
-		out := []string{"\uf002  space, worktree or status", strings.Repeat("\u2500", 100)}
+		out := []string{pickHeader(100), strings.Repeat("\u2500", 100)}
 		for i, l := range list {
 			p := ""
 			if i < len(preview) {

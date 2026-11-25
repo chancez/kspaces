@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -10,13 +12,15 @@ import (
 	"github.com/charmbracelet/x/ansi"
 	"github.com/sahilm/fuzzy"
 
+	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/status"
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
-// pickItem is one thing the picker can switch to: a worktree's session, or a window reporting a status.
+// pickItem is one thing the picker can switch to: a worktree's session, a window reporting a status, or
+// any window.
 type pickItem struct {
 	// The text the query is matched against. It is also what is shown, so matches can be highlighted.
 	text string
@@ -24,9 +28,10 @@ type pickItem struct {
 	nameLen int
 	icon    []look.Span
 
-	// A worktree's row, with its space; or the status, for a window reporting one.
+	// A worktree's row, with its space; the status, for a window reporting one; or the window.
 	row    spaces.Row
 	status *status.Status
+	pane   *spaces.Pane
 }
 
 type pickItems []pickItem
@@ -34,9 +39,53 @@ type pickItems []pickItem
 func (p pickItems) String(i int) string { return p[i].text }
 func (p pickItems) Len() int            { return len(p) }
 
-// pickItemsFrom lists the windows that report a status first, most urgent first, then every session and
-// worktree in sidebar order, a grouped space's under its group's name, so a query finds them by it.
-func pickItemsFrom(snap spaces.Snapshot) pickItems {
+// PickScope is what the picker lists: everything, the spaces with the status entries, or the windows.
+type PickScope int
+
+const (
+	ScopeSpaces PickScope = iota
+	ScopeWindows
+	ScopeAll
+)
+
+// scopeNames are what kspaces pick --scope calls the scopes, scopeTitles the scope strip, by PickScope.
+var (
+	scopeNames  = [...]string{"spaces", "windows", "all"}
+	scopeTitles = [...]string{"Spaces", "Windows", "All"}
+)
+
+// pickScopeZone is the zone of the scope strip's scopes, by PickScope.
+const pickScopeZone = "scope:%d"
+
+// ParsePickScope is the scope called name.
+func ParsePickScope(name string) (PickScope, error) {
+	for i, n := range scopeNames {
+		if n == name {
+			return PickScope(i), nil
+		}
+	}
+	return 0, fmt.Errorf("unknown scope %q, want one of %s", name, strings.Join(scopeNames[:], ", "))
+}
+
+func (s PickScope) String() string { return scopeNames[s] }
+
+// pickItemsFrom lists what scope has: the windows that report a status first, most urgent first, then
+// every session and worktree in sidebar order, a grouped space's under its group's name, so a query finds
+// them by it; then the windows, see paneItems.
+func pickItemsFrom(snap spaces.Snapshot, panes []spaces.Pane, scope PickScope) pickItems {
+	var items pickItems
+	rows := spaces.BuildRows(snap.Others, snap.Spaces, nil, nil, snap.Order)
+	if scope != ScopeWindows {
+		items = append(items, spaceItems(snap, rows)...)
+	}
+	if scope != ScopeSpaces {
+		items = append(items, paneItems(snap, rows, panes)...)
+	}
+	return items
+}
+
+// spaceItems are the status entries, then the sessions and worktrees of rows.
+func spaceItems(snap spaces.Snapshot, rows []spaces.Row) pickItems {
 	var items pickItems
 	for i := range snap.Kitty.Statuses {
 		s := &snap.Kitty.Statuses[i]
@@ -53,17 +102,11 @@ func pickItemsFrom(snap spaces.Snapshot) pickItems {
 		}
 		items = append(items, pickItem{text: joinDetail(name, detail), nameLen: len(name), icon: look.StateMarker(s.State), status: s})
 	}
-	for _, r := range spaces.BuildRows(snap.Others, snap.Spaces, nil, nil, snap.Order) {
+	for _, r := range rows {
 		if r.Worktree == nil {
 			continue
 		}
-		name := r.Space.Name
-		if r.Space.Group != "" {
-			name = r.Space.Group + " / " + name
-		}
-		if !r.Main {
-			name += " / " + r.Dir()
-		}
+		name := rowName(r)
 		icon, detail := []look.Span{look.NoMarker()}, r.Worktree.Branch
 		switch state := status.OfSession(snap.Kitty.Statuses, r.Worktree.Session); {
 		case r.Missing && state == "":
@@ -82,6 +125,53 @@ func pickItemsFrom(snap spaces.Snapshot) pickItems {
 	return items
 }
 
+// rowName is what the picker calls a worktree's row: its space, after its group, and its directory but for
+// the main worktree.
+func rowName(r spaces.Row) string {
+	name := r.Space.Name
+	if r.Space.Group != "" {
+		name = r.Space.Group + " / " + name
+	}
+	if !r.Main {
+		name += " / " + r.Dir()
+	}
+	return name
+}
+
+// paneItems are the windows of panes, each named for its worktree's row, else its session, else its tab,
+// with what runs in it and its title. panes are the most recently focused first, so the first is the
+// window the picker is for, which comes last as switching to it does nothing.
+func paneItems(snap spaces.Snapshot, rows []spaces.Row, panes []spaces.Pane) pickItems {
+	names := map[string]string{}
+	for _, r := range rows {
+		if r.Worktree != nil {
+			names[r.Worktree.Session] = rowName(r)
+		}
+	}
+	states := map[int]string{}
+	for _, s := range snap.Kitty.Statuses {
+		states[s.Window] = s.State
+	}
+	if len(panes) > 1 {
+		panes = append(slices.Clone(panes[1:]), panes[0])
+	}
+	items := make(pickItems, 0, len(panes))
+	for i := range panes {
+		p := &panes[i]
+		name := cmp.Or(names[p.Session], p.Session, p.Tab)
+		detail := p.Program
+		if p.Title != "" && p.Title != p.Program {
+			detail = joinDetail(detail, p.Title)
+		}
+		icon := []look.Span{look.NoMarker()}
+		if state := states[p.Window]; state != "" {
+			icon = look.StateMarker(state)
+		}
+		items = append(items, pickItem{text: joinDetail(name, strings.TrimSpace(detail)), nameLen: len(name), icon: icon, pane: p})
+	}
+	return items
+}
+
 func joinDetail(name, detail string) string {
 	if detail == "" {
 		return name
@@ -90,9 +180,12 @@ func joinDetail(name, detail string) string {
 }
 
 type picker struct {
-	th      *look.Theme
-	self    int
-	snap    spaces.Snapshot
+	th    *look.Theme
+	self  int
+	scope PickScope
+	snap  spaces.Snapshot
+	// kitty's windows, nil until loaded.
+	panes   []spaces.Pane
 	items   pickItems
 	matches fuzzy.Matches
 	input   textinput.Model
@@ -111,22 +204,53 @@ type picker struct {
 	getText func(window int) (string, error)
 }
 
-func newPicker(self int) *picker {
+// scopePlaceholders are the query's placeholder in each scope, by PickScope.
+var scopePlaceholders = [...]string{"space, worktree or status", "program, title or space", "space, status or program"}
+
+func newPicker(self int, scope PickScope) *picker {
 	th := look.New(true)
 	input := newInput(th, th.SearchPrompt())
-	input.Placeholder = "space, worktree or status"
 	input.Focus()
-	return &picker{th: th, self: self, input: input, getText: kitty.ScreenText}
+	m := &picker{th: th, self: self, input: input, getText: kitty.ScreenText}
+	m.setScope(scope)
+	return m
 }
 
-// Init loads afresh, as the picker's own window is new, with the git states the sidebar has.
+// panesMsg is kitty's windows, as the picker lists them.
+type panesMsg struct {
+	panes []spaces.Pane
+	err   error
+}
+
+// Init loads afresh, as the picker's own window is new, with the git states the sidebar has, and kitty's
+// windows apart, as asking the session provider what they run takes longer.
 func (m *picker) Init() tea.Cmd {
 	self := m.self
 	return tea.Batch(textinput.Blink, func() tea.Msg {
 		snap := spaces.Load(self)
 		snap.Git = spaces.GitStates()
 		return snap
+	}, func() tea.Msg {
+		cfg, err := config.Load()
+		if err != nil {
+			return panesMsg{err: err}
+		}
+		panes, err := spaces.Panes(cfg)
+		return panesMsg{panes: panes, err: err}
 	})
+}
+
+// setScope lists what scope has, the cursor on its first entry.
+func (m *picker) setScope(scope PickScope) {
+	m.scope, m.cursor = scope, 0
+	m.input.Placeholder = scopePlaceholders[scope]
+	m.items = pickItemsFrom(m.snap, m.panes, scope)
+	m.filter()
+}
+
+// nextScope lists the scope after this one's, the first after the last.
+func (m *picker) nextScope() {
+	m.setScope((m.scope + 1) % PickScope(len(scopeNames)))
 }
 
 // filter ranks the items against the query. An empty query keeps the items in their own order.
@@ -165,6 +289,8 @@ func (m *picker) chooseItem(it pickItem, opts spaces.OpenOptions) tea.Cmd {
 		switch {
 		case it.status != nil:
 			err = spaces.OpenWindow(cfg, st, it.status.Window, it.status.Session)
+		case it.pane != nil:
+			err = spaces.OpenWindow(cfg, st, it.pane.Window, it.pane.Session)
 		case it.row.Worktree.Session == st.Current:
 			// Already here: closing the picker is all there is to do.
 		case it.row.Missing && st.Windows[it.row.Worktree.Session] == 0:
@@ -192,7 +318,7 @@ func (m *picker) chosen() (pickItem, bool) {
 // choosing it without one skips.
 func (m *picker) opensLayout() bool {
 	it, ok := m.chosen()
-	return ok && it.status == nil && spaces.OpensDefaultLayout(*m.snap.Config, m.snap.Kitty, *it.row.Space, *it.row.Worktree)
+	return ok && it.status == nil && it.pane == nil && spaces.OpensDefaultLayout(*m.snap.Config, m.snap.Kitty, *it.row.Space, *it.row.Worktree)
 }
 
 // Update follows the cursor's entry with the preview's screen after whatever moved it: a key, the query,
@@ -212,14 +338,22 @@ func (m *picker) update(msg tea.Msg) tea.Cmd {
 		m.width, m.height = msg.Width, msg.Height
 		// bubbles v2 draws only the first character of a placeholder without a width, and the cursor
 		// takes a cell past the text.
-		m.input.SetWidth(max(m.width-ansi.StringWidth(m.input.Prompt)-1, 1))
+		m.input.SetWidth(max(m.width-ansi.StringWidth(m.input.Prompt)-1-m.th.Width(m.scopeStrip()...), 1))
 		return nil
 	case spaces.Snapshot:
 		m.err, m.choosing = msg.Err, false
 		if msg.Config != nil {
-			m.snap, m.items = msg, pickItemsFrom(msg)
+			m.snap, m.items = msg, pickItemsFrom(msg, m.panes, m.scope)
 			m.filter()
 		}
+		return nil
+	case panesMsg:
+		if msg.err != nil {
+			m.err = fmt.Errorf("listing kitty's windows: %w", msg.err)
+			return nil
+		}
+		m.panes, m.items = msg.panes, pickItemsFrom(m.snap, msg.panes, m.scope)
+		m.filter()
 		return nil
 	case tea.MouseClickMsg, tea.MouseWheelMsg, tea.MouseMotionMsg, tea.MouseReleaseMsg:
 		return m.mouse(msg.(tea.MouseMsg))
@@ -298,7 +432,9 @@ const pickHeaderRows = 2
 
 func (m *picker) frame() string {
 	th, width := m.th, max(m.width, 1)
-	lines := []string{m.input.View(), th.Render(look.Plain, look.Rule(width, false))}
+	strip := m.scopeStrip()
+	input := look.Fit(m.input.View(), max(width-th.Width(strip...), 0))
+	lines := []string{input + th.Render(look.Plain, strip...), th.Render(look.Plain, look.Rule(width, false))}
 	l := m.layout()
 	var list []string
 	start := max(m.cursor-l.listRows+1, 0)
@@ -345,7 +481,7 @@ func (m *picker) frame() string {
 	if m.opensLayout() {
 		spans = append(spans, look.Text("  "), look.Key("shift+enter"), look.KeyDesc(" switch without layout"))
 	}
-	if _, ok := m.chosen(); ok {
+	if _, ok := m.pickTarget(); ok {
 		spans = append(spans, look.Text("  "), look.Key("tab"), look.KeyDesc(" actions"))
 	}
 	status := th.Render(look.Plain, th.Cut(width, spans...)...)
@@ -355,9 +491,30 @@ func (m *picker) frame() string {
 	return strings.Join(append(lines, status), "\n")
 }
 
-// RunPicker runs the picker, meant for a kitty popup, until something is chosen or it is left.
-func RunPicker(ctx context.Context) error {
-	if err := runPopup(ctx, newPicker(kitty.SelfWindowID())); err != nil {
+// scopeStripWidth is the narrowest picker with the scope strip, which leaves the query room.
+const scopeStripWidth = 60
+
+// scopeStrip is the scopes, the one listed on a chip, each marked so a click lists it. None in a picker
+// too narrow, where the query's placeholder says what is listed.
+func (m *picker) scopeStrip() []look.Span {
+	if m.width < scopeStripWidth {
+		return nil
+	}
+	var spans []look.Span
+	for i, name := range scopeTitles {
+		tab := []look.Span{look.Muted(" " + name + " ")}
+		if PickScope(i) == m.scope {
+			tab = look.Button(name, "")
+		}
+		spans = append(append(spans, look.Text(" ")), look.Mark(fmt.Sprintf(pickScopeZone, i), tab...)...)
+	}
+	return spans
+}
+
+// RunPicker runs the picker listing scope, meant for a kitty popup, until something is chosen or it is
+// left.
+func RunPicker(ctx context.Context, scope PickScope) error {
+	if err := runPopup(ctx, newPicker(kitty.SelfWindowID(), scope)); err != nil {
 		return fmt.Errorf("running the picker: %w", err)
 	}
 	return nil

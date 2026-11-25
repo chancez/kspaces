@@ -25,6 +25,17 @@ func pickerScreen(m *picker) []string {
 	return out
 }
 
+// pickHeader is the query's line of an empty query in the spaces scope, width cells wide, see
+// pickHeaderFor.
+func pickHeader(width int) string { return pickHeaderFor("space, worktree or status", width) }
+
+// pickHeaderFor is the query's line of an empty query with placeholder, width cells wide, its scope strip
+// at the end, the last cell being the space after the strip's last scope.
+func pickHeaderFor(placeholder string, width int) string {
+	q, strip := "\uf002  "+placeholder, "  Spaces   Windows   All"
+	return q + strings.Repeat(" ", width-1-ansi.StringWidth(q)-ansi.StringWidth(strip)) + strip
+}
+
 func typeInto(m tea.Model, s string) {
 	for _, r := range s {
 		m.Update(tea.KeyPressMsg{Code: r, Text: string(r)})
@@ -35,7 +46,7 @@ func typeInto(m tea.Model, s string) {
 // the query is typed, with the matched characters highlighted. Tall enough that the preview below leaves
 // the list room for every entry.
 func TestPicker(t *testing.T) {
-	m := newPicker(0)
+	m := newPicker(0, ScopeSpaces)
 	m.Update(tea.WindowSizeMsg{Width: 40, Height: 26})
 	m.Update(fixture(time.Now()))
 	got := pickerScreen(m)[1:12]
@@ -102,7 +113,7 @@ func down(m tea.Model, n int) {
 // A wide picker has the preview of the cursor's entry beside the list: a status entry as the sidebar's
 // opened entry, a worktree's space, path, branch, session, windows, saved file and statuses.
 func TestPickerPreviewBeside(t *testing.T) {
-	m := newPicker(0)
+	m := newPicker(0, ScopeSpaces)
 	m.Update(tea.WindowSizeMsg{Width: 100, Height: 16})
 	m.Update(previewFixture())
 	// The list takes 48 cells, then a space, the rule and a space.
@@ -125,7 +136,7 @@ func TestPickerPreviewBeside(t *testing.T) {
 		"",
 	}
 	screen := func(preview ...string) []string {
-		out := []string{"\uf002  space, worktree or status", strings.Repeat("\u2500", 100)}
+		out := []string{pickHeader(100), strings.Repeat("\u2500", 100)}
 		for i, l := range list {
 			p := ""
 			if i < len(preview) {
@@ -169,7 +180,7 @@ func TestPickerPreviewBeside(t *testing.T) {
 // A narrow picker has the preview below the list, ten rows high whatever the entry, and none when that
 // would leave the list too few rows.
 func TestPickerPreviewBelow(t *testing.T) {
-	m := newPicker(0)
+	m := newPicker(0, ScopeSpaces)
 	m.Update(tea.WindowSizeMsg{Width: 40, Height: 26})
 	m.Update(previewFixture())
 	screen := func(preview ...string) []string {
@@ -249,7 +260,7 @@ func TestPickerPreviewBelow(t *testing.T) {
 // The preview of a main worktree has its root in full, of a session in no space no path or branch, and
 // without a sessions directory it says so for the saved file.
 func TestPickerPreviewKinds(t *testing.T) {
-	m := newPicker(0)
+	m := newPicker(0, ScopeSpaces)
 	m.Update(tea.WindowSizeMsg{Width: 40, Height: 26})
 	m.Update(fixture(time.Now()))
 	text := func() []string {
@@ -563,5 +574,72 @@ func TestFormButtons(t *testing.T) {
 	cmd = clickOn(t, c, "Close y")
 	if got, want := (result{cmd != nil, c.busy}), (result{true, true}); got != want {
 		t.Errorf("Close: %+v, want %+v", got, want)
+	}
+}
+
+// The windows scope lists every window by what runs in it, the one the picker is for last; shift+tab and
+// a click on the strip list another scope.
+func TestPickerWindows(t *testing.T) {
+	m := newPicker(0, ScopeWindows)
+	m.Update(tea.WindowSizeMsg{Width: 60, Height: 8})
+	m.Update(fixture(time.Now()))
+	m.Update(panesMsg{panes: []spaces.Pane{
+		{Window: 11, Session: "gr@dev", Title: "~/src/gr", FocusedAt: 9},
+		{Window: 20, Session: "gr@dev", Title: "claude", Program: "claude", FocusedAt: 8},
+		{Window: 10, Session: "gr", Title: "nvim main.go", Program: "nvim main.go", FocusedAt: 5},
+		{Window: 30, Tab: "notes", Title: "top", Program: "htop"},
+	}})
+	want := []string{
+		pickHeaderFor("program, title or space", 60),
+		strings.Repeat("\u2500", 60),
+		blocked + "gr / dev  claude",
+		"   gr  nvim main.go",
+		"   notes  htop  top",
+		"   gr / dev  ~/src/gr",
+		"",
+		"4/4",
+	}
+	if got := pickerScreen(m); !reflect.DeepEqual(got, want) {
+		t.Errorf("windows:\n%q\nwant\n%q", got, want)
+	}
+
+	typeInto(m, "nvim")
+	if got := pickerScreen(m)[2:4]; !reflect.DeepEqual(got, []string{"   gr  nvim main.go", ""}) {
+		t.Errorf("after nvim:\n%q", got)
+	}
+	if _, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEnter}); cmd == nil || !m.choosing {
+		t.Errorf("enter: choosing %v, cmd %v", m.choosing, cmd != nil)
+	}
+	m.choosing = false
+	m.input.SetValue("")
+	m.filter()
+
+	m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+	if got := pickerScreen(m)[7]; m.scope != ScopeAll || got != "15/15  tab actions" {
+		t.Errorf("shift+tab: scope %v, count line %q", m.scope, got)
+	}
+	m.Update(tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift})
+	if got := pickerScreen(m)[7]; m.scope != ScopeSpaces || got != "11/11  tab actions" {
+		t.Errorf("shift+tab again: scope %v, count line %q", m.scope, got)
+	}
+
+	head := pickerScreen(m)[0]
+	x := ansi.StringWidth(head[:strings.Index(head, "Windows")])
+	m.Update(tea.MouseClickMsg{X: x, Y: 0, Button: tea.MouseLeft})
+	if m.scope != ScopeWindows || m.cursor != 0 {
+		t.Errorf("click on Windows: scope %v, cursor %d", m.scope, m.cursor)
+	}
+
+	// The preview says where the window is and what runs in it, over its own screen.
+	m.Update(tea.WindowSizeMsg{Width: 100, Height: 16})
+	m.Update(tea.KeyPressMsg{Code: tea.KeyDown})
+	it, _ := m.current()
+	var details []string
+	for _, l := range m.details(it, 40) {
+		details = append(details, strings.TrimRight(ansi.Strip(m.th.Render(look.Plain, l...)), " "))
+	}
+	wantDetails := []string{"gr", "", "session  gr", "tab      untitled", "title    nvim main.go", "runs     nvim main.go", "cwd      unknown"}
+	if !reflect.DeepEqual(details, wantDetails) || m.screenWindow() != 10 {
+		t.Errorf("preview of gr's nvim: screen of %d,\n%q\nwant\n%q", m.screenWindow(), details, wantDetails)
 	}
 }

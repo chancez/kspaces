@@ -33,7 +33,7 @@ func launchForm(cfg config.Config, st kitty.State, size panelSize, args ...strin
 }
 
 // LaunchPicker opens the picker in a popup for the window from, as the kitty mapping that runs
-// `kspaces pick --from` asks for.
-func LaunchPicker(cfg config.Config, from int) error {
-	return kitty.LaunchPopup(popup(cfg, pickerPanel), from, "kspaces_picker", "pick")
+// `kspaces pick --from` asks for, with pick's args, such as --scope.
+func LaunchPicker(cfg config.Config, from int, args ...string) error {
+	return kitty.LaunchPopup(popup(cfg, pickerPanel), from, "kspaces_picker", append([]string{"pick"}, args...)...)
 }

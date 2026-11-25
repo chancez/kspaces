@@ -92,8 +92,30 @@ func (m *picker) details(it pickItem, width int) [][]look.Span {
 		lines := [][]look.Span{statusHeader(m.th, *s, width, time.Now())}
 		return append(lines, statusDetails(*s, max(width-m.th.Width(look.NoMarker()), 1), 0, 0)...)
 	}
+	if p := it.pane; p != nil {
+		return append([][]look.Span{{look.Heading(it.text[:it.nameLen])}, {}}, paneFields(*p)...)
+	}
 	lines := [][]look.Span{{look.Heading(it.text[:it.nameLen])}, {}}
 	return append(lines, worktreeFields(m.th, m.snap, it.row, width)...)
+}
+
+// paneFields are what the picker's preview says of a window: its session, tab, title, what runs in it and
+// where.
+func paneFields(p spaces.Pane) [][]look.Span {
+	field := func(label, value, none string) []look.Span {
+		v := look.Text(value)
+		if value == "" {
+			v = look.Muted(none)
+		}
+		return []look.Span{look.Label(fmt.Sprintf("%-*s", previewLabelWidth, label)), v}
+	}
+	return [][]look.Span{
+		field("session", p.Session, "none"),
+		field("tab", p.Tab, "untitled"),
+		field("title", p.Title, "none"),
+		field("runs", p.Program, "the shell"),
+		field("cwd", config.Tilde(p.Cwd), "unknown"),
+	}
 }
 
 // worktreeFields are what the picker's preview and the sidebar's row popup say of a worktree's row, width

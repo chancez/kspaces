@@ -600,6 +600,7 @@ tab_switch_strategy left
 map f3 kspaces_focus
 map f4 kspaces_toggle
 map f5 kspaces_pick
+map f7 kspaces_pick --scope=windows
 map cmd+alt+[ kspaces_prev
 map cmd+alt+] kspaces_next
 map cmd+alt+/ kspaces_recent
@@ -608,6 +609,9 @@ map cmd+alt+. kspaces_attention_next
 map cmd+alt+n kspaces_new
 map cmd+alt+t kspaces_run test
 ```
+
+`kspaces_pick --scope=windows` opens the picker on every window by what runs in it, see
+[The picker](sidebar.md#the-picker).
 
 `kspaces_recent` switches to the session focused most recently other than the focused window's, as alt-tab
 does, so pressing it twice goes back; sessions in no space count, and docks never count as focusing one.

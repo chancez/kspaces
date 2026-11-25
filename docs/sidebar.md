@@ -693,6 +693,16 @@ button on its SPACES title, left of the funnel, an overlay over the window the k
 beside the sidebar, or a 120 by 32 panel for it, as `[sidebar] popup` says, lists the status entries and then
 every session and worktree in the sidebar's order, narrowed by a fuzzy query. A space in a group is listed
 after its group's name, `work / gr` and `work / gr / dev`, so the group's name finds its entries.
+
+That is its **Spaces** scope. **Windows** lists every kitty window but kspaces' own, the most recently
+focused first and the one the picker is for last, each named for its worktree's entry, else its session,
+else its tab, with what runs in it and its title: `gr / dev  nvim main.go`. What runs is found as
+[saving a layout](kitty.md#saving-a-layout) finds it: the command the shell reports running, for a window showing a
+session provider's session what the provider says it runs, else the program in its foreground; nothing for
+the shell at its prompt. **All** lists both. `kspaces pick --scope spaces|windows|all` says which it lists,
+`spaces` by default, so a mapping picks its own: `map cmd+p kspaces_pick --scope=windows`. `shift+tab`
+lists the next, and the strip of scopes at the end of the query's line, in a picker 60 columns or wider,
+lists the one clicked. `enter` on a window switches to its session and focuses it; a window has no menu.
 `enter` switches to the
 entry under the cursor. `shift+enter`, or `alt+enter` for a terminal that sends `shift+enter` as `enter`,
 switches to it without its [default layout](kitty.md#layouts), as **Open without layout** does; the last
@@ -714,12 +724,13 @@ it, and a click elsewhere closes it, a right click on another entry opening that
 Beside the list in a popup 90 columns or wider, and below it in a narrower one, a preview shows the
 entry under the cursor: a status entry in full, as the sidebar's opened entry; a worktree's space, path,
 branch, its changes, upstream and PR as its row shows them, its session, how many windows it has open,
-whether it has a saved session file, and its status entries. A missing worktree's path says its directory
+whether it has a saved session file, and its status entries. A window's says its session, tab, title, what runs in it and its
+working directory. A missing worktree's path says its directory
 is gone, with no branch or git state. A popup too short for both shows only the list.
 
 Under what it says of the entry, where there is room, the preview shows the bottom of a window's screen,
 with its colors, under a rule: a status entry's own window, or for a session with windows open the one
-switching to it focuses, the one focused most recently, as `goto_session` picks it. Without focus times
+switching to it focuses, the one focused most recently, as `goto_session` picks it; a window's own. Without focus times
 from kitty, it is the active window of the session's active tab. A session with no windows open shows no
 screen, and neither do the picker's own window, the docks and the forms. The screen is read with
 `kitten @ get-text` when the cursor lands on the entry and again every second while it stays, so it
