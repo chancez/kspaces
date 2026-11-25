@@ -175,6 +175,9 @@ pr_layout = "review"
 [sidebar]
 width = 28
 popup = "overlay"
+# A file to log everything the sidebar writes to its terminal, for debugging how it draws. Read
+# when the sidebar starts. Unset by default.
+# trace = "/tmp/kspaces-tea.log"
 
 # A panel's size, COLUMNSxLINES, each in cells or a percentage of the screen, such as "60%x70%", by what
 # it shows: a form, a form that lists what it acts on, and the picker. An overlay is the size of the

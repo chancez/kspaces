@@ -104,6 +104,9 @@ type Sidebar struct {
 	// The size of each kind of panel, DefaultPopupSizes' for one unset; an overlay is the size of the
 	// window it is over.
 	PopupSize PopupSizes `toml:"popup_size"`
+	// A file bubbletea appends what the sidebar writes to its terminal to, as TEA_TRACE does, for debugging
+	// how it draws; empty for none. Read when the sidebar starts.
+	Trace string `toml:"trace"`
 }
 
 // PopupSizes are the panels' sizes, by what they show.
@@ -399,6 +402,7 @@ func decode(data string) (decoded, error) {
 		return decoded{}, err
 	}
 	cfg.SessionsDir = expand(cfg.SessionsDir)
+	cfg.Sidebar.Trace = expand(cfg.Sidebar.Trace)
 	return decoded{cfg: cfg, md: md, spaceKeys: keys}, nil
 }
 

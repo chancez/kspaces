@@ -26,6 +26,7 @@ delete_branch = true
 [sidebar]
 width = 40
 popup = "panel"
+trace = "~/tea.log"
 
 [sidebar.popup_size]
 picker = "150x40"
@@ -53,7 +54,7 @@ group = "work"
 		Launch:      []string{"kitten", "my_launch.py"},
 		SessionsDir: filepath.Join(home, ".local/share/kitty/sessions"),
 		Worktrees:   Worktrees{Dir: ".worktrees", BranchPrefix: "pr/me", DeleteBranch: true},
-		Sidebar:     Sidebar{Width: 40, Popup: PopupPanel, PopupSize: PopupSizes{Picker: PopupSize{Columns: 150, Lines: 40}}},
+		Sidebar:     Sidebar{Width: 40, Popup: PopupPanel, PopupSize: PopupSizes{Picker: PopupSize{Columns: 150, Lines: 40}}, Trace: filepath.Join(home, "tea.log")},
 		Kitty:       Kitty{AutoInstall: true},
 		Git:         Git{Timeout: time.Minute},
 		Editor:      Editor{Vim: true},

@@ -588,6 +588,10 @@ func RunSidebar(ctx context.Context) error {
 	// kitty hangs up on the sidebar when its window closes, which would end it before it removes its socket.
 	ctx, cancel := signal.NotifyContext(ctx, syscall.SIGHUP)
 	defer cancel()
+	// bubbletea reads TEA_TRACE when the program is made.
+	if cfg, err := config.Load(); err == nil && cfg.Sidebar.Trace != "" {
+		os.Setenv("TEA_TRACE", cfg.Sidebar.Trace)
+	}
 	m := newSidebar(kitty.SelfWindowID())
 	prog := tea.NewProgram(m, tea.WithContext(ctx), tea.WithFilter(m.mouse.filter))
 	if path := os.Getenv(focusSocketEnv); path != "" {
