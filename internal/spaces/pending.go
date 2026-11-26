@@ -92,10 +92,16 @@ func processRuns(pid int) bool {
 	return err == nil || errors.Is(err, syscall.EPERM)
 }
 
-// pendingError says what is under way in a worktree, for what it stops.
-func pendingError(p Pending) error {
-	return fmt.Errorf("%s is being %s", config.Tilde(p.Path), map[PendingOp]string{PendingCreate: "created", PendingRemove: "removed"}[p.Op])
+// PendingError is what a worktree being created or removed stops, see MarkPending.
+type PendingError struct {
+	Pending Pending
 }
+
+func (e *PendingError) Error() string {
+	return fmt.Sprintf("%s is being %s", config.Tilde(e.Pending.Path), map[PendingOp]string{PendingCreate: "created", PendingRemove: "removed"}[e.Pending.Op])
+}
+
+func pendingError(p Pending) error { return &PendingError{Pending: p} }
 
 // MarkPending marks the worktree of the space at root, at path on branch, as op says, held by this process,
 // and returns what unmarks it, which leaves a mark another process has taken since alone. It refuses a

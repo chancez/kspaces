@@ -39,3 +39,23 @@ func TestPendingMarker(t *testing.T) {
 		t.Errorf("remove applies %v, want %v", applies, want)
 	}
 }
+
+// Saying a worktree is being removed lasts while a load lists it so, and goes once one does not.
+func TestPendingErrorClears(t *testing.T) {
+	e := newSidebarEnv(t)
+	snap := fixture(time.Now())
+	path := "/src/gr/.worktrees/fix"
+	snap.Pending = map[string]spaces.PendingOp{path: spaces.PendingRemove}
+	e.m.Update(snap)
+	pending := &spaces.PendingError{Pending: spaces.Pending{Op: spaces.PendingRemove, Path: path}}
+	e.m.Update(failedMsg{pending})
+	e.m.Update(snap)
+	if e.m.failed != pending {
+		t.Fatalf("failed while removing = %v, want %v", e.m.failed, pending)
+	}
+	snap.Pending = nil
+	e.m.Update(snap)
+	if e.m.failed != nil {
+		t.Fatalf("failed once removed = %v, want nil", e.m.failed)
+	}
+}

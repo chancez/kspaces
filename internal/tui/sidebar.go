@@ -4,6 +4,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -379,6 +380,10 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			at := m.cursorAt()
 			m.cfg, m.spaces, m.others, m.folded, m.saved, m.suspended, m.keeping, m.kitty = *msg.Config, msg.Spaces, msg.Others, msg.Folded, msg.Saved, msg.Suspended, msg.Keeping, msg.Kitty
 			m.hidden, m.statuses, m.busy = msg.Hidden, msg.Kitty.Statuses, msg.Pending
+			// Saying a worktree is being created or removed is over once it is not.
+			if e, ok := errors.AsType[*spaces.PendingError](m.failed); ok && m.busy[e.Pending.Path] == "" {
+				m.failed = nil
+			}
 			m.kitty.Statuses = spaces.Shown(m.cfg, m.hidden, m.statuses)
 			m.order = msg.Order
 			m.git = msg.Git
