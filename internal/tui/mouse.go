@@ -162,8 +162,7 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 	case tea.MouseRight:
 		if i, ok := m.clickedEntry(msg.X, msg.Y); ok {
 			m.cursor = i
-			t, _ := m.entryTarget(i)
-			m.openMenu(msg.Y, t)
+			m.openMenu(msg.Y, m.menuTargets(i)...)
 			return nil
 		}
 		if msg.Y < headerRows+m.layout().spaces && msg.X < m.contentWidth() {

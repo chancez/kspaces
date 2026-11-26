@@ -321,6 +321,23 @@ Each form confirms in a popup of its own, so the mode ends once the rows show th
 gone from the list, a session with no windows, a saved file gone, or a session with a window more. A form
 cancelled changes nothing, and the ticks stay for another go.
 
+## Shared layouts
+
+With a provider that [shares layouts](kitty.md#shared-layouts), a worktree's tabs follow it between
+machines. When this machine's panes and a host's layout both changed while apart, the worktree has
+diverged from that host, and its row ends with `~ diverged` (see [Spaces](#spaces)) until it is resolved:
+each machine keeps showing its own version, and nothing is shared between the two.
+
+`enter` on a diverged row changes nothing and says on the last line what to do, as `gr@dev diverged from
+desktop: pick a layout from the menu (m)`. The row's menu ends with a Layout section of three items, each
+for the layout as a whole: Use this machine's, Use HOST's and Keep both, the first two with how many tabs
+each side has and how old it is, as `5 tabs now` and `2 tabs 3h`. They have no keys and are last, so
+neither a key pressed by habit nor `enter` on the item the menu opens on resolves anything: move to one
+with `j` / `k` and press `enter`, or click it. A pane closed in resolving
+only has its window closed; its session keeps running, and the detached row lists it. A row standing for
+several divergences, as a folded space's or a worktree's diverged from two hosts, offers none: each is
+resolved from its own row, on the hosts tab under the host it diverged from.
+
 ## The menu
 
 Right-click a row or a status entry, or press `m` on it. The menu lists what applies to the row, in
@@ -364,6 +381,9 @@ group, and Add space.
 | Space | Show / Hide sessions | `space` | show or hide a space's detached sessions, on the row of how many |
 | Space | Clean up sessions | `p` | kill and remove a space's detached sessions chosen in a form, on the row of how many |
 | Space | Add space | `a` | add a repository to the spaces, in a form; on every row, on a group's header or its spaces' rows in that group |
+| Layout | Use this machine's | | save this machine's version of a [diverged](#shared-layouts) layout over the host's; on a diverged row |
+| Layout | Use HOST's | | take the host's version here, opening and closing panes to match; on a diverged row |
+| Layout | Keep both | | open what the host's version has that this machine's does not, and save the two; on a diverged row |
 
 Each item that changes something opens a form in a popup, with buttons and keys to confirm or cancel: an
 overlay over the window beside the sidebar, or with `[sidebar] popup = "panel"` a centered panel of its own,

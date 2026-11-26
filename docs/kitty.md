@@ -311,7 +311,7 @@ one, and a pane closing as its session's host went away looks like a pane closed
 agreed on is all it goes by, and with nothing that says, the user decides.
 
 A diverged layout is neither saved nor taken: each machine keeps showing its own version until the user
-resolves it, as a whole, from the worktree's row in the sidebar. Use this machine's saves this machine's
+resolves it, as a whole, from the worktree's row in [the sidebar](sidebar.md#shared-layouts). Use this machine's saves this machine's
 panes over the host's layout, which the other machines then take. Use the host's takes the host's layout
 here, opening and closing panes to match. Keep both opens what the host's layout has that this machine
 does not, and saves the two together, which the other machines then take. A pane closed in resolving

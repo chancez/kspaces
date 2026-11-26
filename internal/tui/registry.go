@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"errors"
+	"time"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/chancez/kspaces/internal/config"
@@ -22,6 +25,9 @@ type entrySubject struct {
 	index int
 	row   spaces.Row
 }
+
+// divergedSubject is a worktree's layout on a host diverged from its panes here, from its row's menu.
+type divergedSubject struct{ d spaces.Divergence }
 
 // groupSubject is a group's header in the spaces list, by the group's name.
 type groupSubject struct{ name string }
@@ -152,6 +158,7 @@ func foldable(m *sidebar, s entrySubject) bool {
 // lists: the session first, as opening it is what a row is mostly for; then what acts on the row's own
 // worktree; then what is the same from any row of the space, and the list's own last.
 const (
+	sectionLayout   = "Layout"
 	sectionSession  = "Session"
 	sectionWorktree = "Worktree"
 	sectionSpace    = "Space"
@@ -159,6 +166,16 @@ const (
 
 // The spaces list's entries. The titles are the context menu's.
 var (
+	// actDivergedHint is enter on a row whose layout diverged, which does nothing but say how to resolve it,
+	// as opening it would show one version as if it were the shared one.
+	actDivergedHint = &interact.Action[*sidebar, entrySubject]{
+		Title:   "Diverged",
+		Applies: func(m *sidebar, s entrySubject) bool { return len(m.rowDiverged(s.row)) > 0 },
+		Run: func(m *sidebar, s entrySubject) tea.Cmd {
+			m.failed = errors.New(m.divergedHint(s.row))
+			return nil
+		},
+	}
 	actOpenWorktree = &interact.Action[*sidebar, entrySubject]{
 		Title:   "Open",
 		Section: sectionSession,
@@ -1250,7 +1267,33 @@ var (
 	actShowClose    = quit[*errorForm, showSubject]()
 )
 
+// A diverged layout's resolutions, see spaces.Resolution, as its worktree's row's menu offers them.
 var (
+	actUseLocal = &interact.Action[*sidebar, divergedSubject]{
+		Title: "Use this machine's",
+		Name: func(m *sidebar, s divergedSubject) string {
+			return "Use this machine's: " + divergedSide(s.d.LocalTabs, "now")
+		},
+		Section: sectionLayout,
+		Run:     resolveRun(spaces.UseLocal),
+	}
+	actUseRemote = &interact.Action[*sidebar, divergedSubject]{
+		Title: "Use the host's",
+		Name: func(m *sidebar, s divergedSubject) string {
+			return "Use " + hostName(s.d.Host) + "'s: " + divergedSide(s.d.RemoteTabs, status.Age(s.d.Saved, time.Now()))
+		},
+		Section: sectionLayout,
+		Run:     resolveRun(spaces.UseRemote),
+	}
+	actKeepBoth = &interact.Action[*sidebar, divergedSubject]{
+		Title:   "Keep both",
+		Section: sectionLayout,
+		Run:     resolveRun(spaces.KeepBoth),
+	}
+)
+
+var (
+	divergedKind    *interact.Kind[*sidebar, divergedSubject]
 	entryKind       *interact.Kind[*sidebar, entrySubject]
 	groupKind       *interact.Kind[*sidebar, groupSubject]
 	detachedKind    *interact.Kind[*sidebar, detachedSubject]
@@ -1284,6 +1327,7 @@ var (
 	sortKind        *interact.Kind[*sidebar, sortSubject]
 
 	spacesList         *interact.Place[*sidebar, entrySubject]
+	divergedRows       *interact.Place[*sidebar, divergedSubject]
 	groupHeaders       *interact.Place[*sidebar, groupSubject]
 	hostHeaders        *interact.Place[*sidebar, hostSubject]
 	detachedRows       *interact.Place[*sidebar, detachedSubject]
@@ -1355,7 +1399,13 @@ func init() {
 		return spacesSubject{group: s.row.Space.Group}, true
 	}, spacesKind)
 	spacesList = interact.List(entryKind)
+	spacesList.BindQuiet(actDivergedHint, "enter", "l")
 	spacesList.Bind(actOpenWorktree, "enter/l", "open", "enter", "l")
+
+	// Only in a diverged row's menu, see menuTargets, and with no keys: each closes panes here or on the
+	// other machine, which a key pressed by habit should not.
+	divergedKind = interact.NewKind(func(s divergedSubject) string { return "Layout" }, actUseLocal, actUseRemote, actKeepBoth)
+	divergedRows = interact.List(divergedKind)
 
 	groupKind = interact.NewKind(func(s groupSubject) string { return s.name }, actFoldGroup, actUnfoldGroup, actSelectGroup)
 	groupKind.Bind(actFoldGroup, "space", "fold or unfold the group", "space")
