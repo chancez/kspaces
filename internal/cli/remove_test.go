@@ -85,7 +85,7 @@ func TestRemoveDeleteBranch(t *testing.T) {
 	refused := fmt.Sprintf("%s: unmerged has 1 commit not merged, which deleting it would lose; the worktree is kept", wt("unmerged"))
 	want := []result{
 		{Calls: []string{"git -d merged"}, Branches: "kept main merged2 unmerged unmerged2"},
-		{Err: refused, Calls: []string{"kitten show_error Could not remove the worktree"}, Branches: "kept main merged2 unmerged unmerged2"},
+		{Err: refused, Calls: []string{"kitten show_error 'Could not remove the worktree'"}, Branches: "kept main merged2 unmerged unmerged2"},
 		{Calls: []string{"git -D unmerged"}, Branches: "kept main merged2 unmerged2"},
 		{Calls: []string{"git -d merged2", "git -D unmerged2"}, Branches: "kept main"},
 	}
@@ -146,7 +146,7 @@ func TestRemoveForgetSession(t *testing.T) {
 		append([]string{"--forget-session needs --yes"}, all...),
 		append([]string{"give the PATH of a worktree to remove"}, all...),
 		{"<nil>", "@kept.kitty-session", "@stuck.kitty-session"},
-		{fmt.Sprintf("%s@stuck: remove %s: directory not empty", name, stuck), "kitten show_error Could not remove the worktree", "@kept.kitty-session", "@stuck.kitty-session"},
+		{fmt.Sprintf("%s@stuck: remove %s: directory not empty", name, stuck), "kitten show_error 'Could not remove the worktree'", "@kept.kitty-session", "@stuck.kitty-session"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got\n%q\nwant\n%q", got, want)

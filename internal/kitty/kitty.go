@@ -408,7 +408,8 @@ func LaunchBackground(args ...string) error {
 
 // ShowError shows an error in kitty, for a process with no window of its own to show it in.
 func ShowError(title, msg string) error {
-	return Action("show_error", title, msg)
+	// kitty splits show_error's arguments as a shell would.
+	return Action("show_error", Quote(title), Quote(msg))
 }
 
 // CloseSession closes every window of session, as closing them by hand would, so whatever kitty.conf runs
