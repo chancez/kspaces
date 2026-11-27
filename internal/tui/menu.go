@@ -242,14 +242,15 @@ func (m *sidebar) drawMenu(lines []string) {
 }
 
 // toggleFold hides or shows the linked worktrees of the space at root, in every sidebar.
-func (m *sidebar) toggleFold(root string) {
-	m.folded[root] = !m.folded[root]
+func (m *sidebar) toggleFold(host, root string) {
+	key := spaces.FoldKey(host, root)
+	m.folded[key] = !m.folded[key]
 	if err := spaces.SaveFolded(m.folded); err != nil {
 		m.failed = err
 	}
 	m.setRows()
 	for i, r := range m.rows {
-		if r.Main && r.Space.Root == root {
+		if r.Main && r.Space != nil && r.Space.Root == root && r.Host == host {
 			m.cursor = i
 		}
 	}

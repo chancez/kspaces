@@ -211,7 +211,7 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 	if m.showingHosts() {
 		m.rows = m.hostRows()
 	} else {
-		m.rows = m.listRows(m.others, m.listed(), m.detached, m.detachedOpen)
+		m.rows = m.listRows("", m.others, m.listed(), m.detached, m.detachedOpen)
 	}
 	m.pruneTicks()
 	if entry >= 0 {
@@ -251,12 +251,12 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 // listRows are the rows of others and spaces, all of them or the filters', with the detached sessions of
 // detached after their spaces' rows, those of the spaces in open under their head, while no filter
 // narrows the rows.
-func (m *sidebar) listRows(others, list []spaces.Space, detached map[string]spaces.Detached, open map[string]bool) []spaces.Row {
+func (m *sidebar) listRows(host string, others, list []spaces.Space, detached map[string]spaces.Detached, open map[string]bool) []spaces.Row {
 	var rows []spaces.Row
 	if m.filtering {
 		rows = filterRows(spaces.BuildRows(others, list, nil, m.hidden, m.rowOrder()), m.filter.Value())
 	} else {
-		rows = spaces.BuildRows(others, list, m.folded, m.hidden, m.rowOrder())
+		rows = spaces.BuildRows(others, list, spaces.FoldedOn(m.folded, host), m.hidden, m.rowOrder())
 	}
 	if m.attending {
 		rows = spaces.AttentionRows(rows, m.kitty.Statuses)

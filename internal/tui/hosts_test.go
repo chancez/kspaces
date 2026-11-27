@@ -290,3 +290,27 @@ func TestHostsTabRemote(t *testing.T) {
 		t.Errorf("o ran\n%q\nwant second\n%q", got, shell)
 	}
 }
+
+// Folding a space under one host leaves the same space under another as it is, and the cursor on the row
+// it folded.
+func TestHostsTabFoldsPerHost(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(hostsFixture())
+	e.m.Update(tea.FocusMsg{})
+	e.press("tab")
+	server := slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.Host == "server" && r.Main && r.Space.Name == "gr" })
+	e.m.cursor = server
+	e.press("space")
+	folded := map[string]bool{}
+	for _, r := range e.m.rows {
+		if r.Main && r.Space != nil && r.Space.Name == "gr" {
+			folded[hostName(r.Host)] = r.Folded
+		}
+	}
+	if want := map[string]bool{"local": false, "server": true}; !reflect.DeepEqual(folded, want) {
+		t.Errorf("folded %v, want %v", folded, want)
+	}
+	if r := e.m.rows[e.m.cursor]; r.Host != "server" || !r.Main || r.Space.Name != "gr" {
+		t.Errorf("cursor on %+v, want server's gr", r)
+	}
+}

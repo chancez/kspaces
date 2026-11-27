@@ -55,7 +55,7 @@ func (m *sidebar) hostRows() []spaces.Row {
 				open[wt] = true
 			}
 		}
-		rows := m.listRows(v.Others, v.Spaces, v.Detached, open)
+		rows := m.listRows(v.Host, v.Others, v.Spaces, v.Detached, open)
 		if len(rows) == 0 && m.narrowed() {
 			continue
 		}

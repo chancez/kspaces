@@ -201,14 +201,18 @@ var (
 	actFold = &interact.Action[*sidebar, entrySubject]{
 		Title:   "Fold worktrees",
 		Section: sectionSpace,
-		Applies: func(m *sidebar, s entrySubject) bool { return foldable(m, s) && !m.folded[s.row.Space.Root] },
-		Run:     func(m *sidebar, s entrySubject) tea.Cmd { m.toggleFold(s.row.Space.Root); return nil },
+		Applies: func(m *sidebar, s entrySubject) bool {
+			return foldable(m, s) && !m.folded[spaces.FoldKey(s.row.Host, s.row.Space.Root)]
+		},
+		Run: func(m *sidebar, s entrySubject) tea.Cmd { m.toggleFold(s.row.Host, s.row.Space.Root); return nil },
 	}
 	actUnfold = &interact.Action[*sidebar, entrySubject]{
 		Title:   "Unfold worktrees",
 		Section: sectionSpace,
-		Applies: func(m *sidebar, s entrySubject) bool { return foldable(m, s) && m.folded[s.row.Space.Root] },
-		Run:     func(m *sidebar, s entrySubject) tea.Cmd { m.toggleFold(s.row.Space.Root); return nil },
+		Applies: func(m *sidebar, s entrySubject) bool {
+			return foldable(m, s) && m.folded[spaces.FoldKey(s.row.Host, s.row.Space.Root)]
+		},
+		Run: func(m *sidebar, s entrySubject) tea.Cmd { m.toggleFold(s.row.Host, s.row.Space.Root); return nil },
 	}
 	actNewWorktree          = onEntry(rowNewWorktree)
 	actNewWorktreeFromPR    = onEntry(rowNewWorktreeFromPR)

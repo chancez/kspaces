@@ -3,6 +3,7 @@ package spaces
 import (
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/chancez/kspaces/internal/state"
 )
@@ -11,6 +12,33 @@ import (
 // expanded, as kitty opens sessions in it from anywhere, so it never starts with group:.
 func GroupKey(name string) string {
 	return "group:" + name
+}
+
+// FoldKey is how the folded spaces name the space at root as host has it, on the hosts tab: its root for
+// this machine's, as the spaces tab has it, and HOST:ROOT for another host's, so folding a space under one
+// host leaves the same root under another as it is.
+func FoldKey(host, root string) string {
+	if host == "" {
+		return root
+	}
+	return host + ":" + root
+}
+
+// FoldedOn is folded as host's spaces are looked up in it, by root, see FoldKey: the group keys as they
+// are, as a group folds under every host.
+func FoldedOn(folded map[string]bool, host string) map[string]bool {
+	if host == "" {
+		return folded
+	}
+	out := map[string]bool{}
+	for key, on := range folded {
+		if root, ok := strings.CutPrefix(key, host+":"); ok {
+			out[root] = on
+		} else if strings.HasPrefix(key, "group:") {
+			out[key] = on
+		}
+	}
+	return out
 }
 
 // LoadFolded reads the spaces whose linked worktrees are hidden in the sidebar, by root, and the groups
