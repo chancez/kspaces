@@ -139,7 +139,7 @@ func worktreeFields(th *look.Theme, snap spaces.Snapshot, r spaces.Row, width in
 		} else {
 			lines = append(lines, field("branch", look.Text(wt.Branch)))
 		}
-		lines = append(lines, gitFields(snap.Git[wt.Path])...)
+		lines = append(lines, gitFields(snap.Git[spaces.GitKey(*wt)])...)
 	}
 	lines = append(lines, field("session", look.Text(wt.Session)))
 	if n := snap.Kitty.Windows[wt.Session]; n > 0 {

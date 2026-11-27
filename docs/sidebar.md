@@ -207,7 +207,8 @@ under the sidebar blanks nothing; after three failures in a row it is asked agai
 
 ### The hosts tab
 
-With a provider that lists sessions the title is two tabs, `SPACES HOSTS`. `tab`, or a click on the other
+With a provider that lists sessions, or [other hosts](kitty.md#other-hosts) in the config, the title is two
+tabs, `SPACES HOSTS`. `tab`, or a click on the other
 tab, switches between them, and the choice is kept across restarts. The hosts tab lists the spaces tab's
 rows by host: a row for each host, `local` first and then the rest by name, and under it what the spaces
 tab would list of that host. This machine has the whole list. Another host has the spaces and the
@@ -217,6 +218,11 @@ directory. Each host's detached sessions are under their own `N detached` row, w
 there alone. `space` or a click on its caret folds a host's row, not kept across restarts. A host's row has
 the rule across the sidebar that a group's header has on the spaces tab, and a group's header under a host
 has none, so a group reads as inside its host rather than as the next one.
+
+A host the config names lists its own copies of its spaces instead, as its kspaces server says: their
+worktrees there and their git state. Its row says `unreachable` while its server cannot be reached, and
+its copies stay as it last said. Nothing that works in a directory here applies to a copy, so its menu
+offers only folding.
 
 A row does what it does on the spaces tab, so a worktree listed under several hosts opens the same kitty
 session from each. `enter` on a worktree only another host has opens a tab of one of its sessions there,

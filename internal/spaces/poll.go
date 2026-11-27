@@ -44,6 +44,8 @@ type Shared struct {
 	Provider *ProviderState `json:"provider,omitempty"`
 	// The worktrees' layouts diverged from their hosts', see layoutSync.
 	Diverged []Divergence `json:"diverged,omitempty"`
+	// What is known of the other hosts the config names, by name.
+	Remotes map[string]RemoteHost `json:"remotes,omitempty"`
 }
 
 // sharedSpace is a Space with its errors as text.
@@ -134,7 +136,8 @@ func (sh Shared) View(self int) Snapshot {
 	if sh.KittyErr != "" {
 		snap.Err = errors.New(sh.KittyErr)
 	}
-	snap.Git = sh.Git
+	snap.Remotes, snap.Git = remoteViews(sh.Remotes)
+	snap.Git = withRemoteGit(sh.Git, snap.Git)
 	snap.Pending = placePending(snap.Spaces, sh.Pending)
 	snap.Diverged = sh.Diverged
 	snap.Detached = detachedBySpace(sh.Provider, toSet(sh.Kept))
@@ -186,6 +189,8 @@ type Poller struct {
 	share func(sh Shared)
 	// diverged are the layouts the last pass found diverged, see Divergences; nil for never.
 	diverged func() []Divergence
+	// remotes loads the other hosts, nil for none.
+	remotes *remotes
 }
 
 // NewPoller is the poller of the kitty kspaces runs in.
@@ -207,7 +212,25 @@ func NewPoller() *Poller {
 	ls := newLayoutSync()
 	p.share = func(sh Shared) { shareLayouts(ls, sh, self) }
 	p.diverged = ls.divergences
+	if dial := remoteDialer(); dial != nil {
+		p.remotes = newRemotes(dial)
+	}
 	return p
+}
+
+// OnRemote has f called when what is known of another host changes, as it loads in the background. Call
+// it before the first poll.
+func (p *Poller) OnRemote(f func()) {
+	if p.remotes != nil {
+		p.remotes.changed = f
+	}
+}
+
+// Close stops loading the other hosts.
+func (p *Poller) Close() {
+	if p.remotes != nil {
+		p.remotes.stopAll()
+	}
 }
 
 func newPoller(load func(pushed *HostData) Shared) *Poller {
@@ -241,6 +264,9 @@ func (p *Poller) poll(pushed *HostData) Shared {
 	defer p.mu.Unlock()
 	defer logs.Took("poll", time.Now())
 	sh := p.load(pushed)
+	if p.remotes != nil && sh.Config != nil {
+		sh.Remotes = p.remotes.update(sh.Config.Hosts)
+	}
 	p.lastMu.Lock()
 	// The provider's last list until it lists again below, so windows listed in between, see Windows, do
 	// not drop its sessions.
@@ -290,6 +316,9 @@ func (p *Poller) Windows() Shared {
 	sh := p.last
 	if sh.Config != nil {
 		sh.Pending = pendingList()
+	}
+	if p.remotes != nil {
+		sh.Remotes = p.remotes.known()
 	}
 	return p.listed(sh)
 }

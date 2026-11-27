@@ -174,6 +174,8 @@ type sidebar struct {
 	hostsTab    bool
 	sessions    []spaces.ProviderSession
 	hostsFolded map[string]bool
+	// remotes are the other hosts the config names, see spaces.RemoteView.
+	remotes map[string]spaces.RemoteView
 }
 
 func newSidebar(self int) *sidebar {
@@ -228,6 +230,9 @@ func (m *sidebar) focusCursor() tea.Cmd {
 
 // hostMsg is the host data, pushed by this host's server.
 type hostMsg struct{ data spaces.HostData }
+
+// remoteMsg is another host's host data loaded, or failing to.
+type remoteMsg struct{}
 
 // pushed polls with the host data pushed.
 func (m *sidebar) pushed(hd spaces.HostData) tea.Cmd {
@@ -368,6 +373,8 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.th.SetDark(msg.IsDark())
 	case hostMsg:
 		return m, m.pushed(msg.data)
+	case remoteMsg:
+		return m, m.relist()
 	case tickMsg:
 		if m.remote && time.Since(m.remoteAt) > remoteIdle {
 			m.remote = false
@@ -400,7 +407,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.kitty.Statuses = spaces.Shown(m.cfg, m.hidden, m.statuses)
 			m.order = msg.Order
 			m.git, m.diverged = msg.Git, msg.Diverged
-			m.detached, m.caps, m.providerSpaces, m.sessions = msg.Detached, msg.Caps, msg.ProviderSpaces, msg.Sessions
+			m.detached, m.caps, m.providerSpaces, m.sessions, m.remotes = msg.Detached, msg.Caps, msg.ProviderSpaces, msg.Sessions, msg.Remotes
 			m.rebuildRows(at)
 			m.settle()
 			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))
@@ -669,8 +676,11 @@ func RunSidebar(ctx context.Context) error {
 	if path := os.Getenv(focusSocketEnv); path != "" {
 		defer listenFocus(path, func() { prog.Send(kittyFocusMsg{}) })()
 	}
-	// What changes the host data elsewhere, a form or a command, shows at once.
+	// What changes the host data elsewhere, a form or a command, shows at once, and so does what another
+	// host's server loads.
 	defer spaces.ThisHost().Subscribe(func(hd spaces.HostData) { prog.Send(hostMsg{hd}) })()
+	m.poller.OnRemote(func() { prog.Send(remoteMsg{}) })
+	defer m.poller.Close()
 	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("running the sidebar: %w", err)
 	}

@@ -212,6 +212,9 @@ func MissingWorktree(r spaces.Row) Span { return sp(elWorktree, r.Dir()) }
 // Gone stands for a missing worktree's branch, which went with its directory.
 func Gone() Span { return sp(elMuted, "gone") }
 
+// Unreachable marks another host whose server could not load, on its row of the hosts tab.
+func Unreachable() Span { return sp(elMuted, "unreachable") }
+
 // Diverged marks a worktree whose layout on a host diverged from its panes here, see spaces.Divergence.
 func Diverged() []Span { return []Span{sp(elMuted, "~ diverged")} }
 

@@ -332,6 +332,26 @@ session's space is shared: kitty's startup session, whatever its file is named, 
 `default`, which is this machine's alone, and a window left in another space is that space's.
 One kitty's sidebars share one pass, under a lock, which keeps what it knows beside the git states' file.
 
+## Other hosts
+
+`[hosts]` names the other machines whose spaces the [hosts tab](sidebar.md#the-hosts-tab) lists, each as it
+has them: its copies, see [the stories](stories.md).
+
+```toml
+[hosts.white]                  # ssh white, running kspaces from its PATH
+[hosts.nas]
+ssh = "me@nas.lan"             # the ssh destination, the host's name by default
+kspaces = "~/.local/bin/kspaces"   # the kspaces to run there, for a PATH without it
+```
+
+The sidebar reaches each with `ssh -T -o BatchMode=yes DEST KSPACES server proxy`, which connects to the
+[server](server.md) there, starting it as kspaces does here. The other machine needs kspaces and a config
+of its own, not kitty. ssh must get in without asking, by a key or an agent: there is no one to type a
+password. Every two seconds the sidebar asks each host to load, in the background, so a slow one holds
+nothing up; one that fails is asked less and less often, up to once a minute, and keeps what it last said.
+A host is defined in one file; an overlay's takes its place. `hosts` is kspaces.toml's only, not a space's
+own config.
+
 ## Running commands
 
 Commands are what the new worktree form and a worktree's **Run** can start in a session, from kspaces.toml

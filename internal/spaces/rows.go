@@ -69,9 +69,16 @@ func (r Row) Blank() bool {
 	return r.Space == nil && r.Group == nil && r.Detached == nil && !r.HostHeader
 }
 
-// Elsewhere reports whether r is a worktree only another host has, see Worktree.Host.
+// Elsewhere reports whether r is a worktree only another host's sessions are tagged with, see
+// Worktree.Host, with no directory known.
 func (r Row) Elsewhere() bool {
-	return r.Worktree != nil && r.Worktree.Host != ""
+	return r.Worktree != nil && r.Worktree.Host != "" && r.Worktree.Path == ""
+}
+
+// Remote reports whether r is another host's copy of a worktree, from that host's server, see
+// docs/stories.md: its directory is there, so nothing done in a directory here applies to it.
+func (r Row) Remote() bool {
+	return r.Worktree != nil && r.Worktree.Host != "" && r.Worktree.Path != ""
 }
 
 // Absent reports whether r's worktree has no directory here: a missing one, or one only another host has.
@@ -315,8 +322,10 @@ type Snapshot struct {
 	// Sessions the provider is keeping, with the mode each is listed as, see KeepClosing.
 	Keeping map[string]KeepMode
 	Kitty   kitty.State
-	// What git and gh say of each worktree, by path, as far as the leading sidebar knows.
+	// What git and gh say of each worktree, by GitKey.
 	Git map[string]gitstate.State
+	// The other hosts the config names, by name, see RemoteView.
+	Remotes map[string]RemoteView
 	// The worktrees being created or removed, by path, see placePending.
 	Pending map[string]PendingOp
 	// The worktrees' layouts diverged from their hosts', by session and host, see Divergence.

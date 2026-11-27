@@ -32,7 +32,7 @@ func TestHostViews(t *testing.T) {
 		"notes":   {Hosts: []HostSessions{{Host: "server", Sessions: []ProviderSession{sessions[4]}}}},
 		"docs":    {Hosts: []HostSessions{{Host: "laptop", Sessions: []ProviderSession{sessions[5]}}}},
 	}
-	got := HostViews([]Space{def}, []Space{gr, docs}, sessions, detached)
+	got := HostViews([]Space{def}, []Space{gr, docs}, sessions, detached, nil)
 	want := []HostView{
 		{Others: []Space{def}, Spaces: []Space{gr, docs}, Detached: map[string]Detached{
 			"gr": {Hosts: []HostSessions{{Sessions: []ProviderSession{sessions[0]}}}},
@@ -52,6 +52,35 @@ func TestHostViews(t *testing.T) {
 				"default": {Hosts: []HostSessions{{Host: "server", Sessions: []ProviderSession{sessions[3]}}}},
 				"notes":   {Hosts: []HostSessions{{Host: "server", Sessions: []ProviderSession{sessions[4]}}}},
 			}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("views:\n%#v\nwant\n%#v", got, want)
+	}
+}
+
+// A host the config names that has loaded lists its own copies of its spaces, in place of what its
+// sessions say, with the sessions in no space it has; one that has not loaded is listed as its sessions
+// say, with why it could not.
+func TestHostViewsRemote(t *testing.T) {
+	gr := Space{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Session: "gr"}}}
+	def := Space{Name: "default", Worktrees: []Worktree{{Session: "default"}}}
+	homelab := Space{Name: "homelab", Root: "/home/me/homelab", Worktrees: []Worktree{{Path: "/home/me/homelab", Session: "white:homelab", Host: "white"}}}
+	sessions := []ProviderSession{
+		{ID: "w:a", Name: "a", Space: "homelab", Host: "white"},
+		{ID: "w:b", Name: "b", Host: "white"},
+		{ID: "n:c", Name: "c", Space: "gr", Host: "nas"},
+	}
+	remotes := map[string]RemoteView{
+		"white": {Loaded: true, Spaces: []Space{homelab}},
+		"nas":   {Err: "ssh: connect to host nas: Connection refused"},
+		"desk":  {Err: "ssh: connect to host desk: Operation timed out"},
+	}
+	got := HostViews([]Space{def}, []Space{gr}, sessions, nil, remotes)
+	want := []HostView{
+		{Others: []Space{def}, Spaces: []Space{gr}, Detached: map[string]Detached{}},
+		{Host: "desk", Detached: map[string]Detached{}, Err: "ssh: connect to host desk: Operation timed out"},
+		{Host: "nas", Spaces: []Space{{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Session: "gr"}}}}, Detached: map[string]Detached{}, Err: "ssh: connect to host nas: Connection refused"},
+		{Host: "white", Spaces: []Space{homelab}, Others: []Space{def}, Detached: map[string]Detached{}},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("views:\n%#v\nwant\n%#v", got, want)

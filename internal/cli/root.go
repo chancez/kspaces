@@ -75,6 +75,9 @@ func useServer(version string) error {
 		return err
 	}
 	spaces.UseHost(server.NewLocal(path, exe, version))
+	spaces.UseRemotes(func(name string, h config.HostSettings) spaces.Host {
+		return server.NewRemote(h.Destination(name), h.Command(), version)
+	})
 	return nil
 }
 

@@ -21,9 +21,15 @@ const (
 	hostsTabZone  = "tab:hosts"
 )
 
-// showingHosts is whether the hosts tab shows, which needs a provider that lists sessions.
+// showingHosts is whether the hosts tab shows, which needs other hosts to show: a provider that lists
+// sessions, or hosts the config names.
 func (m *sidebar) showingHosts() bool {
-	return m.hostsTab && m.caps[spaces.CapList]
+	return m.hostsTab && m.hasHosts()
+}
+
+// hasHosts is whether there is a hosts tab.
+func (m *sidebar) hasHosts() bool {
+	return m.caps[spaces.CapList] || len(m.remotes) > 0
 }
 
 // switchTab shows the other tab, and keeps the choice.
@@ -42,7 +48,7 @@ func (m *sidebar) switchTab() {
 // none of is left out whole, and a blank row goes between hosts.
 func (m *sidebar) hostRows() []spaces.Row {
 	var out []spaces.Row
-	for _, v := range spaces.HostViews(m.others, m.listed(), m.sessions, m.detached) {
+	for _, v := range spaces.HostViews(m.others, m.listed(), m.sessions, m.detached, m.remotes) {
 		open := map[string]bool{}
 		for key := range m.detachedOpen {
 			if wt, ok := strings.CutPrefix(key, openKey(true, v.Host, "")); ok {
@@ -98,9 +104,9 @@ func (m *sidebar) hostSessionsOf(host string, space spaces.Space, session string
 }
 
 // tabTitle is the title's tabs, SPACES and HOSTS, the one showing as the title and the other muted, or
-// SPACES alone without a provider that lists sessions.
+// SPACES alone without other hosts, see hasHosts.
 func (m *sidebar) tabTitle() []look.Span {
-	if !m.caps[spaces.CapList] {
+	if !m.hasHosts() {
 		return []look.Span{look.Title("SPACES")}
 	}
 	tab := func(name string, on bool) look.Span {
@@ -114,10 +120,14 @@ func (m *sidebar) tabTitle() []look.Span {
 }
 
 // renderHostHeader draws row i, a host's row on the hosts tab, marked as its entry: its caret, its name,
-// local for this machine, and a rule across the rest, as it is the outermost of what the tab lists.
+// local for this machine, unreachable when its server could not load, and a rule across the rest, as it is
+// the outermost of what the tab lists.
 func (m *sidebar) renderHostHeader(i int) string {
 	r, width, th := m.rows[i], m.contentWidth(), m.th
 	spans := append(look.Mark(fmt.Sprintf(caretZone, i), look.Caret(r.Folded)...), look.Title(hostName(r.Host)))
+	if m.remotes[r.Host].Err != "" {
+		spans = append(spans, look.Muted(" "), look.Unreachable())
+	}
 	if rest := width - th.Width(spans...) - 1; rest > 0 {
 		spans = append(spans, look.Muted(" "), th.GroupRule(rest))
 	}

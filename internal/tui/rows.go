@@ -157,7 +157,7 @@ func (m *sidebar) renderRow(i int) string {
 	gitRow := r.Worktree != nil && !r.Folded && !r.Other && !r.Absent()
 	var pieces gitRowPieces
 	if gitRow {
-		pieces = gitPieces(m.git[r.Worktree.Path])
+		pieces = gitPieces(m.git[spaces.GitKey(*r.Worktree)])
 	}
 	// The name gives way to the changes and the PR, its checks and review included, down to labelFloor
 	// cells, so a long name does not hide them. Ahead and behind get only what the name leaves.

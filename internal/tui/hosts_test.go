@@ -5,9 +5,11 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/spaces"
 )
 
@@ -185,5 +187,51 @@ func TestNoHostsTab(t *testing.T) {
 	e.press("tab")
 	if got := e.spacesScreen()[0]; got != spacesTitle || e.m.showingHosts() {
 		t.Errorf("title %q, hosts showing %v; want %q and false", got, e.m.showingHosts(), spacesTitle)
+	}
+}
+
+// remoteFixture is fixture with two other hosts the config names: white, whose server has its copy of
+// homelab, and nas, whose server could not be reached.
+func remoteFixture() spaces.Snapshot {
+	snap := fixture(time.Now())
+	dns := spaces.Worktree{Path: "/home/me/homelab/.worktrees/dns", Branch: "dns", Session: "white:homelab@dns", Host: "white"}
+	snap.Remotes = map[string]spaces.RemoteView{
+		"white": {Loaded: true, Spaces: []spaces.Space{{Name: "homelab", Root: "/home/me/homelab", Worktrees: []spaces.Worktree{
+			{Path: "/home/me/homelab", Branch: "main", Session: "white:homelab", Host: "white"}, dns,
+		}}}},
+		"nas": {Err: "ssh: connect to host nas: Connection refused"},
+	}
+	snap.Git = map[string]gitstate.State{spaces.GitKey(dns): {Status: &gitstate.Status{Changes: 2}}}
+	return snap
+}
+
+// Other hosts the config names make a hosts tab without a provider: each lists its own copies, with their
+// git state, and one that cannot be reached says so. Nothing done in a directory here is done to a copy.
+func TestHostsTabRemote(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(remoteFixture())
+	e.m.Update(tea.FocusMsg{})
+	e.press("tab")
+	got := e.spacesScreen()
+	nas := "▼ nas unreachable " + strings.Repeat("─", 12)
+	i := slices.Index(got, nas)
+	if i < 0 {
+		t.Fatalf("no unreachable nas in\n%q", got)
+	}
+	want := []string{
+		nas,
+		"",
+		"▼ white " + strings.Repeat("─", 22),
+		"▼ " + repoIcon + "homelab main",
+		"  " + branchIcon + "dns dns" + strings.Repeat(" ", 16) + "●2",
+	}
+	if !reflect.DeepEqual(got[i:], want) {
+		t.Errorf("other hosts:\n%q\nwant\n%q", got[i:], want)
+	}
+	e.m.cursor = e.hostRow("white", "white:homelab@dns")
+	for _, key := range []string{"enter", "n", "x", "R", "c"} {
+		if cmd := e.press(key); cmd != nil {
+			t.Errorf("%s on white's copy ran something", key)
+		}
 	}
 }

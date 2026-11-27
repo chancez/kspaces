@@ -32,8 +32,11 @@ func onEntry(a *rowAction) *interact.Action[*sidebar, entrySubject] {
 	act := &interact.Action[*sidebar, entrySubject]{
 		Title:   a.title,
 		Section: a.section,
-		// Nothing is done to a worktree being created or removed, see spaces.MarkPending.
-		Applies: func(m *sidebar, s entrySubject) bool { return !m.isBusy(s.row) && a.applies(m.view(), s.row) },
+		// Nothing is done to a worktree being created or removed, see spaces.MarkPending, nor to another host's
+		// copy, which is in a directory there.
+		Applies: func(m *sidebar, s entrySubject) bool {
+			return !m.isBusy(s.row) && !s.row.Remote() && a.applies(m.view(), s.row)
+		},
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			snap, r := m.view(), s.row
@@ -75,7 +78,7 @@ func rowPR(snap spaces.Snapshot, r spaces.Row) *gh.PR {
 	if r.Worktree == nil {
 		return nil
 	}
-	return snap.Git[r.Worktree.Path].PR
+	return snap.Git[spaces.GitKey(*r.Worktree)].PR
 }
 
 // newWorktreeFrom opens the form that creates a worktree in the row's space, on the tab from says, a new

@@ -185,7 +185,7 @@ var (
 		// windows, as it has no directory to start one in.
 		Applies: func(m *sidebar, s entrySubject) bool {
 			switch {
-			case s.row.Worktree == nil:
+			case s.row.Worktree == nil, s.row.Remote():
 				return false
 			case s.row.Elsewhere():
 				return m.isOpen(s.row.Worktree) || m.caps[spaces.CapOpen] && len(m.hostSessionsOf(s.row.Worktree.Host, *s.row.Space, s.row.Worktree.Session)) > 0
@@ -205,7 +205,7 @@ var (
 		Section: sectionSession,
 		// Only where the default layout would open: elsewhere it opens just as Open does.
 		Applies: func(m *sidebar, s entrySubject) bool {
-			return !s.row.Other && !s.row.Absent() && s.row.Worktree != nil &&
+			return !s.row.Other && !s.row.Absent() && !s.row.Remote() && s.row.Worktree != nil &&
 				spaces.OpensDefaultLayout(m.cfg, m.kitty, *s.row.Space, *s.row.Worktree)
 		},
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
@@ -243,7 +243,7 @@ var (
 	actSelectRow = &interact.Action[*sidebar, entrySubject]{
 		Title:   "Select",
 		Section: sectionSpace,
-		Applies: func(m *sidebar, s entrySubject) bool { return !m.selecting && s.row.Worktree != nil },
+		Applies: func(m *sidebar, s entrySubject) bool { return !m.selecting && s.row.Worktree != nil && !s.row.Remote() },
 		Run:     func(m *sidebar, s entrySubject) tea.Cmd { m.tickRow(rowKey(s.row)); return nil },
 	}
 )
@@ -489,7 +489,7 @@ var actOpenPicker = paneAction("picker", (*sidebar).openPicker)
 // actSwitchTab shows the other tab, see hosts.go, as a click on its title does.
 var actSwitchTab = &interact.Action[*sidebar, paneSubject]{
 	Title:   "other tab",
-	Applies: func(m *sidebar, _ paneSubject) bool { return m.caps[spaces.CapList] },
+	Applies: func(m *sidebar, _ paneSubject) bool { return m.hasHosts() },
 	Run:     func(m *sidebar, _ paneSubject) tea.Cmd { m.switchTab(); return nil },
 }
 
