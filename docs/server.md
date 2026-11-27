@@ -68,6 +68,8 @@ JSON, one message per line, over the socket, or over ssh to another host:
 | `exit` | `{}` | `{}`, then the server exits |
 | `new-worktree` | `{"root", "branch", "base", "dir"}` | the host data with it |
 | `remove-worktree` | `{"path", "delete_branch", "force"}` | the host data without it |
+| `new-space` | `{"name", "dir"}` | `{}`; an ad hoc space the host keeps, in the host data's `ad_hoc` |
+| `remove-space` | `{"name"}` | `{}`; ends the provider's sessions in it there, removes the provider's space, and forgets it |
 | `load-layouts` | `{"layouts": [{"key", "revision"}...]}` | `{"layouts": [...]}`: those at another revision, 0 for none |
 | `save-layout` | `{"key", "revision", "layout"}` | `{"revision"}`, or an error when not the latest |
 

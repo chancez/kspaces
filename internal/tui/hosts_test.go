@@ -333,6 +333,15 @@ func TestByHostOpensAdHoc(t *testing.T) {
 	if tail := got[launch][len(got[launch])-5:]; !slices.Equal(tail, []string{"kitten", "ssh", "--kitten", "cwd=/srv/scratch", "white"}) {
 		t.Errorf("the tab runs %q, want kitten ssh to white in /srv/scratch", tail)
 	}
+	// D confirms removing it, which white does.
+	if cmd = e.press("D"); cmd == nil {
+		t.Fatal("D on white's scratch ran nothing")
+	}
+	cmd()
+	got = calls()
+	if last := got[len(got)-1]; !slices.Equal(last[len(last)-2:], []string{"remove-space", "white:scratch"}) {
+		t.Errorf("D launched %q, want the remove space form of white:scratch", last)
+	}
 }
 
 // a under another host opens the form that makes an ad hoc space there; under this machine, the one that

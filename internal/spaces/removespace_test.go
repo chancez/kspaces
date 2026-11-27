@@ -40,7 +40,7 @@ func TestRemoveConfiguredSpace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := SpaceRemoval{Name: name, Root: r.Dir, Sessions: []string{name, name + "@old"},
+	want := SpaceRemoval{Ref: name, Name: name, Root: r.Dir, Sessions: []string{name, name + "@old"},
 		Provider: []ProviderSession{{ID: "a", Space: name, State: "running", Windows: []int{10}}, {ID: "b", Space: name, State: "shelved"}},
 		Caps:     Capabilities{CapList: true, CapKill: true, CapRemove: true, CapRemoveSpace: true},
 		Fates:    []Fate{FateEnd, FateLeave}}

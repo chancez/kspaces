@@ -248,16 +248,25 @@ var (
 		key:     "D",
 		desc:    "remove the space",
 		section: sectionSpace,
+		// Another host's space of its sessions in no space too, which its host removes.
+		remote: true,
 		applies: func(snap spaces.Snapshot, r spaces.Row) bool {
-			if r.Space == nil || !r.Main {
+			switch {
+			case r.Space == nil || !r.Main || r.Space.Name == "default":
 				return false
-			}
-			if !r.Other {
+			case r.Remote():
+				return r.Other
+			case !r.Other:
+				return true
+			case slices.ContainsFunc(snap.AdHoc, func(a spaces.AdHocSpace) bool { return a.Name == r.Space.Name }):
 				return true
 			}
-			return r.Space.Name != "default" && snap.Caps[spaces.CapRemoveSpace] && slices.Contains(snap.ProviderSpaces, r.Space.Name)
+			return snap.Caps[spaces.CapRemoveSpace] && slices.Contains(snap.ProviderSpaces, r.Space.Name)
 		},
 		ask: func(snap spaces.Snapshot, r spaces.Row) error {
+			if r.Remote() {
+				return spaces.AskRemoveSpace(*snap.Config, snap.Kitty, r.Worktree.Session)
+			}
 			return spaces.AskRemoveSpace(*snap.Config, snap.Kitty, r.Space.Name)
 		},
 	}

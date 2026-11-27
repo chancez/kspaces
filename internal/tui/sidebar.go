@@ -171,8 +171,10 @@ type sidebar struct {
 	// The list by host, see hosts.go: every session the provider lists, and the hosts' rows folded.
 	sessions    []spaces.ProviderSession
 	hostsFolded map[string]bool
-	// remotes are the other hosts the config names, see spaces.RemoteView.
+	// remotes are the other hosts the config names, see spaces.RemoteView, and adHoc this machine's ad
+	// hoc spaces.
 	remotes map[string]spaces.RemoteView
+	adHoc   []spaces.AdHocSpace
 }
 
 func newSidebar(self int) *sidebar {
@@ -420,6 +422,7 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.order = msg.Order
 			m.git = msg.Git
 			m.detached, m.caps, m.providerSpaces, m.sessions, m.remotes = msg.Detached, msg.Caps, msg.ProviderSpaces, msg.Sessions, msg.Remotes
+			m.adHoc = msg.AdHoc
 			m.rebuildRows(at)
 			m.settle()
 			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))
@@ -574,7 +577,7 @@ func (m *sidebar) leave() tea.Cmd {
 
 // view is what the sidebar knows as a snapshot, for what reads one, as the row actions do.
 func (m *sidebar) view() spaces.Snapshot {
-	return spaces.Snapshot{Config: &m.cfg, Git: m.git, Kitty: m.kitty, Saved: m.saved, Suspended: m.suspended, Keeping: m.keeping,
+	return spaces.Snapshot{AdHoc: m.adHoc, Remotes: m.remotes, Config: &m.cfg, Git: m.git, Kitty: m.kitty, Saved: m.saved, Suspended: m.suspended, Keeping: m.keeping,
 		Pending: m.busy, Caps: m.caps, ProviderSpaces: m.providerSpaces}
 }
 

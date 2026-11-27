@@ -61,7 +61,7 @@ func (f *removeSpaceForm) fateChosen() spaces.Fate {
 // this form may be over one of them.
 func (f *removeSpaceForm) remove() tea.Cmd {
 	f.busy, f.err = true, nil
-	name, fate := f.plan.Name, f.fateChosen()
+	name, fate := f.plan.Ref, f.fateChosen()
 	return func() tea.Msg { return spaceRemovedMsg{spaces.RemoveSpaceInBackground(name, fate)} }
 }
 
@@ -101,7 +101,11 @@ func (f *removeSpaceForm) View() tea.View {
 func (f *removeSpaceForm) render() string {
 	th, width := f.th, max(f.width-4, 20)
 	line := func(spans ...look.Span) string { return th.Render(look.Plain, spans...) }
-	lines := []string{line(look.Heading("Remove space " + f.plan.Name)), ""}
+	heading := "Remove space " + f.plan.Name
+	if f.plan.Host != "" {
+		heading += " on " + f.plan.Host
+	}
+	lines := []string{line(look.Heading(heading)), ""}
 	text := func(s string) {
 		for _, row := range look.Text(s).Wrapped(width) {
 			lines = append(lines, line(row))
@@ -109,6 +113,10 @@ func (f *removeSpaceForm) render() string {
 	}
 	if f.plan.Root != "" {
 		text(fmt.Sprintf("Takes %s out of the spaces in the config. The repository stays as it is.", config.Tilde(f.plan.Root)))
+	} else if f.plan.Host != "" {
+		text("Has " + f.plan.Host + " end the sessions in " + f.plan.Name + " there, and remove the space.")
+	} else if f.plan.AdHoc {
+		text("Removes the ad hoc space " + f.plan.Name + ", ending the sessions in it.")
 	} else {
 		text("Removes the session provider's space " + f.plan.Name + ".")
 	}

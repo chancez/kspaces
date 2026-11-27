@@ -194,6 +194,15 @@ it, listed with the sessions in no space above the spaces, whether or not it has
 the session with one shell tab in the home directory, as for any session in no space, and its detached
 sessions are listed under it as a space's are. `default` is one too.
 
+An **ad hoc space** is one made as it is needed, with a name and a directory to start in, and no repository
+or config behind it: `scratch`, `incident-123`. Its host's kspaces server keeps it, so every machine
+sees it, and it is listed as a topic space is, under its host, its tab starting in its directory. The
+provider's sessions in it are filed in its space of the same name, so a topic space the provider already
+has is one under another name. `a` makes one when what is typed is a name rather than a directory: on
+this machine, or under another host, there; `kspaces new-space [HOST:]NAME [--dir DIR]` makes one from a
+shell and switches to it. `D` on one confirms removing it, which ends the sessions in it, on its host for
+another host's, and has the provider remove its space. Ad hoc spaces are in no group.
+
 Without a provider, or one that does not list, there are no detached sessions and no topic spaces, and
 nothing says so. A list that fails leaves the last one that did not showing, so a provider restarting
 under the sidebar blanks nothing; after three failures in a row it is asked again a minute later, or at
@@ -354,7 +363,7 @@ group, and Add space.
 | Space | New worktree from issue | `I` | the same form on its Issue tab, to create a branch for one of the space's open issues, from the row's branch as New worktree |
 | Space | Fold / Unfold worktrees | `space` | hide or show a space's linked worktrees |
 | Space | Clean up worktrees | `p` | remove the space's linked worktrees that look done with, and its missing ones, on a space's row |
-| Space | Remove space | `D` | take a configured space out of the config, its repository kept, or remove a topic space from the provider, closing its kitty sessions, in a form; on a space's row |
+| Space | Remove space | `D` | take a configured space out of the config, its repository kept, or remove an ad hoc or topic space, ending its sessions, on its host for another host's, closing its kitty sessions, in a form; on a space's row |
 | Space | Trust space config | | show what the space's own config adds, and trust it, in a form; while its `.kspaces.toml` is untrusted or changed |
 | Group | Fold / Unfold group | `space` | hide or show a group's spaces, on its header |
 | Space | Select | | turn on the [select mode](#selecting) with the row ticked, a group's header too |

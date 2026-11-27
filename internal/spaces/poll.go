@@ -145,6 +145,7 @@ func (sh Shared) View(self int) Snapshot {
 	kept := state.Load().Sidebar
 	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, local(sh.Config, st.Sessions), slices.DeleteFunc(slices.Clone(sh.Saved), func(name string) bool { return isCopy(sh.Config, name) }), topics), Folded: toSet(kept.Folded), Hidden: toSet(kept.Hidden), Saved: saved, Suspended: suspended, Keeping: sh.Keeping, Kitty: st}
 	withAdHocDirs(snap.Others, sh.AdHoc)
+	snap.AdHoc = sh.AdHoc
 	snap.Order = Order{Mode: sortMode(kept.Sort), Worktrees: worktreeOrder(kept.Order), Groups: sh.Config.Groups, Focused: st.Focused, Statuses: st.Statuses}
 	if sh.KittyErr != "" {
 		snap.Err = errors.New(sh.KittyErr)

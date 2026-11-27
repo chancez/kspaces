@@ -145,6 +145,8 @@ func endSpaceOnHost(cfg config.Config, name string) error {
 	}
 	caps := ProviderCapabilities(cfg.Provider)
 	var errs []error
+	// Only a space the provider has: removing this machine's ends its sessions and the space before.
+	has := true
 	if caps[CapList] {
 		st, err := listSessions(cfg.Provider, nil)
 		if err != nil {
@@ -157,8 +159,9 @@ func endSpaceOnHost(cfg config.Config, name string) error {
 			}
 		}
 		errs = append(errs, ApplyFate(cfg.Provider, caps, FateEnd, in))
+		has = slices.Contains(st.Spaces, name)
 	}
-	if caps[CapRemoveSpace] {
+	if caps[CapRemoveSpace] && has {
 		errs = append(errs, RemoveProviderSpace(cfg.Provider, name))
 	}
 	return errors.Join(errs...)
