@@ -23,8 +23,10 @@ import (
 const dockVar = "kspaces"
 
 // LaunchVars are the user variables every window kspaces opens in a session carries for a launch wrapper,
-// see spaces.inSession, which mark no window of kspaces' own, unlike every other kspaces* variable.
-var LaunchVars = []string{"kspaces_space", "kspaces_worktree"}
+// see spaces.inSession, which mark no window of kspaces' own, unlike every other kspaces* variable. A
+// window of another host's copy carries kspaces_host and kspaces_dir too: the host, and its directory
+// there.
+var LaunchVars = []string{"kspaces_space", "kspaces_worktree", "kspaces_host", "kspaces_dir"}
 
 // ownWindow reports whether w is one of kspaces' own, a dock, form or picker, which mark themselves with a
 // user variable starting kspaces, as the saved sessions leave them out; a launch variable is not one.
@@ -36,6 +38,9 @@ func ownWindow(w Window) bool {
 	}
 	return false
 }
+
+// KittenPath is the kitten to run, see kittenPath.
+func KittenPath() string { return kittenPath() }
 
 // kittenPath prefers the kitten next to the kitty that started us, so remote control talks to a kitten of
 // the same version. That is only known on macOS, where the installation directory sits inside the app

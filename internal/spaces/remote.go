@@ -211,12 +211,6 @@ func remoteSpace(host string, hd *HostData, s sharedSpace) Space {
 	return out
 }
 
-// CopyName is the kitty session of host's copy of the worktree whose session there is session:
-// HOST:SESSION, see docs/stories.md.
-func CopyName(host, session string) string {
-	return host + ":" + session
-}
-
 // GitKey is what git's states of wt are kept by: its path, and another host's copy's by its host too, as
 // two hosts can have a worktree at the same path.
 func GitKey(wt Worktree) string {

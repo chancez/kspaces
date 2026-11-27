@@ -25,6 +25,9 @@ type rowAction struct {
 	key string
 	// desc is what help says of key.
 	desc string
+	// remote applies it to another host's copy too, see Row.Remote: it acts on kitty here, not in the
+	// worktree's directory.
+	remote bool
 }
 
 // onEntry is a as the sidebar's spaces list offers it.
@@ -35,7 +38,7 @@ func onEntry(a *rowAction) *interact.Action[*sidebar, entrySubject] {
 		// Nothing is done to a worktree being created or removed, see spaces.MarkPending, nor to another host's
 		// copy, which is in a directory there.
 		Applies: func(m *sidebar, s entrySubject) bool {
-			return !m.isBusy(s.row) && !s.row.Remote() && a.applies(m.view(), s.row)
+			return !m.isBusy(s.row) && (a.remote || !s.row.Remote()) && a.applies(m.view(), s.row)
 		},
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
@@ -179,6 +182,7 @@ var (
 		key:     "c",
 		desc:    "close session",
 		section: sectionSession,
+		remote:  true,
 		applies: func(snap spaces.Snapshot, r spaces.Row) bool {
 			return r.Worktree != nil && snap.Kitty.Windows[r.Worktree.Session] > 0
 		},

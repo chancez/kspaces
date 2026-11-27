@@ -171,8 +171,9 @@ Every verb exits non-zero on failure, its stderr the error, which kspaces shows.
 prints nothing or `{}`.
 
 **Capabilities.** `capabilities` names what the provider does: `keep` (for `keep` and `forget`), `list`,
-`open`, `kill`, `shelve`, `remove`, `move`, `remove-space` and `layouts` (for `save-layout` and
-`load-layouts`, see [Shared layouts](#shared-layouts)). kspaces offers only what is named: a provider without
+`open`, `kill`, `shelve`, `remove`, `move`, `remove-space`, `layouts` (for `save-layout` and
+`load-layouts`, see [Shared layouts](#shared-layouts)) and `hosts`, which says a launch wrapper runs a window
+with the `kspaces_host` user variable on that host, see [Other hosts](#other-hosts). kspaces offers only what is named: a provider without
 `shelve` never shows Shelve. It is asked once per sidebar, and again at `r`. A provider that fails
 `capabilities` is taken to have `keep` alone, which is what a program written as a keeper does.
 
@@ -351,6 +352,16 @@ password. Every two seconds the sidebar asks each host to load, in the backgroun
 nothing up; one that fails is asked less and less often, up to once a minute, and keeps what it last said.
 A host is defined in one file; an overlay's takes its place. `hosts` is kspaces.toml's only, not a space's
 own config.
+
+**Opening a copy.** `kspaces open HOST:SESSION`, such as `kspaces open white:gr@dev`, or `enter` on its row,
+switches to the kitty session `white:gr@dev`, opening it if it has no windows: from its saved file, as any
+session, else with one tab on white, in the worktree's directory there. `kspaces open white:`, or `o` on
+white's row, opens `white:default`, a shell in white's home directory. The tab's window carries the launch
+variables, `kspaces_space` and `kspaces_worktree` as white names them, and `kspaces_host` and `kspaces_dir`,
+the host and the directory there. With a provider that has `hosts`, it is a shell, which its launch wrapper
+runs on the host; else it runs `kitten ssh --kitten cwd=DIR DEST`, and kitty opens the windows split from it
+on the host too, in their directory there. kitty starts it here in the home directory. The open copies'
+kitty sessions are not sessions in no space on the spaces tab: the hosts tab lists them under their host.
 
 ## Running commands
 

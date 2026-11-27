@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -9,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/spaces"
 )
@@ -194,6 +196,7 @@ func TestNoHostsTab(t *testing.T) {
 // homelab, and nas, whose server could not be reached.
 func remoteFixture() spaces.Snapshot {
 	snap := fixture(time.Now())
+	snap.Config = &config.Config{Launch: []string{"launch"}}
 	dns := spaces.Worktree{Path: "/home/me/homelab/.worktrees/dns", Branch: "dns", Session: "white:homelab@dns", Host: "white"}
 	snap.Remotes = map[string]spaces.RemoteView{
 		"white": {Loaded: true, Spaces: []spaces.Space{{Name: "homelab", Root: "/home/me/homelab", Worktrees: []spaces.Worktree{
@@ -206,9 +209,15 @@ func remoteFixture() spaces.Snapshot {
 }
 
 // Other hosts the config names make a hosts tab without a provider: each lists its own copies, with their
-// git state, and one that cannot be reached says so. Nothing done in a directory here is done to a copy.
+// git state, and one that cannot be reached says so. Nothing done in a directory here is done to a copy;
+// enter opens it in a kitty session of its own, a tab of kitten ssh to the host, in its directory there.
 func TestHostsTabRemote(t *testing.T) {
 	e := newSidebarEnv(t)
+	calls := fakeKittenCalls(t)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
 	e.m.Update(remoteFixture())
 	e.m.Update(tea.FocusMsg{})
 	e.press("tab")
@@ -229,9 +238,39 @@ func TestHostsTabRemote(t *testing.T) {
 		t.Errorf("other hosts:\n%q\nwant\n%q", got[i:], want)
 	}
 	e.m.cursor = e.hostRow("white", "white:homelab@dns")
-	for _, key := range []string{"enter", "n", "x", "R", "c"} {
+	for _, key := range []string{"n", "x", "R", "c"} {
 		if cmd := e.press(key); cmd != nil {
 			t.Errorf("%s on white's copy ran something", key)
 		}
+	}
+	cmd := e.press("enter")
+	if cmd == nil {
+		t.Fatal("enter on white's copy ran nothing")
+	}
+	cmd()
+	dir := "/home/me/homelab/.worktrees/dns"
+	wantCalls := [][]string{
+		{"@", "focus-window", "--match", "id:11"},
+		{"@", "action", "launch", "--type=tab", "--cwd=" + home, "--add-to-session=white:homelab@dns",
+			"--var=kspaces_space=homelab", "--var=kspaces_worktree=dns", "--var=kspaces_host=white", "--var=kspaces_dir=" + dir,
+			"kitten", "ssh", "--kitten", "cwd=" + dir, "white"},
+		{"@", "action", "goto_session", "white:homelab@dns.kitty-session"},
+	}
+	if got := calls(); !reflect.DeepEqual(got, wantCalls) {
+		t.Errorf("kitten ran\n%q\nwant\n%q", got, wantCalls)
+	}
+
+	// o on white's own row opens a shell there, its default copy.
+	e.m.cursor = slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.HostHeader && r.Host == "white" })
+	before := len(calls())
+	if cmd := e.press("o"); cmd == nil {
+		t.Fatal("o on white ran nothing")
+	} else {
+		cmd()
+	}
+	shell := []string{"@", "action", "launch", "--type=tab", "--cwd=" + home, "--add-to-session=white:default",
+		"--var=kspaces_space=default", "--var=kspaces_host=white", "kitten", "ssh", "white"}
+	if got := calls()[before:]; len(got) < 2 || !reflect.DeepEqual(got[1], shell) {
+		t.Errorf("o ran\n%q\nwant second\n%q", got, shell)
 	}
 }

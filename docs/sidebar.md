@@ -221,8 +221,9 @@ has none, so a group reads as inside its host rather than as the next one.
 
 A host the config names lists its own copies of its spaces instead, as its kspaces server says: their
 worktrees there and their git state. Its row says `unreachable` while its server cannot be reached, and
-its copies stay as it last said. Nothing that works in a directory here applies to a copy, so its menu
-offers only folding.
+its copies stay as it last said. `enter` on a copy opens it, in a kitty session of its own on that host, and
+`o` on the host's row opens a shell there, see [Opening a copy](kitty.md#other-hosts). Nothing else that
+works in a directory here applies to a copy: its menu offers opening, closing its session, and folding.
 
 A row does what it does on the spaces tab, so a worktree listed under several hosts opens the same kitty
 session from each. `enter` on a worktree only another host has opens a tab of one of its sessions there,

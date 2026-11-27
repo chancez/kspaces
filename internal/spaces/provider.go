@@ -30,6 +30,9 @@ const (
 	CapMove   = "move"
 	// CapLayouts is save-layout and load-layouts, see SharedLayout.
 	CapLayouts = "layouts"
+	// CapHosts says a launch wrapper runs each window kspaces opens with kspaces_host on that host, in
+	// kspaces_dir, so a window of another host's copy is a shell, see remoteTab.
+	CapHosts = "hosts"
 )
 
 // Capabilities are what a provider does, by name.

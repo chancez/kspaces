@@ -101,6 +101,13 @@ func listWindows(sh Shared, list func() ([]kitty.OSWindow, error)) Shared {
 	return sh
 }
 
+// local are the open sessions, by name, but other hosts' copies', see isCopy.
+func local(cfg *config.Config, sessions map[string]int) map[string]int {
+	out := maps.Clone(sessions)
+	maps.DeleteFunc(out, func(name string, _ int) bool { return isCopy(cfg, name) })
+	return out
+}
+
 // View is the snapshot sh is from the window self, or kitty.FocusedWindow. The folded spaces and groups,
 // the hidden groups, the sort mode and the worktrees' manual order are read here rather than shared, so a
 // change shows in the sidebar that made it at once.
@@ -131,7 +138,7 @@ func (sh Shared) View(self int) Snapshot {
 	// The missing worktrees go in the spaces, which are this view's own copies: what the load holds, and
 	// git is asked about in targets, is only what git lists.
 	kept := state.Load().Sidebar
-	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, st.Sessions, sh.Saved, topics), Folded: toSet(kept.Folded), Hidden: toSet(kept.Hidden), Saved: saved, Suspended: suspended, Keeping: sh.Keeping, Kitty: st}
+	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, local(sh.Config, st.Sessions), slices.DeleteFunc(slices.Clone(sh.Saved), func(name string) bool { return isCopy(sh.Config, name) }), topics), Folded: toSet(kept.Folded), Hidden: toSet(kept.Hidden), Saved: saved, Suspended: suspended, Keeping: sh.Keeping, Kitty: st}
 	snap.Order = Order{Mode: sortMode(kept.Sort), Worktrees: worktreeOrder(kept.Order), Groups: sh.Config.Groups, Focused: st.Focused, Statuses: st.Statuses}
 	if sh.KittyErr != "" {
 		snap.Err = errors.New(sh.KittyErr)

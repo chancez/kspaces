@@ -185,8 +185,10 @@ var (
 		// windows, as it has no directory to start one in.
 		Applies: func(m *sidebar, s entrySubject) bool {
 			switch {
-			case s.row.Worktree == nil, s.row.Remote():
+			case s.row.Worktree == nil:
 				return false
+			case s.row.Remote():
+				return true
 			case s.row.Elsewhere():
 				return m.isOpen(s.row.Worktree) || m.caps[spaces.CapOpen] && len(m.hostSessionsOf(s.row.Worktree.Host, *s.row.Space, s.row.Worktree.Session)) > 0
 			}
@@ -283,6 +285,17 @@ var (
 		Section: "Host",
 		Applies: func(m *sidebar, s hostSubject) bool { return !m.filtering && m.hostsFolded[s.host] },
 		Run:     func(m *sidebar, s hostSubject) tea.Cmd { m.toggleHost(s.host); return nil },
+	}
+	// actOpenHostShell opens a host the config names' default copy: a shell there, see docs/stories.md.
+	actOpenHostShell = &interact.Action[*sidebar, hostSubject]{
+		Title:   "Open shell",
+		Section: "Host",
+		Applies: func(m *sidebar, s hostSubject) bool { _, ok := m.remotes[s.host]; return ok },
+		Run: func(m *sidebar, s hostSubject) tea.Cmd {
+			m.remote = false
+			wt := spaces.Worktree{Session: spaces.CopyName(s.host, "default"), Host: s.host}
+			return m.openWorktreeCmd(wt, spaces.OpenOptions{})
+		},
 	}
 )
 
@@ -1413,9 +1426,10 @@ func init() {
 	interact.Via(groupKind, func(s groupSubject) (spacesSubject, bool) { return spacesSubject{group: s.name}, true }, spacesKind)
 	groupHeaders = interact.List(groupKind)
 
-	hostKind := interact.NewKind(func(s hostSubject) string { return hostName(s.host) }, actFoldHost, actUnfoldHost)
+	hostKind := interact.NewKind(func(s hostSubject) string { return hostName(s.host) }, actOpenHostShell, actFoldHost, actUnfoldHost)
 	hostKind.Bind(actFoldHost, "space", "fold or unfold the host", "space")
 	hostKind.Bind(actUnfoldHost, "", "", "space")
+	hostKind.Bind(actOpenHostShell, "o", "open a shell on the host", "o")
 	interact.Via(hostKind, func(hostSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	hostHeaders = interact.List(hostKind)
 	hostHeaders.Bind(actFoldHost, "enter/l", "fold or unfold", "enter", "l")

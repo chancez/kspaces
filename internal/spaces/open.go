@@ -28,7 +28,7 @@ type OpenOptions struct {
 // default layout that needs inputs is not opened: the tab is, and the error says so. A worktree another
 // process is creating or removing is refused, see MarkPending.
 func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree, opts OpenOptions) error {
-	if wt.Path != "" {
+	if wt.Path != "" && wt.Host == "" {
 		if err := CheckPending(wt.Path); err != nil {
 			return err
 		}
@@ -50,7 +50,7 @@ func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree, opts OpenOptio
 	}
 	// More than the switch is a fresh session's first tab, which the default layout stands in for.
 	var skipped error
-	if len(actions) > 1 && !opts.NoLayout {
+	if len(actions) > 1 && !opts.NoLayout && wt.Host == "" {
 		spaceCfg, space, found, lr, ok, err := freshLayout(cfg, wt)
 		if ok {
 			return OpenLayout(spaceCfg, st, space, found, lr)
@@ -67,12 +67,24 @@ func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree, opts OpenOptio
 	return skipped
 }
 
-// openActions are the kitty actions that switch to wt's session, see OpenWorktree.
+// openActions are the kitty actions that switch to wt's session, see OpenWorktree. Another host's copy
+// opens afresh with a tab on that host, see remoteTab.
 func openActions(cfg config.Config, st kitty.State, wt Worktree) ([][]string, error) {
 	path := SessionFile(cfg, wt.Session)
 	goTo := []string{"goto_session", path}
 	if !opensAfresh(cfg, st, wt) {
 		return [][]string{goTo}, nil
+	}
+	if wt.Host != "" {
+		var caps Capabilities
+		if len(cfg.Provider) > 0 {
+			caps = ProviderCapabilities(cfg.Provider)
+		}
+		tab, err := remoteTab(cfg, caps, wt)
+		if err != nil {
+			return nil, err
+		}
+		return [][]string{tab, goTo}, nil
 	}
 	cwd := wt.Path
 	if cwd == "" {

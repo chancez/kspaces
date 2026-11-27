@@ -16,9 +16,10 @@ func inSession(session string) []string {
 // kspaces_space, the space part of the session's name, and for a linked worktree's session, SPACE@DIR,
 // kspaces_worktree, the DIR. The wrapper cannot see which kitty session a window goes in, as it runs before
 // kitty adds the window to one, but it sees the window's --var options. A session in no space, such as
-// default or a topic space's, is a space of its own name. See kitty.LaunchVars, which are not kspaces' own
-// windows' marks.
+// default or a topic space's, is a space of its own name. A window of another host's copy, HOST:SESSION,
+// carries kspaces_host too, see SplitCopy. See kitty.LaunchVars, which are not kspaces' own windows' marks.
 func launchVars(session string) []string {
+	host, session := SplitCopy(session)
 	space, dir, linked := strings.Cut(session, "@")
 	if space == "" {
 		return nil
@@ -26,6 +27,9 @@ func launchVars(session string) []string {
 	vars := []string{kitty.Quote("--var=kspaces_space=" + space)}
 	if linked && dir != "" {
 		vars = append(vars, kitty.Quote("--var=kspaces_worktree="+dir))
+	}
+	if host != "" {
+		vars = append(vars, kitty.Quote("--var=kspaces_host="+host))
 	}
 	return vars
 }
