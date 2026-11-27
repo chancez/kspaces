@@ -154,7 +154,7 @@ kspaces is. They are under a row of how many there are, `14 detached`. The space
 sessions alone; the [hosts tab](#the-hosts-tab) lists each host's under that host, and a space's row there
 counts them by host, `local 3, server 9`, where several hosts' are under one. The sessions a window shows are where their windows are, and not listed again. `space` on the row, or a
 click on it or its caret, shows them under it, by name, under a row for each host when there are several,
-and again hides them; they start hidden, and showing them is not kept across restarts. A session's row has
+and again hides them; they start hidden, and showing them is kept across restarts, as folds are. A session's row has
 its name, what it is doing in a word, `busy` while a command runs, else `running`, `shelved`, `exited` or
 `dead`, then its title, else its command. Its icon is its program's status when it reports one that is not
 idle; one that is not running is faint. A folded space or group shows none of them, and nor do the query,
@@ -210,7 +210,7 @@ tab would list of that host. This machine has the whole list. Another host has t
 sessions in no space it runs a session in: a space keeps its own row and, of its linked worktrees, those
 its sessions there are tagged with, and a worktree only that host has is listed after them by its
 directory. Each host's detached sessions are under their own `N detached` row, which shows and hides them
-there alone. `space` or a click on its caret folds a host's row, not kept across restarts. A host's row has
+there alone. `space` or a click on its caret folds a host's row, kept across restarts. A host's row has
 the rule across the sidebar that a group's header has on the spaces tab, and a group's header under a host
 has none, so a group reads as inside its host rather than as the next one.
 

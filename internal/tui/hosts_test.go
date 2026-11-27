@@ -369,3 +369,22 @@ func TestSpacesTabThisMachine(t *testing.T) {
 		t.Errorf("enter ran %q, want a goto_session of white:homelab@dns", got)
 	}
 }
+
+// A host folded and a worktree's detached sessions shown are so in a sidebar started after, as the
+// folded spaces are.
+func TestHostsTabKeepsFolds(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(hostsFixture())
+	e.m.Update(tea.FocusMsg{})
+	e.press("tab")
+	e.m.cursor = slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.HostHeader && r.Host == "server" })
+	e.press("space")
+	e.m.cursor = slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.Detached != nil && r.Detached.Head() && r.Host == "" })
+	e.press("space")
+	m := newSidebar(0)
+	got := []map[string]bool{m.hostsFolded, m.detachedOpen}
+	want := []map[string]bool{{"server": true}, e.m.detachedOpen}
+	if !reflect.DeepEqual(got, want) || len(e.m.detachedOpen) != 1 {
+		t.Errorf("a new sidebar has %v, want %v", got, want)
+	}
+}

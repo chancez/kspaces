@@ -195,6 +195,9 @@ func newSidebar(self int) *sidebar {
 		openOnly:   filters.Open,
 		awakeOnly:  filters.Awake,
 		hostsTab:   spaces.LoadHostsTab(),
+		// Kept across restarts, as the folded spaces are.
+		hostsFolded:  spaces.LoadHostsFolded(),
+		detachedOpen: spaces.LoadDetachedShown(),
 	}
 }
 

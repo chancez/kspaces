@@ -47,6 +47,9 @@ func (m *sidebar) toggleDetached(space string) {
 	} else {
 		m.detachedOpen[space] = true
 	}
+	if err := spaces.SaveDetachedShown(m.detachedOpen); err != nil {
+		m.failed = err
+	}
 	m.setRows()
 }
 

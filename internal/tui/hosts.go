@@ -87,6 +87,9 @@ func (m *sidebar) toggleHost(host string) {
 	} else {
 		m.hostsFolded[host] = true
 	}
+	if err := spaces.SaveHostsFolded(m.hostsFolded); err != nil {
+		m.failed = err
+	}
 	m.setRows()
 }
 
