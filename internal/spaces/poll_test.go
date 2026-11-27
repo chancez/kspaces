@@ -114,10 +114,12 @@ func (h *fakeHost) Load(bool) (HostData, error) {
 	return h.data, h.err
 }
 
-func (h *fakeHost) NewWorktree(string, string, string) (Worktree, error) { return Worktree{}, nil }
-func (h *fakeHost) RemoveWorktree(string, RemoveOptions) error           { return nil }
-func (h *fakeHost) Refresh() error                                       { return nil }
-func (h *fakeHost) Subscribe(func(HostData)) (stop func())               { return func() {} }
+func (h *fakeHost) NewWorktree(string, string, string) (Worktree, error)  { return Worktree{}, nil }
+func (h *fakeHost) RemoveWorktree(string, RemoveOptions) error            { return nil }
+func (h *fakeHost) LoadLayouts([]CopyLayout) ([]CopyLayout, error)        { return nil, nil }
+func (h *fakeHost) SaveLayout(string, int64, SharedLayout) (int64, error) { return 0, nil }
+func (h *fakeHost) Refresh() error                                        { return nil }
+func (h *fakeHost) Subscribe(func(HostData)) (stop func())                { return func() {} }
 
 // Windows lists kitty's windows again into the latest poll without loading, and polls when there is none.
 func TestPollerWindows(t *testing.T) {

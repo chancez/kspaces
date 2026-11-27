@@ -80,6 +80,24 @@ func (c *Client) RemoveWorktree(path string, opts spaces.RemoveOptions) error {
 	return c.call(methodRemoveWorktree, removeWorktreeParams{Path: path, Force: opts.Force, DeleteBranch: opts.DeleteBranch, ForceBranch: opts.ForceBranch}, nil)
 }
 
+// LoadLayouts are the layouts of the server's host's copies known names at another revision.
+func (c *Client) LoadLayouts(known []spaces.CopyLayout) ([]spaces.CopyLayout, error) {
+	var got loadLayoutsParams
+	err := c.call(methodLoadLayouts, loadLayoutsParams{Layouts: known}, &got)
+	return got.Layouts, err
+}
+
+// SaveLayout saves l as the layout of the copy key names on the server's host, if it is still at revision.
+// spaces.ErrLayoutConflict when it is not.
+func (c *Client) SaveLayout(key string, revision int64, l spaces.SharedLayout) (int64, error) {
+	var got saved
+	err := c.call(methodSaveLayout, saveLayoutParams{Key: key, Revision: revision, Layout: l}, &got)
+	if err != nil && err.Error() == spaces.ErrLayoutConflict.Error() {
+		return 0, spaces.ErrLayoutConflict
+	}
+	return got.Revision, err
+}
+
 // Exit asks the server to exit.
 func (c *Client) Exit() error {
 	return c.call(methodExit, struct{}{}, nil)

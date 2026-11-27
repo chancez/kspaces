@@ -2,7 +2,11 @@
 // kspaces' processes on the host, over a Unix socket, and to other machines, over ssh.
 package server
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/chancez/kspaces/internal/spaces"
+)
 
 // Protocol is the version of what is said over the socket. A client of a newer one replaces an older
 // server; a client of an older one refuses a newer server, see Client.
@@ -29,6 +33,9 @@ const (
 	// spaces.RemoveOnHost.
 	methodNewWorktree    = "new-worktree"
 	methodRemoveWorktree = "remove-worktree"
+	// The layouts of the host's copies, see spaces.CopyLayout.
+	methodLoadLayouts = "load-layouts"
+	methodSaveLayout  = "save-layout"
 	// methodUpdate is the push of the host data to a client that subscribed.
 	methodUpdate = "update"
 )
@@ -60,4 +67,20 @@ type removeWorktreeParams struct {
 	Force        bool   `json:"force,omitempty"`
 	DeleteBranch bool   `json:"delete_branch,omitempty"`
 	ForceBranch  bool   `json:"force_branch,omitempty"`
+}
+
+// loadLayoutsParams are a load-layouts': the layouts known, by key and revision.
+type loadLayoutsParams struct {
+	Layouts []spaces.CopyLayout `json:"layouts"`
+}
+
+// saveLayoutParams are a save-layout's, and saved its answer.
+type saveLayoutParams struct {
+	Key      string              `json:"key"`
+	Revision int64               `json:"revision"`
+	Layout   spaces.SharedLayout `json:"layout"`
+}
+
+type saved struct {
+	Revision int64 `json:"revision"`
 }

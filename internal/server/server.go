@@ -259,6 +259,20 @@ func (c *serverConn) answer(msg message) (any, error) {
 			return nil, err
 		}
 		return struct{}{}, h.RemoveWorktree(p.Path, spaces.RemoveOptions{Force: p.Force, DeleteBranch: p.DeleteBranch, ForceBranch: p.ForceBranch})
+	case methodLoadLayouts:
+		var p loadLayoutsParams
+		if err := json.Unmarshal(msg.Params, &p); err != nil {
+			return nil, err
+		}
+		got, err := h.LoadLayouts(p.Layouts)
+		return loadLayoutsParams{Layouts: got}, err
+	case methodSaveLayout:
+		var p saveLayoutParams
+		if err := json.Unmarshal(msg.Params, &p); err != nil {
+			return nil, err
+		}
+		rev, err := h.SaveLayout(p.Key, p.Revision, p.Layout)
+		return saved{Revision: rev}, err
 	}
 	return nil, fmt.Errorf("no method %q", msg.Method)
 }

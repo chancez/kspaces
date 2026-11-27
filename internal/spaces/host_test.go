@@ -39,7 +39,7 @@ func TestLocalHostGitStates(t *testing.T) {
 		{Name: "broken", Root: "/src/broken", Err: "not a git repository"},
 	}
 	host := func() *LocalHost {
-		h := NewLocalHost(path)
+		h := NewLocalHost(path, "")
 		h.load = func() HostData { return HostData{Config: &config.Config{}, Spaces: spaces} }
 		h.newWatcher = watcher
 		return h

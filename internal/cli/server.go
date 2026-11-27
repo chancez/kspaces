@@ -42,7 +42,11 @@ it finds none, and it exits once it has had no client for five minutes, or its b
 			ctx, cancel := signal.NotifyContext(cmd.Context(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
 			defer cancel()
 			name, _ := os.Hostname()
-			s := server.New(spaces.NewLocalHost(strings.TrimSuffix(path, ".sock")+".git.json"), a.version, name)
+			layouts, err := spaces.LayoutsPath()
+			if err != nil {
+				return err
+			}
+			s := server.New(spaces.NewLocalHost(strings.TrimSuffix(path, ".sock")+".git.json", layouts), a.version, name)
 			if exe, err := os.Executable(); err == nil {
 				s.WatchExe(server.ExeChanged(exe))
 			}

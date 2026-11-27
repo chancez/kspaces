@@ -32,6 +32,8 @@ type fakeHost struct {
 	next      int
 	// asked are the worktrees it was asked to create and remove.
 	asked []string
+	// store keeps its layouts.
+	store *spaces.LocalHost
 }
 
 func (h *fakeHost) set(hd spaces.HostData) {
@@ -79,6 +81,14 @@ func (h *fakeHost) RemoveWorktree(path string, opts spaces.RemoveOptions) error 
 	defer h.mu.Unlock()
 	h.asked = append(h.asked, fmt.Sprintf("remove %s %+v", path, opts))
 	return nil
+}
+
+func (h *fakeHost) LoadLayouts(known []spaces.CopyLayout) ([]spaces.CopyLayout, error) {
+	return h.store.LoadLayouts(known)
+}
+
+func (h *fakeHost) SaveLayout(key string, revision int64, l spaces.SharedLayout) (int64, error) {
+	return h.store.SaveLayout(key, revision, l)
 }
 
 func (h *fakeHost) Refresh() error {
@@ -457,6 +467,31 @@ func TestClientWorktrees(t *testing.T) {
 		want := []string{"new /src/gr dev main", "new /src/gr taken ", "remove /src/gr/.worktrees/dev {Force:true DeleteBranch:true ForceBranch:false}"}
 		if !reflect.DeepEqual(h.asked, want) {
 			t.Errorf("asked %q, want %q", h.asked, want)
+		}
+	})
+}
+
+// A client saves a copy's layout on the server's host at the revision it last had, and loads those saved
+// since; a save behind another is a conflict.
+func TestClientLayouts(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		h := &fakeHost{data: grData, store: spaces.NewLocalHost("", "")}
+		ln := newPipes()
+		defer ln.Close()
+		go New(h, "v1", "white").Serve(t.Context(), ln)
+		a, b := NewClient(ln.dial, "v1"), NewClient(ln.dial, "v1")
+		l := spaces.SharedLayout{Version: 1, Sessions: []string{"@a"}, Tabs: []spaces.SharedTab{{Panes: []spaces.SharedPane{{Session: 0}}}}}
+		rev, err := a.SaveLayout("gr@dev", 0, l)
+		if err != nil || rev != 1 {
+			t.Fatalf("SaveLayout = %d, %v", rev, err)
+		}
+		if _, err := b.SaveLayout("gr@dev", 0, l); !errors.Is(err, spaces.ErrLayoutConflict) {
+			t.Errorf("a save behind = %v, want %v", err, spaces.ErrLayoutConflict)
+		}
+		got, err := b.LoadLayouts([]spaces.CopyLayout{{Key: "gr@dev"}, {Key: "gr", Revision: 0}, {Key: "gr@old", Revision: 3}})
+		want := []spaces.CopyLayout{{Key: "gr@dev", Revision: 1, Layout: &l}, {Key: "gr@old"}}
+		if err != nil || !reflect.DeepEqual(got, want) {
+			t.Errorf("LoadLayouts = %+v, %v; want %+v", got, err, want)
 		}
 	})
 }

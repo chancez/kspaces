@@ -38,6 +38,12 @@ type Host interface {
 	NewWorktree(root, branch, base string) (Worktree, error)
 	// RemoveWorktree removes the worktree at path, see RemoveOnHost.
 	RemoveWorktree(path string, opts RemoveOptions) error
+	// LoadLayouts are the layouts of the host's copies known names at another revision than it gives, see
+	// CopyLayout.
+	LoadLayouts(known []CopyLayout) ([]CopyLayout, error)
+	// SaveLayout saves l as the layout of the copy key names, if it is still at revision, and is its new
+	// revision; ErrLayoutConflict when it is not.
+	SaveLayout(key string, revision int64, l SharedLayout) (int64, error)
 }
 
 var (
@@ -85,11 +91,14 @@ type LocalHost struct {
 	subsMu sync.Mutex
 	subs   map[int]func(HostData)
 	nextID int
+	// layouts are the layouts of the host's copies it keeps.
+	layouts layoutStore
 }
 
-// NewLocalHost is the host of the machine kspaces runs on, keeping git's states in path.
-func NewLocalHost(path string) *LocalHost {
-	return &LocalHost{path: path, load: loadHost, newWatcher: gitstate.NewWatcher}
+// NewLocalHost is the host of the machine kspaces runs on, keeping git's states in path and its copies'
+// layouts in layouts.
+func NewLocalHost(path, layouts string) *LocalHost {
+	return &LocalHost{path: path, load: loadHost, newWatcher: gitstate.NewWatcher, layouts: layoutStore{path: layouts}}
 }
 
 // loadHost reads the config, every space's worktrees and own file, and the worktrees being created or
@@ -167,6 +176,16 @@ func (h *LocalHost) RemoveWorktree(path string, opts RemoveOptions) error {
 	err = RemoveOnHost(cfg, path, opts)
 	h.Load(true)
 	return err
+}
+
+// LoadLayouts are the layouts of known kept here at another revision, see CopyLayout.
+func (h *LocalHost) LoadLayouts(known []CopyLayout) ([]CopyLayout, error) {
+	return h.layouts.changed(known), nil
+}
+
+// SaveLayout keeps l as the layout of key, if it is still at revision.
+func (h *LocalHost) SaveLayout(key string, revision int64, l SharedLayout) (int64, error) {
+	return h.layouts.save(key, revision, l)
 }
 
 // Subscribe calls f with every load that changes the host data.
