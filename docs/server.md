@@ -138,3 +138,11 @@ Each is a release of its own.
 - Writes to the config and the state file still go to the files from each process, under their locks; the
   server could take them, and batch them.
 - The kitty view stays in the sidebar: with one sidebar per kitty, it has nothing to share.
+- Without a provider, a copy's layout is not kept: a layout names the provider's sessions, and a pane of
+  `kitten ssh` has none to name, so a copy opened again elsewhere is one shell tab.
+- A copy's new worktree form takes a branch and what it starts from; the host's branches, PRs and issues
+  are not listed, nor its layouts or commands offered.
+- Most commands, `list`, `open PATH`, `new` with `--yes` and the like, still read the config and the
+  spaces themselves rather than ask the server.
+- A pane split from a copy's `kitten ssh` window opens on the host by kitty's own doing, which needs the
+  host's shell integration reporting the remote directory.
