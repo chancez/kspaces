@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-
-	"github.com/chancez/kspaces/internal/state"
 )
 
 // A host's server keeps the layouts of its copies, see docs/server.md: it is the only writer of each, so
@@ -24,16 +22,6 @@ type CopyLayout struct {
 
 // ErrLayoutConflict is a save at a revision the layout is no longer at: another machine saved since.
 var ErrLayoutConflict = errors.New("the layout was saved by another machine since")
-
-// LayoutsPath is the file of the layouts this host keeps, in the state directory, as they last as long as
-// the copies do.
-func LayoutsPath() (string, error) {
-	dir, err := state.Dir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "layouts.json"), nil
-}
 
 // layoutStore is the layouts a host keeps, in a file, "" for none, as in tests.
 type layoutStore struct {

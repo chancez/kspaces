@@ -276,6 +276,15 @@ func (c *serverConn) answer(msg message) (any, error) {
 		}
 		rev, err := h.SaveLayout(p.Key, p.Revision, p.Layout)
 		return saved{Revision: rev}, err
+	case methodNewSpace, methodRemoveSpace:
+		var p spaceParams
+		if err := json.Unmarshal(msg.Params, &p); err != nil {
+			return nil, err
+		}
+		if msg.Method == methodNewSpace {
+			return struct{}{}, h.NewSpace(p.Name, p.Dir)
+		}
+		return struct{}{}, h.RemoveSpace(p.Name)
 	}
 	return nil, fmt.Errorf("no method %q", msg.Method)
 }

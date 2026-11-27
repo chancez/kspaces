@@ -10,7 +10,7 @@ import (
 // A host keeps its copies' layouts in a file, so a server started again has them, each at the revision
 // its last save left it, and refuses a save behind it.
 func TestLayoutStore(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "state", "layouts.json")
+	path := filepath.Join(t.TempDir(), "state")
 	l := SharedLayout{Version: 1, Sessions: []string{"@a"}, Tabs: []SharedTab{{Panes: []SharedPane{{Session: 0}}}}}
 	first := NewLocalHost("", path)
 	for _, rev := range []int64{0, 1} {

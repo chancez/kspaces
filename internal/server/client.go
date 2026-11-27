@@ -98,6 +98,16 @@ func (c *Client) SaveLayout(key string, revision int64, l spaces.SharedLayout) (
 	return got.Revision, err
 }
 
+// NewSpace has the server's host make an ad hoc space, see spaces.AdHocSpace.
+func (c *Client) NewSpace(name, dir string) error {
+	return c.call(methodNewSpace, spaceParams{Name: name, Dir: dir}, nil)
+}
+
+// RemoveSpace has the server's host remove its ad hoc space name.
+func (c *Client) RemoveSpace(name string) error {
+	return c.call(methodRemoveSpace, spaceParams{Name: name}, nil)
+}
+
 // Exit asks the server to exit.
 func (c *Client) Exit() error {
 	return c.call(methodExit, struct{}{}, nil)

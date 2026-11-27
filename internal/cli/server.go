@@ -15,6 +15,7 @@ import (
 	"github.com/chancez/kspaces/internal/logs"
 	"github.com/chancez/kspaces/internal/server"
 	"github.com/chancez/kspaces/internal/spaces"
+	"github.com/chancez/kspaces/internal/state"
 )
 
 func (a *app) serverCommand() *cobra.Command {
@@ -42,11 +43,11 @@ it finds none, and it exits once it has had no client for five minutes, or its b
 			ctx, cancel := signal.NotifyContext(cmd.Context(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
 			defer cancel()
 			name, _ := os.Hostname()
-			layouts, err := spaces.LayoutsPath()
+			dir, err := state.Dir()
 			if err != nil {
 				return err
 			}
-			s := server.New(spaces.NewLocalHost(strings.TrimSuffix(path, ".sock")+".git.json", layouts), a.version, name)
+			s := server.New(spaces.NewLocalHost(strings.TrimSuffix(path, ".sock")+".git.json", dir), a.version, name)
 			if exe, err := os.Executable(); err == nil {
 				s.WatchExe(server.ExeChanged(exe))
 			}

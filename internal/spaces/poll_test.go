@@ -118,6 +118,8 @@ func (h *fakeHost) NewWorktree(string, string, string) (Worktree, error)  { retu
 func (h *fakeHost) RemoveWorktree(string, RemoveOptions) error            { return nil }
 func (h *fakeHost) LoadLayouts([]CopyLayout) ([]CopyLayout, error)        { return nil, nil }
 func (h *fakeHost) SaveLayout(string, int64, SharedLayout) (int64, error) { return 0, nil }
+func (h *fakeHost) NewSpace(string, string) error                         { return nil }
+func (h *fakeHost) RemoveSpace(string) error                              { return nil }
 func (h *fakeHost) Refresh() error                                        { return nil }
 func (h *fakeHost) Subscribe(func(HostData)) (stop func())                { return func() {} }
 

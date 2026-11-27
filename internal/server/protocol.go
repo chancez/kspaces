@@ -36,6 +36,9 @@ const (
 	// The layouts of the host's copies, see spaces.CopyLayout.
 	methodLoadLayouts = "load-layouts"
 	methodSaveLayout  = "save-layout"
+	// The host's ad hoc spaces, see spaces.AdHocSpace.
+	methodNewSpace    = "new-space"
+	methodRemoveSpace = "remove-space"
 	// methodUpdate is the push of the host data to a client that subscribed.
 	methodUpdate = "update"
 )
@@ -83,4 +86,10 @@ type saveLayoutParams struct {
 
 type saved struct {
 	Revision int64 `json:"revision"`
+}
+
+// spaceParams are a new-space's and a remove-space's: the space's name, and where a new one starts.
+type spaceParams struct {
+	Name string `json:"name"`
+	Dir  string `json:"dir,omitempty"`
 }

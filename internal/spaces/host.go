@@ -3,6 +3,7 @@ package spaces
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,6 +24,8 @@ type HostData struct {
 	Spaces  []sharedSpace             `json:"spaces,omitempty"`
 	Pending []Pending                 `json:"pending,omitempty"`
 	Git     map[string]gitstate.State `json:"git,omitempty"`
+	// AdHoc are the host's ad hoc spaces, see AdHocSpace.
+	AdHoc []AdHocSpace `json:"ad_hoc,omitempty"`
 }
 
 // Host is where this host's data comes from: its server, or LocalHost in the server itself.
@@ -44,6 +47,10 @@ type Host interface {
 	// SaveLayout saves l as the layout of the copy key names, if it is still at revision, and is its new
 	// revision; ErrLayoutConflict when it is not.
 	SaveLayout(key string, revision int64, l SharedLayout) (int64, error)
+	// NewSpace makes an ad hoc space on the host, see AdHocSpace.
+	NewSpace(name, dir string) error
+	// RemoveSpace removes the host's ad hoc space name, ending the provider's sessions in it there.
+	RemoveSpace(name string) error
 }
 
 var (
@@ -91,14 +98,19 @@ type LocalHost struct {
 	subsMu sync.Mutex
 	subs   map[int]func(HostData)
 	nextID int
-	// layouts are the layouts of the host's copies it keeps.
+	// layouts are the layouts of the host's copies it keeps, and adHoc its ad hoc spaces.
 	layouts layoutStore
+	adHoc   adHocStore
 }
 
-// NewLocalHost is the host of the machine kspaces runs on, keeping git's states in path and its copies'
-// layouts in layouts.
-func NewLocalHost(path, layouts string) *LocalHost {
-	return &LocalHost{path: path, load: loadHost, newWatcher: gitstate.NewWatcher, layouts: layoutStore{path: layouts}}
+// NewLocalHost is the host of the machine kspaces runs on, keeping git's states in path, and in dir its
+// copies' layouts and its ad hoc spaces; "" keeps either in memory alone.
+func NewLocalHost(path, dir string) *LocalHost {
+	h := &LocalHost{path: path, load: loadHost, newWatcher: gitstate.NewWatcher}
+	if dir != "" {
+		h.layouts.path, h.adHoc.path = filepath.Join(dir, "layouts.json"), filepath.Join(dir, "spaces.json")
+	}
+	return h
 }
 
 // loadHost reads the config, every space's worktrees and own file, and the worktrees being created or
@@ -135,6 +147,7 @@ func (h *LocalHost) Load(fresh bool) (HostData, error) {
 	}
 	start := time.Now()
 	hd := h.load()
+	hd.AdHoc = h.adHoc.list()
 	if w := h.watcher(); w != nil {
 		hd.Git = w.Update(hostTargets(hd))
 		h.write(hd.Git)
@@ -186,6 +199,37 @@ func (h *LocalHost) LoadLayouts(known []CopyLayout) ([]CopyLayout, error) {
 // SaveLayout keeps l as the layout of key, if it is still at revision.
 func (h *LocalHost) SaveLayout(key string, revision int64, l SharedLayout) (int64, error) {
 	return h.layouts.save(key, revision, l)
+}
+
+// NewSpace keeps the ad hoc space name, starting in dir, and loads, so it shows at once.
+func (h *LocalHost) NewSpace(name, dir string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	if err := CheckAdHocName(cfg, name); err != nil {
+		return err
+	}
+	if err := h.adHoc.add(AdHocSpace{Name: name, Dir: dir}); err != nil {
+		return err
+	}
+	h.Load(true)
+	return nil
+}
+
+// RemoveSpace ends the provider's sessions in the ad hoc space name here, has the provider remove its
+// space, and forgets it, and loads.
+func (h *LocalHost) RemoveSpace(name string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	err = endSpaceOnHost(cfg, name)
+	if _, ferr := h.adHoc.remove(name); ferr != nil {
+		err = errors.Join(err, ferr)
+	}
+	h.Load(true)
+	return err
 }
 
 // Subscribe calls f with every load that changes the host data.

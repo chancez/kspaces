@@ -91,6 +91,20 @@ func (h *fakeHost) SaveLayout(key string, revision int64, l spaces.SharedLayout)
 	return h.store.SaveLayout(key, revision, l)
 }
 
+func (h *fakeHost) NewSpace(name, dir string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.asked = append(h.asked, "new-space "+name+" "+dir)
+	return nil
+}
+
+func (h *fakeHost) RemoveSpace(name string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.asked = append(h.asked, "remove-space "+name)
+	return nil
+}
+
 func (h *fakeHost) Refresh() error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -464,7 +478,14 @@ func TestClientWorktrees(t *testing.T) {
 		if err := c.RemoveWorktree("/src/gr/.worktrees/dev", spaces.RemoveOptions{Force: true, DeleteBranch: true}); err != nil {
 			t.Fatal(err)
 		}
-		want := []string{"new /src/gr dev main", "new /src/gr taken ", "remove /src/gr/.worktrees/dev {Force:true DeleteBranch:true ForceBranch:false}"}
+		if err := c.NewSpace("scratch", "/tmp/x"); err != nil {
+			t.Fatal(err)
+		}
+		if err := c.RemoveSpace("scratch"); err != nil {
+			t.Fatal(err)
+		}
+		want := []string{"new /src/gr dev main", "new /src/gr taken ", "remove /src/gr/.worktrees/dev {Force:true DeleteBranch:true ForceBranch:false}",
+			"new-space scratch /tmp/x", "remove-space scratch"}
 		if !reflect.DeepEqual(h.asked, want) {
 			t.Errorf("asked %q, want %q", h.asked, want)
 		}
