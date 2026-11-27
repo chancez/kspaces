@@ -92,8 +92,10 @@ func TestUnmarkTakenOver(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A background process takes the mark over, as from the form that handed the removal to it.
-	other := Pending{Op: PendingRemove, Root: root, Path: path, PID: os.Getppid(), Since: time.Unix(1000, 0)}
+	// A background process takes the mark over, as from the form that handed the removal to it. UTC, as
+	// the mark is read back from JSON: with the machine's zone at UTC that gives time.UTC, not time.Local,
+	// and DeepEqual tells the two apart.
+	other := Pending{Op: PendingRemove, Root: root, Path: path, PID: os.Getppid(), Since: time.Unix(1000, 0).UTC()}
 	markOther(t, dir, other)
 	unmark()
 	got, want := LoadPending(), map[string]Pending{path: other}
