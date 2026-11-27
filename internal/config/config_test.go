@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -205,5 +206,20 @@ func TestPopupSizeCells(t *testing.T) {
 		if big != c.big || small != c.small {
 			t.Errorf("%q: %v on the big screen, %v on the small one, want %v and %v", c.text, big, small, c.big, c.small)
 		}
+	}
+}
+
+// A size not set is written empty, and reads back as not set, as the server's host data carries it.
+func TestPopupSizeEmpty(t *testing.T) {
+	data, err := json.Marshal(PopupSizes{Form: PopupSize{Columns: 90, Lines: 24}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got PopupSizes
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if want := (PopupSizes{Form: PopupSize{Columns: 90, Lines: 24}}); got != want {
+		t.Errorf("read back %+v from %s, want %+v", got, data, want)
 	}
 }

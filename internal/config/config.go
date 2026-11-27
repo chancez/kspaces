@@ -181,8 +181,12 @@ func (s PopupSize) String() string {
 func (s PopupSize) MarshalText() ([]byte, error) { return []byte(s.String()), nil }
 
 // UnmarshalText reads COLUMNSxLINES, each in cells, no fewer than the smallest panel's, or a percentage
-// from 1% to 100%.
+// from 1% to 100%; empty is none, as String writes it, so a size not set reads back as it was written.
 func (s *PopupSize) UnmarshalText(text []byte) error {
+	if len(text) == 0 {
+		*s = PopupSize{}
+		return nil
+	}
 	dim := func(v string, least int) (int, bool, error) {
 		digits, percent := strings.CutSuffix(v, "%")
 		n, err := strconv.Atoi(digits)
