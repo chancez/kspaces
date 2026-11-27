@@ -31,6 +31,7 @@ type groupSubject struct{ name, host string }
 type detachedSubject struct {
 	index int
 	row   spaces.DetachedRow
+	host  string
 }
 
 // hostSubject is a host's row on the hosts tab, by the host, empty for this machine.
@@ -415,14 +416,29 @@ var actShowError = &interact.Action[*sidebar, errorSubject]{
 }
 
 // The spaces list's own, offered on every row and on the sidebar.
-var actAddSpace = &interact.Action[*sidebar, spacesSubject]{
-	Title:   "Add space",
-	Section: sectionSpace,
-	Run: func(m *sidebar, s spacesSubject) tea.Cmd {
-		m.remote = false
-		return m.addSpace(s.group, s.host)
-	},
-}
+var (
+	actNewSpace = &interact.Action[*sidebar, spacesSubject]{
+		Title:   "New space",
+		Section: sectionSpace,
+		Run: func(m *sidebar, s spacesSubject) tea.Cmd {
+			m.remote = false
+			return m.newSpace(s.host)
+		},
+	}
+	// actAddSpace adds a repository to this machine's config, so not with the cursor under another host,
+	// whose config it is not.
+	actAddSpace = &interact.Action[*sidebar, spacesSubject]{
+		Title:   "Add repository",
+		Section: sectionSpace,
+		Applies: func(m *sidebar, s spacesSubject) bool {
+			return s.host == "" && (m.cursor < 0 || m.cursor >= len(m.rows) || m.rows[m.cursor].Host == "")
+		},
+		Run: func(m *sidebar, s spacesSubject) tea.Cmd {
+			m.remote = false
+			return m.addSpace(s.group)
+		},
+	}
+)
 
 // paneAction is an action on the sidebar.
 func paneAction(title string, run func(m *sidebar) tea.Cmd) *interact.Action[*sidebar, paneSubject] {
@@ -1336,8 +1352,9 @@ var (
 func init() {
 	// Every row and the sidebar carry the list's own, so a row's menu offers them, even a row that has
 	// nothing else, and their keys work wherever the cursor is.
-	spacesKind = interact.NewKind(func(spacesSubject) string { return "Spaces" }, actAddSpace)
-	spacesKind.Bind(actAddSpace, "a", "add space", "a")
+	spacesKind = interact.NewKind(func(spacesSubject) string { return "Spaces" }, actNewSpace, actAddSpace)
+	spacesKind.Bind(actNewSpace, "a", "new space", "a")
+	spacesKind.Bind(actAddSpace, "A", "add a repository", "A")
 
 	entryKind = interact.NewKind(func(s entrySubject) string { return s.row.Space.Name },
 		actOpenWorktree, actOpenPlain, actRunCommand, actOpenLayout, actSaveAsLayout, actCloseSession, actSuspendSession, actOpenPR, actRemoveWorktree, actForgetSession, actNewWorktree, actNewWorktreeFromPR, actNewWorktreeFromIssue, actFold, actUnfold, actCleanup, actTrustConfig, actRemoveSpaceRow, actSelectRow)
@@ -1396,7 +1413,9 @@ func init() {
 	detachedKind.Bind(actShelveDetached, "z", "shelve the session", "z")
 	detachedKind.Bind(actMoveDetached, "M", "move the session to another space", "M")
 	detachedKind.Bind(actCleanupDetached, "p", "clean up the space's detached sessions", "p")
-	interact.Via(detachedKind, func(s detachedSubject) (spacesSubject, bool) { return spacesSubject{group: s.row.Of.Group}, true }, spacesKind)
+	interact.Via(detachedKind, func(s detachedSubject) (spacesSubject, bool) {
+		return spacesSubject{group: s.row.Of.Group, host: s.host}, true
+	}, spacesKind)
 	detachedRows = interact.List(detachedKind)
 	detachedRows.Bind(actOpenDetached, "enter/l", "open", "enter", "l")
 	detachedRows.Bind(actShowDetached, "", "", "enter", "l")
@@ -1595,7 +1614,7 @@ func init() {
 	trustKind.Bind(actTrustQuit, "ctrl+c", "quit", "ctrl+c")
 	theTrustForm = interact.List(trustKind)
 
-	addKind = interact.NewKind(func(addSubject) string { return "Add space" },
+	addKind = interact.NewKind(func(addSubject) string { return "Add repository" },
 		actAddNextField, actAddPrevField, actAddNextGroup, actAddPrevGroup, actAddList, actAdd, actAddCancel, actAddClear)
 	addKind.Bind(actAddNextField, "tab", "next field", "tab", "down")
 	addKind.Bind(actAddPrevField, "shift+tab", "previous field", "shift+tab", "up")
@@ -1720,7 +1739,7 @@ func (m *sidebar) entryTarget(i int) (interact.Target[*sidebar], bool) {
 	case i >= 0 && i < len(m.rows) && m.rows[i].Group != nil:
 		return groupHeaders.Target(groupSubject{name: m.rows[i].Group.Name, host: m.rows[i].Host}), true
 	case i >= 0 && i < len(m.rows) && m.rows[i].Detached != nil:
-		return detachedRows.Target(detachedSubject{index: i, row: *m.rows[i].Detached}), true
+		return detachedRows.Target(detachedSubject{index: i, row: *m.rows[i].Detached, host: m.rows[i].Host}), true
 	case i >= 0 && i < len(m.rows) && m.rows[i].Space != nil:
 		return spacesList.Target(entrySubject{index: i, row: m.rows[i]}), true
 	case i >= len(m.rows) && i < m.numEntries():

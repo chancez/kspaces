@@ -303,12 +303,24 @@ func (m *sidebar) openPicker() tea.Cmd {
 	}
 }
 
-// addSpace opens the form that adds a space, in a popup as newWorktree's, with the repository of the
-// window beside the sidebar filled in, and group chosen, empty for none.
-func (m *sidebar) addSpace(group, host string) tea.Cmd {
+// newSpace opens the form that makes an ad hoc space on host, empty for this machine, in a popup as
+// newWorktree's.
+func (m *sidebar) newSpace(host string) tea.Cmd {
 	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
-		if err := spaces.AskAddSpace(cfg, st, group, host); err != nil {
+		if err := spaces.AskNewSpace(cfg, st, host); err != nil {
+			return failedMsg{err}
+		}
+		return nil
+	}
+}
+
+// addSpace opens the form that adds a space, in a popup as newWorktree's, with the repository of the
+// window beside the sidebar filled in, and group chosen, empty for none.
+func (m *sidebar) addSpace(group string) tea.Cmd {
+	cfg, st := m.cfg, m.kitty
+	return func() tea.Msg {
+		if err := spaces.AskAddSpace(cfg, st, group); err != nil {
 			return failedMsg{err}
 		}
 		return nil

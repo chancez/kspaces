@@ -165,10 +165,10 @@ func TestLayoutKey(t *testing.T) {
 	want := []string{
 		menuRule("Session"), " Open", menuItem("Run", "R"), menuItem("Open layout", "L"), " Save as layout", menuItem("Close session", "c"),
 		menuRule("Worktree"), menuItem("Remove worktree", "x"),
-		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("Add space", "a"),
+		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("New space", "a"), menuItem("Add repository", "A"),
 		menuRule(""),
 	}
-	if got := e.screen()[y+1 : y+17]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[y+1 : y+18]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	e.press("esc")
@@ -732,11 +732,11 @@ func TestOpenWithoutLayoutMenu(t *testing.T) {
 	linked := func(session ...string) []string {
 		return slices.Concat([]string{menuRule("Session"), " Open"}, session, []string{menuItem("Open layout", "L"),
 			menuRule("Worktree"), menuItem("Remove worktree", "x"),
-			menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("Add space", "a"), menuRule("")})
+			menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("New space", "a"), menuItem("Add repository", "A"), menuRule("")})
 	}
 	main := func(session ...string) []string {
 		return slices.Concat([]string{menuRule("Session"), " Open"}, session, []string{menuItem("Open layout", "L"),
-			menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Remove space", "D"), " Select", menuItem("Add space", "a"), menuRule("")})
+			menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Remove space", "D"), " Select", menuItem("New space", "a"), menuItem("Add repository", "A"), menuRule("")})
 	}
 	type result struct {
 		Session string
@@ -759,9 +759,9 @@ func TestOpenWithoutLayoutMenu(t *testing.T) {
 		{"kitty", main(menuItem("Open without layout", "o"))},
 		// With windows open, there is no default layout to skip.
 		{"gr", []string{menuRule("Session"), " Open", menuItem("Open layout", "L"), " Save as layout", menuItem("Close session", "c"),
-			menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), menuItem("Clean up worktrees", "p"), menuItem("Remove space", "D"), " Select", menuItem("Add space", "a"), menuRule("")}},
-		{"default", []string{menuRule("Session"), " Open", menuItem("Close session", "c"), menuRule("Space"), " Select", menuItem("Add space", "a"), menuRule("")}},
-		{"gr@gone", []string{menuRule(""), menuItem("Fold worktrees", "space"), " Select", menuItem("Add space", "a"), menuRule("")}},
+			menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), menuItem("Clean up worktrees", "p"), menuItem("Remove space", "D"), " Select", menuItem("New space", "a"), menuItem("Add repository", "A"), menuRule("")}},
+		{"default", []string{menuRule("Session"), " Open", menuItem("Close session", "c"), menuRule("Space"), " Select", menuItem("New space", "a"), menuItem("Add repository", "A"), menuRule("")}},
+		{"gr@gone", []string{menuRule(""), menuItem("Fold worktrees", "space"), " Select", menuItem("New space", "a"), menuItem("Add repository", "A"), menuRule("")}},
 	})
 
 	// kitty's saved file restores it, and gr@fix's empty one would not.

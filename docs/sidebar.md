@@ -198,9 +198,11 @@ An **ad hoc space** is one made as it is needed, with a name and a directory to 
 or config behind it: `scratch`, `incident-123`. Its host's kspaces server keeps it, so every machine
 sees it, and it is listed as a topic space is, under its host, its tab starting in its directory. The
 provider's sessions in it are filed in its space of the same name, so a topic space the provider already
-has is one under another name. `a` makes one when what is typed is a name rather than a directory: on
-this machine, or under another host, there; `kspaces new-space [HOST:]NAME [--dir DIR]` makes one from a
-shell and switches to it. `D` on one confirms removing it, which ends the sessions in it, on its host for
+has is one under another name. **New space**, `a`, makes one on the host under the cursor, as does the
+plus at the right end of the SPACES title on this machine: a form asks for a name and, optionally, the
+directory its windows start in, the host's home directory by default, then opens it. A space is not tied
+to a directory: its tabs and panes can be anywhere. `kspaces new-space [HOST:]NAME [--dir DIR]` makes one
+from a shell and switches to it; without a NAME, or with `HOST:` alone, it opens the form. `D` on one confirms removing it, which ends the sessions in it, on its host for
 another host's, and has the provider remove its space. Ad hoc spaces are in no group.
 
 Without a provider, or one that does not list, there are no detached sessions and no topic spaces, and
@@ -271,7 +273,7 @@ that group; onto a session in no space, first in no group. Groups are not reorde
 right above it and after it on its line, through a symlinked config to its target, each group's spaces
 together as the list shows them. Moving it into another group rewrites its entry too, a path becoming
 `{ path = "~/src/x", group = "work" }` and a table's group changing or going, and moves the entry, with its
-comments, to the config file that lists the most of that group's spaces, as **Add space** picks the file,
+comments, to the config file that lists the most of that group's spaces, as **Add repository** picks the file,
 so a space dragged into the group a `conf.d/work.toml` holds goes there. A group set in a `[space.NAME]` table
 stays that table's: dragging the space out of it says to change it there. Moving a worktree keeps its
 space's order, by the worktrees' directories, in `$XDG_STATE_HOME/kspaces/state.json`. Either moves the order of
@@ -342,7 +344,7 @@ the label, and the key runs the item from the menu as it does on the row. `j` / 
 the items only. `esc`, a click outside it, or a click in another window closes it. On a hover popup, a right click is on the entry it shows. On the SPACES
 title, its buttons or an empty row of the list, a right click opens the list's own menu, of the sort modes,
 the attention filter and the groups; see [Spaces](#spaces). A group's header's has Fold group or Unfold
-group, and Add space.
+group, New space, and Add repository.
 
 | Section | Item | Key | Does |
 |---|---|---|---|
@@ -374,7 +376,8 @@ group, and Add space.
 | Session | Move to space | `M` | move a detached session to another space, or a new one, in a form; with a provider that moves |
 | Space | Show / Hide sessions | `space` | show or hide a space's detached sessions, on the row of how many |
 | Space | Clean up sessions | `p` | kill and remove a space's detached sessions chosen in a form, on the row of how many |
-| Space | Add space | `a` | add a repository to the spaces, in a form; on every row, on a group's header or its spaces' rows in that group |
+| Space | New space | `a` | make an ad hoc space on the cursor's host, in a form; on every row |
+| Space | Add repository | `A` | add a repository to this machine's spaces, in a form; on every row of this machine's, on a group's header or its spaces' rows in that group |
 
 Each item that changes something opens a form in a popup, with buttons and keys to confirm or cancel: an
 overlay over the window beside the sidebar, or with `[sidebar] popup = "panel"` a centered panel of its own,
@@ -639,7 +642,7 @@ what each of its panes runs, and the settings it sets. Trust, `y`, trusts what i
 error says what it is, and cannot be trusted until fixed. `kspaces trust [PATH]` does the same for the
 space PATH is in; `--yes` without asking, `--revoke` to forget it.
 
-**Add space**, which the plus at the right end of the SPACES title also opens, has a field for a directory,
+**Add repository** has a field for a directory,
 filled in with the repository of the window the sidebar is beside, and shows the root it adds: the top of
 the directory's work tree, `~/` for the home directory. A directory in no repository, or a repository
 already in the spaces, is refused before you confirm. With spaces in [groups](#groups), a `group` choice
@@ -715,7 +718,8 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `L` | open a layout in the worktree's session, with layouts configured |
 | `o` | open without the default layout, where it would open |
 | `b` | open the worktree's PR in the browser, when its row shows one |
-| `a` | add a space, wherever the cursor is |
+| `a` | make an ad hoc space, on the cursor's host |
+| `A` | add a repository to the spaces, under this machine |
 | `!` | focus the window that needs you most, wherever the cursor is |
 | `t` | reply to the cursor's status entry: write to its window without switching to it |
 | `x` | clear the done and failed records of the cursor's status entry, without focusing its window; see [Status](#status) |

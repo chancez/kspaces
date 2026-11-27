@@ -45,13 +45,9 @@ func NewSpaceRoot(roots []string, path string) (string, error) {
 }
 
 // AskAddSpace opens the form that adds a space, in a popup as NewWorktree's, with the repository of the
-// window the sidebar is beside filled in, and group chosen, when not empty. On host, another host, the form
-// makes an ad hoc space there.
-func AskAddSpace(cfg config.Config, st kitty.State, group, host string) error {
+// window the sidebar is beside filled in, and group chosen, when not empty.
+func AskAddSpace(cfg config.Config, st kitty.State, group string) error {
 	args := []string{"add"}
-	if host != "" {
-		return launchForm(cfg, st, formPanel, "add", "--host", host)
-	}
 	if group != "" {
 		args = append(args, "--group", group)
 	}

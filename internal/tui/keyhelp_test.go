@@ -36,7 +36,7 @@ func TestSidebarHelp(t *testing.T) {
 		" I        new worktree from",
 		"          issue",
 		" c        close session",
-		"\u25be 28 more",
+		"\u25be 29 more",
 		"",
 	})
 	e.press("j", "j")
@@ -50,12 +50,12 @@ func TestSidebarHelp(t *testing.T) {
 		" c        close session",
 		" x        remove worktree",
 		menuRule("Spaces"),
-		"\u25be 26 more",
+		"\u25be 27 more",
 		"",
 	})
 	e.press("G")
 	check("at the bottom", []string{
-		title, "\u25b4 28 more",
+		title, "\u25b4 29 more",
 		"          sessions",
 		" Z        hide suspended",
 		"          sessions",
@@ -83,7 +83,7 @@ func TestSidebarHelp(t *testing.T) {
 		menuRule("gr"),
 		" space   fold or unfold the",
 		"         space's worktrees",
-		"\u25be 8 more",
+		"\u25be 9 more",
 		"",
 	})
 	e.press("?")

@@ -128,7 +128,7 @@ func TestAddSpaceFormClickField(t *testing.T) {
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	clickInto(t, f, "/src/gr", 4)
 	typeInto(f, "x")
-	want := []string{"", "  Add a space", "", "  repository /srcx/gr", "", "  /srcx/gr is not a directory", "", "   Add    Cancel esc", ""}
+	want := []string{"", "  Add a repository", "", "  repository /srcx/gr", "", "  /srcx/gr is not a directory", "", "   Add    Cancel esc", ""}
 	if got := formScreen(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("clicked:\n%q\nwant\n%q", got, want)
 	}

@@ -397,10 +397,10 @@ func TestRightClickMenu(t *testing.T) {
 	want := []string{
 		menuRule("Session"), " Open", " Save as layout", menuItem("Close session", "c"),
 		menuRule("Worktree"), menuItem("Remove worktree", "x"),
-		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("Add space", "a"),
+		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("New space", "a"), menuItem("Add repository", "A"),
 		menuRule(""),
 	}
-	if got := e.screen()[y+1 : y+15]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[y+1 : y+16]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	if got := e.highlighted(); !reflect.DeepEqual(got, []string{" Open"}) {
@@ -422,8 +422,8 @@ func TestRightClickMenu(t *testing.T) {
 	def := e.row("default")
 	e.click(fmt.Sprintf(entryZone, def), tea.MouseRight)
 	_, y = e.zone(fmt.Sprintf(entryZone, def))
-	want = []string{menuRule("Session"), " Open", menuItem("Close session", "c"), menuRule("Space"), " Select", menuItem("Add space", "a"), menuRule("")}
-	if got := e.screen()[y+1 : y+8]; !reflect.DeepEqual(got, want) {
+	want = []string{menuRule("Session"), " Open", menuItem("Close session", "c"), menuRule("Space"), " Select", menuItem("New space", "a"), menuItem("Add repository", "A"), menuRule("")}
+	if got := e.screen()[y+1 : y+9]; !reflect.DeepEqual(got, want) {
 		t.Errorf("default's menu:\n%q\nwant\n%q", got, want)
 	}
 	// A click elsewhere closes it; a right click elsewhere opens that row's instead.
@@ -444,7 +444,7 @@ func TestMenuOneSection(t *testing.T) {
 	broken := len(e.m.rows) - 1
 	e.click(fmt.Sprintf(entryZone, broken), tea.MouseRight)
 	_, y := e.zone(fmt.Sprintf(entryZone, broken))
-	if got, want := e.screen()[y+1:y+5], []string{menuRule(""), menuItem("Remove space", "D"), menuItem("Add space", "a"), menuRule("")}; !reflect.DeepEqual(got, want) {
+	if got, want := e.screen()[y+1:y+6], []string{menuRule(""), menuItem("Remove space", "D"), menuItem("New space", "a"), menuItem("Add repository", "A"), menuRule("")}; !reflect.DeepEqual(got, want) {
 		t.Errorf("the broken space's menu:\n%q\nwant\n%q", got, want)
 	}
 }
@@ -461,10 +461,10 @@ func TestMenuNarrow(t *testing.T) {
 	want := []string{
 		"\u2500 Session \u2500\u2500", " Open", " Save as la\u2026", " Close sess\u2026",
 		"\u2500 Worktree \u2500", " Remove wor\u2026",
-		"\u2500 Space \u2500\u2500\u2500\u2500", " New worktr\u2026", " New worktr\u2026", " New worktr\u2026", " Fold workt\u2026", " Select", " Add space",
+		"\u2500 Space \u2500\u2500\u2500\u2500", " New worktr\u2026", " New worktr\u2026", " New worktr\u2026", " Fold workt\u2026", " Select", " New space", " Add reposi\u2026",
 		rule,
 	}
-	if got := e.screen()[y+1 : y+15]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[y+1 : y+16]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 }
@@ -533,13 +533,13 @@ func TestMenuClosesOnBlur(t *testing.T) {
 	}
 }
 
-// a adds a space wherever the cursor is: on a row, on a status entry, or in a sidebar with neither.
+// a makes a space wherever the cursor is: on a row, on a status entry, or in a sidebar with neither.
 func TestAddSpaceKey(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(tea.FocusMsg{})
 	adds := func() bool {
 		b, ok := interact.Lookup(e.m, keyMsg("a"), e.m.chain()...)
-		return ok && b.Is(actAddSpace)
+		return ok && b.Is(actNewSpace)
 	}
 	got := []bool{adds()}
 	e.press("G")
@@ -547,7 +547,7 @@ func TestAddSpaceKey(t *testing.T) {
 	e.m.Update(spaces.Snapshot{Config: &config.Config{}})
 	got = append(got, adds())
 	if want := []bool{true, true, true}; !reflect.DeepEqual(got, want) {
-		t.Errorf("a adds a space on a row, a status entry, nothing: %v, want %v", got, want)
+		t.Errorf("a makes a space on a row, a status entry, nothing: %v, want %v", got, want)
 	}
 }
 
@@ -606,7 +606,7 @@ func TestAddSpaceButton(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := launched(), []string{"@", "launch", "--type=overlay", "--var=kspaces_form=1", "--next-to", "id:11", exe, "add"}; !reflect.DeepEqual(got, want) {
+	if got, want := launched(), []string{"@", "launch", "--type=overlay", "--var=kspaces_form=1", "--next-to", "id:11", exe, "new-space"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("the button launched %q, want %q", got, want)
 	}
 
@@ -619,10 +619,10 @@ func TestAddSpaceButton(t *testing.T) {
 // A menu that would run off the bottom opens above its row.
 func TestMenuAbove(t *testing.T) {
 	e := newSidebarEnv(t)
-	// Only gr, so its last row is the list's last, and no indicator takes it, below sessions in no space,
-	// so the menu has room above.
+	// Only gr, after a space of one row, so its last row is the list's last, and no indicator takes it,
+	// below sessions in no space, so the menu has room above.
 	snap := fixture(time.Now())
-	snap.Spaces = snap.Spaces[:1]
+	snap.Spaces = []spaces.Space{{Name: "aaa", Root: "/src/aaa", Worktrees: []spaces.Worktree{{Path: "/src/aaa", Branch: "main", Session: "aaa"}}}, snap.Spaces[0]}
 	for _, name := range []string{"notes", "scratch", "mail", "todo", "work", "chat"} {
 		snap.Others = append(snap.Others, spaces.Space{Name: name, Worktrees: []spaces.Worktree{{Session: name}}})
 	}
@@ -635,10 +635,10 @@ func TestMenuAbove(t *testing.T) {
 	want := []string{
 		menuRule("Session"), " Open",
 		menuRule("Worktree"), menuItem("Remove worktree", "x"),
-		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("Add space", "a"),
+		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("New space", "a"), menuItem("Add repository", "A"),
 		menuRule(""),
 	}
-	if got := e.screen()[y-12 : y]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[y-13 : y]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu above row %d:\n%q\nwant\n%q", y, got, want)
 	}
 }

@@ -21,7 +21,7 @@ const (
 	menuZone = "menu:%d"
 	// popupZone is the hover popup, all of it.
 	popupZone = "popup"
-	// addZone is the button on the SPACES title that adds a space.
+	// addZone is the button on the SPACES title that makes a space.
 	addZone = "add"
 	// sortZone is the button on the SPACES title that shows and changes the sort mode.
 	sortZone = "sort"

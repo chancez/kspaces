@@ -143,7 +143,7 @@ type sidebar struct {
 	bar       controls[*sidebar]
 	barHints  map[string]string
 	barHot    string
-	// Whether the mouse is on the add space button, the sort button, the attention filter's button or the
+	// Whether the mouse is on the new space button, the sort button, the attention filter's button or the
 	// picker's button, which lights it.
 	addHot, sortHot, attentionHot, pickHot bool
 	// The zone of the clear button under the mouse, which lights it, or "", see statuslist.go.
@@ -604,7 +604,7 @@ func (m *sidebar) render() string {
 }
 
 // titleLine is SPACES with the filters on after it, see filterSummary, and the picker's button, the
-// attention filter's button, the sort button and the add space button at its right end. The funnel is lit
+// attention filter's button, the sort button and the new space button at its right end. The funnel is lit
 // while either filter is on. The summary goes first when the line is short, whole, then the picker's
 // button, which P stands in for, then the cell between the title and the buttons, so the narrowest sidebar
 // still reads SPACES; only narrower is the title cut.

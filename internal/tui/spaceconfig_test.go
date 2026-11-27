@@ -113,9 +113,9 @@ func TestTrustMenu(t *testing.T) {
 	e.m.cursor = e.row("gr@dev")
 	e.press("m")
 	_, y := e.zone(fmt.Sprintf(entryZone, e.m.cursor))
-	if got, want := e.screen()[y+1:y+17], []string{
+	if got, want := e.screen()[y+1:y+18], []string{
 		menuRule("Session"), " Open", " Save as layout", menuItem("Close session", "c"), menuRule("Worktree"), menuItem("Open PR #123", "b"), menuItem("Remove worktree", "x"),
-		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Trust space config", " Select", menuItem("Add space", "a"), menuRule(""),
+		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Trust space config", " Select", menuItem("New space", "a"), menuItem("Add repository", "A"), menuRule(""),
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("the menu:\n%q\nwant\n%q", got, want)
 	}

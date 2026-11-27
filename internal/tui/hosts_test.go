@@ -344,24 +344,34 @@ func TestByHostOpensAdHoc(t *testing.T) {
 	}
 }
 
-// a under another host opens the form that makes an ad hoc space there; under this machine, the one that
-// adds a repository or makes one here.
+// a opens the form that makes a space on the host under the cursor; A, the one that adds a repository,
+// only under this machine, whose config it is.
 func TestByHostAddSpace(t *testing.T) {
 	e := newSidebarEnv(t)
 	calls := fakeKittenCalls(t)
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
 	e.m.Update(remoteFixture())
 	e.m.Update(tea.FocusMsg{})
-	for host, tail := range map[string][]string{"white": {"add", "--host", "white"}, "": {"add"}} {
-		e.m.cursor = e.hostHeaderRow(host)
-		cmd := e.press("a")
-		if cmd == nil {
-			t.Fatalf("a under %q ran nothing", host)
+	var got [][]string
+	for _, host := range []string{"white", ""} {
+		for _, key := range []string{"a", "A"} {
+			e.m.cursor = e.hostHeaderRow(host)
+			before := len(calls())
+			if cmd := e.press(key); cmd != nil {
+				cmd()
+			}
+			for _, call := range calls()[before:] {
+				if i := slices.Index(call, exe); i >= 0 {
+					got = append(got, append([]string{key}, call[i+1:]...))
+				}
+			}
 		}
-		cmd()
-		got := calls()
-		last := got[len(got)-1]
-		if !slices.Equal(last[len(last)-len(tail):], tail) || host == "" && slices.Contains(last, "--host") {
-			t.Errorf("a under %q launched %q, want it to end in %q", host, last, tail)
-		}
+	}
+	want := [][]string{{"a", "new-space", "white:"}, {"a", "new-space"}, {"A", "add"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("launched %q\nwant %q", got, want)
 	}
 }

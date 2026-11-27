@@ -92,7 +92,7 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 		}
 		if m.inZone(addZone, msg.X, msg.Y) {
 			m.unhover()
-			return runFirst(m, thePane.Target(paneSubject{}), actAddSpace)
+			return runFirst(m, thePane.Target(paneSubject{}), actNewSpace)
 		}
 		if m.inZone(sortZone, msg.X, msg.Y) {
 			m.unhover()

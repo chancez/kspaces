@@ -59,7 +59,7 @@ func TestAddSpaceForm(t *testing.T) {
 	f := newAddSpaceForm(roots, nil, filepath.Join(home, "repo", "sub"), "")
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	screen := func(path, says, buttons string) []string {
-		return []string{"", "  Add a space", "", "  repository " + path, "", "  " + says, "", "   " + buttons, ""}
+		return []string{"", "  Add a repository", "", "  repository " + path, "", "  " + says, "", "   " + buttons, ""}
 	}
 	if got, want := formScreen(f), screen("~/repo/sub", "Adds ~/repo to the spaces", "Add enter    Cancel esc"); !reflect.DeepEqual(got, want) {
 		t.Errorf("a directory in a repository:\n%q\nwant\n%q", got, want)
@@ -71,8 +71,7 @@ func TestAddSpaceForm(t *testing.T) {
 		want  []string
 	}
 	for _, s := range []step{
-		{"", screen("a directory in a git repository", "Name a directory in the repository to add, or an ad hoc space", "Add    Cancel esc")},
-		{"bad name", screen("bad name", `"bad name": a space's name is letters, digits, '.', '_' and '-'`, "Add    Cancel esc")},
+		{"", screen("a directory in a git repository", "Name a directory in the repository to add", "Add    Cancel esc")},
 		{"~/plain", screen("~/plain", "~/plain is not in a git repository", "Add    Cancel esc")},
 		{"~/nothing", screen("~/nothing", "~/nothing is not a directory", "Add    Cancel esc")},
 	} {
@@ -98,23 +97,6 @@ func TestAddSpaceForm(t *testing.T) {
 	}
 	if _, quit := f.Update(cmd()); quit == nil || quit() != tea.Quit() {
 		t.Errorf("the form stayed after adding: %v", f.err)
-	}
-
-	// A name that is no directory makes an ad hoc space, on this machine.
-	var made []string
-	f = newAddSpaceForm(roots, nil, "scratch", "")
-	f.newSpace = func(name string) error { made = append(made, name); return nil }
-	f.Update(tea.WindowSizeMsg{Width: 90, Height: 20})
-	if got, want := formScreen(f)[5], "  Makes the ad hoc space scratch on "+hostName("")+", starting in its home directory"; got != want {
-		t.Errorf("a name says %q, want %q", got, want)
-	}
-	_, cmd = f.Update(keyMsg("enter"))
-	if cmd == nil {
-		t.Fatal("enter on a name ran nothing")
-	}
-	f.Update(cmd())
-	if !reflect.DeepEqual(made, []string{"scratch"}) {
-		t.Errorf("made %q, want scratch", made)
 	}
 	data, err := os.ReadFile(config)
 	if want := "# Mine.\nspaces = [\n  \"~/other\", # old\n  \"~/repo\",\n]\n"; err != nil || string(data) != want {
@@ -176,7 +158,7 @@ func TestAddSpaceFormGroup(t *testing.T) {
 	f := newAddSpaceForm(cfg.Spaces, groupNames(cfg), "~/repo", "work")
 	f.Update(tea.WindowSizeMsg{Width: 70, Height: 20})
 	screen := func(group, says, keys string) []string {
-		return []string{"", "  Add a space", "", "  repository ~/repo", "  group      " + group, "", "  " + says, "", "   Add enter    Cancel esc   tab next field" + keys, ""}
+		return []string{"", "  Add a repository", "", "  repository ~/repo", "  group      " + group, "", "  " + says, "", "   Add enter    Cancel esc   tab next field" + keys, ""}
 	}
 	got := [][]string{formScreen(f)}
 	f.Update(keyMsg("tab"))

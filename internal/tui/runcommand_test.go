@@ -94,10 +94,10 @@ func TestRunKey(t *testing.T) {
 	want := []string{
 		menuRule("Session"), " Open", menuItem("Run", "R"), " Save as layout", menuItem("Close session", "c"),
 		menuRule("Worktree"), menuItem("Remove worktree", "x"),
-		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("Add space", "a"),
+		menuRule("Space"), menuItem("New worktree", "n"), menuItem("New worktree from PR", "N"), menuItem("New worktree from issue", "I"), menuItem("Fold worktrees", "space"), " Select", menuItem("New space", "a"), menuItem("Add repository", "A"),
 		menuRule(""),
 	}
-	if got := e.screen()[y+1 : y+16]; !reflect.DeepEqual(got, want) {
+	if got := e.screen()[y+1 : y+17]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	e.press("esc")

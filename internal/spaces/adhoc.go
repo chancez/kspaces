@@ -179,8 +179,36 @@ func withAdHocDirs(others []Space, adHoc []AdHocSpace) {
 	}
 }
 
-// ExpandHome is path with a leading ~/ as the home directory.
-func ExpandHome(path string) string { return expandHome(path) }
+// AdHocDir is dir, as typed, as this machine's ad hoc space starts in it: absolute, ~/ expanded, and a
+// directory; empty stays empty, for the home directory.
+func AdHocDir(dir string) (string, error) {
+	if dir = strings.TrimSpace(dir); dir == "" {
+		return "", nil
+	}
+	abs, err := filepath.Abs(expandHome(dir))
+	if err != nil {
+		return "", err
+	}
+	if info, err := os.Stat(abs); err != nil || !info.IsDir() {
+		return "", fmt.Errorf("%s is not a directory", dir)
+	}
+	return abs, nil
+}
+
+// AskNewSpace opens the form that makes an ad hoc space on host, empty for this machine, in a popup as
+// NewWorktree's.
+func AskNewSpace(cfg config.Config, st kitty.State, host string) error {
+	args := []string{"new-space"}
+	if host != "" {
+		args = append(args, host+":")
+	}
+	return launchForm(cfg, st, formPanel, args...)
+}
+
+// AdHocWorktree is the one worktree of host's ad hoc space name, starting in dir, as OpenWorktree opens it.
+func AdHocWorktree(host, name, dir string) Worktree {
+	return Worktree{Session: copyOf(host, name), Host: host, Path: dir}
+}
 
 // OpenAdHoc switches to wt's kitty session from where kspaces runs, opening it if need be, as
 // OpenWorktree does: an ad hoc space's, this machine's or another host's.

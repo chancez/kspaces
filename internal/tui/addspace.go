@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -19,18 +18,10 @@ import (
 
 // addSpaceForm asks for a repository, and the group to put it in when there are groups, shows the root it
 // would add or why it cannot, and adds it to the config's spaces, in the file of the group's spaces. The
-// sidebars pick it up when they next read the config. A name that is no repository makes an ad hoc space
-// instead, see spaces.AdHocSpace, on host, which another host's form makes alone. It is meant for a kitty
-// popup, like the new worktree form.
+// sidebars pick it up when they next read the config. It is meant for a kitty popup, like the new worktree
+// form.
 type addSpaceForm struct {
 	th *look.Theme
-	// host is where an ad hoc space is made, empty for this machine; cfg is the config a name is checked
-	// against, and newSpace makes the ad hoc space.
-	host     string
-	cfg      config.Config
-	newSpace func(name string) error
-	// adHoc is the name typed making an ad hoc space rather than adding a repository.
-	adHoc bool
 	// The configured spaces, to refuse one already there.
 	roots []string
 	path  lineField
@@ -103,27 +94,9 @@ func (f *addSpaceForm) chosenGroup() string {
 }
 
 // check works out what the path adds, as it is typed, so a path that cannot be added is refused before
-// anything is written: a repository, else, for a name that is no directory, an ad hoc space, the only
-// thing another host's form makes.
+// anything is written.
 func (f *addSpaceForm) check() {
-	name := strings.TrimSpace(f.path.Value())
-	f.adHoc = false
-	if f.host == "" {
-		if f.root, f.problem = spaces.NewSpaceRoot(f.roots, f.path.Value()); f.problem == nil || !looksLikeName(name) {
-			return
-		}
-	}
-	f.adHoc, f.problem = true, spaces.CheckAdHocName(f.cfg, name)
-}
-
-// looksLikeName says whether s is a name rather than a path: nothing a path is written with, and no
-// directory of that name here.
-func looksLikeName(s string) bool {
-	if s == "" || strings.ContainsAny(s, "/~") {
-		return false
-	}
-	info, err := os.Stat(s)
-	return err != nil || !info.IsDir()
+	f.root, f.problem = spaces.NewSpaceRoot(f.roots, f.path.Value())
 }
 
 // locate works out the file the space goes in, for the group chosen. A config that cannot be read says
@@ -134,10 +107,6 @@ func (f *addSpaceForm) locate() {
 
 func (f *addSpaceForm) add() tea.Cmd {
 	f.busy, f.err = true, nil
-	if f.adHoc {
-		newSpace, name := f.newSpace, strings.TrimSpace(f.path.Value())
-		return func() tea.Msg { return addedMsg{newSpace(name)} }
-	}
 	root, group := f.root, f.chosenGroup()
 	return func() tea.Msg { return addedMsg{config.SaveSpace(root, group)} }
 }
@@ -213,23 +182,14 @@ func (f *addSpaceForm) View() tea.View {
 func (f *addSpaceForm) render() string {
 	th, width := f.th, max(f.width-4, 20)
 	line := func(spans ...look.Span) string { return th.Render(look.Plain, spans...) }
-	heading, label := "Add a space", "repository"
-	if f.host != "" {
-		heading, label = "Add a space on "+f.host, "name"
-	}
-	lines := append([]string{line(look.Heading(heading)), ""}, fieldLines(th, label, &f.path, width)...)
+	lines := append([]string{line(look.Heading("Add a repository")), ""}, fieldLines(th, "repository", &f.path, width)...)
 	groupAt := len(lines)
 	lines = append(append(lines, f.group.lines(f.onGroup(), width)...), "")
 	switch {
-	case strings.TrimSpace(f.path.Value()) == "" && f.host != "":
-		lines = append(lines, line(look.Muted("Name the ad hoc space to make there")))
 	case strings.TrimSpace(f.path.Value()) == "":
-		lines = append(lines, line(look.Muted("Name a directory in the repository to add, or an ad hoc space")))
+		lines = append(lines, line(look.Muted("Name a directory in the repository to add")))
 	case f.problem != nil:
 		lines = append(lines, line(th.Cut(width, look.Error(f.problem.Error()))...))
-	case f.adHoc:
-		says := "Makes the ad hoc space " + strings.TrimSpace(f.path.Value()) + " on " + hostName(f.host) + ", starting in its home directory"
-		lines = append(lines, line(th.Cut(width, look.Muted(says))...))
 	default:
 		says := "Adds " + config.Tilde(f.root) + " to the spaces"
 		if g := f.chosenGroup(); g != "" {
@@ -302,26 +262,12 @@ func (f *addSpaceForm) restore(d map[string]string) tea.Cmd {
 
 // RunAddSpace runs the add space form, meant for a kitty popup, with path filled in and group chosen,
 // until the space is added or the form is left.
-func RunAddSpace(ctx context.Context, path, group, host string) error {
+func RunAddSpace(ctx context.Context, path, group string) error {
 	cfg, err := loadForAdd()
 	if err != nil {
 		return err
 	}
-	h, hangUp := spaces.ThisHost(), func() {}
-	if host != "" {
-		if h, hangUp, err = spaces.HostOf(cfg, host); err != nil {
-			return err
-		}
-	}
-	defer hangUp()
-	groups := groupNames(cfg)
-	if host != "" {
-		groups = nil
-	}
-	f := openAddSpaceForm(cfg.Spaces, groups, path, group)
-	f.host, f.cfg, f.newSpace = host, cfg, func(name string) error { return h.NewSpace(name, "") }
-	f.check()
-	if err := runPopup(ctx, f); err != nil {
+	if err := runPopup(ctx, openAddSpaceForm(cfg.Spaces, groupNames(cfg), path, group)); err != nil {
 		return fmt.Errorf("running the add space form: %w", err)
 	}
 	return nil

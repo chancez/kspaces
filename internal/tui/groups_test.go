@@ -200,8 +200,8 @@ func TestFoldGroupClick(t *testing.T) {
 	}
 
 	e.click(fmt.Sprintf(entryZone, work), tea.MouseRight)
-	want := []string{menuRule("Group"), menuItem("Fold group", "space"), menuRule("Space"), " Select", menuItem("Add space", "a"), menuRule("")}
-	if got := e.screen()[y+1 : y+7]; !reflect.DeepEqual(got, want) {
+	want := []string{menuRule("Group"), menuItem("Fold group", "space"), menuRule("Space"), " Select", menuItem("New space", "a"), menuItem("Add repository", "A"), menuRule("")}
+	if got := e.screen()[y+1 : y+8]; !reflect.DeepEqual(got, want) {
 		t.Errorf("menu:\n%q\nwant\n%q", got, want)
 	}
 	e.click(fmt.Sprintf(menuZone, 0), tea.MouseLeft)
@@ -370,8 +370,8 @@ func TestDragAcrossGroups(t *testing.T) {
 	}
 }
 
-// Add space on a group's header, or on one of its spaces' rows, opens the form on that group; on a session
-// in no space, on none.
+// Add repository on a group's header, or on one of its spaces' rows, opens the form on that group; on a
+// session in no space, on none.
 func TestAddSpaceInGroup(t *testing.T) {
 	e := newGroupsEnv(t)
 	e.m.Update(tea.FocusMsg{})
@@ -382,7 +382,7 @@ func TestAddSpaceInGroup(t *testing.T) {
 	}
 	for _, at := range []int{e.headerRow("personal"), e.row("docs"), e.row("default")} {
 		e.m.cursor = at
-		if cmd := e.press("a"); cmd != nil {
+		if cmd := e.press("A"); cmd != nil {
 			cmd()
 		}
 	}
