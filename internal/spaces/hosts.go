@@ -31,16 +31,24 @@ func HostViews(others, spaces []Space, sessions []ProviderSession, detached map[
 		for _, s := range rv.Spaces {
 			listed[s.Name] = true
 		}
-		// The host's sessions in no space it has, as its own spaces of them.
-		var names []string
+		// Its ad hoc spaces, and the provider's spaces of its sessions that are none of its spaces, as its
+		// own: each opens as a copy of its one kitty session, in its directory there or its home.
+		dirs := map[string]string{}
+		for _, a := range rv.AdHoc {
+			dirs[a.Name] = a.Dir
+		}
 		for _, s := range sessions {
-			if s.Host == host && !listed[s.SpaceName()] && !slices.Contains(names, s.SpaceName()) {
-				names = append(names, s.SpaceName())
+			if s.Host == host && !listed[s.SpaceName()] {
+				if _, ok := dirs[s.SpaceName()]; !ok {
+					dirs[s.SpaceName()] = ""
+				}
 			}
 		}
-		slices.Sort(names)
-		for _, name := range names {
-			v.Others = append(v.Others, Space{Name: name, Worktrees: []Worktree{{Session: CopyName(host, name), Host: host}}})
+		for _, name := range slices.Sorted(maps.Keys(dirs)) {
+			if name == defaultSpace {
+				continue
+			}
+			v.Others = append(v.Others, Space{Name: name, Worktrees: []Worktree{{Session: CopyName(host, name), Host: host, Path: dirs[name]}}})
 		}
 		views = append(views, v)
 	}

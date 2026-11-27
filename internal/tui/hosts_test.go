@@ -307,3 +307,30 @@ func TestByHostKeepsFolds(t *testing.T) {
 		t.Errorf("a new sidebar has %v, want %v", got, want)
 	}
 }
+
+// enter on another host's space of its sessions in no space, an ad hoc one or the provider's, opens it as
+// a copy, its tab on that host.
+func TestByHostOpensAdHoc(t *testing.T) {
+	e := newSidebarEnv(t)
+	calls := fakeKittenCalls(t)
+	snap := remoteFixture()
+	rv := snap.Remotes["white"]
+	rv.AdHoc = []spaces.AdHocSpace{{Name: "scratch", Dir: "/srv/scratch"}}
+	snap.Remotes["white"] = rv
+	e.m.Update(snap)
+	e.m.Update(tea.FocusMsg{})
+	e.m.cursor = e.hostRow("white", "white:scratch")
+	cmd := e.press("enter")
+	if cmd == nil {
+		t.Fatal("enter on white's scratch ran nothing")
+	}
+	cmd()
+	got := calls()
+	launch := slices.IndexFunc(got, func(c []string) bool { return slices.Contains(c, "--add-to-session=white:scratch") })
+	if launch < 0 {
+		t.Fatalf("no tab of white:scratch in %q", got)
+	}
+	if tail := got[launch][len(got[launch])-5:]; !slices.Equal(tail, []string{"kitten", "ssh", "--kitten", "cwd=/srv/scratch", "white"}) {
+		t.Errorf("the tab runs %q, want kitten ssh to white in /srv/scratch", tail)
+	}
+}

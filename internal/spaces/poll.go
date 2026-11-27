@@ -44,6 +44,8 @@ type Shared struct {
 	Provider *ProviderState `json:"provider,omitempty"`
 	// What is known of the other hosts the config names, by name.
 	Remotes map[string]RemoteHost `json:"remotes,omitempty"`
+	// This host's ad hoc spaces, from the host data.
+	AdHoc []AdHocSpace `json:"ad_hoc,omitempty"`
 }
 
 // sharedSpace is a Space with its errors as text.
@@ -79,7 +81,7 @@ func loadShared(h Host, pushed *HostData) Shared {
 			return Shared{Err: err.Error()}
 		}
 	}
-	sh := Shared{Config: hd.Config, Err: hd.Err, Spaces: hd.Spaces, Pending: hd.Pending, Git: hd.Git}
+	sh := Shared{Config: hd.Config, Err: hd.Err, Spaces: hd.Spaces, Pending: hd.Pending, Git: hd.Git, AdHoc: hd.AdHoc}
 	if cfg := sh.Config; cfg != nil {
 		sh.Saved = savedSessions(cfg.SessionsDir)
 		sh.Suspended = suspendedSessions(cfg.SessionsDir)
@@ -125,6 +127,11 @@ func (sh Shared) View(self int) Snapshot {
 	}
 	st := kitty.StateOf(sh.Windows, self)
 	topics := topicSpaces(sh.Provider, spaces)
+	for _, a := range sh.AdHoc {
+		if !slices.Contains(topics, a.Name) {
+			topics = append(topics, a.Name)
+		}
+	}
 	saved := make(map[string]bool, len(sh.Saved))
 	for _, name := range sh.Saved {
 		saved[name] = true
@@ -137,6 +144,7 @@ func (sh Shared) View(self int) Snapshot {
 	// git is asked about in targets, is only what git lists.
 	kept := state.Load().Sidebar
 	snap := Snapshot{Config: sh.Config, Spaces: spaces, Others: placeSessions(spaces, local(sh.Config, st.Sessions), slices.DeleteFunc(slices.Clone(sh.Saved), func(name string) bool { return isCopy(sh.Config, name) }), topics), Folded: toSet(kept.Folded), Hidden: toSet(kept.Hidden), Saved: saved, Suspended: suspended, Keeping: sh.Keeping, Kitty: st}
+	withAdHocDirs(snap.Others, sh.AdHoc)
 	snap.Order = Order{Mode: sortMode(kept.Sort), Worktrees: worktreeOrder(kept.Order), Groups: sh.Config.Groups, Focused: st.Focused, Statuses: st.Statuses}
 	if sh.KittyErr != "" {
 		snap.Err = errors.New(sh.KittyErr)

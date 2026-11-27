@@ -180,6 +180,8 @@ func (r *remotes) load(name string, h *remote) {
 // not load, if it could not.
 type RemoteView struct {
 	Spaces []Space
+	// AdHoc are its ad hoc spaces, see AdHocSpace.
+	AdHoc []AdHocSpace
 	// Loaded is whether it has loaded at all, so its spaces are what it has.
 	Loaded bool
 	Err    string
@@ -195,7 +197,7 @@ func RemoteViewsOf(hosts map[string]RemoteHost) (map[string]RemoteView, map[stri
 	for name, rh := range hosts {
 		v := RemoteView{Err: rh.Err}
 		if hd := rh.Data; hd != nil {
-			v.Loaded = true
+			v.Loaded, v.AdHoc = true, hd.AdHoc
 			for _, s := range hd.Spaces {
 				v.Spaces = append(v.Spaces, remoteSpace(name, hd, s))
 			}

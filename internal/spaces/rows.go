@@ -73,13 +73,14 @@ func (r Row) Blank() bool {
 // Elsewhere reports whether r is a worktree only another host's sessions are tagged with, see
 // Worktree.Host, with no directory known.
 func (r Row) Elsewhere() bool {
-	return r.Worktree != nil && r.Worktree.Host != "" && r.Worktree.Path == ""
+	return r.Worktree != nil && r.Worktree.Host != "" && r.Worktree.Path == "" && !r.Other
 }
 
-// Remote reports whether r is another host's copy of a worktree, from that host's server, see
-// docs/stories.md: its directory is there, so nothing done in a directory here applies to it.
+// Remote reports whether r is another host's copy of a worktree, from that host's server, or of a space of
+// its sessions in no space, see docs/stories.md: its directory is there, so nothing done in a directory
+// here applies to it.
 func (r Row) Remote() bool {
-	return r.Worktree != nil && r.Worktree.Host != "" && r.Worktree.Path != ""
+	return r.Worktree != nil && r.Worktree.Host != "" && (r.Worktree.Path != "" || r.Other)
 }
 
 // Absent reports whether r's worktree has no directory here: a missing one, or one only another host has.

@@ -162,3 +162,15 @@ func endSpaceOnHost(cfg config.Config, name string) error {
 	}
 	return errors.Join(errs...)
 }
+
+// withAdHocDirs starts the sessions in no space that are ad hoc spaces in their directories, see
+// AdHocSpace, others being one space each of one worktree.
+func withAdHocDirs(others []Space, adHoc []AdHocSpace) {
+	for i := range others {
+		for _, a := range adHoc {
+			if others[i].Name == a.Name && len(others[i].Worktrees) > 0 {
+				others[i].Worktrees[0].Path = a.Dir
+			}
+		}
+	}
+}

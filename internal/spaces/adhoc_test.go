@@ -60,3 +60,38 @@ func TestAdHocSpaces(t *testing.T) {
 		t.Errorf("after removing scratch %+v, want %+v", hd.AdHoc, want)
 	}
 }
+
+// This machine's ad hoc spaces are its sessions in no space, each starting in its directory, open or not.
+func TestAdHocOthers(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	sh := Shared{Config: &config.Config{}, AdHoc: []AdHocSpace{{Name: "scratch", Dir: "/tmp/scratch"}, {Name: "notes"}}}
+	got := sh.View(0).Others
+	want := []Space{
+		{Name: "notes", Worktrees: []Worktree{{Session: "notes"}}},
+		{Name: "scratch", Worktrees: []Worktree{{Session: "scratch", Path: "/tmp/scratch"}}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("others %+v, want %+v", got, want)
+	}
+}
+
+// Another host's ad hoc spaces are its own sessions in no space, each a copy of its one kitty session, in
+// its directory there; the provider's space of the host's sessions that is no space of its is one too, in
+// its home directory, and its default is not listed.
+func TestHostViewsAdHoc(t *testing.T) {
+	sessions := []ProviderSession{
+		{ID: "w:a", Space: "media", Host: "white"},
+		{ID: "w:b", Space: "scratch", Host: "white"},
+		{ID: "w:c", Host: "white"},
+	}
+	remotes := map[string]RemoteView{"white": {Loaded: true, AdHoc: []AdHocSpace{{Name: "scratch", Dir: "/srv/scratch"}, {Name: "empty"}}}}
+	got := HostViews(nil, nil, sessions, nil, remotes)[1].Others
+	want := []Space{
+		{Name: "empty", Worktrees: []Worktree{{Session: "white:empty", Host: "white"}}},
+		{Name: "media", Worktrees: []Worktree{{Session: "white:media", Host: "white"}}},
+		{Name: "scratch", Worktrees: []Worktree{{Session: "white:scratch", Host: "white", Path: "/srv/scratch"}}},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("white's others\n%+v\nwant\n%+v", got, want)
+	}
+}
