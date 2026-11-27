@@ -73,6 +73,18 @@ func (c *Client) Exit() error {
 	return c.call(methodExit, struct{}{}, nil)
 }
 
+// Close hangs up, if connected. A call after connects again.
+func (c *Client) Close() error {
+	c.mu.Lock()
+	cn := c.conn
+	c.conn = nil
+	c.mu.Unlock()
+	if cn != nil {
+		cn.close(errGone)
+	}
+	return nil
+}
+
 // Hello is what the server said it is, connecting if need be.
 func (c *Client) Hello() (Hello, error) {
 	cn, err := c.connected()
