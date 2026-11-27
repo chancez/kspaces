@@ -100,7 +100,7 @@ func TestPollerSessions(t *testing.T) {
 			{ID: 1, PID: 100, Cmdline: []string{"mux", "attach", "s1"}, UserVars: map[string]string{"mux": "s1"}, Cwd: "/src"},
 			{ID: 2, UserVars: map[string]string{"kspaces": "1"}},
 		}}}}}
-		p := newPoller(filepath.Join(t.TempDir(), "kitty.git.json"), func() Shared { return Shared{Config: &cfg} })
+		p := polling(func() Shared { return Shared{Config: &cfg} })
 		p.list = func() ([]kitty.OSWindow, error) { return windows, nil }
 		asked, lists, fail := 0, 0, true
 		caps := Capabilities{CapList: true}

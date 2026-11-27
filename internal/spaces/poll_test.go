@@ -2,16 +2,12 @@ package spaces
 
 import (
 	"errors"
-	"maps"
+	"os"
 	"path/filepath"
 	"reflect"
-	"slices"
 	"testing"
-	"time"
 
 	"github.com/chancez/kspaces/internal/config"
-	"github.com/chancez/kspaces/internal/gh"
-	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
 )
 
@@ -75,79 +71,51 @@ func TestSharedView(t *testing.T) {
 	}
 }
 
-// The poller asks git and gh, writes what they said for the picker and the forms, and a refresh has them
-// asked again. A sidebar started again carries on from the last one's pull requests.
-func TestPollerGitStates(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "run", "kitty.git.json")
-	// UTC, as the states are read back from JSON: with the machine's zone at UTC that gives time.UTC, not
-	// time.Local, and DeepEqual tells the two apart.
-	now := time.Unix(1_000_000, 0).UTC()
-	var asked []string
-	watcher := func() *gitstate.Watcher {
-		return gitstate.WatcherOf(
-			func(dir string) (gitstate.Status, error) {
-				asked = append(asked, "status "+dir)
-				return gitstate.Status{Changes: 2}, nil
-			},
-			func(root, branch string) (*gh.PR, error) {
-				asked = append(asked, "pr "+branch)
-				return &gh.PR{Number: 7, State: "merged"}, nil
-			},
-			func() time.Time { return now },
-			func(f func()) { f() },
-		)
-	}
-	// gr@gone is a missing worktree of gr, which git is not asked about.
-	load := func() Shared {
-		return Shared{Config: &config.Config{}, Spaces: []sharedSpace{
-			{Name: "gr", Root: "/src/gr", Worktrees: []Worktree{{Path: "/src/gr", Branch: "main", Session: "gr"}, {Path: "/src/gr/dev", Branch: "dev", Session: "gr@dev"}}},
-			{Name: "broken", Root: "/src/broken", Err: "not a git repository"},
-		}, Saved: []string{"gr@gone"}}
-	}
-	poller := func() *Poller {
-		p := newPoller(path, load)
-		p.newWatcher = watcher
-		return p
-	}
-	pa, pb := poller(), poller()
-	poll := func(f func() Shared) []string {
-		asked = nil
-		f()
-		return asked
-	}
+// polling is a poller whose loads are load's.
+func polling(load func() Shared) *Poller {
+	return newPoller(func(*HostData) Shared { return load() })
+}
 
-	states := map[string]gitstate.State{
-		"/src/gr":     {Status: &gitstate.Status{Changes: 2}, PR: &gh.PR{Number: 7, State: "merged"}, PRAt: now, PRBranch: "main"},
-		"/src/gr/dev": {Status: &gitstate.Status{Changes: 2}, PR: &gh.PR{Number: 7, State: "merged"}, PRAt: now, PRBranch: "dev"},
+// A poll loads this host's data, unless a subscription pushed it, and the session files beside it.
+func TestPollerHostData(t *testing.T) {
+	dir := t.TempDir()
+	cfg := config.Config{SessionsDir: dir}
+	if err := os.WriteFile(filepath.Join(dir, "gr.kitty-session"), []byte("launch\n"), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	got := [][]string{poll(pa.Poll)}
-	if written, _ := readGit(path); !reflect.DeepEqual(written, states) {
-		t.Errorf("written states:\n%+v\nwant\n%+v", written, states)
+	loaded := HostData{Config: &cfg, Spaces: []sharedSpace{{Name: "gr", Root: "/src/gr"}}}
+	pushed := HostData{Config: &cfg, Spaces: []sharedSpace{{Name: "kitty", Root: "/src/kitty"}}}
+	h := &fakeHost{data: loaded}
+	p := newPoller(func(pu *HostData) Shared { return loadShared(h, pu) })
+	got := []Shared{p.Poll(), p.Pushed(pushed)}
+	want := []Shared{
+		{Config: &cfg, Spaces: loaded.Spaces, Saved: []string{"gr"}, Keeping: map[string]KeepMode{}},
+		{Config: &cfg, Spaces: pushed.Spaces, Saved: []string{"gr"}, Keeping: map[string]KeepMode{}},
 	}
-	now = now.Add(time.Second)
-	got = append(got, poll(pa.Poll), poll(pa.Refresh))
-	now = now.Add(time.Minute)
-	got = append(got, poll(pb.Poll))
-	want := [][]string{
-		{"status /src/gr", "status /src/gr/dev", "pr main", "pr dev"},
-		nil,
-		{"status /src/gr", "status /src/gr/dev", "pr main", "pr dev"},
-		// Statuses are read again, but the pull requests are not due.
-		{"status /src/gr", "status /src/gr/dev"},
+	if !reflect.DeepEqual(got, want) || h.loads != 1 {
+		t.Errorf("got\n%#v\nwant\n%#v\nloads %d", got, want, h.loads)
 	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("asked:\n%q\nwant\n%q", got, want)
-	}
-	// What the sidebar sees of the load has gr@gone missing, and the states none for it.
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	sh := pb.Poll()
-	if got, want := sh.View(0).Spaces[0].Missing, []Worktree{{Session: "gr@gone"}}; !reflect.DeepEqual(got, want) {
-		t.Errorf("missing %#v, want %#v", got, want)
-	}
-	if got := slices.Sorted(maps.Keys(sh.Git)); !reflect.DeepEqual(got, []string{"/src/gr", "/src/gr/dev"}) {
-		t.Errorf("states for %q", got)
+	// A host that cannot be reached is the error shown.
+	h.err = errors.New("kspaces server: gone")
+	if got, want := p.Poll(), (Shared{Err: "kspaces server: gone"}); !reflect.DeepEqual(got, want) {
+		t.Errorf("unreachable: %+v, want %+v", got, want)
 	}
 }
+
+// fakeHost is a Host whose loads are data, or err.
+type fakeHost struct {
+	data  HostData
+	err   error
+	loads int
+}
+
+func (h *fakeHost) Load(bool) (HostData, error) {
+	h.loads++
+	return h.data, h.err
+}
+
+func (h *fakeHost) Refresh() error                         { return nil }
+func (h *fakeHost) Subscribe(func(HostData)) (stop func()) { return func() {} }
 
 // Windows lists kitty's windows again into the latest poll without loading, and polls when there is none.
 func TestPollerWindows(t *testing.T) {
@@ -156,7 +124,7 @@ func TestPollerWindows(t *testing.T) {
 		loads++
 		return Shared{Config: &config.Config{}, Saved: []string{string(rune('0' + loads))}}
 	}
-	p := newPoller(filepath.Join(t.TempDir(), "kitty.git.json"), load)
+	p := polling(load)
 	p.list = func() ([]kitty.OSWindow, error) {
 		lists++
 		if lists == 3 {
@@ -183,7 +151,7 @@ func TestPollerWindows(t *testing.T) {
 func TestPollerSettles(t *testing.T) {
 	keeping := map[string]KeepMode{"gr@dev": KeepSuspending}
 	polls := 0
-	p := newPoller(filepath.Join(t.TempDir(), "kitty.git.json"), func() Shared {
+	p := polling(func() Shared {
 		polls++
 		if polls == 3 {
 			return Shared{Config: &config.Config{Provider: []string{"prov"}}}
@@ -215,7 +183,7 @@ func TestPollerSettles(t *testing.T) {
 // kitty's windows listed again while a poll waits on the provider's list keep the provider's last list,
 // so the sidebar does not drop the detached sessions until the poll ends.
 func TestPollerWindowsDuringPoll(t *testing.T) {
-	p := newPoller(filepath.Join(t.TempDir(), "kitty.git.json"), func() Shared {
+	p := polling(func() Shared {
 		return Shared{Config: &config.Config{Provider: []string{"prov"}}}
 	})
 	p.list = func() ([]kitty.OSWindow, error) { return nil, nil }
@@ -238,7 +206,7 @@ func TestPollerWindowsDuringPoll(t *testing.T) {
 
 // A poll carries the diverged layouts, and windows listed after it keep them until the next.
 func TestPollerDiverged(t *testing.T) {
-	p := newPoller(filepath.Join(t.TempDir(), "kitty.git.json"), func() Shared { return Shared{Config: &config.Config{}} })
+	p := polling(func() Shared { return Shared{Config: &config.Config{}} })
 	p.list = func() ([]kitty.OSWindow, error) { return nil, nil }
 	diverged := []Divergence{{Session: "gr@dev", Host: "desktop", LocalTabs: 5, RemoteTabs: 2}}
 	p.diverged = func() []Divergence { return diverged }

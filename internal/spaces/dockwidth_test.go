@@ -2,7 +2,6 @@ package spaces
 
 import (
 	"errors"
-	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -94,7 +93,7 @@ func TestPollerSavesDraggedWidth(t *testing.T) {
 		n++
 		return sh
 	}
-	p := newPoller(filepath.Join(t.TempDir(), "kitty.json"), load)
+	p := polling(load)
 	var saved [][2]int
 	p.saveWidth = func(w, cfg int) error {
 		saved = append(saved, [2]int{w, cfg})
@@ -146,7 +145,7 @@ func TestPollerKeepsDraggedWidth(t *testing.T) {
 		n++
 		return sh
 	}
-	p := newPoller(filepath.Join(t.TempDir(), "kitty.json"), load)
+	p := polling(load)
 	p.saveWidth = saveDockWidth
 	for _, c := range polls {
 		p.Poll()

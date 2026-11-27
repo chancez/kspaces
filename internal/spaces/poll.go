@@ -1,12 +1,9 @@
 package spaces
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -15,7 +12,6 @@ import (
 	"time"
 
 	"github.com/chancez/kspaces/internal/config"
-	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/gitstate"
 	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/logs"
@@ -42,7 +38,7 @@ type Shared struct {
 	// kitty's windows, as `kitten @ ls` lists them, and why they could not be listed.
 	Windows  []kitty.OSWindow `json:"windows,omitempty"`
 	KittyErr string           `json:"kitty_err,omitempty"`
-	// What git and gh say of each worktree, by path, which only the sidebar asks.
+	// What git and gh say of each worktree, by path, from the host data.
 	Git map[string]gitstate.State `json:"git,omitempty"`
 	// What the session provider says, which only the sidebar asks; nil without one, see Poller.sessions.
 	Provider *ProviderState `json:"provider,omitempty"`
@@ -62,41 +58,34 @@ type sharedSpace struct {
 	ConfigErr string         `json:"config_err,omitempty"`
 }
 
-// LoadShared reads the config, every space's worktrees and own file, the saved sessions and kitty's
-// windows. Each read of a space's file is a stat while it has not changed, see statCache.
+// LoadShared is this host's data, loaded now, with the session files and kitty's windows.
 func LoadShared() Shared {
-	sh := loadSpaces()
+	sh := loadShared(ThisHost(), nil)
 	if sh.Config != nil {
 		sh = listWindows(sh, kitty.ListWindows)
 	}
 	return sh
 }
 
-// loadSpaces is LoadShared but kitty's windows.
-func loadSpaces() Shared {
-	cfg, err := config.Load()
-	if err != nil {
-		return Shared{Err: err.Error()}
-	}
-	// Each poll, so the sidebar follows an edit.
-	git.SetTimeouts(cfg.Git.Timeout, cfg.Git.FetchTimeout)
-	sh := Shared{Config: &cfg}
-	for _, root := range cfg.Spaces {
-		s := ReadSpace(cfg, root)
-		ss := sharedSpace{Name: s.Name, Root: s.Root, Worktrees: s.Worktrees, Config: s.Config, Untrusted: s.Untrusted}
-		if s.Err != nil {
-			ss.Err = s.Err.Error()
+// loadShared is all of LoadShared but kitty's windows: the host data pushed, or else h's loaded now, and
+// the session files of the sessions directory it configures.
+func loadShared(h Host, pushed *HostData) Shared {
+	var hd HostData
+	if pushed != nil {
+		hd = *pushed
+	} else {
+		var err error
+		if hd, err = h.Load(true); err != nil {
+			return Shared{Err: err.Error()}
 		}
-		if s.ConfigErr != nil {
-			ss.ConfigErr = s.ConfigErr.Error()
-		}
-		sh.Spaces = append(sh.Spaces, ss)
 	}
-	sh.Saved = savedSessions(cfg.SessionsDir)
-	sh.Suspended = suspendedSessions(cfg.SessionsDir)
-	sh.Keeping = keepingSessions(cfg.SessionsDir)
-	sh.Kept = slices.Sorted(maps.Keys(keptHandles(cfg.SessionsDir)))
-	sh.Pending = pendingList()
+	sh := Shared{Config: hd.Config, Err: hd.Err, Spaces: hd.Spaces, Pending: hd.Pending, Git: hd.Git}
+	if cfg := sh.Config; cfg != nil {
+		sh.Saved = savedSessions(cfg.SessionsDir)
+		sh.Suspended = suspendedSessions(cfg.SessionsDir)
+		sh.Keeping = keepingSessions(cfg.SessionsDir)
+		sh.Kept = slices.Sorted(maps.Keys(keptHandles(cfg.SessionsDir)))
+	}
 	return sh
 }
 
@@ -155,26 +144,22 @@ func (sh Shared) View(self int) Snapshot {
 	return snap
 }
 
-// Poller loads for the sidebar, with what git and gh say of each worktree, and writes those to a file for
-// what does not poll itself, such as the picker, see GitStates. It is safe to call from several goroutines.
+// Poller loads for the sidebar: this host's data, from its server, and what is kitty's. It is safe to
+// call from several goroutines.
 type Poller struct {
 	// mu is held through a poll.
 	mu sync.Mutex
-	// path is the git states' file.
-	path string
-	// load is all of a poll's Shared but kitty's windows, which list lists after it, nil to keep load's.
-	load func() Shared
-	list func() ([]kitty.OSWindow, error)
+	// load is all of a poll's Shared but kitty's windows, which list lists after it, nil to keep load's:
+	// with the host data pushed, as a subscription has it, else loaded now.
+	load func(pushed *HostData) Shared
+	// refresh has git and gh asked again at the next load, nil for nothing to ask.
+	refresh func() error
+	list    func() ([]kitty.OSWindow, error)
 	// lastMu is held while kitty's windows are listed, for last, the latest poll with the latest windows,
 	// see Windows.
 	lastMu sync.Mutex
 	last   Shared
 	have   bool
-	// newWatcher makes the watcher of the worktrees' git states, nil for none.
-	newWatcher func() *gitstate.Watcher
-	git        *gitstate.Watcher
-	// written is what was last written, so unchanged states are not written again.
-	written []byte
 	// capabilities asks the session provider what it does, once per sidebar and again at a refresh; caps is
 	// what it said, nil until asked. listSessions is its list, nil for never. listed is the last list that
 	// worked, which one that fails leaves showing, as a provider restarting under the sidebar should not
@@ -205,9 +190,10 @@ type Poller struct {
 
 // NewPoller is the poller of the kitty kspaces runs in.
 func NewPoller() *Poller {
-	p := newPoller(gitPath(), loadSpaces)
+	h := ThisHost()
+	p := newPoller(func(pushed *HostData) Shared { return loadShared(h, pushed) })
+	p.refresh = h.Refresh
 	p.list = kitty.ListWindows
-	p.newWatcher = gitstate.NewWatcher
 	p.capabilities = ProviderCapabilities
 	p.listSessions = listSessions
 	p.saveWidth = saveDockWidth
@@ -224,39 +210,37 @@ func NewPoller() *Poller {
 	return p
 }
 
-func newPoller(path string, load func() Shared) *Poller {
-	return &Poller{path: path, load: load}
+func newPoller(load func(pushed *HostData) Shared) *Poller {
+	return &Poller{load: load}
 }
 
-// gitPath is the git states' file of the kitty kspaces runs in, in the user's runtime directory, else a
-// directory of the user's own in the temporary one, named after the kitty's remote control socket, which
-// is what `kitten @` talks to, else its process.
-func gitPath() string {
-	dir := os.Getenv("XDG_RUNTIME_DIR")
-	if dir != "" {
-		dir = filepath.Join(dir, "kspaces")
-	} else {
-		dir = filepath.Join(os.TempDir(), fmt.Sprintf("kspaces-%d", os.Getuid()))
-	}
+// kittyPath is the file of the kitty kspaces runs in, of what lasts as long as it does, in the runtime
+// directory, named after the kitty's remote control socket, which is what `kitten @` talks to, else its
+// process.
+func kittyPath() string {
 	key := os.Getenv("KITTY_LISTEN_ON")
 	if key == "" {
 		key = "pid:" + os.Getenv("KITTY_PID")
 	}
 	sum := sha256.Sum256([]byte(key))
-	return filepath.Join(dir, hex.EncodeToString(sum[:8])+".git.json")
+	return filepath.Join(state.RuntimeDir(), hex.EncodeToString(sum[:8]))
 }
 
-// Poll loads, asks git and gh about what is due, and writes their states. kitty's windows are listed last,
-// so they are as recent as they can be.
+// Poll loads, then lists kitty's windows, last, so they are as recent as they can be.
 func (p *Poller) Poll() Shared {
+	return p.poll(nil)
+}
+
+// Pushed polls with the host data a subscription pushed, rather than loading it again.
+func (p *Poller) Pushed(hd HostData) Shared {
+	return p.poll(&hd)
+}
+
+func (p *Poller) poll(pushed *HostData) Shared {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	defer logs.Took("poll", time.Now())
-	sh := p.load()
-	if w := p.watcher(); w != nil {
-		sh.Git = w.Update(targets(sh))
-		p.write(sh.Git)
-	}
+	sh := p.load(pushed)
 	p.lastMu.Lock()
 	// The provider's last list until it lists again below, so windows listed in between, see Windows, do
 	// not drop its sessions.
@@ -353,18 +337,6 @@ func (p *Poller) sessions(provider []string, data []kitty.OSWindow) *ProviderSta
 	return &st
 }
 
-// watcher is the git states' watcher, made at the first poll, nil for none.
-func (p *Poller) watcher() *gitstate.Watcher {
-	if p.git == nil && p.newWatcher != nil {
-		p.git = p.newWatcher()
-		// Carry on from the last sidebar, so gh is not asked about every branch again at once.
-		if prev, ok := readGit(p.path); ok {
-			p.git.Seed(prev)
-		}
-	}
-	return p.git
-}
-
 // followDock saves the width the sidebar dock was dragged to, see dockDrag.
 func (p *Poller) followDock(sh Shared) {
 	if p.saveWidth == nil {
@@ -383,22 +355,13 @@ func (p *Poller) followDock(sh Shared) {
 	}
 }
 
-// targets are the worktrees of the spaces in sh.
-func targets(sh Shared) []gitstate.Target {
-	var ans []gitstate.Target
-	for _, s := range sh.Spaces {
-		for _, wt := range s.Worktrees {
-			ans = append(ans, gitstate.Target{Root: s.Root, Path: wt.Path, Branch: wt.Branch})
-		}
-	}
-	return ans
-}
-
 // Refresh loads at once, and has git and gh asked again too.
 func (p *Poller) Refresh() Shared {
 	p.mu.Lock()
-	if w := p.watcher(); w != nil {
-		w.Refresh()
+	if p.refresh != nil {
+		if err := p.refresh(); err != nil {
+			logs.Error("refreshing git and gh", err)
+		}
 	}
 	p.listAfter, p.listFailures, p.caps = time.Time{}, 0, nil
 	p.mu.Unlock()
@@ -407,44 +370,6 @@ func (p *Poller) Refresh() Shared {
 
 // GitStates is the sidebar's latest git states, for what does not poll itself, such as the picker.
 func GitStates() map[string]gitstate.State {
-	states, _ := readGit(gitPath())
+	states, _ := readGit(kittyPath() + ".git.json")
 	return states
-}
-
-// write replaces the file with states, unless it already holds them. A rename, so a reader sees all of
-// one poll's or all of the next's.
-func (p *Poller) write(states map[string]gitstate.State) {
-	data, err := json.Marshal(states)
-	if err != nil {
-		return
-	}
-	if bytes.Equal(data, p.written) {
-		if _, err := os.Stat(p.path); err == nil {
-			return
-		}
-	}
-	if err := os.MkdirAll(filepath.Dir(p.path), 0o700); err != nil {
-		return
-	}
-	tmp := fmt.Sprintf("%s.%d.tmp", p.path, os.Getpid())
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
-		return
-	}
-	if err := os.Rename(tmp, p.path); err != nil {
-		os.Remove(tmp)
-		return
-	}
-	p.written = data
-}
-
-func readGit(path string) (map[string]gitstate.State, bool) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, false
-	}
-	var states map[string]gitstate.State
-	if err := json.Unmarshal(data, &states); err != nil {
-		return nil, false
-	}
-	return states, true
 }

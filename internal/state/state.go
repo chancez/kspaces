@@ -91,6 +91,15 @@ func Dir() (string, error) {
 	return filepath.Join(dir, "kspaces"), nil
 }
 
+// RuntimeDir is where kspaces keeps what lasts as long as the login: $XDG_RUNTIME_DIR/kspaces, else a
+// directory of the user's own in the temporary one, kspaces-UID.
+func RuntimeDir() string {
+	if dir := os.Getenv("XDG_RUNTIME_DIR"); dir != "" {
+		return filepath.Join(dir, "kspaces")
+	}
+	return filepath.Join(os.TempDir(), fmt.Sprintf("kspaces-%d", os.Getuid()))
+}
+
 // fileName is the file's name in Dir.
 const fileName = "state.json"
 

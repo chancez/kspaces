@@ -159,7 +159,7 @@ func newLayoutSync() *layoutSync {
 	host, _ := os.Hostname()
 	host, _, _ = strings.Cut(host, ".")
 	return &layoutSync{
-		path:   strings.TrimSuffix(gitPath(), ".git.json") + ".layouts.json",
+		path:   kittyPath() + ".layouts.json",
 		kitty:  kittyID(),
 		writer: host,
 		now:    time.Now,
