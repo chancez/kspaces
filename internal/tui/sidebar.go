@@ -226,6 +226,15 @@ func (m *sidebar) focusCursor() tea.Cmd {
 	return tea.Tick(focusSettle, func(time.Time) tea.Msg { return focusSettledMsg{gen} })
 }
 
+// hostMsg is the host data, pushed by this host's server.
+type hostMsg struct{ data spaces.HostData }
+
+// pushed polls with the host data pushed.
+func (m *sidebar) pushed(hd spaces.HostData) tea.Cmd {
+	p, self := m.poller, m.self
+	return func() tea.Msg { return p.Pushed(hd).View(self) }
+}
+
 // poll loads, on the timer.
 func (m *sidebar) poll() tea.Cmd {
 	p, self := m.poller, m.self
@@ -357,6 +366,8 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.focused, m.focusScroll = false, false
 	case tea.BackgroundColorMsg:
 		m.th.SetDark(msg.IsDark())
+	case hostMsg:
+		return m, m.pushed(msg.data)
 	case tickMsg:
 		if m.remote && time.Since(m.remoteAt) > remoteIdle {
 			m.remote = false
@@ -658,6 +669,8 @@ func RunSidebar(ctx context.Context) error {
 	if path := os.Getenv(focusSocketEnv); path != "" {
 		defer listenFocus(path, func() { prog.Send(kittyFocusMsg{}) })()
 	}
+	// What changes the host data elsewhere, a form or a command, shows at once.
+	defer spaces.ThisHost().Subscribe(func(hd spaces.HostData) { prog.Send(hostMsg{hd}) })()
 	if _, err := prog.Run(); err != nil {
 		return fmt.Errorf("running the sidebar: %w", err)
 	}

@@ -27,8 +27,7 @@ kspaces is two roles, in one binary:
   the provider's sessions as its windows show them, moving windows whose space changed, the dock's width.
   It is a client of this host's server, and of each other host's whose copies it shows.
 
-The CLI's commands, the picker and the forms are clients of this host's server too, for what they read of
-the host.
+The picker and the forms are clients of this host's server too, for what they read of the host.
 
 ## Lifecycle
 
@@ -39,7 +38,7 @@ directory, named after the config file and the state directory, so a sandbox wit
 A client that finds no server starts one: the same kspaces binary, `kspaces server`, in a new session so
 it outlives the client, and waits for its socket. Two clients starting one at once are fine: the server
 holds a lock on a file beside the socket, and the second exits. The server exits once it has had no client
-for `idle` (five minutes), and on SIGTERM.
+for five minutes, when its binary is replaced, as by installing another kspaces, and on SIGTERM.
 
 A client that loses the server, as when it exits or crashes, keeps what it last had and connects again,
 starting it if need be. A sidebar shows the last host data meanwhile, and its last line says the server is
@@ -64,7 +63,7 @@ JSON, one message per line, over the socket, or over ssh to another host:
 | --- | --- | --- |
 | `hello` | `{"protocol", "version"}` | `{"protocol", "version", "host"}` |
 | `load` | `{"fresh"}` | the host data, loaded now when `fresh`, else the last |
-| `refresh` | `{}` | the host data, with git and gh asked again |
+| `refresh` | `{}` | `{}`; git and gh are asked again at the next load |
 | `subscribe` | `{}` | the host data; then `update`s with it whenever it changes |
 | `exit` | `{}` | `{}`, then the server exits |
 | `new-worktree` | `{"root", "branch", "base", "dir"}` | the host data with it |
@@ -126,7 +125,7 @@ panes added or removed on another machine show here.
 Each is a release of its own.
 
 1. **Local server.** `kspaces server`, the protocol's `hello`, `load`, `refresh`, `subscribe` and `exit`.
-   The sidebar, the CLI, the picker and the forms read the host data from it; the git states' file goes.
+   The sidebar, the picker and the forms read the host data from it; the git states' file goes.
    Nothing else changes.
 2. **Other hosts, read only.** `[hosts]`, `kspaces server proxy`, and the hosts tab listing each host's
    copies from its server.

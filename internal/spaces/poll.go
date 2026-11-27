@@ -368,8 +368,12 @@ func (p *Poller) Refresh() Shared {
 	return p.Poll()
 }
 
-// GitStates is the sidebar's latest git states, for what does not poll itself, such as the picker.
+// GitStates is what git and gh last said of this host's worktrees, for what does not poll itself, such as
+// the picker.
 func GitStates() map[string]gitstate.State {
-	states, _ := readGit(kittyPath() + ".git.json")
-	return states
+	hd, err := ThisHost().Load(false)
+	if err != nil {
+		logs.Error("loading the git states", err)
+	}
+	return hd.Git
 }

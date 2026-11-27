@@ -13,6 +13,8 @@ import (
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/git"
 	"github.com/chancez/kspaces/internal/logs"
+	"github.com/chancez/kspaces/internal/server"
+	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/tui"
 )
 
@@ -22,11 +24,13 @@ type app struct {
 	stderr io.Writer
 	// The --size of the panel the command run opens, zero when not given.
 	popupSize config.PopupSize
+	// version is kspaces' own, see versionOf.
+	version string
 }
 
 // Execute runs kspaces with os.Args and returns the exit code.
 func Execute(ctx context.Context) int {
-	a := &app{stdout: os.Stdout, stderr: os.Stderr}
+	a := newApp(os.Stdout, os.Stderr)
 	cmd := a.rootCommand()
 	cmd.SetArgs(os.Args[1:])
 	// Here, not in rootCommand, so tests running commands log nothing.
@@ -36,6 +40,12 @@ func Execute(ctx context.Context) int {
 	}
 	logs.Init(role)
 	logs.Debug("start", "args", os.Args[1:])
+	// Every command but the server's own asks it for the host data, starting it if need be.
+	if role != "server" {
+		if err := useServer(a.version); err != nil {
+			logs.Error("finding the kspaces server", err)
+		}
+	}
 	// A config that cannot load leaves git's default; the command loading it says why.
 	if cfg, err := config.Load(); err == nil {
 		git.SetTimeouts(cfg.Git.Timeout, cfg.Git.FetchTimeout)
@@ -48,8 +58,27 @@ func Execute(ctx context.Context) int {
 	return 0
 }
 
-func (a *app) rootCommand() *cobra.Command {
+// newApp is kspaces writing to stdout and stderr.
+func newApp(stdout, stderr io.Writer) *app {
 	info, ok := debug.ReadBuildInfo()
+	return &app{stdout: stdout, stderr: stderr, version: versionOf(version, info, ok)}
+}
+
+// useServer has this process ask this host's server for the host data.
+func useServer(version string) error {
+	path, err := server.SocketPath()
+	if err != nil {
+		return err
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	spaces.UseHost(server.NewLocal(path, exe, version))
+	return nil
+}
+
+func (a *app) rootCommand() *cobra.Command {
 	root := &cobra.Command{
 		Use:   "kspaces",
 		Short: "A kitty sidebar for repositories and their git worktrees",
@@ -60,7 +89,7 @@ Run without a command to show the sidebar. The config is $XDG_CONFIG_HOME/kspace
 default ~/.config/kspaces/kspaces.toml, then every .toml file in conf.d beside it, by name, then
 kspaces.ENV.toml beside it for each of $KSPACES_ENV, by default the host's name, and kspaces.local.toml.`,
 		Args:          cobra.NoArgs,
-		Version:       versionOf(version, info, ok),
+		Version:       a.version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		// The sidebar loads the config itself, so an error shows in its UI.
@@ -92,6 +121,7 @@ kspaces.ENV.toml beside it for each of $KSPACES_ENV, by default the host's name,
 		a.errorCommand(),
 		a.addCommand(),
 		a.kittyCommand(),
+		a.serverCommand(),
 	)
 	return root
 }

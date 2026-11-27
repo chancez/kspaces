@@ -69,7 +69,7 @@ type configFiles struct {
 // configFiles.missing. Another .toml file beside kspaces.toml than an overlay is an error, as it was read
 // before conf.d was.
 func readFiles() (configFiles, error) {
-	path, err := filePath()
+	path, err := FilePath()
 	if err != nil {
 		return configFiles{}, err
 	}
@@ -135,7 +135,7 @@ func FileName(path string) string {
 	if path == "" {
 		return ""
 	}
-	if main, err := filePath(); err == nil {
+	if main, err := FilePath(); err == nil {
 		if rel, err := filepath.Rel(filepath.Dir(main), path); err == nil && !strings.HasPrefix(rel, "..") {
 			return rel
 		}

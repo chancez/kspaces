@@ -47,12 +47,13 @@ func UseHost(h Host) {
 	thisHost = h
 }
 
-// ThisHost is the host data's source UseHost set, else a LocalHost of the process's own.
+// ThisHost is the host data's source UseHost set, else a LocalHost of the process's own that leaves git
+// and gh alone, as in tests.
 func ThisHost() Host {
 	hostMu.Lock()
 	defer hostMu.Unlock()
 	if thisHost == nil {
-		thisHost = NewLocalHost(kittyPath() + ".git.json")
+		thisHost = &LocalHost{load: loadHost}
 	}
 	return thisHost
 }

@@ -277,7 +277,8 @@ var defaultLaunch = []string{"launch"}
 
 const defaultWorktreeDir = ".worktrees"
 
-func filePath() (string, error) {
+// FilePath is kspaces.toml's path, in $XDG_CONFIG_HOME/kspaces, else ~/.config/kspaces.
+func FilePath() (string, error) {
 	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
 		return filepath.Join(dir, "kspaces", "kspaces.toml"), nil
 	}

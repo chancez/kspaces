@@ -793,7 +793,7 @@ active tab's. `kspaces_watcher.py`:
   kitty's own flag for it, which a config reload resets and its next check, within two seconds, sets again;
 - notes when each program status record changed state, in the window's `program_status_at` user variable,
   which the status list's ages come from;
-- tells the sidebar when focus moves, with a datagram on a socket beside the git states' file, which the
+- tells the sidebar when focus moves, with a datagram on a socket in the runtime directory, which the
   sidebar answers with a `kitten @ ls` alone, so a switch to another session shows at once.
 
 `kspaces_toggle.py` hides and shows the sidebar, and `kspaces_focus.py` moves the keyboard into the
@@ -802,11 +802,17 @@ status records without focusing them, for the status list's clear buttons; the s
 the `kspaces_clear_status` action. `kspaces_screen.py` says how many cells fit a window's screen, for a
 popup sized as a percentage of it; kspaces runs it with `kitten @ kitten`.
 
-Every two seconds the sidebar runs `kitten @ ls` and `git worktree list` for each space, and in the
-background `git status` and `gh` for the [rows' git state](sidebar.md#spaces). It writes what git and gh
-said to a file in `$XDG_RUNTIME_DIR/kspaces/`, or `kspaces-UID/` in the temporary directory, named after
-kitty's `KITTY_LISTEN_ON` socket, for the picker and the forms, and a sidebar started again carries on
-from it. `r` loads at once, and has git and gh asked again.
+Every two seconds the sidebar runs `kitten @ ls`, and asks this host's [server](server.md) to load: it
+runs `git worktree list` for each space, and in the background `git status` and `gh` for the
+[rows' git state](sidebar.md#spaces), once for every kspaces process on the host. The picker and the forms
+ask the server too, and what one of them changes shows in the sidebar as soon as the server loads it. `r`
+loads at once, and has git and gh asked again.
+
+The server is `kspaces server`, which kspaces starts when it finds none, listening on a socket in
+`$XDG_RUNTIME_DIR/kspaces/`, or `kspaces-UID/` in the temporary directory. It keeps what git and gh said in
+a file beside it, which a server started again carries on from. It exits five minutes after its last client
+goes, and when its binary is replaced, as by installing another kspaces, so the next client starts the new
+one. `kspaces server stop` stops it.
 
 `save_sessions.py`, with `save_sessions = true`, saves each session to its own file at quit and as its
 windows close, take focus or change directory, and loads the ones that were open at startup, ending on the
