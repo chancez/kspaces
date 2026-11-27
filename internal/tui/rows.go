@@ -68,7 +68,8 @@ func rowHolds(r spaces.Row, session string) bool {
 // name. The icon says what the row is, and is replaced by the most urgent status of its sessions' windows;
 // see look.RowIcon. A missing worktree has the gone marker and `gone` for its branch, faint only once its
 // session has no windows. A suspended session has the suspended marker, and one being suspended or closed
-// says so until it is. A worktree being created or removed has the pending marker, over its status.
+// says so until it is. A worktree with no windows whose provider sessions still run has the running
+// marker and is not faint: closed here, its work goes on. One whose sessions are all shelved is suspended. A worktree being created or removed has the pending marker, over its status.
 func (m *sidebar) renderRow(i int) string {
 	r, width, th := m.rows[i], m.contentWidth(), m.th
 	switch {
@@ -76,8 +77,6 @@ func (m *sidebar) renderRow(i int) string {
 		return m.renderHeader(i)
 	case r.HostHeader:
 		return m.renderHostHeader(i)
-	case r.Detached != nil:
-		return m.renderDetached(i)
 	case r.Space == nil:
 		return th.Draw(look.Plain, width)
 	}
@@ -100,6 +99,8 @@ func (m *sidebar) renderRow(i int) string {
 			state = s
 		}
 	}
+	running, shelved := spaces.SessionCounts(r.Sessions)
+	background := !open && running > 0
 	icon := look.RowIcon(kind, state, open, r.Worktree == nil)
 	switch {
 	case m.isBusy(r):
@@ -108,7 +109,9 @@ func (m *sidebar) renderRow(i int) string {
 		icon = look.DimIf(!open, look.GoneMarker(open)...)
 	case state == "" && r.Worktree != nil && m.keeping[r.Worktree.Session] != "":
 		icon = look.KeepingMarker(m.keeping[r.Worktree.Session] == spaces.KeepSuspending)
-	case state == "" && !open && r.Worktree != nil && m.suspended[r.Worktree.Session]:
+	case state == "" && background:
+		icon = look.RunningMarker()
+	case state == "" && !open && r.Worktree != nil && (m.suspended[r.Worktree.Session] || shelved > 0):
 		icon = look.SuspendedMarker()
 	case state == "" && r.Worktree != nil:
 		icon = look.DimIf(!open, icon...)
@@ -129,7 +132,7 @@ func (m *sidebar) renderRow(i int) string {
 	if current {
 		label = label.With(look.Strong)
 	}
-	faint := !open
+	faint := !open && !background
 	head := append(append(caret, m.box(i)...), icon...)
 	room := max(width-th.Width(head...), 0)
 	// The git state takes the right end, after a space, and the branch what is left between. A space whose
@@ -154,9 +157,9 @@ func (m *sidebar) renderRow(i int) string {
 	var git []look.Span
 	switch {
 	case r.Main && !r.Other && (r.Space.Untrusted || r.Space.ConfigErr != nil):
-		git = look.DimIf(!open, m.configSpans(*r.Space, rest-1)...)
+		git = look.DimIf(faint, m.configSpans(*r.Space, rest-1)...)
 	case gitRow:
-		git = look.DimIf(!open, m.fitGit(pieces, rest-1)...)
+		git = look.DimIf(faint, m.fitGit(pieces, rest-1)...)
 	}
 	if w := th.Width(git...); w > 0 {
 		rest -= w + 1

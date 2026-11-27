@@ -3,8 +3,6 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/chancez/kspaces/internal/config"
-	"github.com/chancez/kspaces/internal/kitty"
 	"github.com/chancez/kspaces/internal/spaces"
 	"github.com/chancez/kspaces/internal/status"
 	"github.com/chancez/kspaces/internal/tui/interact"
@@ -25,14 +23,6 @@ type entrySubject struct {
 
 // groupSubject is a group's header in the spaces list, by the group's name.
 type groupSubject struct{ name, host string }
-
-// detachedSubject is a row of a space's provider sessions that no window shows, by its index in the rows: their head,
-// a host's or a session's.
-type detachedSubject struct {
-	index int
-	row   spaces.DetachedRow
-	host  string
-}
 
 // hostSubject is a host's row on the hosts tab, by the host, empty for this machine.
 type hostSubject struct{ host string }
@@ -181,7 +171,7 @@ var (
 		Run: func(m *sidebar, s entrySubject) tea.Cmd {
 			m.remote = false
 			if wt := *s.row.Worktree; s.row.Elsewhere() && !m.isOpen(&wt) {
-				return m.openDetachedCmd(spaces.DetachedRow{Of: s.row.Space, Session: &m.hostSessionsOf(wt.Host, *s.row.Space, wt.Session)[0]})
+				return m.openSessionCmd(*s.row.Space, m.hostSessionsOf(wt.Host, *s.row.Space, wt.Session)[0])
 			}
 			return m.openOrResumeCmd(*s.row.Worktree, spaces.OpenOptions{})
 		},
@@ -284,85 +274,6 @@ var (
 			wt := spaces.Worktree{Session: spaces.CopyName(s.host, "default"), Host: s.host}
 			return m.openWorktreeCmd(wt, spaces.OpenOptions{})
 		},
-	}
-)
-
-// A space's detached sessions' rows'. A click on the head does what space does, as there is nothing to open.
-var (
-	actOpenDetached = &interact.Action[*sidebar, detachedSubject]{
-		Title:   "Open",
-		Section: sectionSession,
-		Applies: func(m *sidebar, s detachedSubject) bool { return s.row.Session != nil && m.caps[spaces.CapOpen] },
-		Run: func(m *sidebar, s detachedSubject) tea.Cmd {
-			m.remote = false
-			return m.openDetachedCmd(s.row)
-		},
-	}
-	actKillDetached = &interact.Action[*sidebar, detachedSubject]{
-		Title:   "Kill",
-		Section: sectionSession,
-		Applies: func(m *sidebar, s detachedSubject) bool {
-			return s.row.Session != nil && !s.row.Session.Ended() && m.caps[spaces.CapKill]
-		},
-		Run: func(m *sidebar, s detachedSubject) tea.Cmd {
-			return m.askDetached(func(cfg config.Config, st kitty.State) error {
-				return spaces.AskKillProviderSessions(cfg, st, s.row.Session.ID)
-			})
-		},
-	}
-	actShelveDetached = &interact.Action[*sidebar, detachedSubject]{
-		Title:   "Shelve",
-		Section: sectionSession,
-		Applies: func(m *sidebar, s detachedSubject) bool {
-			return s.row.Session != nil && !s.row.Session.Ended() && m.caps[spaces.CapShelve]
-		},
-		Run: func(m *sidebar, s detachedSubject) tea.Cmd { return m.shelveDetachedCmd(*s.row.Session) },
-	}
-	actRemoveDetached = &interact.Action[*sidebar, detachedSubject]{
-		Title:   "Remove",
-		Section: sectionSession,
-		Applies: func(m *sidebar, s detachedSubject) bool {
-			return s.row.Session != nil && s.row.Session.Ended() && m.caps[spaces.CapRemove]
-		},
-		Run: func(m *sidebar, s detachedSubject) tea.Cmd {
-			return m.askDetached(func(cfg config.Config, st kitty.State) error {
-				return spaces.AskRemoveProviderSessions(cfg, st, s.row.Session.ID)
-			})
-		},
-	}
-	actMoveDetached = &interact.Action[*sidebar, detachedSubject]{
-		Title:   "Move to space",
-		Section: sectionSession,
-		Applies: func(m *sidebar, s detachedSubject) bool { return s.row.Session != nil && m.caps[spaces.CapMove] },
-		Run: func(m *sidebar, s detachedSubject) tea.Cmd {
-			return m.askDetached(func(cfg config.Config, st kitty.State) error {
-				return spaces.AskMoveProviderSessions(cfg, st, s.row.Session.ID)
-			})
-		},
-	}
-	actCleanupDetached = &interact.Action[*sidebar, detachedSubject]{
-		Title:   "Clean up sessions",
-		Section: sectionSpace,
-		Applies: func(m *sidebar, s detachedSubject) bool {
-			return s.row.Head() && (m.caps[spaces.CapKill] || m.caps[spaces.CapRemove])
-		},
-		Run: func(m *sidebar, s detachedSubject) tea.Cmd {
-			return m.askDetached(func(cfg config.Config, st kitty.State) error {
-				return spaces.AskCleanupProviderSessions(cfg, st, s.row.Of.Name)
-			})
-		},
-	}
-	actShowDetached = &interact.Action[*sidebar, detachedSubject]{
-		Title:   "Show sessions",
-		Section: sectionSpace,
-		Applies: func(_ *sidebar, s detachedSubject) bool { return s.row.Head() && !s.row.Expanded },
-		Run:     func(m *sidebar, s detachedSubject) tea.Cmd { m.toggleDetachedAt(s.index); return nil },
-	}
-	actHideDetached = &interact.Action[*sidebar, detachedSubject]{
-		Title:   "Hide sessions",
-		Section: sectionSpace,
-		Applies: func(_ *sidebar, s detachedSubject) bool { return s.row.Head() && s.row.Expanded },
-		Run:     func(m *sidebar, s detachedSubject) tea.Cmd { m.toggleDetachedAt(s.index); return nil },
 	}
 )
 
@@ -552,11 +463,6 @@ var (
 	actSelRun = &interact.Action[*sidebar, selectSubject]{
 		Title: "Run",
 		Run:   cmd[*sidebar, selectSubject]((*sidebar).runSelected),
-	}
-	actSelMove = &interact.Action[*sidebar, selectSubject]{
-		Title:   "Move",
-		Applies: func(m *sidebar, _ selectSubject) bool { return m.caps[spaces.CapMove] },
-		Run:     cmd[*sidebar, selectSubject]((*sidebar).moveSelected),
 	}
 )
 
@@ -1279,7 +1185,6 @@ var (
 var (
 	entryKind       *interact.Kind[*sidebar, entrySubject]
 	groupKind       *interact.Kind[*sidebar, groupSubject]
-	detachedKind    *interact.Kind[*sidebar, detachedSubject]
 	groupShowKind   *interact.Kind[*sidebar, groupFilterSubject]
 	statusKind      *interact.Kind[*sidebar, statusSubject]
 	paneKind        *interact.Kind[*sidebar, paneSubject]
@@ -1312,7 +1217,6 @@ var (
 	spacesList         *interact.Place[*sidebar, entrySubject]
 	groupHeaders       *interact.Place[*sidebar, groupSubject]
 	hostHeaders        *interact.Place[*sidebar, hostSubject]
-	detachedRows       *interact.Place[*sidebar, detachedSubject]
 	theGroups          *interact.Place[*sidebar, groupFilterSubject]
 	statusList         *interact.Place[*sidebar, statusSubject]
 	thePane            *interact.Place[*sidebar, paneSubject]
@@ -1399,28 +1303,6 @@ func init() {
 	hostHeaders.Bind(actFoldHost, "enter/l", "fold or unfold", "enter", "l")
 	hostHeaders.Bind(actUnfoldHost, "", "", "enter", "l")
 
-	detachedKind = interact.NewKind(func(s detachedSubject) string {
-		if s.row.Session != nil {
-			return s.row.Session.Name
-		}
-		return s.row.Of.Name
-	}, actOpenDetached, actKillDetached, actShelveDetached, actRemoveDetached, actMoveDetached, actShowDetached, actHideDetached, actCleanupDetached)
-	detachedKind.Bind(actShowDetached, "space", "show or hide the space's detached sessions", "space")
-	detachedKind.Bind(actHideDetached, "", "", "space")
-	// x as on a worktree's row: kill a running one, remove an ended one, which F does too, as forgetting.
-	detachedKind.Bind(actKillDetached, "x", "kill the session", "x")
-	detachedKind.Bind(actRemoveDetached, "F/x", "remove the ended session", "F", "x")
-	detachedKind.Bind(actShelveDetached, "z", "shelve the session", "z")
-	detachedKind.Bind(actMoveDetached, "M", "move the session to another space", "M")
-	detachedKind.Bind(actCleanupDetached, "p", "clean up the space's detached sessions", "p")
-	interact.Via(detachedKind, func(s detachedSubject) (spacesSubject, bool) {
-		return spacesSubject{group: s.row.Of.Group, host: s.host}, true
-	}, spacesKind)
-	detachedRows = interact.List(detachedKind)
-	detachedRows.Bind(actOpenDetached, "enter/l", "open", "enter", "l")
-	detachedRows.Bind(actShowDetached, "", "", "enter", "l")
-	detachedRows.Bind(actHideDetached, "", "", "enter", "l")
-
 	statusKind = interact.NewKind(func(s statusSubject) string { return s.status.Session }, actOpenWindow, actReply, actClearStatus)
 	statusKind.Bind(actReply, "t", "reply", "t")
 	statusKind.Bind(actClearStatus, "x", "clear", "x")
@@ -1459,7 +1341,7 @@ func init() {
 	thePane = interact.List(paneKind)
 
 	selectKind = interact.NewKind(func(selectSubject) string { return "Select" },
-		actTick, actTickAll, actSelRemove, actSelClose, actSelSuspend, actSelForget, actSelRun, actSelMove, actEndSelect)
+		actTick, actTickAll, actSelRemove, actSelClose, actSelSuspend, actSelForget, actSelRun, actEndSelect)
 	selectKind.Bind(actTick, "space", "tick the row", "space")
 	selectKind.Bind(actTickAll, "A", "tick every row", "A")
 	selectKind.Bind(actSelRemove, "x", "remove the ticked worktrees", "x")
@@ -1467,7 +1349,6 @@ func init() {
 	selectKind.Bind(actSelSuspend, "z", "suspend the ticked sessions", "z")
 	selectKind.Bind(actSelForget, "F", "forget the ticked sessions' saved files", "F")
 	selectKind.Bind(actSelRun, "R", "run a command in the ticked worktrees", "R")
-	selectKind.Bind(actSelMove, "M", "move the ticked sessions to another space", "M")
 	selectKind.Bind(actEndSelect, "esc", "leave the select mode", "esc")
 	theSelection = interact.List(selectKind)
 
@@ -1738,8 +1619,6 @@ func (m *sidebar) entryTarget(i int) (interact.Target[*sidebar], bool) {
 		return hostHeaders.Target(hostSubject{host: m.rows[i].Host}), true
 	case i >= 0 && i < len(m.rows) && m.rows[i].Group != nil:
 		return groupHeaders.Target(groupSubject{name: m.rows[i].Group.Name, host: m.rows[i].Host}), true
-	case i >= 0 && i < len(m.rows) && m.rows[i].Detached != nil:
-		return detachedRows.Target(detachedSubject{index: i, row: *m.rows[i].Detached, host: m.rows[i].Host}), true
 	case i >= 0 && i < len(m.rows) && m.rows[i].Space != nil:
 		return spacesList.Target(entrySubject{index: i, row: m.rows[i]}), true
 	case i >= len(m.rows) && i < m.numEntries():

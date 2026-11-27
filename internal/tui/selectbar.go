@@ -43,7 +43,6 @@ const (
 	noneToClose  = "None has windows open"
 	noneToForget = "None has only a saved file"
 	noneToRun    = "None has commands to run"
-	noneToMove   = "None is a detached session"
 )
 
 // selected are the ticked rows, folds and filters aside, in the list's order.
@@ -131,7 +130,7 @@ func (m *sidebar) settle() {
 
 // refuse says why an action applies to none of the ticked rows, on the last line.
 func (m *sidebar) refuse(why string) tea.Cmd {
-	if len(m.selected()) == 0 && len(m.tickedDetached()) == 0 {
+	if len(m.selected()) == 0 {
 		why = "Nothing is ticked"
 	}
 	m.failed = errors.New(why)
@@ -268,10 +267,6 @@ func (m *sidebar) barActions() []barAction {
 		run := len(m.toRun())
 		out = append(out, barAction{actSelRun, "Run", run, "Runs a command in " + plural(run, "worktree"), noneToRun})
 	}
-	if m.caps[spaces.CapMove] {
-		move := len(m.tickedDetached())
-		out = append(out, barAction{actSelMove, "Move", move, "Moves " + plural(move, "session") + " to another space, asking first", noneToMove})
-	}
 	return out
 }
 
@@ -293,7 +288,7 @@ func (m *sidebar) barLines(width int) []string {
 	}
 	th := m.th
 	m.bar, m.barHints = controls[*sidebar]{}, map[string]string{}
-	n := len(m.selected()) + len(m.tickedDetached())
+	n := len(m.selected())
 	count := look.Title(fmt.Sprintf("%d selected", n))
 	if th.Width(count)+5 > width {
 		count = look.Title(fmt.Sprint(n))

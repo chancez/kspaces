@@ -268,7 +268,7 @@ kspaces suspend [SESSION...]  stop what runs in the sessions and close them, kee
 kspaces forget SESSION...   delete the saved files of sessions with no windows, after confirming
 kspaces resume SESSION   open a suspended session again, after confirming
 kspaces sessions kill|remove ID...  kill or remove the session provider's sessions, after confirming;
-kspaces sessions move ID...  move them to another space, in a form; cleanup SPACE: a space's detached ones
+kspaces sessions move ID...  move them to another space, in a form; cleanup SPACE: the ones of a space no window shows
 kspaces trust [PATH]     trust the .kspaces.toml of the space PATH is in, after seeing what it adds in a
   --yes, --revoke        form; --yes without asking, --revoke to forget it
 kspaces reply WINDOW_ID [TEXT]  type TEXT and Enter into a window without switching to it; no TEXT: a form

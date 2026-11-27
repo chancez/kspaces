@@ -147,6 +147,16 @@ func worktreeFields(th *look.Theme, snap spaces.Snapshot, r spaces.Row, width in
 	} else {
 		lines = append(lines, field("windows", look.Muted("none open")))
 	}
+	if running, shelved := spaces.SessionCounts(r.Sessions); running+shelved > 0 {
+		var parts []string
+		if running > 0 {
+			parts = append(parts, fmt.Sprintf("%d running", running))
+		}
+		if shelved > 0 {
+			parts = append(parts, fmt.Sprintf("%d shelved", shelved))
+		}
+		lines = append(lines, field("sessions", look.Text(strings.Join(parts, ", "))))
+	}
 	switch {
 	case snap.Config.SessionsDir == "":
 		lines = append(lines, field("saved", look.Muted("no sessions directory")))

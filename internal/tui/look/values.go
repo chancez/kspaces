@@ -65,6 +65,10 @@ func GoneMarker(open bool) []Span {
 // SuspendedMarker marks a suspended session, muted as the rest of its row, which has no windows.
 func SuspendedMarker() []Span { return marker(elMuted, GlyphSuspended) }
 
+// RunningMarker marks a session with no windows whose provider sessions still run: closed here, its work
+// going on.
+func RunningMarker() []Span { return marker(elMuted, GlyphRunning) }
+
 // KeepingMarker marks a session being suspended, the suspended marker dimmed, or with suspending false,
 // being closed, the working marker dimmed: its windows may still be open, and what ran in them is on its
 // way to being kept.

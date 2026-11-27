@@ -166,26 +166,3 @@ func StateWords(s ProviderSession) string {
 	}
 	return s.State
 }
-
-// AskKillProviderSessions opens the form that confirms killing sessions, by id, in a popup sized as
-// AskCloseSession's; an ended one is removed instead.
-func AskKillProviderSessions(cfg config.Config, st kitty.State, ids ...string) error {
-	return launchForm(cfg, st, panelFor(len(ids)), append([]string{"sessions", "kill", "--"}, ids...)...)
-}
-
-// AskRemoveProviderSessions opens the form that confirms removing ended sessions, as AskKillProviderSessions's.
-func AskRemoveProviderSessions(cfg config.Config, st kitty.State, ids ...string) error {
-	return launchForm(cfg, st, panelFor(len(ids)), append([]string{"sessions", "remove", "--"}, ids...)...)
-}
-
-// AskCleanupProviderSessions opens the form that kills and removes the sessions of space no window shows, in a
-// popup of a list's size, as AskCleanup's.
-func AskCleanupProviderSessions(cfg config.Config, st kitty.State, space string) error {
-	return launchForm(cfg, st, listPanel, "sessions", "cleanup", space)
-}
-
-// AskMoveProviderSessions opens the form that moves sessions to another space, in a popup sized as
-// AskOpenLayout's.
-func AskMoveProviderSessions(cfg config.Config, st kitty.State, ids ...string) error {
-	return launchForm(cfg, st, formPanel, append([]string{"sessions", "move", "--"}, ids...)...)
-}

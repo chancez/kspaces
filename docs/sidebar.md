@@ -9,7 +9,8 @@ Each row starts with a fold triangle for a space with linked worktrees, then an 
 space, a branch for a linked worktree, a terminal for a session in no space, or a cross for a space whose
 worktrees could not be listed. The most urgent status of the row's sessions replaces the icon. The icon is
 green when the session has windows open; the row is faint when it has none, its icon a pause sign (`z` in
-ASCII, a double bar in Unicode) once the session is [suspended](kitty.md#closing-and-suspending-sessions).
+ASCII, a double bar in Unicode) once the session is [suspended](kitty.md#closing-and-suspending-sessions),
+and a play sign, not faint, while its provider sessions still run, see [Session states](#session-states).
 A worktree being created has an hourglass (`+` in ASCII, a dotted circle in Unicode) and one being removed
 a trash can (`~` in ASCII, a circled minus in Unicode), in the accent, over its status. A new worktree's
 row shows from when the form or `kspaces new` starts making it. Until it is done the row offers no action:
@@ -138,7 +139,7 @@ STATUS list, `!` and `kspaces next --attention` skip them, and the attention fil
 rows, has none of them. They are found by name, the space's or `SPACE@DIR`. The picker still lists them,
 as it searches everything. The sessions in no space are in no group, and always show.
 
-## Detached sessions
+## Session states
 
 A [session provider](kitty.md#session-providers), a program the config names, owns what runs in windows and
 the sessions that run with no window, a multiplexer's on this machine or another. With one that lists its
@@ -148,51 +149,32 @@ wrapper that runs each window in a cm session, filed by the [launch
 variables](kitty.md#spaces-and-sessions) under the space of its kitty session: `kspaces-provider-cm`
 answers for it, and a window shows the session its cm client is attached to.
 
-A space's sessions that no kitty window shows are listed after the row of the worktree they are in, the
-one their `worktree` tag names, else the space's main worktree, as one from before tagging or from outside
-kspaces is. They are under a row of how many there are, `14 detached`, each host's under its own spaces,
-see [By host](#by-host). The sessions a window shows are where their windows are, and not listed again. `space` on the row, or a
-click on it or its caret, shows them under it, by name, under a row for each host when there are several,
-and again hides them; they start hidden, and showing them is kept across restarts, as folds are. A session's row has
-its name, what it is doing in a word, `busy` while a command runs, else `running`, `shelved`, `exited` or
-`dead`, then its title, else its command. Its icon is its program's status when it reports one that is not
-idle; one that is not running is faint. A folded space or group shows none of them, and nor do the query,
-`f` and `O`, which look for kitty sessions.
+A worktree's provider sessions are its panes, and a worktree is in one of four states:
 
-`enter` on one, or a click, opens a tab running what the provider's `open` says, such as `cm attach ID`,
-which can bring back one that has ended or been shelved. The tab goes where the session belongs: in the linked
-worktree's session its `worktree` tag names, when the space has that worktree; else in that of the
-worktree whose directory holds the session's directory, the deepest; else in the sidebar's own session,
-when that is in the space; else in the space's own session. It starts where the provider says, else in the
-session's directory, and closes when its command ends, as at a detach. A session with no windows is
-restored from its saved file first, or gets the tab as its first, without its default layout.
+| State | Its row | Panes here | Its sessions | Opening it |
+| --- | --- | --- | --- | --- |
+| Open | its icon green | yes | running | switches to it |
+| Running | a play sign (`&` in ASCII, a hollow triangle in Unicode), not faint | none | running | brings back its saved file or kept layout, attached to them |
+| Suspended | a pause sign, faint | none | shelved | resumes them |
+| Closed | faint | none | none | starts afresh, with its default layout |
 
-What a row offers is what the provider does, as its `capabilities` say, asked once per sidebar and again at
-`r`; a provider without `shelve` shows no Shelve:
+A session no window shows belongs in the worktree its `worktree` tag names, else the deepest worktree
+whose directory holds the session's directory, else the space's main worktree, as one from before tagging
+or from outside kspaces is. A folded space's row stands for all of its worktrees'. The hover popup says
+how many sessions are running and shelved. Opening a worktree from no windows opens each of its sessions
+that no window shows once the restored windows have attached, each in a tab of its own: one whose pane was
+closed with its session left running, or one started from another client, shows with the rest. Closing a
+worktree chooses what becomes of its sessions, see [the menu](#the-menu): end them, which closes it;
+shelve them, which suspends it; or leave them running, which leaves it running. A session that exited or
+died counts for no state.
 
-- `x` on a running session kills it, and on an ended one removes it, in a form that confirms with `y` and
-  says what a busy one runs; `F` removes an ended one too.
-- `z` shelves a running one, at once, as it ends it only so that it comes back as it was.
-- `M` moves one to another space, in a form: typing a name lists the provider's spaces it matches, the
-  session's own left out, `down` and `up` choose one, and `enter` moves to it or, with none chosen, to the
-  name as typed, a new space, which the provider creates. This is how sessions that all landed in `default`
-  are filed where they belong.
-- `p` on a row of how many opens **Clean up sessions**, listing all of the space's detached sessions, each
-  with a box, ticked at first for those that exited or died, not for a shelved one, which was ended to come back,
-  nor a running one, which may be someone's work, and a busy one says what it runs. `y` kills the ticked
-  running ones and removes the ticked ended ones; one the provider refuses is said in the form, which
-  stays, and the rest still go.
-
-In the [select mode](#selecting) a session's row ticks as a worktree's does, and the row of how many ticks
-all of the space's; **Move** `M` on the bar moves the ticked ones in one form.
-
-`kspaces sessions kill ID...`, `remove ID...`, `move ID... [--to SPACE]` and `cleanup SPACE` open the same
-forms, by the provider's ids; `--yes`, or `--to`, without asking.
+`kspaces sessions kill ID...`, `remove ID...`, `move ID... [--to SPACE]` and `cleanup SPACE` act on the
+provider's sessions by their ids, each in a form; `--yes`, or `--to`, without asking.
 
 A space the provider lists that is no configured space's is a topic space: one kitty session named after
 it, listed with the sessions in no space above the spaces, whether or not it has windows. Opening it makes
-the session with one shell tab in the home directory, as for any session in no space, and its detached
-sessions are listed under it as a space's are. `default` is one too.
+the session with one shell tab in the home directory, as for any session in no space, and its sessions
+are its own, as a worktree's are. `default` is one too.
 
 An **ad hoc space** is one made as it is needed, with a name and a directory to start in, and no repository
 or config behind it: `scratch`, `incident-123`. Its host's kspaces server keeps it, so every machine
@@ -205,7 +187,7 @@ to a directory: its tabs and panes can be anywhere. `kspaces new-space [HOST:]NA
 from a shell and switches to it; without a NAME, or with `HOST:` alone, it opens the form. `D` on one confirms removing it, which ends the sessions in it, on its host for
 another host's, and has the provider remove its space. Ad hoc spaces are in no group.
 
-Without a provider, or one that does not list, there are no detached sessions and no topic spaces, and
+Without a provider, or one that does not list, there are no running worktrees and no topic spaces, and
 nothing says so. A list that fails leaves the last one that did not showing, so a provider restarting
 under the sidebar blanks nothing; after three failures in a row it is asked again a minute later, or at
 `r`.
@@ -216,8 +198,8 @@ With [other hosts](kitty.md#other-hosts) in the config, the list is by host: a r
 first by its short hostname, then the rest by name, and under it what the list has of that host. Each
 host's spaces are its copies, see [the stories](stories.md): this machine's are its configured spaces, and
 another host's are its own, as its kspaces server says, with their worktrees there and their git state.
-Each host's sessions in no space are under it, another host's by their space's name, and its detached
-sessions are under its own spaces alone. A host the provider lists sessions on but the config does not name
+Each host's sessions in no space are under it, another host's by their space's name, and its sessions no
+window shows are its own spaces' alone. A host the provider lists sessions on but the config does not name
 has no kspaces server to say what its sessions are of, and is left out. Without other hosts there is no
 host's row, and the list is this machine's.
 
@@ -306,8 +288,7 @@ cursor where it was, and the cursor is the box drawn lit, reversed, as that is w
 A bar at the bottom of the spaces list, above the STATUS rule, is titled by a rule with how many rows are
 ticked set into it, `8 selected`, or the number alone in a narrow sidebar. Under it is a row for each
 action on the ticked rows, as a menu's items: **Remove** `x`, **Close** `c`, with the session saver
-**Suspend** `z`, **Forget** `F`, with commands configured **Run** `R`, with a provider that moves **Move**
-`M`, for the ticked [detached sessions](#detached-sessions), and last **Cancel** `esc`. Each row
+**Suspend** `z`, **Forget** `F`, with commands configured **Run** `R`, and last **Cancel** `esc`. Each row
 has the action's name on the left, then how
 many of the ticked rows it applies to and its key, each in a column of its own, so the rows line up; an
 action that applies to none of them is muted, with `-` for its count, and stays in its row. A click
@@ -369,13 +350,6 @@ group, New space, and Add repository.
 | Space | Trust space config | | show what the space's own config adds, and trust it, in a form; while its `.kspaces.toml` is untrusted or changed |
 | Group | Fold / Unfold group | `space` | hide or show a group's spaces, on its header |
 | Space | Select | | turn on the [select mode](#selecting) with the row ticked, a group's header too |
-| Session | Open | `enter` | on a detached session, open a tab showing it, in a session of its space; see [Detached sessions](#detached-sessions) |
-| Session | Kill | `x` | end a running detached session, in a form; with a provider that kills |
-| Session | Shelve | `z` | end a running detached session so it comes back as it was; with a provider that shelves |
-| Session | Remove | `F`, `x` | discard an ended detached session, in a form; with a provider that removes |
-| Session | Move to space | `M` | move a detached session to another space, or a new one, in a form; with a provider that moves |
-| Space | Show / Hide sessions | `space` | show or hide a space's detached sessions, on the row of how many |
-| Space | Clean up sessions | `p` | kill and remove a space's detached sessions chosen in a form, on the row of how many |
 | Space | New space | `a` | make an ad hoc space on the cursor's host, in a form; on every row |
 | Space | Add repository | `A` | add a repository to this machine's spaces, in a form; on every row of this machine's, on a group's header or its spaces' rows in that group |
 
@@ -565,8 +539,8 @@ worktree, as once the directory is gone there is nothing for them to run in or c
 the same lines. Closing saves the session's file
 and marks its windows before the sessions end, as a multiplexer's client exits with its session and its
 window can close before kspaces closes it. Left to the windows closing, a multiplexer's close watcher would decide instead, and cm's
-shelves an idle session and detaches a busy one, so a removed worktree's sessions came back as detached
-rows of its space. `--sessions end`, `shelve` or `leave` on `kspaces close` and `kspaces remove-space
+shelves an idle session and detaches a busy one, so a removed worktree's sessions would come back in its
+space's main worktree. `--sessions end`, `shelve` or `leave` on `kspaces close` and `kspaces remove-space
 --yes` choose without the form; `kspaces remove` has no `--sessions`, and always ends them. Suspend session has no choice: it is shelving them.
 
 **Remove space** takes a configured space out of the config, as text, its entry with its own comments and
@@ -706,13 +680,12 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `ctrl+f` / `ctrl+b`, `pgdown` / `pgup` | a page down / up |
 | `g` / `G` | first / last row |
 | `enter` / `l` | open |
-| `space` | fold or unfold the space's worktrees, on a group's header the group's spaces, or on a space's detached sessions' row show or hide them |
-| `x`, `F`, `z`, `M` | on a detached session: kill, or remove an ended one; remove; shelve; move to another space; see [Detached sessions](#detached-sessions) |
+| `space` | fold or unfold the space's worktrees, on a group's header the group's spaces |
 | `m` | menu |
 | `?` | list the keys where the cursor is |
 | `n`, `N`, `c`, `z`, `x` | new worktree, new worktree from a PR, close session, suspend session, remove worktree (forget, on a missing worktree) |
 | `F` | forget a session's saved file, on a session with no windows open |
-| `p` | clean up the space's worktrees, on a space's row; its detached sessions, on the row of how many |
+| `p` | clean up the space's worktrees, on a space's row |
 | `D` | remove the space, on a space's row or a topic space's |
 | `R` | run a command in the worktree, with commands configured |
 | `L` | open a layout in the worktree's session, with layouts configured |

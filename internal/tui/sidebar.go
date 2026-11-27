@@ -161,11 +161,9 @@ type sidebar struct {
 	poller    *spaces.Poller
 	// What git and gh say of each worktree, by path, from the poller.
 	git map[string]gitstate.State
-	// The provider's sessions no window shows, by space, see spaces.Snapshot, the spaces whose sessions
-	// show under their head, see detached.go, and what the provider does.
-	detached     map[string]spaces.Detached
-	detachedOpen map[string]bool
-	caps         spaces.Capabilities
+	// The provider's sessions no window shows, by space, see spaces.Snapshot, and what the provider does.
+	detached map[string]spaces.Detached
+	caps     spaces.Capabilities
 	// providerSpaces are the provider's spaces, for removing a topic space.
 	providerSpaces []string
 	// The list by host, see hosts.go: every session the provider lists, and the hosts' rows folded.
@@ -193,8 +191,7 @@ func newSidebar(self int) *sidebar {
 		openOnly:   filters.Open,
 		awakeOnly:  filters.Awake,
 		// Kept across restarts, as the folded spaces are.
-		hostsFolded:  spaces.LoadHostsFolded(),
-		detachedOpen: spaces.LoadDetachedShown(),
+		hostsFolded: spaces.LoadHostsFolded(),
 	}
 }
 

@@ -29,6 +29,8 @@ const (
 	GlyphGone
 	// GlyphSuspended marks a suspended session: its windows closed, what ran in them kept to resume.
 	GlyphSuspended
+	// GlyphRunning marks a session with no windows whose provider sessions still run.
+	GlyphRunning
 	// GlyphCreating and GlyphRemoving mark a worktree being created or removed, see spaces.MarkPending.
 	GlyphCreating
 	GlyphRemoving
@@ -108,6 +110,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphBroken:           "x",
 		GlyphGone:             "x",
 		GlyphSuspended:        "z",
+		GlyphRunning:          "&",
 		GlyphCreating:         "+",
 		GlyphRemoving:         "~",
 		GlyphSpace:            "#",
@@ -160,6 +163,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphBroken:           "\u2717",
 		GlyphGone:             "\u2715", // multiplication x
 		GlyphSuspended:        "\u2016", // double vertical line
+		GlyphRunning:          "\u25b7", // white right-pointing triangle
 		GlyphCreating:         "\u25cc", // dotted circle
 		GlyphRemoving:         "\u2296", // circled minus
 		GlyphSpace:            "\u25a0", // black square
@@ -215,6 +219,7 @@ var glyphSets = map[Glyphs][numGlyphs]string{
 		GlyphBroken:      "\uf00d", // times
 		GlyphGone:        "\uf127", // chain-broken
 		GlyphSuspended:   "\uf04c", // pause
+		GlyphRunning:     "\uf04b", // play
 		GlyphCreating:    "\uf252", // hourglass-half
 		GlyphRemoving:    "\uf1f8", // trash
 		GlyphSpace:       "\uf401", // repo

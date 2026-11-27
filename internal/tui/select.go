@@ -35,9 +35,6 @@ func (m *sidebar) endSelect() {
 // rows a filter hides are left out, so nothing ticked is out of sight.
 func (m *sidebar) tickSet(i int) []string {
 	r := m.rows[i]
-	if r.Detached != nil {
-		return detachedTicks(*r.Detached)
-	}
 	var under func(o spaces.Row) bool
 	switch {
 	case r.Group != nil:
@@ -188,13 +185,6 @@ func (m *sidebar) pruneTicks() {
 	for _, r := range m.allRows() {
 		if r.Worktree != nil {
 			listed[r.Worktree.Session] = true
-		}
-	}
-	for space, d := range m.detached {
-		for _, h := range d.Hosts {
-			for _, s := range h.Sessions {
-				listed[sessionKey(space, s)] = true
-			}
 		}
 	}
 	for s := range m.ticked {

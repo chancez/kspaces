@@ -66,9 +66,6 @@ type Sidebar struct {
 	Filters Filters `json:"filters"`
 	// HostsFolded are the hosts folded in the list by host, "" for this machine.
 	HostsFolded []string `json:"hostsFolded,omitempty"`
-	// DetachedShown are the worktrees whose detached sessions show under their head, see the sidebar's
-	// openKey.
-	DetachedShown []string `json:"detachedShown,omitempty"`
 }
 
 // Filters are the spaces list's filters that can be on: the query is not kept.

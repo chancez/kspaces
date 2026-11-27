@@ -139,7 +139,7 @@ func (m *sidebar) dropAt(i int) (group string, to int, on string, ok bool) {
 			return last.Group, n, "", true
 		}
 		switch r := m.rows[i]; {
-		case r.Blank(), r.Detached != nil:
+		case r.Blank():
 			return "", 0, "", false
 		case r.Group != nil:
 			return r.Group.Name, 0, "", true
@@ -204,7 +204,7 @@ func (m *sidebar) release(x, y int) tea.Cmd {
 	}
 	m.cursor = i
 	t, _ := m.entryTarget(i)
-	return runFirst(m, t, actOpenWorktree, actFoldGroup, actUnfoldGroup, actFoldHost, actUnfoldHost, actOpenDetached, actShowDetached, actHideDetached)
+	return runFirst(m, t, actOpenWorktree, actFoldGroup, actUnfoldGroup, actFoldHost, actUnfoldHost)
 }
 
 // cancelPress lets go of the press, and puts the rows back where a drag found them.

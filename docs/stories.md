@@ -58,8 +58,8 @@ Two copies of one worktree on two hosts are two things, with nothing tying them 
 10. **"A quick local shell while in `white:gr`."** Possible, but it is not part of white's copy: it is not
     saved to white's layout and shows nowhere else. Opening the local copy beside it is the way.
 
-11. **"What's going on on white?"** The sidebar lists white's copies under white, which are open here, and white's
-    detached sessions, without opening anything.
+11. **"What's going on on white?"** The sidebar lists white's copies under white, which are open here, and which
+    run with no windows here, without opening anything.
 
 12. **"My laptop rebooted."** Local copies come back as they do now. Remote copies that were open come back
     from their hosts' layouts.

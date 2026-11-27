@@ -73,16 +73,6 @@ func SaveHostsFolded(folded map[string]bool) error {
 	return state.Update(func(s *state.State) { s.Sidebar.HostsFolded = fromSet(folded) })
 }
 
-// LoadDetachedShown reads the worktrees whose detached sessions show, by the sidebar's key for each.
-func LoadDetachedShown() map[string]bool {
-	return toSet(state.Load().Sidebar.DetachedShown)
-}
-
-// SaveDetachedShown saves the worktrees whose detached sessions show.
-func SaveDetachedShown(shown map[string]bool) error {
-	return state.Update(func(s *state.State) { s.Sidebar.DetachedShown = fromSet(shown) })
-}
-
 func toSet(names []string) map[string]bool {
 	ans := map[string]bool{}
 	for _, n := range names {

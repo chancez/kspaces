@@ -234,6 +234,8 @@ const (
 	repoIcon   = "\uf401  "
 	branchIcon = "\ue725  "
 	termIcon   = "\uf120  "
+	// runningIcon heads a row with no windows whose provider sessions still run.
+	runningIcon = "\uf04b  "
 )
 
 // here is the edge of the sidebar's own session's row, in its caret's place, as wide.

@@ -213,7 +213,7 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 	} else {
 		// This machine's, with its own detached sessions: a host the config does not name has no server to
 		// say what its sessions are of.
-		m.rows = m.listRows("", m.others, m.listed(), spaces.DetachedOn(m.detached, ""), m.detachedOpen)
+		m.rows = m.listRows("", m.others, m.listed(), spaces.DetachedOn(m.detached, ""))
 	}
 	m.pruneTicks()
 	if entry >= 0 {
@@ -253,7 +253,7 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 // listRows are the rows of others and spaces, all of them or the filters', with the detached sessions of
 // detached after their spaces' rows, those of the spaces in open under their head, while no filter
 // narrows the rows.
-func (m *sidebar) listRows(host string, others, list []spaces.Space, detached map[string]spaces.Detached, open map[string]bool) []spaces.Row {
+func (m *sidebar) listRows(host string, others, list []spaces.Space, detached map[string]spaces.Detached) []spaces.Row {
 	var rows []spaces.Row
 	if m.filtering {
 		rows = filterRows(spaces.BuildRows(others, list, nil, m.hidden, m.rowOrder()), m.filter.Value())
@@ -269,18 +269,12 @@ func (m *sidebar) listRows(host string, others, list []spaces.Space, detached ma
 	if m.awakeOnly {
 		rows = spaces.AwakeRows(rows, m.suspended)
 	}
-	// The provider's sessions no window shows are not what the query, the attention filter or the open filter
-	// look for, and a drag moves only the rows it knows.
-	if !m.filtering && !m.attending && !m.openOnly && (m.press == nil || m.press.drag == nil) {
-		rows = spaces.WithDetached(rows, detached, open)
-	}
-	return rows
+	return spaces.WithSessions(rows, detached)
 }
 
 // rowKey names the entry a row is, the same across refreshes and filters: its session, for a space whose
-// worktrees could not be listed its root, for a group's header the group's key in the folded file, and for
-// a detached session's row, see detachedKey, one no session's name can be, each on the hosts tab under its
-// host's. The blank row is none.
+// worktrees could not be listed its root, and for a group's header the group's key in the folded file,
+// each on the hosts tab under its host's. The blank row is none.
 func rowKey(r spaces.Row) string {
 	// The hosts tab can list a worktree under several hosts, each its own entry.
 	if r.ByHost {
@@ -291,8 +285,6 @@ func rowKey(r spaces.Row) string {
 		return "host:" + r.Host + ":" + rowKey(r)
 	}
 	switch {
-	case r.Detached != nil:
-		return detachedKey(*r.Detached)
 	case r.Worktree != nil:
 		return r.Worktree.Session
 	case r.Space != nil:

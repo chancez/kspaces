@@ -113,8 +113,8 @@ the windows close; left running, it is what keeps the watcher from shelving or d
 worktree does not set it: it ends them.
 
 A provider's `keep` shelves the sessions, and the windows marked then are left out of what `list` is told,
-before `keep` says what it kept. A list in between would show those sessions as detached rows of their
-space for a moment, then the session as suspended. So keeping runs in this order:
+before `keep` says what it kept. A list in between would show the session as running for a moment, then as
+suspended. So keeping runs in this order:
 
 1. kspaces asks `capabilities`, then `list`, and notes the ids and names of the sessions the session's
    windows show.
@@ -201,7 +201,7 @@ spaces; one no configured space is named after is a topic space, below. Each ses
 
 A session whose `space` changes while windows show it moves them there: a provider's session moved from a
 shell, as `cm space move` does, belongs to the other space now. kitty keeps a window in the kitty session it
-was made in, so a move is a new tab in the space's session, opened as `open` opens a detached row, and the
+was made in, so a move is a new tab in the space's session, opened as `open` opens a session no window shows, and the
 old window closed with `kspaces_keep` set, so a watcher ending a window's session on close leaves this one,
 which the new tab shows. The keyboard goes along only from the window that had it; any other opens behind,
 with `--keep-focus`. Only a change moves a window: one already disagreeing with its session's space when the
@@ -209,10 +209,10 @@ sidebar starts stays, as does one whose space's session is not open but restored
 added now would keep from restoring. Each window is moved by the sidebar of its own OS window, so several
 sidebars move it once, and a move that fails is logged and not tried again.
 
-A session with no `windows` is detached and listed under its space, by host, unless it is a kept
-session's: a session whose `id` or `name` equals a handle `keep` returned for a kitty session kspaces closed
+A session with no `windows` belongs to a worktree of its space, by host, see [Session
+states](sidebar.md#session-states), unless it is a kept session's: a session whose `id` or `name` equals a handle `keep` returned for a kitty session kspaces closed
 or suspended, as `.kept-sessions` lists them, is that kitty session's, whose row stands for it, and comes
-back with it, so it is not listed as detached. Once that kitty session is opened again and its handles
+back with it, so it is no orphan of its worktree. Once that kitty session is opened again and its handles
 leave the list, the session is an ordinary one again. A `list` that fails leaves the
 sidebar showing the last one that did not, so a provider restarting under it, as a multiplexer upgrading
 does, blanks nothing; after three failures in a row it is asked again a minute later, or at `r`.
@@ -232,9 +232,9 @@ discards one that has ended, and `move` puts one in another space, which the pro
 
 **Topic spaces.** A space in `spaces` that no configured space has the name of is listed with the sessions in
 no space, as a topic space: one kitty session of its name, opened with a shell tab in the home directory, and
-its detached sessions listed as any space's are.
+its sessions its own, as a worktree's are.
 
-Without a provider, or one without `list`, there are no detached sessions and no topic spaces.
+Without a provider, or one without `list`, there are no running worktrees and no topic spaces.
 
 ### Shared layouts
 

@@ -54,7 +54,7 @@ func providerHostsFixture() spaces.Snapshot {
 func (e *sidebarEnv) hostRow(host, session string) int {
 	e.t.Helper()
 	i := slices.IndexFunc(e.m.rows, func(r spaces.Row) bool {
-		return r.Host == host && r.Worktree != nil && r.Worktree.Session == session && r.Detached == nil
+		return r.Host == host && r.Worktree != nil && r.Worktree.Session == session
 	})
 	if i < 0 {
 		e.t.Fatalf("no row of %s under %q", session, host)
@@ -74,8 +74,8 @@ func (e *sidebarEnv) hostHeaderRow(host string) int {
 
 // With other hosts the config names, the list is by host: this machine first, by its name, then each other
 // host by name, with its own copies and their git state, and one that cannot be reached says so. A host
-// with no kspaces server is not listed, nor its sessions anywhere; each host's detached sessions are under
-// its own copies, and its sessions in a space it has no copy of are under a row of that space.
+// with no kspaces server is not listed, nor its sessions anywhere; each host's sessions no window shows are
+// its own copies', and its sessions in a space it has no copy of a row of that space's.
 func TestByHost(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(providerHostsFixture())
@@ -91,11 +91,9 @@ func TestByHost(t *testing.T) {
 		if r.Host == "dune" {
 			t.Errorf("a row of dune, which has no kspaces server: %+v", r)
 		}
-		if r.Detached != nil {
-			for _, h := range r.Detached.All.Hosts {
-				if h.Host != r.Host {
-					t.Errorf("%q's detached sessions under %q's %s", h.Host, r.Host, r.Detached.Of.Name)
-				}
+		for _, s := range r.Sessions {
+			if s.Host != r.Host {
+				t.Errorf("%q's session %s under %q's %s", s.Host, s.ID, r.Host, r.Space.Name)
 			}
 		}
 	}
@@ -111,20 +109,18 @@ func TestByHost(t *testing.T) {
 		nas,
 		"",
 		"▼ white " + strings.Repeat("─", 22),
-		"  " + termIcon + "homelab-media",
-		"  ▶ 1 detached",
+		"  " + runningIcon + "homelab-media",
 		"",
 		"▼ " + repoIcon + "homelab main",
-		"  " + branchIcon + "dns dns" + strings.Repeat(" ", 16) + "●2",
-		"  ▶ 1 detached",
+		"  " + runningIcon + "dns dns" + strings.Repeat(" ", 16) + "●2",
 	}
 	if !reflect.DeepEqual(got[i:], want) {
 		t.Errorf("other hosts:\n%q\nwant\n%q", got[i:], want)
 	}
 }
 
-// Without other hosts the config names, the list is this machine's, with no host's row, and its detached
-// sessions alone: another host has no server to say what its sessions are of.
+// Without other hosts the config names, the list is this machine's, with no host's row, and its sessions
+// alone: another host has no server to say what its sessions are of.
 func TestNoHosts(t *testing.T) {
 	e := newSidebarEnv(t)
 	snap := providerHostsFixture()
@@ -134,11 +130,9 @@ func TestNoHosts(t *testing.T) {
 		if r.HostHeader {
 			t.Errorf("a host's row: %+v", r)
 		}
-		if r.Detached != nil {
-			for _, h := range r.Detached.All.Hosts {
-				if h.Host != "" {
-					t.Errorf("%q's detached sessions under %s", h.Host, r.Detached.Of.Name)
-				}
+		for _, s := range r.Sessions {
+			if s.Host != "" {
+				t.Errorf("%q's session %s under %s", s.Host, s.ID, r.Space.Name)
 			}
 		}
 	}
@@ -290,21 +284,15 @@ func TestByHostFoldedHostTakesFocus(t *testing.T) {
 	}
 }
 
-// A host folded and a worktree's detached sessions shown are so in a sidebar started after, as the folded
-// spaces are.
+// A host folded is so in a sidebar started after, as the folded spaces are.
 func TestByHostKeepsFolds(t *testing.T) {
 	e := newSidebarEnv(t)
 	e.m.Update(providerHostsFixture())
 	e.m.Update(tea.FocusMsg{})
 	e.m.cursor = e.hostHeaderRow("nas")
 	e.press("space")
-	e.m.cursor = slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.Detached != nil && r.Detached.Head() && r.Host == "white" })
-	e.press("space")
-	m := newSidebar(0)
-	got := []map[string]bool{m.hostsFolded, m.detachedOpen}
-	want := []map[string]bool{{"nas": true}, e.m.detachedOpen}
-	if !reflect.DeepEqual(got, want) || len(e.m.detachedOpen) != 1 {
-		t.Errorf("a new sidebar has %v, want %v", got, want)
+	if got, want := newSidebar(0).hostsFolded, map[string]bool{"nas": true}; !reflect.DeepEqual(got, want) {
+		t.Errorf("a new sidebar has %v folded, want %v", got, want)
 	}
 }
 
