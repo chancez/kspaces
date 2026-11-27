@@ -104,6 +104,11 @@ func spaceOn(s Space, host string, dirs map[string]bool) Space {
 	return out
 }
 
+// DetachedOn are the sessions of detached that run on host, "" for this machine, by space.
+func DetachedOn(detached map[string]Detached, host string) map[string]Detached {
+	return detachedOn(detached, host)
+}
+
 // detachedOn are the sessions of detached that run on host, by space.
 func detachedOn(detached map[string]Detached, host string) map[string]Detached {
 	out := map[string]Detached{}

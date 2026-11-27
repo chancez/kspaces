@@ -150,8 +150,9 @@ answers for it, and a window shows the session its cm client is attached to.
 
 A space's sessions that no kitty window shows are listed after the row of the worktree they are in, the
 one their `worktree` tag names, else the space's main worktree, as one from before tagging or from outside
-kspaces is. They are under a row of how many there are, `14 detached`, or by host once the provider lists
-more than one machine, `local 3, server 9`. The sessions a window shows are where their windows are, and not listed again. `space` on the row, or a
+kspaces is. They are under a row of how many there are, `14 detached`. The spaces tab lists this machine's
+sessions alone; the [hosts tab](#the-hosts-tab) lists each host's under that host, and a space's row there
+counts them by host, `local 3, server 9`, where several hosts' are under one. The sessions a window shows are where their windows are, and not listed again. `space` on the row, or a
 click on it or its caret, shows them under it, by name, under a row for each host when there are several,
 and again hides them; they start hidden, and showing them is not kept across restarts. A session's row has
 its name, what it is doing in a word, `busy` while a command runs, else `running`, `shelved`, `exited` or
@@ -215,7 +216,8 @@ has none, so a group reads as inside its host rather than as the next one.
 
 A host the config names lists its own copies of its spaces instead, as its kspaces server says: their
 worktrees there and their git state. Its row says `unreachable` while its server cannot be reached, and
-its copies stay as it last said. `enter` on a copy opens it, in a kitty session of its own on that host, and
+its copies stay as it last said. A copy open here is on the spaces tab too, by its kitty session's name,
+`white:homelab`, beside the sessions in no space, so what is open is there to switch to. `enter` on a copy opens it, in a kitty session of its own on that host, and
 `o` on the host's row opens a shell there, see [Opening a copy](kitty.md#other-hosts). `n` on a copy opens
 a form for a new worktree there, its branch typed, which the host creates and the form opens; `x` on a
 linked worktree's copy confirms removing it, which closes its kitty session here and has the host remove

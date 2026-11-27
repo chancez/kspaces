@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/chancez/kspaces/internal/config"
@@ -134,4 +135,30 @@ func AskNewCopyWorktree(cfg config.Config, st kitty.State, host, root string) er
 // AskRemoveWorktree's.
 func AskRemoveCopyWorktree(cfg config.Config, st kitty.State, host, path string) error {
 	return launchForm(cfg, st, formPanel, "remove", "--host", host, path)
+}
+
+// openCopies are the copies of remotes with windows here, by sessions, kitty's open ones, each a space of
+// its one worktree named after its kitty session, HOST:SESSION, in name order: the spaces tab lists them
+// beside the sessions in no space, so a copy opened here shows there too. One whose host has not loaded
+// is its session alone.
+func openCopies(remotes map[string]RemoteView, sessions map[string]int) []Space {
+	var out []Space
+	for name := range sessions {
+		host, _ := SplitCopy(name)
+		rv, ok := remotes[host]
+		if host == "" || !ok {
+			continue
+		}
+		wt := Worktree{Session: name, Host: host}
+		for _, s := range rv.Spaces {
+			for _, w := range s.Worktrees {
+				if w.Session == name {
+					wt = w
+				}
+			}
+		}
+		out = append(out, Space{Name: name, Worktrees: []Worktree{wt}})
+	}
+	slices.SortFunc(out, func(a, b Space) int { return strings.Compare(a.Name, b.Name) })
+	return out
 }

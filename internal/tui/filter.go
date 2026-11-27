@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"slices"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -211,7 +212,10 @@ func (m *sidebar) rebuildRows(at cursorPos) {
 	if m.showingHosts() {
 		m.rows = m.hostRows()
 	} else {
-		m.rows = m.listRows("", m.others, m.listed(), m.detached, m.detachedOpen)
+		// This machine's: its own detached sessions, the other hosts' being on the hosts tab, and the
+		// other hosts' copies open here beside its sessions in no space.
+		others := slices.Concat(m.others, m.openCopies)
+		m.rows = m.listRows("", others, m.listed(), spaces.DetachedOn(m.detached, ""), m.detachedOpen)
 	}
 	m.pruneTicks()
 	if entry >= 0 {

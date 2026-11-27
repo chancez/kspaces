@@ -326,6 +326,9 @@ type Snapshot struct {
 	Git map[string]gitstate.State
 	// The other hosts the config names, by name, see RemoteView.
 	Remotes map[string]RemoteView
+	// OpenCopies are the other hosts' copies with windows here, each a space of one worktree named after
+	// its kitty session, see openCopies.
+	OpenCopies []Space
 	// The worktrees being created or removed, by path, see placePending.
 	Pending map[string]PendingOp
 	// The provider's sessions no kitty window shows, by space, which is a configured space's name or a

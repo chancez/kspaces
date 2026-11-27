@@ -330,3 +330,42 @@ func TestHostsTabFoldedHostTakesFocus(t *testing.T) {
 		t.Errorf("first row %+v, want this machine's, folded", r)
 	}
 }
+
+// The spaces tab is this machine's: its own detached sessions, the other hosts' being on the hosts tab,
+// and the other hosts' copies open here beside its sessions in no space, which enter goes to.
+func TestSpacesTabThisMachine(t *testing.T) {
+	e := newSidebarEnv(t)
+	calls := fakeKittenCalls(t)
+	snap := hostsFixture()
+	r := remoteFixture()
+	snap.Remotes, snap.Git = r.Remotes, r.Git
+	snap.OpenCopies = []spaces.Space{{Name: "white:homelab@dns", Worktrees: []spaces.Worktree{r.Remotes["white"].Spaces[0].Worktrees[1]}}}
+	snap.Kitty.Sessions["white:homelab@dns"] = 30
+	e.m.Update(snap)
+	e.m.Update(tea.FocusMsg{})
+	for _, r := range e.m.rows {
+		if r.Detached == nil {
+			continue
+		}
+		for _, h := range r.Detached.All.Hosts {
+			if h.Host != "" {
+				t.Errorf("%s's detached sessions on the spaces tab, under %s", h.Host, r.Detached.Of.Name)
+			}
+		}
+	}
+	i := slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.Worktree != nil && r.Worktree.Session == "white:homelab@dns" })
+	if i < 0 {
+		t.Fatalf("white's open copy is not on the spaces tab:\n%q", e.spacesScreen())
+	}
+	e.m.cursor = i
+	cmd := e.press("enter")
+	if cmd == nil {
+		t.Fatal("enter on white's copy ran nothing")
+	}
+	cmd()
+	if got := calls(); !slices.ContainsFunc(got, func(c []string) bool {
+		return slices.Equal(c, []string{"@", "action", "goto_session", "white:homelab@dns.kitty-session"})
+	}) {
+		t.Errorf("enter ran %q, want a goto_session of white:homelab@dns", got)
+	}
+}
