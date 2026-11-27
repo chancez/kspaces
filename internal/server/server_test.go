@@ -495,3 +495,31 @@ func TestClientLayouts(t *testing.T) {
 		}
 	})
 }
+
+// A client that writes its requests and stops, as a pipe through the proxy does, is answered before the
+// server hangs up.
+func TestServerAnswersBeforeHangup(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "s.sock")
+	ln, unlock, err := Listen(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	go New(&fakeHost{data: grData}, "v1", "white").Serve(t.Context(), ln)
+	conn, err := net.Dial("unix", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.Write([]byte(`{"id":1,"method":"hello","params":{"protocol":1,"version":"x"}}` + "\n")); err != nil {
+		t.Fatal(err)
+	}
+	conn.(*net.UnixConn).CloseWrite()
+	var got message
+	if err := json.NewDecoder(conn).Decode(&got); err != nil {
+		t.Fatalf("no answer: %v", err)
+	}
+	if want := `{"protocol":1,"version":"v1","host":"white"}`; got.ID != 1 || string(got.Result) != want {
+		t.Errorf("answer %+v, want id 1 and %s", got, want)
+	}
+}

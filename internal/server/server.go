@@ -130,6 +130,9 @@ func (s *Server) ServeConn(ctx context.Context, rw io.ReadWriteCloser) {
 	}()
 	go c.pushes(ctx)
 	defer c.unsubscribe()
+	// A client that hangs up after its requests, as a pipe through the proxy does, is answered first.
+	var handling sync.WaitGroup
+	defer handling.Wait()
 	dec := json.NewDecoder(rw)
 	for {
 		var msg message
@@ -139,7 +142,7 @@ func (s *Server) ServeConn(ctx context.Context, rw io.ReadWriteCloser) {
 			}
 			return
 		}
-		go c.handle(msg)
+		handling.Go(func() { c.handle(msg) })
 	}
 }
 

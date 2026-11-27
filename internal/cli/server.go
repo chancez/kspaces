@@ -72,16 +72,19 @@ it finds none, and it exits once it has had no client for five minutes, or its b
 				return err
 			}
 			defer conn.Close()
-			done := make(chan error, 2)
+			// Once stdin ends, the server is told so and still answers what came before it, so a client
+			// that writes its requests and closes, as a pipe does, gets its answers.
 			go func() {
-				_, err := io.Copy(conn, os.Stdin)
-				done <- err
+				if _, err := io.Copy(conn, os.Stdin); err == nil {
+					if hc, ok := conn.(interface{ CloseWrite() error }); ok {
+						hc.CloseWrite()
+						return
+					}
+				}
+				conn.Close()
 			}()
-			go func() {
-				_, err := io.Copy(os.Stdout, conn)
-				done <- err
-			}()
-			return <-done
+			_, err = io.Copy(os.Stdout, conn)
+			return err
 		},
 	}, &cobra.Command{
 		Use:   "stop",
