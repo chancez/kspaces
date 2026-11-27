@@ -32,9 +32,12 @@ const (
 )
 
 // rowSessions are the worktrees a row stands for: its own, for a folded space all of the space's, missing
-// ones too, and for a folded group's header all of its spaces'.
+// ones too, for a folded group's header all of its spaces', and none for a host's row.
 func rowSessions(r spaces.Row) []spaces.Worktree {
 	switch {
+	case r.HostHeader:
+		// A host's row, folded or not, is no space's.
+		return nil
 	case r.Group != nil && r.Folded:
 		var ans []spaces.Worktree
 		for _, s := range r.Group.Spaces {

@@ -314,3 +314,19 @@ func TestHostsTabFoldsPerHost(t *testing.T) {
 		t.Errorf("cursor on %+v, want server's gr", r)
 	}
 }
+
+// A host's row folded is no space's: the sidebar taking focus, which puts the cursor on the current
+// session's row, passes over it.
+func TestHostsTabFoldedHostTakesFocus(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(hostsFixture())
+	e.m.Update(tea.FocusMsg{})
+	e.press("tab")
+	e.m.cursor = slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.HostHeader && r.Host == "" })
+	e.press("space")
+	e.m.Update(tea.BlurMsg{})
+	e.m.Update(tea.FocusMsg{})
+	if r := e.m.rows[0]; !r.HostHeader || !r.Folded {
+		t.Errorf("first row %+v, want this machine's, folded", r)
+	}
+}
