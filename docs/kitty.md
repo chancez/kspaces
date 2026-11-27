@@ -48,8 +48,11 @@ Opening a worktree:
 1. focuses its session's most recently focused window, if it has windows open;
 2. otherwise loads `SESSION.kitty-session` from the `sessions` directory with `goto_session`, if there is one
    that opens any window (has a `launch` line);
-3. otherwise opens it with its [default layout](#layouts), if it has one, unless opened without it;
-4. otherwise runs the `launch` action with `--type=tab --cwd=WORKTREE --add-to-session=SESSION`, in the home
+3. otherwise opens the layout its host keeps of it, see [Shared layouts](#shared-layouts), with a provider
+   that lists and opens sessions: its tabs and splits, each pane attached to the session it showed, but
+   those the provider no longer has running or shelved, unless opened without a layout;
+4. otherwise opens it with its [default layout](#layouts), if it has one, unless opened without it;
+5. otherwise runs the `launch` action with `--type=tab --cwd=WORKTREE --add-to-session=SESSION`, in the home
    directory for a session in no space, such as `default`.
 
 `launch` in the config is that action, `["launch"]` by default. Every window kspaces opens in a session
@@ -308,7 +311,8 @@ own config.
 
 **Opening a copy.** `kspaces open HOST:SESSION`, such as `kspaces open white:gr@dev`, or `enter` on its row,
 switches to the kitty session `white:gr@dev`, opening it if it has no windows: from its saved file, as any
-session, else with one tab on white, in the worktree's directory there. `kspaces open white:`, or `o` on
+session, else with the layout white keeps of it, see [Shared layouts](#shared-layouts), else with one tab
+on white, in the worktree's directory there. `kspaces open white:`, or `o` on
 white's row, opens `white:default`, a shell in white's home directory. The tab's window carries the launch
 variables, `kspaces_space` and `kspaces_worktree` as white names them, and `kspaces_host` and `kspaces_dir`,
 the host and the directory there. With a provider that has `hosts`, it is a shell, which its launch wrapper

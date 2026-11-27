@@ -48,7 +48,11 @@ func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree, opts OpenOptio
 	if err != nil {
 		return err
 	}
-	// More than the switch is a fresh session's first tab, which the default layout stands in for.
+	// More than the switch is a fresh session's first tab, which the layout its host keeps stands in for,
+	// see openKept, else the default layout.
+	if len(actions) > 1 && !opts.NoLayout && openKept(cfg, wt) {
+		return gotoSession(SessionFile(cfg, wt.Session))
+	}
 	var skipped error
 	if len(actions) > 1 && !opts.NoLayout && wt.Host == "" {
 		spaceCfg, space, found, lr, ok, err := freshLayout(cfg, wt)
