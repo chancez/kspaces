@@ -64,9 +64,7 @@ type Sidebar struct {
 	WidthOver int `json:"widthOver,omitempty"`
 	// Filters are the spaces list's filters on.
 	Filters Filters `json:"filters"`
-	// Hosts is the hosts tab showing rather than the spaces tab.
-	Hosts bool `json:"hosts,omitempty"`
-	// HostsFolded are the hosts folded on the hosts tab, "" for this machine.
+	// HostsFolded are the hosts folded in the list by host, "" for this machine.
 	HostsFolded []string `json:"hostsFolded,omitempty"`
 	// DetachedShown are the worktrees whose detached sessions show under their head, see the sidebar's
 	// openKey.

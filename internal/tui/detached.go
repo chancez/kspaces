@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"fmt"
 	"maps"
+	"os"
 	"slices"
 	"strings"
 
@@ -81,10 +82,20 @@ func detachedCount(d spaces.Detached, byHost bool) string {
 // hostName names a host, local for this machine.
 func hostName(host string) string {
 	if host == "" {
-		return "local"
+		return localName
 	}
 	return host
 }
+
+// localName is this machine's name, its short hostname, as cm names it by default.
+var localName = func() string {
+	name, err := os.Hostname()
+	if err != nil || name == "" {
+		return "local"
+	}
+	name, _, _ = strings.Cut(name, ".")
+	return strings.ToLower(name)
+}()
 
 // renderDetached draws row i, one of a space's detached sessions' rows, marked as its entry, indented under the
 // space's rows as a linked worktree's icon is: the head, its caret, then how many; a host's name; or a

@@ -1,7 +1,6 @@
 package tui
 
 import (
-	"slices"
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
@@ -209,13 +208,12 @@ func (m *sidebar) setRows() {
 // keeps its place, as it did before the rows changed.
 func (m *sidebar) rebuildRows(at cursorPos) {
 	key, entry := at.key, at.entry
-	if m.showingHosts() {
+	if m.byHost() {
 		m.rows = m.hostRows()
 	} else {
-		// This machine's: its own detached sessions, the other hosts' being on the hosts tab, and the
-		// other hosts' copies open here beside its sessions in no space.
-		others := slices.Concat(m.others, m.openCopies)
-		m.rows = m.listRows("", others, m.listed(), spaces.DetachedOn(m.detached, ""), m.detachedOpen)
+		// This machine's, with its own detached sessions: a host the config does not name has no server to
+		// say what its sessions are of.
+		m.rows = m.listRows("", m.others, m.listed(), spaces.DetachedOn(m.detached, ""), m.detachedOpen)
 	}
 	m.pruneTicks()
 	if entry >= 0 {

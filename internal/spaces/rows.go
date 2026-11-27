@@ -1,6 +1,7 @@
 package spaces
 
 import (
+	"cmp"
 	"os"
 	"path/filepath"
 	"slices"
@@ -204,11 +205,14 @@ func mainSession(space Space) string {
 
 // detachedUnder splits d, space's detached sessions, by the worktree each is in, by that worktree's
 // session: the linked or missing one its worktree tag names, when space has it, else the main one, as a
-// session from before tagging or from outside kspaces is.
+// session from before tagging or from outside kspaces is. Another host's copy's sessions are named after
+// the host, see CopyName.
 func detachedUnder(space Space, d Detached) map[string]Detached {
 	has := map[string]bool{}
+	host := ""
 	for _, wt := range slices.Concat(space.Worktrees, space.Missing) {
 		has[wt.Session] = true
+		host = cmp.Or(host, wt.Host)
 	}
 	out := map[string]Detached{}
 	for _, h := range d.Hosts {
@@ -216,8 +220,8 @@ func detachedUnder(space Space, d Detached) map[string]Detached {
 		var order []string
 		for _, s := range h.Sessions {
 			wt := mainSession(space)
-			if dir := s.Tags["worktree"]; dir != "" && has[space.Name+"@"+dir] {
-				wt = space.Name + "@" + dir
+			if dir := s.Tags["worktree"]; dir != "" && has[copyOf(host, space.Name+"@"+dir)] {
+				wt = copyOf(host, space.Name+"@"+dir)
 			}
 			if by[wt] == nil {
 				order = append(order, wt)
@@ -326,9 +330,6 @@ type Snapshot struct {
 	Git map[string]gitstate.State
 	// The other hosts the config names, by name, see RemoteView.
 	Remotes map[string]RemoteView
-	// OpenCopies are the other hosts' copies with windows here, each a space of one worktree named after
-	// its kitty session, see openCopies.
-	OpenCopies []Space
 	// The worktrees being created or removed, by path, see placePending.
 	Pending map[string]PendingOp
 	// The provider's sessions no kitty window shows, by space, which is a configured space's name or a

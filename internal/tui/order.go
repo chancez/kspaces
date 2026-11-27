@@ -119,7 +119,8 @@ func (a arrangement) held() map[string]int {
 // movable reports whether a row can be moved by hand: a space, or a linked worktree within its space.
 // Sessions in no space keep their names' order, and a missing worktree stays last.
 func movable(r spaces.Row) bool {
-	return r.Space != nil && !r.Other && !r.Missing && (r.Main || r.Worktree != nil)
+	// This machine's alone: another host's spaces keep its order.
+	return r.Space != nil && !r.Other && !r.Missing && (r.Main || r.Worktree != nil) && r.Host == "" && !r.Remote()
 }
 
 // place is where r is in a, and how many it is among: a space among the spaces of its group, a linked
@@ -275,7 +276,7 @@ func (m *sidebar) keep(a arrangement, r spaces.Row) tea.Cmd {
 
 // moveRow moves the cursor's row by delta among its own, as dragging it does: K and J.
 func (m *sidebar) moveRow(delta int) tea.Cmd {
-	if m.narrowed() || m.showingHosts() || m.cursor < 0 || m.cursor >= len(m.rows) || !movable(m.rows[m.cursor]) {
+	if m.narrowed() || m.cursor < 0 || m.cursor >= len(m.rows) || !movable(m.rows[m.cursor]) {
 		return nil
 	}
 	r, a := m.rows[m.cursor], m.shown()

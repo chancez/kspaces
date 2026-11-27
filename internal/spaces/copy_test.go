@@ -96,21 +96,3 @@ func TestCopiesNotOthers(t *testing.T) {
 		t.Errorf("others %q, want %q", names, want)
 	}
 }
-
-// The copies open here are a space each, named after its kitty session, with the worktree its host
-// lists, or the session alone before the host has loaded; another session open here is not one.
-func TestOpenCopies(t *testing.T) {
-	dns := Worktree{Path: "/home/me/homelab/.worktrees/dns", Branch: "dns", Session: "white:homelab@dns", Host: "white"}
-	remotes := map[string]RemoteView{
-		"white": {Loaded: true, Spaces: []Space{{Name: "homelab", Worktrees: []Worktree{{Path: "/home/me/homelab", Session: "white:homelab", Host: "white"}, dns}}}},
-		"nas":   {Err: "unreachable"},
-	}
-	got := openCopies(remotes, map[string]int{"white:homelab@dns": 1, "nas:gr": 2, "gr@dev": 3, "dune:x": 4})
-	want := []Space{
-		{Name: "nas:gr", Worktrees: []Worktree{{Session: "nas:gr", Host: "nas"}}},
-		{Name: "white:homelab@dns", Worktrees: []Worktree{dns}},
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("open copies\n%+v\nwant\n%+v", got, want)
-	}
-}

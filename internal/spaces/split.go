@@ -22,13 +22,3 @@ func LoadFilters() state.Filters {
 func SaveFilters(f state.Filters) error {
 	return state.Update(func(s *state.State) { s.Sidebar.Filters = f })
 }
-
-// LoadHostsTab reads whether the sidebar last showed the hosts tab.
-func LoadHostsTab() bool {
-	return state.Load().Sidebar.Hosts
-}
-
-// SaveHostsTab saves whether the sidebar shows the hosts tab.
-func SaveHostsTab(on bool) error {
-	return state.Update(func(s *state.State) { s.Sidebar.Hosts = on })
-}

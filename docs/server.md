@@ -92,7 +92,8 @@ tab, and is asked again with a backoff.
 ## Copies
 
 A copy is a space or a worktree as one host has it, `HOST:SPACE@WORKTREE`, see [the stories](stories.md).
-This machine's copies are the spaces tab, as now. Another host's are on the hosts tab, from that host's data:
+The sidebar lists them by host: this machine's copies under it, as before, and another host's under that
+host, from that host's data:
 its spaces, where they are there, their worktrees and git state.
 
 **Opening** `white:gr@dev` opens a kitty session of that name. Its windows carry the `kspaces_host` user

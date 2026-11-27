@@ -190,7 +190,7 @@ spaces; one no configured space is named after is a topic space, below. Each ses
 | `name` | what the sidebar shows it as |
 | `space` | the space it is in; empty is `default` |
 | `host` | the machine it runs on, empty for this one |
-| `stale` | optional: its host did not answer, so this is what it last said; the hosts tab marks it |
+| `stale` | optional: its host did not answer, so this is what it last said; the sidebar marks it |
 | `state` | `running`, `exited`, `shelved` or `dead`; only `running` is offered Kill and Shelve, only the others Remove |
 | `busy` | whether a command is running, which a confirmation says |
 | `title`, `command` | what the row shows after its name: the title, else the command; `command` is also what a layout saved from a window showing it runs |
@@ -291,7 +291,7 @@ shows its sessions; another host's is, as `white:` is a copy as any other.
 
 ## Other hosts
 
-`[hosts]` names the other machines whose spaces the [hosts tab](sidebar.md#the-hosts-tab) lists, each as it
+`[hosts]` names the other machines whose spaces the sidebar lists [by host](sidebar.md#by-host), each as it
 has them: its copies, see [the stories](stories.md).
 
 ```toml
@@ -318,7 +318,7 @@ variables, `kspaces_space` and `kspaces_worktree` as white names them, and `kspa
 the host and the directory there. With a provider that has `hosts`, it is a shell, which its launch wrapper
 runs on the host; else it runs `kitten ssh --kitten cwd=DIR DEST`, and kitty opens the windows split from it
 on the host too, in their directory there. kitty starts it here in the home directory. The open copies'
-kitty sessions are not sessions in no space on the spaces tab: the hosts tab lists them under their host.
+kitty sessions are not sessions in no space here: the sidebar lists them under their host.
 
 ## Running commands
 

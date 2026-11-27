@@ -106,11 +106,6 @@ func (m *sidebar) click(msg tea.MouseClickMsg) tea.Cmd {
 			m.unhover()
 			return runFirst(m, thePane.Target(paneSubject{}), actOpenPicker)
 		}
-		// The tab that is not showing switches; the one that is does nothing.
-		if m.showingHosts() && m.inZone(spacesTabZone, msg.X, msg.Y) || !m.showingHosts() && m.inZone(hostsTabZone, msg.X, msg.Y) {
-			m.unhover()
-			return runFirst(m, thePane.Target(paneSubject{}), actSwitchTab)
-		}
 		// A status entry's popup has its button too, in place of the one it covers.
 		if id := m.clearAt(msg.X, msg.Y); id != "" {
 			m.unhover()

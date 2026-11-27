@@ -150,9 +150,8 @@ answers for it, and a window shows the session its cm client is attached to.
 
 A space's sessions that no kitty window shows are listed after the row of the worktree they are in, the
 one their `worktree` tag names, else the space's main worktree, as one from before tagging or from outside
-kspaces is. They are under a row of how many there are, `14 detached`. The spaces tab lists this machine's
-sessions alone; the [hosts tab](#the-hosts-tab) lists each host's under that host, and a space's row there
-counts them by host, `local 3, server 9`, where several hosts' are under one. The sessions a window shows are where their windows are, and not listed again. `space` on the row, or a
+kspaces is. They are under a row of how many there are, `14 detached`, each host's under its own spaces,
+see [By host](#by-host). The sessions a window shows are where their windows are, and not listed again. `space` on the row, or a
 click on it or its caret, shows them under it, by name, under a row for each host when there are several,
 and again hides them; they start hidden, and showing them is kept across restarts, as folds are. A session's row has
 its name, what it is doing in a word, `busy` while a command runs, else `running`, `shelved`, `exited` or
@@ -200,34 +199,31 @@ nothing says so. A list that fails leaves the last one that did not showing, so 
 under the sidebar blanks nothing; after three failures in a row it is asked again a minute later, or at
 `r`.
 
-### The hosts tab
+### By host
 
-With a provider that lists sessions, or [other hosts](kitty.md#other-hosts) in the config, the title is two
-tabs, `SPACES HOSTS`. `tab`, or a click on the other
-tab, switches between them, and the choice is kept across restarts. The hosts tab lists the spaces tab's
-rows by host: a row for each host, `local` first and then the rest by name, and under it what the spaces
-tab would list of that host. This machine has the whole list. Another host has the spaces and the
-sessions in no space it runs a session in: a space keeps its own row and, of its linked worktrees, those
-its sessions there are tagged with, and a worktree only that host has is listed after them by its
-directory. Each host's detached sessions are under their own `N detached` row, which shows and hides them
-there alone. `space` or a click on its caret folds a host's row, kept across restarts. A host's row has
-the rule across the sidebar that a group's header has on the spaces tab, and a group's header under a host
-has none, so a group reads as inside its host rather than as the next one.
+With [other hosts](kitty.md#other-hosts) in the config, the list is by host: a row for each, this machine
+first by its short hostname, then the rest by name, and under it what the list has of that host. Each
+host's spaces are its copies, see [the stories](stories.md): this machine's are its configured spaces, and
+another host's are its own, as its kspaces server says, with their worktrees there and their git state.
+Each host's sessions in no space are under it, another host's by their space's name, and its detached
+sessions are under its own spaces alone. A host the provider lists sessions on but the config does not name
+has no kspaces server to say what its sessions are of, and is left out. Without other hosts there is no
+host's row, and the list is this machine's.
 
-A host the config names lists its own copies of its spaces instead, as its kspaces server says: their
-worktrees there and their git state. Its row says `unreachable` while its server cannot be reached, and
-its copies stay as it last said. A copy open here is on the spaces tab too, by its kitty session's name,
-`white:homelab`, beside the sessions in no space, so what is open is there to switch to. `enter` on a copy opens it, in a kitty session of its own on that host, and
-`o` on the host's row opens a shell there, see [Opening a copy](kitty.md#other-hosts). `n` on a copy opens
-a form for a new worktree there, its branch typed, which the host creates and the form opens; `x` on a
-linked worktree's copy confirms removing it, which closes its kitty session here and has the host remove
-it, ending its sessions there, and its branch with `d`, or its changes with `f`. Nothing else that works in
-a directory here applies to a copy: its menu offers those, opening, closing its session, and folding.
+`space` or a click on its caret folds a host's row, kept across restarts. A host's row has the rule across
+the sidebar that a group's header has, and a group's header under a host has none, so a group reads as
+inside its host rather than as the next one. Folding a space under one host leaves one at the same root
+under another as it is. A host's row says `unreachable` while its server cannot be reached, and its copies
+stay as it last said.
 
-A row does what it does on the spaces tab, so a worktree listed under several hosts opens the same kitty
-session from each. `enter` on a worktree only another host has opens a tab of one of its sessions there,
-in a kitty session of its name. The filters narrow each host's rows as they narrow the spaces tab's, and
-a host they leave nothing of is left out. Rows do not move on the hosts tab, by drag or by `K` and `J`.
+`enter` on another host's copy opens it, in a kitty session of its own on that host, and `o` on the host's
+row opens a shell there, see [Opening a copy](kitty.md#other-hosts). `n` on a copy opens a form for a new
+worktree there, its branch typed, which the host creates and the form opens; `x` on a linked worktree's
+copy confirms removing it, which closes its kitty session here and has the host remove it, ending its
+sessions there, and its branch with `d`, or its changes with `f`. Nothing else that works in a directory
+here applies to a copy: its menu offers those, opening, closing its session, and folding. The filters
+narrow each host's rows, and a host they leave nothing of is left out. Only this machine's rows move, by
+drag or by `K` and `J`.
 
 ## Order
 
@@ -723,7 +719,6 @@ sidebar's own session and goes after `enter`, `esc` or ten seconds without a key
 | `s` | sort the list the next way; see [Order](#order) |
 | `K` / `J` | move the cursor's space within its group, or linked worktree within its space, up / down |
 | `v` | select rows to act on; see [Selecting](#selecting) |
-| `tab` | switch between the spaces and hosts tabs; see [The hosts tab](#the-hosts-tab) |
 | `space`, `A` | in the select mode, tick the cursor's row, every row shown |
 | `x`, `c`, `z`, `F`, `R`, `M` | in the select mode, remove, close, suspend, forget, run in, move what is ticked |
 | `r` | refresh, which also happens every two seconds |

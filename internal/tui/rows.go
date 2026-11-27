@@ -83,12 +83,13 @@ func (m *sidebar) renderRow(i int) string {
 	}
 	kind, label := look.RowSpace, look.Space(*r.Space)
 	switch {
+	// A session in no space, another host's too, is one by its name.
+	case r.Other:
+		kind, label = look.RowOther, look.OtherSession(*r.Space)
 	case r.Absent():
 		kind, label = look.RowWorktree, look.MissingWorktree(r)
 	case !r.Main:
 		kind, label = look.RowWorktree, look.Worktree(*r.Worktree)
-	case r.Other:
-		kind, label = look.RowOther, look.OtherSession(*r.Space)
 	}
 	// A folded space stands for all its worktrees: it is current, open or in a state if any of them is.
 	current, open, state := false, false, ""

@@ -168,15 +168,11 @@ type sidebar struct {
 	caps         spaces.Capabilities
 	// providerSpaces are the provider's spaces, for removing a topic space.
 	providerSpaces []string
-	// The hosts tab, see hosts.go: whether it shows, every session the provider lists, and the host's and
-	// space's rows folded there, by spaces.HostKey.
-	hostsTab    bool
+	// The list by host, see hosts.go: every session the provider lists, and the hosts' rows folded.
 	sessions    []spaces.ProviderSession
 	hostsFolded map[string]bool
-	// remotes are the other hosts the config names, see spaces.RemoteView, and openCopies their copies
-	// with windows here.
-	remotes    map[string]spaces.RemoteView
-	openCopies []spaces.Space
+	// remotes are the other hosts the config names, see spaces.RemoteView.
+	remotes map[string]spaces.RemoteView
 }
 
 func newSidebar(self int) *sidebar {
@@ -194,7 +190,6 @@ func newSidebar(self int) *sidebar {
 		attending:  filters.Attention,
 		openOnly:   filters.Open,
 		awakeOnly:  filters.Awake,
-		hostsTab:   spaces.LoadHostsTab(),
 		// Kept across restarts, as the folded spaces are.
 		hostsFolded:  spaces.LoadHostsFolded(),
 		detachedOpen: spaces.LoadDetachedShown(),
@@ -425,7 +420,6 @@ func (m *sidebar) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.order = msg.Order
 			m.git = msg.Git
 			m.detached, m.caps, m.providerSpaces, m.sessions, m.remotes = msg.Detached, msg.Caps, msg.ProviderSpaces, msg.Sessions, msg.Remotes
-			m.openCopies = msg.OpenCopies
 			m.rebuildRows(at)
 			m.settle()
 			m.statusOffset = min(m.statusOffset, max(len(m.kitty.Statuses)-1, 0))

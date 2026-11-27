@@ -9,43 +9,18 @@ import (
 	"github.com/chancez/kspaces/internal/tui/look"
 )
 
-// The sidebar has two tabs when the provider lists sessions: spaces, and hosts, which lists the same rows
-// by host: each host's row, then what the spaces tab would list of that host, see spaces.HostViews. tab or
-// a click on its title switches, and the choice is kept. A row acts as it does on the spaces tab, so
-// opening a worktree goes to its kitty session whichever host it is listed under; one only another host
-// has opens a tab of its sessions there.
+// With other hosts the config names, the spaces list is by host: each host's row, then what the list
+// would have of that host, see spaces.HostViews, this machine first. Each host's spaces are its copies, see
+// docs/stories.md, and its detached sessions are under them alone.
 
-// Zones of the tabs on the title.
-const (
-	spacesTabZone = "tab:spaces"
-	hostsTabZone  = "tab:hosts"
-)
-
-// showingHosts is whether the hosts tab shows, which needs other hosts to show: a provider that lists
-// sessions, or hosts the config names.
-func (m *sidebar) showingHosts() bool {
-	return m.hostsTab && m.hasHosts()
+// byHost is whether the spaces list is by host: when the config names other hosts.
+func (m *sidebar) byHost() bool {
+	return len(m.remotes) > 0
 }
 
-// hasHosts is whether there is a hosts tab.
-func (m *sidebar) hasHosts() bool {
-	return m.caps[spaces.CapList] || len(m.remotes) > 0
-}
-
-// switchTab shows the other tab, and keeps the choice.
-func (m *sidebar) switchTab() {
-	m.hostsTab = !m.showingHosts()
-	if err := spaces.SaveHostsTab(m.hostsTab); err != nil {
-		m.failed = err
-	}
-	m.cursor, m.offset = 0, 0
-	m.rebuildRows(cursorPos{entry: -1})
-	m.cursorToCurrent()
-}
-
-// hostRows are the hosts tab's rows: for each host, its row, then the rows the spaces tab's filters keep of
-// what the host has, see listRows, left out while the host is folded. A host whose rows a filter leaves
-// none of is left out whole, and a blank row goes between hosts.
+// hostRows are the rows by host: for each host, its row, then the rows the list's filters keep of what the
+// host has, see listRows, left out while the host is folded. A host whose rows a filter leaves none of is
+// left out whole, and a blank row goes between hosts.
 func (m *sidebar) hostRows() []spaces.Row {
 	var out []spaces.Row
 	for _, v := range spaces.HostViews(m.others, m.listed(), m.sessions, m.detached, m.remotes) {
@@ -106,20 +81,9 @@ func (m *sidebar) hostSessionsOf(host string, space spaces.Space, session string
 	return out
 }
 
-// tabTitle is the title's tabs, SPACES and HOSTS, the one showing as the title and the other muted, or
-// SPACES alone without other hosts, see hasHosts.
+// tabTitle is the list's title.
 func (m *sidebar) tabTitle() []look.Span {
-	if !m.hasHosts() {
-		return []look.Span{look.Title("SPACES")}
-	}
-	tab := func(name string, on bool) look.Span {
-		if on {
-			return look.Title(name)
-		}
-		return look.Muted(name)
-	}
-	hosts := m.showingHosts()
-	return slices.Concat(look.Mark(spacesTabZone, tab("SPACES", !hosts)), []look.Span{look.Default(" ")}, look.Mark(hostsTabZone, tab("HOSTS", hosts)))
+	return []look.Span{look.Title("SPACES")}
 }
 
 // renderHostHeader draws row i, a host's row on the hosts tab, marked as its entry: its caret, its name,

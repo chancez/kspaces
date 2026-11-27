@@ -29,11 +29,10 @@ Two copies of one worktree on two hosts are two things, with nothing tying them 
 
 2. **"I want to do some homelab work on white."** The repository is on white.
    `kspaces open white:homelab` opens white's copy of the space: its tabs on white, in homelab's directory
-   there, which white's kspaces knows from white's config. The sidebar lists it under white on the hosts
-   tab.
+   there, which white's kspaces knows from white's config. The sidebar lists it under white.
 
 3. **"I'm working on my desktop and want to resume that work on my laptop."**
-   On the laptop the hosts tab lists the desktop's copies. Opening `desktop:gr@dev` builds the desktop's
+   On the laptop the sidebar lists the desktop's copies under the desktop. Opening `desktop:gr@dev` builds the desktop's
    layout of it on the laptop, attached to the desktop's sessions. Changes are saved to the desktop's
    copy, so back at the desktop it is as the laptop left it.
 
@@ -59,7 +58,7 @@ Two copies of one worktree on two hosts are two things, with nothing tying them 
 10. **"A quick local shell while in `white:gr`."** Possible, but it is not part of white's copy: it is not
     saved to white's layout and shows nowhere else. Opening the local copy beside it is the way.
 
-11. **"What's going on on white?"** The hosts tab lists white's copies, which are open here, and white's
+11. **"What's going on on white?"** The sidebar lists white's copies under white, which are open here, and white's
     detached sessions, without opening anything.
 
 12. **"My laptop rebooted."** Local copies come back as they do now. Remote copies that were open come back

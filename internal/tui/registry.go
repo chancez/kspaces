@@ -486,13 +486,6 @@ var actAwakeOnly = paneAction("suspended filter", (*sidebar).toggleAwake)
 // actOpenPicker opens the picker in a popup, as kitty.conf's kspaces_pick mapping does.
 var actOpenPicker = paneAction("picker", (*sidebar).openPicker)
 
-// actSwitchTab shows the other tab, see hosts.go, as a click on its title does.
-var actSwitchTab = &interact.Action[*sidebar, paneSubject]{
-	Title:   "other tab",
-	Applies: func(m *sidebar, _ paneSubject) bool { return m.hasHosts() },
-	Run:     func(m *sidebar, _ paneSubject) tea.Cmd { m.switchTab(); return nil },
-}
-
 // actCycleSort goes on to the next sort mode, as a left click on the sort button does.
 var actCycleSort = paneAction("sort", func(m *sidebar) tea.Cmd { m.setSort(m.sortMode().Next()); return nil })
 
@@ -1417,7 +1410,7 @@ func init() {
 
 	paneKind = interact.NewKind(func(paneSubject) string { return "Sidebar" },
 		actDown, actUp, actHalfDown, actHalfUp, actPageDown, actPageUp, actTop, actBottom, actLeave, actRefresh, actMenuHere, actQuit,
-		actAttend, actClearFinished, actFilter, actAttention, actOpenOnly, actAwakeOnly, actOpenPicker, actCycleSort, actMoveUp, actMoveDown, actSelect, actSwitchTab, actHelp)
+		actAttend, actClearFinished, actFilter, actAttention, actOpenOnly, actAwakeOnly, actOpenPicker, actCycleSort, actMoveUp, actMoveDown, actSelect, actHelp)
 	paneKind.Bind(actDown, "j/k", "down/up", "j", "down")
 	paneKind.Bind(actUp, "", "", "k", "up")
 	paneKind.Bind(actHalfDown, "ctrl+d/u", "half page down/up", "ctrl+d")
@@ -1442,7 +1435,6 @@ func init() {
 	paneKind.Bind(actMoveUp, "K/J", "move the row up/down", "K")
 	paneKind.Bind(actMoveDown, "", "", "J")
 	paneKind.Bind(actSelect, "v", "select rows to act on", "v")
-	paneKind.Bind(actSwitchTab, "tab", "switch between the spaces and hosts tabs", "tab")
 	paneKind.Bind(actHelp, "?", "list keys", append([]string{"?"}, helpKeys...)...)
 	interact.Via(paneKind, func(paneSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
 	thePane = interact.List(paneKind)

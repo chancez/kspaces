@@ -142,7 +142,6 @@ func (sh Shared) View(self int) Snapshot {
 		snap.Err = errors.New(sh.KittyErr)
 	}
 	snap.Remotes, snap.Git = RemoteViewsOf(sh.Remotes)
-	snap.OpenCopies = openCopies(snap.Remotes, st.Sessions)
 	snap.Git = withRemoteGit(sh.Git, snap.Git)
 	snap.Pending = placePending(snap.Spaces, sh.Pending)
 	snap.Detached = detachedBySpace(sh.Provider, toSet(sh.Kept))

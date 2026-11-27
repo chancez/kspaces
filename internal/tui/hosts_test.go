@@ -15,183 +15,6 @@ import (
 	"github.com/chancez/kspaces/internal/spaces"
 )
 
-// hostsFixture is detachedFixture with every session the provider lists: its detached ones on this
-// machine, and on server one gr@dev's window 11 shows, one detached in gr's far, which only server has,
-// and one detached in default, stale.
-func hostsFixture() spaces.Snapshot {
-	snap := detachedFixture()
-	for _, space := range []string{"default", "docs", "gr"} {
-		for _, h := range snap.Detached[space].Hosts {
-			snap.Sessions = append(snap.Sessions, h.Sessions...)
-		}
-	}
-	far := spaces.ProviderSession{ID: "server:@f6", Name: "deploy", Space: "gr", Host: "server", State: "running", Tags: map[string]string{"worktree": "far"}}
-	logs := spaces.ProviderSession{ID: "server:@g7", Name: "logs", Host: "server", State: "running", Stale: true, Command: "tail -f"}
-	snap.Sessions = append(snap.Sessions,
-		spaces.ProviderSession{ID: "server:@e5", Name: "shell", Space: "gr", Host: "server", State: "running", Windows: []int{11}, Tags: map[string]string{"worktree": "dev"}},
-		far, logs)
-	gr := snap.Detached["gr"]
-	gr.Hosts = append(gr.Hosts, spaces.HostSessions{Host: "server", Sessions: []spaces.ProviderSession{far}})
-	snap.Detached["gr"] = gr
-	def := snap.Detached["default"]
-	def.Hosts = append(def.Hosts, spaces.HostSessions{Host: "server", Sessions: []spaces.ProviderSession{logs}})
-	snap.Detached["default"] = def
-	return snap
-}
-
-// tab lists the spaces tab's rows by host: this machine's whole list, then each other host with what it
-// has, its detached sessions under its own head. A worktree opens its kitty session whichever host lists
-// it, one only another host has opens a tab of its session there, and space folds a host. The tab is
-// kept, so a sidebar started after shows it.
-func TestHostsTab(t *testing.T) {
-	e := newSidebarEnv(t)
-	calls := fakeKittenCalls(t)
-	opens := fakeProvider(t, map[string]string{"open": `{"argv": ["mux", "attach", "server:@f6"]}`}, "")
-	e.m.Update(hostsFixture())
-	e.m.Update(tea.FocusMsg{})
-	e.press("tab")
-	local := []string{
-		tabsTitle,
-		"",
-		"\u25bc local " + strings.Repeat("\u2500", 22),
-		"  " + termIcon + "default",
-		"  \u25b6 1 detached",
-		"",
-		"\u25bc " + repoIcon + "gr main",
-		here + blocked + "dev pr/me/dev",
-		"  " + branchIcon + "fix fix",
-		"  \u25b6 2 detached",
-		"",
-		"  " + repoIcon + "kitty master",
-		"",
-		"\u25b6 \uf110  docs main",
-		"",
-		"  \uf00d  broken",
-		"",
-	}
-	all := append(slices.Clone(local),
-		"\u25bc server "+strings.Repeat("\u2500", 21),
-		"  "+termIcon+"default",
-		"  \u25b6 1 detached",
-		"",
-		"\u25bc "+repoIcon+"gr main",
-		here+blocked+"dev pr/me/dev",
-		"  "+branchIcon+"far",
-		"  \u25b6 1 detached",
-	)
-	if got := e.spacesScreen(); !reflect.DeepEqual(got, all) {
-		t.Errorf("hosts tab:\n%q\nwant\n%q", got, all)
-	}
-
-	// server's far, which only server has: its session opens in a tab of gr@far.
-	e.m.cursor = e.hostRow("server", "gr@far")
-	cmd := e.press("enter")
-	if cmd == nil {
-		t.Fatal("enter on far ran nothing")
-	}
-	cmd()
-	if got, want := opens(), []string{`open {"session":"server:@f6"}`}; !reflect.DeepEqual(got, want) {
-		t.Errorf("asked the provider %q, want %q", got, want)
-	}
-	launched := slices.ContainsFunc(calls(), func(c []string) bool { return slices.Contains(c, "--add-to-session=gr@far") })
-	if !launched {
-		t.Errorf("enter on far opened no tab in gr@far")
-	}
-
-	// server's own row folds it.
-	e.m.cursor = slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.HostHeader && r.Host == "server" })
-	e.press("space")
-	if got, want := e.spacesScreen(), append(slices.Clone(local), "\u25b6 server "+strings.Repeat("\u2500", 21)); !reflect.DeepEqual(got, want) {
-		t.Errorf("server folded:\n%q\nwant\n%q", got, want)
-	}
-
-	if !newSidebar(0).hostsTab {
-		t.Error("a new sidebar does not show the hosts tab")
-	}
-	e.press("tab")
-	if got := e.spacesScreen()[2]; got != "  "+termIcon+"default" {
-		t.Errorf("tab back shows %q first, want the spaces tab's default", got)
-	}
-}
-
-// hostRow is the index of the row of the worktree whose kitty session is session, under host.
-func (e *sidebarEnv) hostRow(host, session string) int {
-	e.t.Helper()
-	i := slices.IndexFunc(e.m.rows, func(r spaces.Row) bool {
-		return r.Host == host && r.Worktree != nil && r.Worktree.Session == session && r.Detached == nil
-	})
-	if i < 0 {
-		e.t.Fatalf("no row of %s under %q", session, host)
-	}
-	return i
-}
-
-// The cursor on a worktree under one host stays there across a poll, though another host lists it too.
-func TestHostsTabKeepsTheCursorsHost(t *testing.T) {
-	e := newSidebarEnv(t)
-	e.m.Update(hostsFixture())
-	e.m.Update(tea.FocusMsg{})
-	e.press("tab")
-	e.m.cursor = e.hostRow("server", "gr@dev")
-	before := e.m.cursor
-	e.m.Update(hostsFixture())
-	if e.m.cursor != before || e.m.rows[e.m.cursor].Host != "server" {
-		t.Errorf("cursor moved from %d to %d, on host %q", before, e.m.cursor, e.m.rows[e.m.cursor].Host)
-	}
-}
-
-// On the hosts tab a group is inside its host, so its header is indented with no rule, while the host's
-// row has one: a rule across the sidebar under a host read as the next host.
-func TestHostsTabGroups(t *testing.T) {
-	e := newSidebarEnv(t)
-	snap := groupsFixture()
-	snap.Config.Provider = []string{"prov"}
-	snap.Caps = spaces.Capabilities{spaces.CapList: true}
-	e.m.Update(snap)
-	e.press("tab")
-	var headers []string
-	for i, r := range e.m.rows {
-		if r.HostHeader || r.Group != nil {
-			headers = append(headers, e.spacesScreen()[i+2])
-		}
-	}
-	want := []string{"\u25bc local " + strings.Repeat("\u2500", 22), "   WORK \uf07c", "   PERSONAL \uf07c"}
-	if !reflect.DeepEqual(headers, want) {
-		t.Errorf("headers\n%q\nwant\n%q", headers, want)
-	}
-}
-
-// A click on the title's tab that is not showing switches to it; the one that is does nothing.
-func TestHostsTabClick(t *testing.T) {
-	e := newSidebarEnv(t)
-	e.m.Update(hostsFixture())
-	e.m.render()
-	e.click(spacesTabZone, tea.MouseLeft)
-	if e.m.showingHosts() {
-		t.Fatal("a click on SPACES showed the hosts tab")
-	}
-	e.click(hostsTabZone, tea.MouseLeft)
-	if !e.m.showingHosts() {
-		t.Fatal("a click on HOSTS did not show the hosts tab")
-	}
-	e.click(spacesTabZone, tea.MouseLeft)
-	if e.m.showingHosts() {
-		t.Fatal("a click on SPACES did not show the spaces tab")
-	}
-}
-
-// Without a provider that lists sessions there is no hosts tab: the title is SPACES alone, and tab does
-// nothing, even with the hosts tab kept from before.
-func TestNoHostsTab(t *testing.T) {
-	e := newSidebarEnv(t)
-	e.m.hostsTab = true
-	e.m.setRows()
-	e.press("tab")
-	if got := e.spacesScreen()[0]; got != spacesTitle || e.m.showingHosts() {
-		t.Errorf("title %q, hosts showing %v; want %q and false", got, e.m.showingHosts(), spacesTitle)
-	}
-}
-
 // remoteFixture is fixture with two other hosts the config names: white, whose server has its copy of
 // homelab, and nas, whose server could not be reached.
 func remoteFixture() spaces.Snapshot {
@@ -208,20 +31,77 @@ func remoteFixture() spaces.Snapshot {
 	return snap
 }
 
-// Other hosts the config names make a hosts tab without a provider: each lists its own copies, with their
-// git state, and one that cannot be reached says so. Nothing done in a directory here is done to a copy;
-// enter opens it in a kitty session of its own, a tab of kitten ssh to the host, in its directory there.
-func TestHostsTabRemote(t *testing.T) {
-	e := newSidebarEnv(t)
-	calls := fakeKittenCalls(t)
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatal(err)
+// providerHostsFixture is remoteFixture with a provider listing sessions on this machine, on white, in
+// homelab's dns and in a space white has no copy of, and on dune, which has no kspaces server.
+func providerHostsFixture() spaces.Snapshot {
+	snap := remoteFixture()
+	snap.Config.Provider = []string{"prov"}
+	snap.Caps = spaces.Capabilities{spaces.CapList: true, spaces.CapOpen: true}
+	build := spaces.ProviderSession{ID: "a1", Name: "build", Space: "gr", State: "running"}
+	logs := spaces.ProviderSession{ID: "white:@b2", Name: "logs", Space: "homelab", Host: "white", State: "running", Tags: map[string]string{"worktree": "dns"}}
+	media := spaces.ProviderSession{ID: "white:@c3", Name: "jellyfin", Space: "homelab-media", Host: "white", State: "running"}
+	far := spaces.ProviderSession{ID: "dune:@d4", Name: "far", Space: "gr", Host: "dune", State: "running"}
+	snap.Sessions = []spaces.ProviderSession{build, logs, media, far}
+	snap.Detached = map[string]spaces.Detached{
+		"gr":            {Hosts: []spaces.HostSessions{{Sessions: []spaces.ProviderSession{build}}, {Host: "dune", Sessions: []spaces.ProviderSession{far}}}},
+		"homelab":       {Hosts: []spaces.HostSessions{{Host: "white", Sessions: []spaces.ProviderSession{logs}}}},
+		"homelab-media": {Hosts: []spaces.HostSessions{{Host: "white", Sessions: []spaces.ProviderSession{media}}}},
 	}
-	e.m.Update(remoteFixture())
-	e.m.Update(tea.FocusMsg{})
-	e.press("tab")
+	return snap
+}
+
+// hostRow is the index of the row of the worktree whose kitty session is session, under host.
+func (e *sidebarEnv) hostRow(host, session string) int {
+	e.t.Helper()
+	i := slices.IndexFunc(e.m.rows, func(r spaces.Row) bool {
+		return r.Host == host && r.Worktree != nil && r.Worktree.Session == session && r.Detached == nil
+	})
+	if i < 0 {
+		e.t.Fatalf("no row of %s under %q", session, host)
+	}
+	return i
+}
+
+// hostHeaderRow is the index of host's own row.
+func (e *sidebarEnv) hostHeaderRow(host string) int {
+	e.t.Helper()
+	i := slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.HostHeader && r.Host == host })
+	if i < 0 {
+		e.t.Fatalf("no row of host %q", host)
+	}
+	return i
+}
+
+// With other hosts the config names, the list is by host: this machine first, by its name, then each other
+// host by name, with its own copies and their git state, and one that cannot be reached says so. A host
+// with no kspaces server is not listed, nor its sessions anywhere; each host's detached sessions are under
+// its own copies, and its sessions in a space it has no copy of are under a row of that space.
+func TestByHost(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(providerHostsFixture())
 	got := e.spacesScreen()
+	if got[0] != spacesTitle {
+		t.Errorf("title %q, want %q", got[0], spacesTitle)
+	}
+	var hosts []string
+	for _, r := range e.m.rows {
+		if r.HostHeader {
+			hosts = append(hosts, hostName(r.Host))
+		}
+		if r.Host == "dune" {
+			t.Errorf("a row of dune, which has no kspaces server: %+v", r)
+		}
+		if r.Detached != nil {
+			for _, h := range r.Detached.All.Hosts {
+				if h.Host != r.Host {
+					t.Errorf("%q's detached sessions under %q's %s", h.Host, r.Host, r.Detached.Of.Name)
+				}
+			}
+		}
+	}
+	if want := []string{hostName(""), "nas", "white"}; !reflect.DeepEqual(hosts, want) {
+		t.Errorf("hosts %q, want %q", hosts, want)
+	}
 	nas := "▼ nas unreachable " + strings.Repeat("─", 12)
 	i := slices.Index(got, nas)
 	if i < 0 {
@@ -231,19 +111,90 @@ func TestHostsTabRemote(t *testing.T) {
 		nas,
 		"",
 		"▼ white " + strings.Repeat("─", 22),
+		"  " + termIcon + "homelab-media",
+		"  ▶ 1 detached",
+		"",
 		"▼ " + repoIcon + "homelab main",
 		"  " + branchIcon + "dns dns" + strings.Repeat(" ", 16) + "●2",
+		"  ▶ 1 detached",
 	}
 	if !reflect.DeepEqual(got[i:], want) {
 		t.Errorf("other hosts:\n%q\nwant\n%q", got[i:], want)
 	}
+}
+
+// Without other hosts the config names, the list is this machine's, with no host's row, and its detached
+// sessions alone: another host has no server to say what its sessions are of.
+func TestNoHosts(t *testing.T) {
+	e := newSidebarEnv(t)
+	snap := providerHostsFixture()
+	snap.Remotes = nil
+	e.m.Update(snap)
+	for _, r := range e.m.rows {
+		if r.HostHeader {
+			t.Errorf("a host's row: %+v", r)
+		}
+		if r.Detached != nil {
+			for _, h := range r.Detached.All.Hosts {
+				if h.Host != "" {
+					t.Errorf("%q's detached sessions under %s", h.Host, r.Detached.Of.Name)
+				}
+			}
+		}
+	}
+}
+
+// On the list by host a group is inside its host, so its header is indented with no rule, while the host's
+// row has one: a rule across the sidebar under a host read as the next host.
+func TestByHostGroups(t *testing.T) {
+	e := newSidebarEnv(t)
+	snap := groupsFixture()
+	snap.Remotes = remoteFixture().Remotes
+	e.m.Update(snap)
+	var headers []string
+	for i, r := range e.m.rows {
+		if (r.HostHeader || r.Group != nil) && r.Host == "" {
+			headers = append(headers, e.spacesScreen()[i+2])
+		}
+	}
+	local := "▼ " + hostName("") + " "
+	want := []string{local + strings.Repeat("─", 30-len([]rune(local))), "   WORK ", "   PERSONAL "}
+	if !reflect.DeepEqual(headers, want) {
+		t.Errorf("headers\n%q\nwant\n%q", headers, want)
+	}
+}
+
+// The cursor on a row of one host stays there across a poll.
+func TestByHostKeepsTheCursorsHost(t *testing.T) {
+	e := newSidebarEnv(t)
+	e.m.Update(remoteFixture())
+	e.m.Update(tea.FocusMsg{})
+	e.m.cursor = e.hostRow("white", "white:homelab@dns")
+	before := e.m.cursor
+	e.m.Update(remoteFixture())
+	if e.m.cursor != before || e.m.rows[e.m.cursor].Host != "white" {
+		t.Errorf("cursor moved from %d to %d, on host %q", before, e.m.cursor, e.m.rows[e.m.cursor].Host)
+	}
+}
+
+// Nothing done in a directory here is done to another host's copy; enter opens it in a kitty session of
+// its own, a tab of kitten ssh to the host, in its directory there, n and x open the copy's forms, which
+// its host's server does them for, and o on the host's row opens a shell there.
+func TestByHostCopies(t *testing.T) {
+	e := newSidebarEnv(t)
+	calls := fakeKittenCalls(t)
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.m.Update(remoteFixture())
+	e.m.Update(tea.FocusMsg{})
 	e.m.cursor = e.hostRow("white", "white:homelab@dns")
 	for _, key := range []string{"N", "R", "c"} {
 		if cmd := e.press(key); cmd != nil {
 			t.Errorf("%s on white's copy ran something", key)
 		}
 	}
-	// New worktree and Remove worktree open the copy's forms, which white's server does them for.
 	for key, form := range map[string][]string{
 		"n": {"new", "--host", "white", "/home/me/homelab"},
 		"x": {"remove", "--host", "white", "/home/me/homelab/.worktrees/dns"},
@@ -276,8 +227,7 @@ func TestHostsTabRemote(t *testing.T) {
 		t.Errorf("kitten ran\n%q\nwant\n%q", got, wantCalls)
 	}
 
-	// o on white's own row opens a shell there, its default copy.
-	e.m.cursor = slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.HostHeader && r.Host == "white" })
+	e.m.cursor = e.hostHeaderRow("white")
 	before := len(calls())
 	if cmd := e.press("o"); cmd == nil {
 		t.Fatal("o on white ran nothing")
@@ -291,38 +241,47 @@ func TestHostsTabRemote(t *testing.T) {
 	}
 }
 
-// Folding a space under one host leaves the same space under another as it is, and the cursor on the row
-// it folded.
-func TestHostsTabFoldsPerHost(t *testing.T) {
+// sameRootFixture is remoteFixture with white's copy of homelab at gr's root here, as two hosts can have a
+// space at one path.
+func sameRootFixture() spaces.Snapshot {
+	snap := remoteFixture()
+	rv := snap.Remotes["white"]
+	s := rv.Spaces[0]
+	s.Root = "/src/gr"
+	rv.Spaces = []spaces.Space{s}
+	snap.Remotes["white"] = rv
+	return snap
+}
+
+// Folding a space under one host leaves a space at the same root under another as it is, and the cursor on
+// the row it folded.
+func TestByHostFoldsPerHost(t *testing.T) {
 	e := newSidebarEnv(t)
-	e.m.Update(hostsFixture())
+	e.m.Update(sameRootFixture())
 	e.m.Update(tea.FocusMsg{})
-	e.press("tab")
-	server := slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.Host == "server" && r.Main && r.Space.Name == "gr" })
-	e.m.cursor = server
+	e.m.cursor = slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.Host == "white" && r.Main && r.Space != nil })
 	e.press("space")
 	folded := map[string]bool{}
 	for _, r := range e.m.rows {
-		if r.Main && r.Space != nil && r.Space.Name == "gr" {
+		if r.Main && r.Space != nil && r.Space.Root == "/src/gr" {
 			folded[hostName(r.Host)] = r.Folded
 		}
 	}
-	if want := map[string]bool{"local": false, "server": true}; !reflect.DeepEqual(folded, want) {
+	if want := map[string]bool{hostName(""): false, "white": true}; !reflect.DeepEqual(folded, want) {
 		t.Errorf("folded %v, want %v", folded, want)
 	}
-	if r := e.m.rows[e.m.cursor]; r.Host != "server" || !r.Main || r.Space.Name != "gr" {
-		t.Errorf("cursor on %+v, want server's gr", r)
+	if r := e.m.rows[e.m.cursor]; r.Host != "white" || !r.Main {
+		t.Errorf("cursor on %+v, want white's homelab", r)
 	}
 }
 
 // A host's row folded is no space's: the sidebar taking focus, which puts the cursor on the current
 // session's row, passes over it.
-func TestHostsTabFoldedHostTakesFocus(t *testing.T) {
+func TestByHostFoldedHostTakesFocus(t *testing.T) {
 	e := newSidebarEnv(t)
-	e.m.Update(hostsFixture())
+	e.m.Update(remoteFixture())
 	e.m.Update(tea.FocusMsg{})
-	e.press("tab")
-	e.m.cursor = slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.HostHeader && r.Host == "" })
+	e.m.cursor = e.hostHeaderRow("")
 	e.press("space")
 	e.m.Update(tea.BlurMsg{})
 	e.m.Update(tea.FocusMsg{})
@@ -331,59 +290,19 @@ func TestHostsTabFoldedHostTakesFocus(t *testing.T) {
 	}
 }
 
-// The spaces tab is this machine's: its own detached sessions, the other hosts' being on the hosts tab,
-// and the other hosts' copies open here beside its sessions in no space, which enter goes to.
-func TestSpacesTabThisMachine(t *testing.T) {
+// A host folded and a worktree's detached sessions shown are so in a sidebar started after, as the folded
+// spaces are.
+func TestByHostKeepsFolds(t *testing.T) {
 	e := newSidebarEnv(t)
-	calls := fakeKittenCalls(t)
-	snap := hostsFixture()
-	r := remoteFixture()
-	snap.Remotes, snap.Git = r.Remotes, r.Git
-	snap.OpenCopies = []spaces.Space{{Name: "white:homelab@dns", Worktrees: []spaces.Worktree{r.Remotes["white"].Spaces[0].Worktrees[1]}}}
-	snap.Kitty.Sessions["white:homelab@dns"] = 30
-	e.m.Update(snap)
+	e.m.Update(providerHostsFixture())
 	e.m.Update(tea.FocusMsg{})
-	for _, r := range e.m.rows {
-		if r.Detached == nil {
-			continue
-		}
-		for _, h := range r.Detached.All.Hosts {
-			if h.Host != "" {
-				t.Errorf("%s's detached sessions on the spaces tab, under %s", h.Host, r.Detached.Of.Name)
-			}
-		}
-	}
-	i := slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.Worktree != nil && r.Worktree.Session == "white:homelab@dns" })
-	if i < 0 {
-		t.Fatalf("white's open copy is not on the spaces tab:\n%q", e.spacesScreen())
-	}
-	e.m.cursor = i
-	cmd := e.press("enter")
-	if cmd == nil {
-		t.Fatal("enter on white's copy ran nothing")
-	}
-	cmd()
-	if got := calls(); !slices.ContainsFunc(got, func(c []string) bool {
-		return slices.Equal(c, []string{"@", "action", "goto_session", "white:homelab@dns.kitty-session"})
-	}) {
-		t.Errorf("enter ran %q, want a goto_session of white:homelab@dns", got)
-	}
-}
-
-// A host folded and a worktree's detached sessions shown are so in a sidebar started after, as the
-// folded spaces are.
-func TestHostsTabKeepsFolds(t *testing.T) {
-	e := newSidebarEnv(t)
-	e.m.Update(hostsFixture())
-	e.m.Update(tea.FocusMsg{})
-	e.press("tab")
-	e.m.cursor = slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.HostHeader && r.Host == "server" })
+	e.m.cursor = e.hostHeaderRow("nas")
 	e.press("space")
-	e.m.cursor = slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.Detached != nil && r.Detached.Head() && r.Host == "" })
+	e.m.cursor = slices.IndexFunc(e.m.rows, func(r spaces.Row) bool { return r.Detached != nil && r.Detached.Head() && r.Host == "white" })
 	e.press("space")
 	m := newSidebar(0)
 	got := []map[string]bool{m.hostsFolded, m.detachedOpen}
-	want := []map[string]bool{{"server": true}, e.m.detachedOpen}
+	want := []map[string]bool{{"nas": true}, e.m.detachedOpen}
 	if !reflect.DeepEqual(got, want) || len(e.m.detachedOpen) != 1 {
 		t.Errorf("a new sidebar has %v, want %v", got, want)
 	}
