@@ -238,11 +238,27 @@ func TestHostsTabRemote(t *testing.T) {
 		t.Errorf("other hosts:\n%q\nwant\n%q", got[i:], want)
 	}
 	e.m.cursor = e.hostRow("white", "white:homelab@dns")
-	for _, key := range []string{"n", "x", "R", "c"} {
+	for _, key := range []string{"N", "R", "c"} {
 		if cmd := e.press(key); cmd != nil {
 			t.Errorf("%s on white's copy ran something", key)
 		}
 	}
+	// New worktree and Remove worktree open the copy's forms, which white's server does them for.
+	for key, form := range map[string][]string{
+		"n": {"new", "--host", "white", "/home/me/homelab"},
+		"x": {"remove", "--host", "white", "/home/me/homelab/.worktrees/dns"},
+	} {
+		cmd := e.press(key)
+		if cmd == nil {
+			t.Fatalf("%s on white's copy ran nothing", key)
+		}
+		cmd()
+		got := calls()
+		if last := got[len(got)-1]; !slices.Equal(last[len(last)-len(form):], form) {
+			t.Errorf("%s launched %q, want it to end in %q", key, last, form)
+		}
+	}
+	start := len(calls())
 	cmd := e.press("enter")
 	if cmd == nil {
 		t.Fatal("enter on white's copy ran nothing")
@@ -256,7 +272,7 @@ func TestHostsTabRemote(t *testing.T) {
 			"kitten", "ssh", "--kitten", "cwd=" + dir, "white"},
 		{"@", "action", "goto_session", "white:homelab@dns.kitty-session"},
 	}
-	if got := calls(); !reflect.DeepEqual(got, wantCalls) {
+	if got := calls()[start:]; !reflect.DeepEqual(got, wantCalls) {
 		t.Errorf("kitten ran\n%q\nwant\n%q", got, wantCalls)
 	}
 

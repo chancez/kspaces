@@ -15,11 +15,20 @@ func (a *app) removeCommand() *cobra.Command {
 	var yes, force, deleteBranch, forceBranch bool
 	var forcePaths, deletePaths, forceBranchPaths, forgetSessions []string
 	var window int
+	var host string
 	cmd := &cobra.Command{
 		Use:   "remove [PATH...]",
 		Short: "Close the session of the linked worktree at PATH and remove the worktree, after confirming in a form",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			switch {
+			case host != "" && len(args) != 1:
+				return fmt.Errorf("--host removes one worktree, at the PATH it has there")
+			case host != "":
+				cfg, err := config.Load()
+				if err != nil {
+					return err
+				}
+				return tui.RunRemoveCopyWorktree(cmd.Context(), cfg, host, args[0])
 			case window != 0 && len(args) > 0:
 				return fmt.Errorf("--from removes the window's worktree; give no PATH")
 			case window != 0:
@@ -56,7 +65,11 @@ func (a *app) removeCommand() *cobra.Command {
 	cmd.Flags().StringArrayVar(&deletePaths, "delete-branch-path", nil, "with --yes, delete the branch of the worktree at this path, as --delete-branch does; repeatable")
 	cmd.Flags().BoolVar(&forceBranch, "force-branch", false, "with --yes and --delete-branch, delete the branches even with commits not merged, losing them")
 	cmd.Flags().StringArrayVar(&forceBranchPaths, "force-branch-path", nil, "with --yes, delete the branch of the worktree at this path even with commits not merged, as --force-branch does; repeatable")
+	cmd.Flags().StringVar(&host, "host", "", "remove this host's worktree at PATH, one of [hosts], in a form")
 	a.fromFlag(cmd, &window, "the worktree of its session")
+	for _, f := range []string{"yes", "from", "delete-branch"} {
+		cmd.MarkFlagsMutuallyExclusive("host", f)
+	}
 	cmd.MarkFlagsMutuallyExclusive("from", "yes")
 	cmd.MarkFlagsMutuallyExclusive("from", "delete-branch")
 	return cmd

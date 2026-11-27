@@ -14,7 +14,8 @@ import (
 )
 
 // Another host's data is seen as its copies: its spaces, their worktrees' sessions named after the host,
-// in the groups its config puts them in, and git's states of them kept by host and path.
+// in the groups its config puts them in and with its config, and git's states of them kept by host and
+// path.
 func TestRemoteViews(t *testing.T) {
 	cfg := config.Config{Space: map[string]config.SpaceSettings{"homelab": {Group: "home"}}}
 	state := gitstate.State{Status: &gitstate.Status{Changes: 3}, PR: &gh.PR{Number: 9}}
@@ -28,14 +29,14 @@ func TestRemoteViews(t *testing.T) {
 		}, Git: map[string]gitstate.State{"/home/me/homelab": state}}, Err: "lost it a moment ago"},
 		"nas": {Err: "unreachable"},
 	}
-	views, git := remoteViews(hosts)
+	views, git := RemoteViewsOf(hosts)
 	wantViews := map[string]RemoteView{
 		"white": {Loaded: true, Err: "lost it a moment ago", Spaces: []Space{
-			{Name: "homelab", Root: "/home/me/homelab", Group: "home", Worktrees: []Worktree{
+			{Name: "homelab", Root: "/home/me/homelab", Group: "home", Config: &cfg, Worktrees: []Worktree{
 				{Path: "/home/me/homelab", Branch: "main", Session: "white:homelab", Host: "white"},
 				{Path: "/home/me/homelab/.worktrees/dns", Branch: "dns", Session: "white:homelab@dns", Host: "white"},
 			}},
-			{Name: "broken", Root: "/home/me/broken", Err: errors.New("not a git repository")},
+			{Name: "broken", Root: "/home/me/broken", Config: &cfg, Err: errors.New("not a git repository")},
 		}},
 		"nas": {Err: "unreachable"},
 	}

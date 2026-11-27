@@ -1,6 +1,7 @@
 package spaces
 
 import (
+	"cmp"
 	"errors"
 	"io"
 	"maps"
@@ -172,8 +173,8 @@ type RemoteView struct {
 	Err    string
 }
 
-// remoteViews are the other hosts' views, and git's states of their worktrees, by GitKey.
-func remoteViews(hosts map[string]RemoteHost) (map[string]RemoteView, map[string]gitstate.State) {
+// RemoteViewsOf are the other hosts' views, and git's states of their worktrees, by GitKey.
+func RemoteViewsOf(hosts map[string]RemoteHost) (map[string]RemoteView, map[string]gitstate.State) {
 	if len(hosts) == 0 {
 		return nil, nil
 	}
@@ -197,7 +198,8 @@ func remoteViews(hosts map[string]RemoteHost) (map[string]RemoteView, map[string
 
 // remoteSpace is s, a space host has, as a copy of it there: its worktrees' sessions named after the host.
 func remoteSpace(host string, hd *HostData, s sharedSpace) Space {
-	out := Space{Name: s.Name, Root: s.Root, Config: s.Config, Untrusted: s.Untrusted}
+	// Its config is the host's, its own file merged in when it has one in use, see Space.Config.
+	out := Space{Name: s.Name, Root: s.Root, Config: cmp.Or(s.Config, hd.Config), Untrusted: s.Untrusted}
 	if hd.Config != nil {
 		out.Group = hd.Config.Space[s.Name].Group
 	}

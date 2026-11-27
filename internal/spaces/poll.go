@@ -143,7 +143,7 @@ func (sh Shared) View(self int) Snapshot {
 	if sh.KittyErr != "" {
 		snap.Err = errors.New(sh.KittyErr)
 	}
-	snap.Remotes, snap.Git = remoteViews(sh.Remotes)
+	snap.Remotes, snap.Git = RemoteViewsOf(sh.Remotes)
 	snap.Git = withRemoteGit(sh.Git, snap.Git)
 	snap.Pending = placePending(snap.Spaces, sh.Pending)
 	snap.Diverged = sh.Diverged

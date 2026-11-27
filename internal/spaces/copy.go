@@ -62,21 +62,32 @@ func remoteTab(cfg config.Config, caps Capabilities, wt Worktree) ([]string, err
 // ErrNoHost is a copy of a host the config does not name.
 var ErrNoHost = errors.New("no such host in [hosts]")
 
-// FindCopy is host's copy whose session there is session, as host's server says, its main worktree's for
-// a space's name. An empty session is host's default: a shell in its home directory.
-func FindCopy(cfg config.Config, host, session string) (Worktree, error) {
+// HostOf is the server of host, which the config names, and what hangs up on it.
+func HostOf(cfg config.Config, host string) (Host, func(), error) {
 	settings, ok := cfg.Hosts[host]
 	dial := remoteDialer()
 	if !ok || dial == nil {
-		return Worktree{}, fmt.Errorf("%s: %w", host, ErrNoHost)
+		return nil, nil, fmt.Errorf("%s: %w", host, ErrNoHost)
 	}
+	h := dial(host, settings)
+	return h, func() {
+		if c, ok := h.(io.Closer); ok {
+			c.Close()
+		}
+	}, nil
+}
+
+// FindCopy is host's copy whose session there is session, as host's server says, its main worktree's for
+// a space's name. An empty session is host's default: a shell in its home directory.
+func FindCopy(cfg config.Config, host, session string) (Worktree, error) {
+	h, hangUp, err := HostOf(cfg, host)
+	if err != nil {
+		return Worktree{}, err
+	}
+	defer hangUp()
 	session = cmp.Or(session, "default")
 	if session == "default" {
 		return Worktree{Session: CopyName(host, session), Host: host}, nil
-	}
-	h := dial(host, settings)
-	if c, ok := h.(io.Closer); ok {
-		defer c.Close()
 	}
 	hd, err := h.Load(false)
 	if err != nil {
@@ -111,4 +122,16 @@ func isCopy(cfg *config.Config, name string) bool {
 	host, _ := SplitCopy(name)
 	_, ok := cfg.Hosts[host]
 	return host != "" && ok
+}
+
+// AskNewCopyWorktree opens the form that creates a worktree in host's copy of the space at root, there,
+// in a popup as NewWorktree's.
+func AskNewCopyWorktree(cfg config.Config, st kitty.State, host, root string) error {
+	return launchForm(cfg, st, formPanel, "new", "--host", host, root)
+}
+
+// AskRemoveCopyWorktree opens the form that removes host's worktree at path, in a popup as
+// AskRemoveWorktree's.
+func AskRemoveCopyWorktree(cfg config.Config, st kitty.State, host, path string) error {
+	return launchForm(cfg, st, formPanel, "remove", "--host", host, path)
 }

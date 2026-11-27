@@ -12,7 +12,7 @@ import (
 )
 
 func (a *app) newCommand() *cobra.Command {
-	var pr, issue, base string
+	var pr, issue, base, host string
 	var fromPR, fromIssue bool
 	var window int
 	var yes bool
@@ -37,6 +37,16 @@ func (a *app) newCommand() *cobra.Command {
 			query := ""
 			if len(args) > 0 {
 				query = args[0]
+			}
+			if host != "" {
+				cfg, err := config.Load()
+				if err != nil {
+					return err
+				}
+				if len(args) == 0 {
+					return fmt.Errorf("--host needs the root of the space on that host")
+				}
+				return tui.RunNewCopyWorktree(cmd.Context(), cfg, host, query)
 			}
 			if yes {
 				return a.newNow(query, now, pr, issue, base, inputs)
@@ -84,6 +94,7 @@ func (a *app) newCommand() *cobra.Command {
 			return tui.RunNewWorktree(cmd.Context(), cfg, space, from, arg, base)
 		},
 	}
+	cmd.Flags().StringVar(&host, "host", "", "create it in this host's copy of the space at the root given, one of [hosts], in a form")
 	cmd.Flags().BoolVar(&fromPR, "from-pr", false, "open on the Pull request tab, to choose one of the open PRs")
 	cmd.Flags().StringVar(&pr, "pr", "", "open on the Pull request tab on this PR, its number or URL; with --yes, check it out")
 	cmd.Flags().BoolVar(&fromIssue, "from-issue", false, "open on the Issue tab, to choose one of the open issues")
@@ -100,6 +111,9 @@ func (a *app) newCommand() *cobra.Command {
 	cmd.MarkFlagsMutuallyExclusive("yes", "from-pr")
 	cmd.MarkFlagsMutuallyExclusive("yes", "from-issue")
 	a.fromFlag(cmd, &window, "the space of its session by default")
+	for _, f := range []string{"yes", "from", "from-pr", "pr", "from-issue", "issue"} {
+		cmd.MarkFlagsMutuallyExclusive("host", f)
+	}
 	cmd.MarkFlagsMutuallyExclusive("from", "yes")
 	cmd.MarkFlagsMutuallyExclusive("from", "pr")
 	cmd.MarkFlagsMutuallyExclusive("from", "issue")

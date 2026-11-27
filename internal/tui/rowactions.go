@@ -92,8 +92,13 @@ func newWorktreeFrom(from spaces.From, title, key, desc string) *rowAction {
 		key:     key,
 		desc:    desc,
 		section: sectionSpace,
+		// A branch on another host's copy, which that host creates, see spaces.CreateOnHost.
+		remote:  from == spaces.FromBranch,
 		applies: newWorktreeApplies,
 		ask: func(snap spaces.Snapshot, r spaces.Row) error {
+			if r.Remote() {
+				return spaces.AskNewCopyWorktree(*snap.Config, snap.Kitty, r.Worktree.Host, r.Space.Root)
+			}
 			base := rowBranch(r)
 			if from == spaces.FromPR {
 				base = ""
@@ -113,9 +118,14 @@ var (
 		key:     "x",
 		desc:    "remove worktree",
 		section: sectionWorktree,
+		// Another host's copy's too, which that host removes, see spaces.RemoveOnHost.
+		remote: true,
 		// Only a linked worktree: the main one is the repository itself.
 		applies: func(_ spaces.Snapshot, r spaces.Row) bool { return !r.Main && !r.Absent() && r.Worktree != nil },
 		ask: func(snap spaces.Snapshot, r spaces.Row) error {
+			if r.Remote() {
+				return spaces.AskRemoveCopyWorktree(*snap.Config, snap.Kitty, r.Worktree.Host, r.Worktree.Path)
+			}
 			return spaces.AskRemoveWorktree(*snap.Config, snap.Kitty, r.Worktree.Path)
 		},
 	}
