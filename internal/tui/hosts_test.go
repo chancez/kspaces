@@ -334,3 +334,25 @@ func TestByHostOpensAdHoc(t *testing.T) {
 		t.Errorf("the tab runs %q, want kitten ssh to white in /srv/scratch", tail)
 	}
 }
+
+// a under another host opens the form that makes an ad hoc space there; under this machine, the one that
+// adds a repository or makes one here.
+func TestByHostAddSpace(t *testing.T) {
+	e := newSidebarEnv(t)
+	calls := fakeKittenCalls(t)
+	e.m.Update(remoteFixture())
+	e.m.Update(tea.FocusMsg{})
+	for host, tail := range map[string][]string{"white": {"add", "--host", "white"}, "": {"add"}} {
+		e.m.cursor = e.hostHeaderRow(host)
+		cmd := e.press("a")
+		if cmd == nil {
+			t.Fatalf("a under %q ran nothing", host)
+		}
+		cmd()
+		got := calls()
+		last := got[len(got)-1]
+		if !slices.Equal(last[len(last)-len(tail):], tail) || host == "" && slices.Contains(last, "--host") {
+			t.Errorf("a under %q launched %q, want it to end in %q", host, last, tail)
+		}
+	}
+}

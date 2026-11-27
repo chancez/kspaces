@@ -305,10 +305,10 @@ func (m *sidebar) openPicker() tea.Cmd {
 
 // addSpace opens the form that adds a space, in a popup as newWorktree's, with the repository of the
 // window beside the sidebar filled in, and group chosen, empty for none.
-func (m *sidebar) addSpace(group string) tea.Cmd {
+func (m *sidebar) addSpace(group, host string) tea.Cmd {
 	cfg, st := m.cfg, m.kitty
 	return func() tea.Msg {
-		if err := spaces.AskAddSpace(cfg, st, group); err != nil {
+		if err := spaces.AskAddSpace(cfg, st, group, host); err != nil {
 			return failedMsg{err}
 		}
 		return nil

@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/chancez/kspaces/internal/config"
+	"github.com/chancez/kspaces/internal/kitty"
 )
 
 // An ad hoc space is one made as it is needed, with a name and a directory to start in, and no repository
@@ -36,7 +37,7 @@ var adHocName = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 func CheckAdHocName(cfg config.Config, name string) error {
 	switch {
 	case !adHocName.MatchString(name) || name == "." || name == "..":
-		return fmt.Errorf("%q is not a space name: letters, digits, '.', '_' and '-', up to 64", name)
+		return fmt.Errorf("%q: a space's name is letters, digits, '.', '_' and '-'", name)
 	case name == defaultSpace:
 		return fmt.Errorf("%s is every host's own", name)
 	}
@@ -173,4 +174,17 @@ func withAdHocDirs(others []Space, adHoc []AdHocSpace) {
 			}
 		}
 	}
+}
+
+// ExpandHome is path with a leading ~/ as the home directory.
+func ExpandHome(path string) string { return expandHome(path) }
+
+// OpenAdHoc switches to wt's kitty session from where kspaces runs, opening it if need be, as
+// OpenWorktree does: an ad hoc space's, this machine's or another host's.
+func OpenAdHoc(cfg config.Config, wt Worktree) error {
+	st, err := kitty.LoadState(kitty.SelfWindowID())
+	if err != nil {
+		return err
+	}
+	return OpenWorktree(cfg, st, wt, OpenOptions{})
 }

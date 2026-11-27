@@ -13,7 +13,7 @@ import (
 
 func (a *app) addCommand() *cobra.Command {
 	var yes bool
-	var group string
+	var group, host string
 	var window int
 	cmd := &cobra.Command{
 		Use:   "add [PATH]",
@@ -29,11 +29,11 @@ func (a *app) addCommand() *cobra.Command {
 			}
 			if window != 0 {
 				return a.popupFor(window, func(cfg config.Config, st kitty.State) error {
-					return spaces.AskAddSpace(cfg, st, group)
+					return spaces.AskAddSpace(cfg, st, group, host)
 				})
 			}
 			if !yes {
-				return tui.RunAddSpace(cmd.Context(), path, group)
+				return tui.RunAddSpace(cmd.Context(), path, group, host)
 			}
 			if path == "" {
 				return errors.New("--yes needs a PATH")
@@ -43,6 +43,7 @@ func (a *app) addCommand() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "add without asking")
 	cmd.Flags().StringVar(&group, "group", "", "put the space in this group, in the config file that lists its spaces")
+	cmd.Flags().StringVar(&host, "host", "", "make an ad hoc space on this host, one of [hosts], in the form; see new-space")
 	a.fromFlag(cmd, &window, "the repository of its directory")
 	cmd.MarkFlagsMutuallyExclusive("from", "yes")
 	return cmd

@@ -72,8 +72,8 @@ func TestPopups(t *testing.T) {
 		{func(cfg config.Config) error { return AskTrust(cfg, st, "/src/gr") }, "100", "32", form, []string{"trust", "/src/gr"}},
 		{func(cfg config.Config) error { return AskCleanup(cfg, st, "/src/gr") }, "100", "32", form, []string{"cleanup", "/src/gr"}},
 		{func(cfg config.Config) error { return AskRemoveSessions(cfg, st, []string{"gr@dev", "gr@gone"}) }, "100", "32", form, []string{"cleanup", "--session", "gr@dev", "--session", "gr@gone"}},
-		{func(cfg config.Config) error { return AskAddSpace(cfg, st, "") }, "90", "24", form, []string{"add"}},
-		{func(cfg config.Config) error { return AskAddSpace(cfg, st, "work") }, "90", "24", form, []string{"add", "--group", "work"}},
+		{func(cfg config.Config) error { return AskAddSpace(cfg, st, "", "") }, "90", "24", form, []string{"add"}},
+		{func(cfg config.Config) error { return AskAddSpace(cfg, st, "work", "") }, "90", "24", form, []string{"add", "--group", "work"}},
 		{func(cfg config.Config) error { return LaunchPicker(cfg, 11) }, "120", "32", picker, []string{"pick"}},
 	} {
 		launched := fakeLaunch(t)

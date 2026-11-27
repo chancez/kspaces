@@ -125,6 +125,7 @@ kspaces.ENV.toml beside it for each of $KSPACES_ENV, by default the host's name,
 		a.addCommand(),
 		a.kittyCommand(),
 		a.serverCommand(),
+		a.newSpaceCommand(),
 	)
 	return root
 }

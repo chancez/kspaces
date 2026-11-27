@@ -24,7 +24,7 @@ type entrySubject struct {
 }
 
 // groupSubject is a group's header in the spaces list, by the group's name.
-type groupSubject struct{ name string }
+type groupSubject struct{ name, host string }
 
 // detachedSubject is a row of a space's provider sessions that no window shows, by its index in the rows: their head,
 // a host's or a session's.
@@ -50,7 +50,7 @@ type paneSubject struct{}
 
 // spacesSubject is the spaces list as a whole, for what adds to it rather than acting on one row: from a
 // group's header or one of its spaces' rows, in that group.
-type spacesSubject struct{ group string }
+type spacesSubject struct{ group, host string }
 
 // menuSubject is the sidebar's open context menu.
 type menuSubject struct{}
@@ -420,7 +420,7 @@ var actAddSpace = &interact.Action[*sidebar, spacesSubject]{
 	Section: sectionSpace,
 	Run: func(m *sidebar, s spacesSubject) tea.Cmd {
 		m.remote = false
-		return m.addSpace(s.group)
+		return m.addSpace(s.group, s.host)
 	},
 }
 
@@ -1360,9 +1360,9 @@ func init() {
 	bindRow(entryKind, actRemoveSpaceRow, rowRemoveSpace)
 	interact.Via(entryKind, func(s entrySubject) (spacesSubject, bool) {
 		if s.row.Space == nil || s.row.Other {
-			return spacesSubject{}, true
+			return spacesSubject{host: s.row.Host}, true
 		}
-		return spacesSubject{group: s.row.Space.Group}, true
+		return spacesSubject{group: s.row.Space.Group, host: s.row.Host}, true
 	}, spacesKind)
 	spacesList = interact.List(entryKind)
 	spacesList.Bind(actOpenWorktree, "enter/l", "open", "enter", "l")
@@ -1370,14 +1370,14 @@ func init() {
 	groupKind = interact.NewKind(func(s groupSubject) string { return s.name }, actFoldGroup, actUnfoldGroup, actSelectGroup)
 	groupKind.Bind(actFoldGroup, "space", "fold or unfold the group", "space")
 	groupKind.Bind(actUnfoldGroup, "", "", "space")
-	interact.Via(groupKind, func(s groupSubject) (spacesSubject, bool) { return spacesSubject{group: s.name}, true }, spacesKind)
+	interact.Via(groupKind, func(s groupSubject) (spacesSubject, bool) { return spacesSubject{group: s.name, host: s.host}, true }, spacesKind)
 	groupHeaders = interact.List(groupKind)
 
 	hostKind := interact.NewKind(func(s hostSubject) string { return hostName(s.host) }, actOpenHostShell, actFoldHost, actUnfoldHost)
 	hostKind.Bind(actFoldHost, "space", "fold or unfold the host", "space")
 	hostKind.Bind(actUnfoldHost, "", "", "space")
 	hostKind.Bind(actOpenHostShell, "o", "open a shell on the host", "o")
-	interact.Via(hostKind, func(hostSubject) (spacesSubject, bool) { return spacesSubject{}, true }, spacesKind)
+	interact.Via(hostKind, func(s hostSubject) (spacesSubject, bool) { return spacesSubject{host: s.host}, true }, spacesKind)
 	hostHeaders = interact.List(hostKind)
 	hostHeaders.Bind(actFoldHost, "enter/l", "fold or unfold", "enter", "l")
 	hostHeaders.Bind(actUnfoldHost, "", "", "enter", "l")
@@ -1718,7 +1718,7 @@ func (m *sidebar) entryTarget(i int) (interact.Target[*sidebar], bool) {
 	case i >= 0 && i < len(m.rows) && m.rows[i].HostHeader:
 		return hostHeaders.Target(hostSubject{host: m.rows[i].Host}), true
 	case i >= 0 && i < len(m.rows) && m.rows[i].Group != nil:
-		return groupHeaders.Target(groupSubject{name: m.rows[i].Group.Name}), true
+		return groupHeaders.Target(groupSubject{name: m.rows[i].Group.Name, host: m.rows[i].Host}), true
 	case i >= 0 && i < len(m.rows) && m.rows[i].Detached != nil:
 		return detachedRows.Target(detachedSubject{index: i, row: *m.rows[i].Detached}), true
 	case i >= 0 && i < len(m.rows) && m.rows[i].Space != nil:
