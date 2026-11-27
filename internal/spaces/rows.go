@@ -328,8 +328,6 @@ type Snapshot struct {
 	Remotes map[string]RemoteView
 	// The worktrees being created or removed, by path, see placePending.
 	Pending map[string]PendingOp
-	// The worktrees' layouts diverged from their hosts', by session and host, see Divergence.
-	Diverged []Divergence
 	// The provider's sessions no kitty window shows, by space, which is a configured space's name or a
 	// session's in no space; nil without a provider that lists them. Only the sidebar asks.
 	Detached map[string]Detached

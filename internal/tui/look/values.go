@@ -215,9 +215,6 @@ func Gone() Span { return sp(elMuted, "gone") }
 // Unreachable marks another host whose server could not load, on its row of the hosts tab.
 func Unreachable() Span { return sp(elMuted, "unreachable") }
 
-// Diverged marks a worktree whose layout on a host diverged from its panes here, see spaces.Divergence.
-func Diverged() []Span { return []Span{sp(elMuted, "~ diverged")} }
-
 // stateGroups name the groups of status entries in a state, in the order the list sorts them.
 var stateGroups = map[string]string{"blocked": "Blocked", "error": "Failed", "done": "Done", "working": "Working", "idle": "Idle"}
 

@@ -20,97 +20,45 @@ import (
 	"github.com/chancez/kspaces/internal/logs"
 )
 
-// Sharing a worktree's layout, see shared.go, is a pass at each poll: it captures the shared panes of every
-// worktree with windows, takes the layouts other machines saved since, and saves this machine's changes.
-// One pass runs at a time in a kitty, under a lock, whichever of its sidebars gets it, and what it knows
-// is in a file all of them read, so a second sidebar neither opens a tab the first opened nor saves over
-// what the first took.
+// Sharing a copy's layout, see shared.go, is a pass at each poll: it captures the panes of every copy with
+// windows here, takes what other machines saved on the copy's host since, and saves this machine's changes
+// there. The host is the layout's only writer, see docs/server.md, so there is nothing to reconcile: what
+// was saved since the pass last took or saved is merged into the panes here, keeping what changed here
+// meanwhile, and the result saved, at the revision taken, after it. A pass runs at a time in a kitty,
+// under a lock, and what it knows is in a file beside the lock.
 
-// loadEvery is how often a pass asks the provider for layouts changed since, when it knows each it shows,
-// and passEvery how often a pass runs at all, whichever of a kitty's sidebars polls, so several do not each
-// list kitty's tabs at every poll.
+// loadEvery is how often a pass asks a host for its layouts saved since, when it knows each it shows, and
+// passEvery how often a pass runs at all.
 const (
 	loadEvery = 4 * time.Second
 	passEvery = 1500 * time.Millisecond
-	// settleAfterTake is how long a worktree is not saved after taking another machine's layout opened or
-	// closed its panes: a window just opened is not shown as its session's until the provider lists it, and
-	// saving before would close it on the other machine.
+	// settleAfterTake is how long a copy is not saved after taking another machine's layout opened or
+	// closed its panes, or after the pass first sees it: a window just opened is not shown as its session's
+	// until the provider lists it, and saving before would close it on the other machine.
 	settleAfterTake = 10 * time.Second
-	// connectedFor is how long a base stays valid without its host answering a load: a host that does not
-	// answer, or a kitty that did not run, as on a laptop asleep, may come back to changes made on either
-	// side, which merging against the base would mix unasked.
-	connectedFor = 30 * time.Second
-	// openingFor is how long after a pass first sees a worktree its layout on a host first seen is taken as
-	// the worktree's opening, see take: its first panes are listed a few passes apart.
-	openingFor = 10 * time.Second
 )
 
 // syncState is what passes know, kept between them in the kitty's layouts file.
 type syncState struct {
 	LastPass time.Time `json:"last_pass"`
-	LastLoad time.Time `json:"last_load"`
-	// By the worktree's kitty session.
-	Layouts map[string]*syncWorktree `json:"layouts"`
+	// LastLoad is when each host was last asked for its layouts.
+	LastLoad map[string]time.Time `json:"last_load"`
+	// By the copy's kitty session.
+	Layouts map[string]*syncEntry `json:"layouts"`
 }
 
-// syncWorktree is what passes know of a worktree with windows: when a pass first saw it, and its layouts,
-// by the host of the sessions each shows, empty for this machine.
-type syncWorktree struct {
-	Seen  time.Time             `json:"seen"`
-	Hosts map[string]*syncEntry `json:"hosts"`
-}
-
-// syncEntry is what a pass knows of a worktree's layout on a host: where it is, the layout last saved or
-// taken, Base, at Revision, -1 until the provider has said, and Pending, the panes seen at the last pass,
-// by Members, which a save waits to see twice so a change is saved once it settles.
+// syncEntry is what a pass knows of a copy with windows: its host, empty for this machine, and its kitty
+// session there, Key; the layout last saved or taken, Base, at Revision, -1 until the host has said; and
+// Pending, the panes seen at the last pass, by Members, which a save waits to see twice so a change is
+// saved once it settles. Its sessions are as the host names them.
 type syncEntry struct {
-	Ref      LayoutRef     `json:"ref"`
+	Host     string        `json:"host,omitempty"`
+	Key      string        `json:"key"`
 	Revision int64         `json:"revision"`
 	Base     *SharedLayout `json:"base,omitempty"`
 	Pending  string        `json:"pending,omitempty"`
 	// Hold is when a take that changed the panes settles, see settleAfterTake.
 	Hold time.Time `json:"hold,omitzero"`
-	// Answered is when the host last answered a load. Base is dropped once it has not for connectedFor, and
-	// Agreed, the last layout both sides had, kept, which tells a change made on one side while apart from
-	// changes made on both.
-	Answered time.Time     `json:"answered,omitzero"`
-	Agreed   *SharedLayout `json:"agreed,omitempty"`
-	// Opening is a layout first seen as its worktree opened, see openingFor.
-	Opening bool `json:"opening,omitempty"`
-	// Diverged is the host's layout and this machine's panes having both changed since they agreed, which
-	// is not shared until the user picks one, see Resolve.
-	Diverged *sharedDivergence `json:"diverged,omitempty"`
-}
-
-// sharedDivergence is a worktree's layout on a host and its panes here, having diverged: since when, each
-// side as the last pass saw it, and how the user asked to resolve it, for the next pass to.
-type sharedDivergence struct {
-	Since   time.Time    `json:"since"`
-	Local   SharedLayout `json:"local"`
-	Remote  SharedLayout `json:"remote"`
-	Resolve Resolution   `json:"resolve,omitempty"`
-}
-
-// Resolution is how the user resolves a diverged layout, as a whole.
-type Resolution string
-
-const (
-	// UseLocal saves this machine's panes over the host's layout, which the other machines then take.
-	UseLocal Resolution = "local"
-	// UseRemote takes the host's layout here, opening and closing panes to match.
-	UseRemote Resolution = "remote"
-	// KeepBoth opens what the host's layout has that this machine does not, and saves the two together.
-	KeepBoth Resolution = "both"
-)
-
-// agree makes l what e and its host agree on.
-func (e *syncEntry) agree(l *SharedLayout) {
-	e.Base, e.Agreed, e.Diverged, e.Opening = l, l, nil, false
-}
-
-// drop drops e's base, its host having stopped answering, so the next load says where it is now.
-func (e *syncEntry) drop() {
-	e.Base, e.Revision, e.Pending = nil, -1, ""
 }
 
 // Members is which sessions l's tabs show, a tab's in no order and the tabs in none: what a pass saves on a
@@ -141,38 +89,38 @@ type sharedKitty interface {
 	Close(id int) error
 }
 
-// layoutSync shares the layouts of a kitty's worktrees through the provider.
+// layoutSync shares the layouts of a kitty's copies through their hosts' servers.
 type layoutSync struct {
 	path   string
 	kitty  string
 	writer string
 	now    func() time.Time
 	tabs   func() ([]kitty.FullTab, error)
-	load   func(provider []string, known []StoredLayout) (LoadedLayouts, error)
-	save   func(provider []string, ref LayoutRef, revision int64, l SharedLayout) (int64, error)
-	open   func(provider []string, s ProviderSession) ([]string, string, error)
-	k      sharedKitty
+	// host is the server of the host a copy is of, "" for this machine, nil when there is none to ask.
+	host func(name string) Host
+	open func(provider []string, s ProviderSession) ([]string, string, error)
+	k    sharedKitty
 }
 
-// newLayoutSync is the layout sharing of the kitty kspaces runs in, its file beside the git states'.
-func newLayoutSync() *layoutSync {
-	host, _ := os.Hostname()
-	host, _, _ = strings.Cut(host, ".")
+// newLayoutSync is the layout sharing of the kitty kspaces runs in, its file beside the kitty's others,
+// asking host for each copy's host's server.
+func newLayoutSync(host func(name string) Host) *layoutSync {
+	name, _ := os.Hostname()
+	name, _, _ = strings.Cut(name, ".")
 	return &layoutSync{
 		path:   kittyPath() + ".layouts.json",
 		kitty:  kittyID(),
-		writer: host,
+		writer: name,
 		now:    time.Now,
 		tabs:   kitty.ListTabs,
-		load:   loadLayouts,
-		save:   saveLayout,
+		host:   host,
 		open:   openCommand,
 		k:      liveShared{},
 	}
 }
 
-// kittyID names the kitty kspaces runs in, as gitPath does, so a layout this kitty saved is told from one
-// another kitty did, on this machine or another.
+// kittyID names the kitty kspaces runs in, as kittyPath does, so a layout this kitty saved is told from
+// one another kitty did, on this machine or another.
 func kittyID() string {
 	host, _ := os.Hostname()
 	key := cmp.Or(os.Getenv("KITTY_LISTEN_ON"), "pid:"+os.Getenv("KITTY_PID"))
@@ -202,11 +150,6 @@ var errBusy = errors.New("another sidebar is sharing layouts")
 // locked runs f under the layouts file's lock, with what the file holds, and writes back what f leaves.
 // errBusy when another holds it.
 func (ls *layoutSync) locked(f func(st *syncState)) error {
-	return ls.lock(syscall.LOCK_EX|syscall.LOCK_NB, f)
-}
-
-// lock is locked with how, which may wait for the lock.
-func (ls *layoutSync) lock(how int, f func(st *syncState)) error {
 	if err := os.MkdirAll(filepath.Dir(ls.path), 0o700); err != nil {
 		return err
 	}
@@ -215,17 +158,23 @@ func (ls *layoutSync) lock(how int, f func(st *syncState)) error {
 		return err
 	}
 	defer lock.Close()
-	if err := syscall.Flock(int(lock.Fd()), how); err != nil {
+	if err := syscall.Flock(int(lock.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		if errors.Is(err, syscall.EWOULDBLOCK) {
 			return errBusy
 		}
 		return err
 	}
-	st := syncState{Layouts: map[string]*syncWorktree{}}
+	st := syncState{}
 	if b, err := os.ReadFile(ls.path); err == nil {
-		if err := json.Unmarshal(b, &st); err != nil || st.Layouts == nil {
-			st = syncState{Layouts: map[string]*syncWorktree{}}
+		if err := json.Unmarshal(b, &st); err != nil {
+			st = syncState{}
 		}
+	}
+	if st.Layouts == nil {
+		st.Layouts = map[string]*syncEntry{}
+	}
+	if st.LastLoad == nil {
+		st.LastLoad = map[string]time.Time{}
 	}
 	f(&st)
 	b, err := json.Marshal(st)
@@ -239,32 +188,39 @@ func (ls *layoutSync) lock(how int, f func(st *syncState)) error {
 	return os.Rename(tmp, ls.path)
 }
 
-// sharedWorktree is a worktree with windows whose layouts a pass shares: its kitty session, its space and
-// key, see LayoutRef, and its panes now, by the host of the sessions they show.
-type sharedWorktree struct {
-	session string
-	space   string
-	key     string
-	hosts   map[string]sharedPanes
-}
-
-// sharedPanes are a worktree's panes that show one host's sessions: their layout, and where each is.
-type sharedPanes struct {
+// sharedCopy is a copy with windows whose layout a pass shares: its host and key, see syncEntry, and its
+// panes now, their sessions as the host names them.
+type sharedCopy struct {
+	host   string
+	key    string
 	layout SharedLayout
-	at     sharedLocal
+	// at is where each session's pane is here, by the session as the host names it.
+	at sharedLocal
 }
 
-// ref is where w's layout on host is.
-func (w sharedWorktree) ref(host string) LayoutRef {
-	return LayoutRef{Space: w.space, Host: host, Key: w.key}
+// onHost is id, a session as this machine's provider names it, as host names it: without the host before
+// it, which the provider puts before another host's.
+func onHost(host, id string) string {
+	if host == "" {
+		return id
+	}
+	return strings.TrimPrefix(id, host+":")
 }
 
-// sharedWorktrees are the worktrees of tabs with windows, by their kitty session, with the panes that show
-// a provider session of their space, in sessions, each in the layout of its session's host: a tab showing
-// sessions of two hosts is in both layouts, with that host's panes alone. A pane showing a session of
-// another space is not shared, which leaves out kitty's startup session whatever its file is named, its
-// windows showing sessions in default, and default itself is this machine's alone.
-func sharedWorktrees(tabs []kitty.FullTab, sessions []ProviderSession) map[string]sharedWorktree {
+// fromHost is id, a session as host names it, as this machine's provider does.
+func fromHost(host, id string) string {
+	if host == "" {
+		return id
+	}
+	return host + ":" + id
+}
+
+// sharedCopies are the copies with windows in tabs, by their kitty session, with the panes that show a
+// session of the copy's host and space, of sessions, the provider's: a pane showing another's is not
+// shared, see docs/stories.md. This machine's default is left out, which kitty's startup session's windows
+// show; another host's default is a copy as any other. A copy of a host cfg does not name has nowhere to
+// save, and is left out.
+func sharedCopies(cfg config.Config, tabs []kitty.FullTab, sessions []ProviderSession) map[string]sharedCopy {
 	shows := map[int]ProviderSession{}
 	for _, s := range sessions {
 		for _, id := range s.Windows {
@@ -279,39 +235,43 @@ func sharedWorktrees(tabs []kitty.FullTab, sessions []ProviderSession) map[strin
 			}
 		}
 	}
-	out := map[string]sharedWorktree{}
+	out := map[string]sharedCopy{}
 	for name := range names {
-		space, dir, _ := strings.Cut(name, "@")
-		if space == "" || space == defaultSpace {
+		host, key := SplitCopy(name)
+		if _, ok := cfg.Hosts[host]; host != "" && !ok {
+			continue
+		}
+		space, _, _ := strings.Cut(key, "@")
+		if space == "" || host == "" && space == defaultSpace {
 			continue
 		}
 		mine := map[int]ProviderSession{}
-		hosts := map[string]bool{}
 		for _, tab := range tabs {
 			for _, w := range tab.Windows {
-				if s, ok := shows[w.ID]; ok && w.SessionName == name && !w.Own() && s.SpaceName() == space {
+				if s, ok := shows[w.ID]; ok && w.SessionName == name && !w.Own() && s.Host == host && s.SpaceName() == space {
 					mine[w.ID] = s
-					hosts[s.Host] = true
 				}
 			}
 		}
-		w := sharedWorktree{session: name, space: space, key: dir, hosts: map[string]sharedPanes{}}
-		for host := range hosts {
-			l, at := captureShared(tabs, name, host, mine)
-			w.hosts[host] = sharedPanes{layout: l, at: at}
+		l, at := captureShared(tabs, name, host, mine)
+		c := sharedCopy{host: host, key: key, layout: l, at: sharedLocal{Window: map[string]int{}, Tab: map[string]int{}}}
+		for i, id := range l.Sessions {
+			c.layout.Sessions[i] = onHost(host, id)
 		}
-		out[name] = w
+		for id, w := range at.Window {
+			c.at.Window[onHost(host, id)] = w
+			c.at.Tab[onHost(host, id)] = at.Tab[id]
+		}
+		out[name] = c
 	}
 	return out
 }
 
-// pass shares the layouts of the worktrees with windows, each host's apart. It forgets a worktree with none,
-// so one opened again is seen afresh rather than against panes it no longer has, and a worktree's layout on
-// a host once none of its panes shows one of the host's sessions. A worktree it has not seen yet is being
-// opened, so it also loads the layouts of the hosts with sessions in it, in sessions, which no pane here
-// shows yet. It takes the layouts other machines saved since it last asked, or every one it has not asked
-// about, and saves those whose panes changed and settled. cwd is where a session opened without a directory
-// of its own starts, by the worktree's kitty session, and anchor the window a new tab of a session goes by.
+// pass shares the layouts of the copies with windows. It forgets a copy with none, so one opened again is
+// seen afresh rather than against panes it no longer has. It takes the layouts other machines saved since
+// it last asked, or every one it has not asked about, and saves those whose panes changed and settled.
+// cwd is where a session opened without a directory of its own starts, by the copy's kitty session, and
+// anchor the window a new tab of a session goes by.
 func (ls *layoutSync) pass(cfg config.Config, sessions []ProviderSession, cwd func(session string) string, anchor map[string]int) error {
 	var err error
 	lockErr := ls.locked(func(st *syncState) {
@@ -324,280 +284,100 @@ func (ls *layoutSync) pass(cfg config.Config, sessions []ProviderSession, cwd fu
 		if tabs, err = ls.tabs(); err != nil {
 			return
 		}
-		shown := sharedWorktrees(tabs, sessions)
-		for name, sw := range st.Layouts {
-			w, ok := shown[name]
-			if !ok {
-				delete(st.Layouts, name)
-				continue
-			}
-			for host, e := range sw.Hosts {
-				// One loaded at the worktree's opening is kept until the panes it opened are listed.
-				if _, ok := w.hosts[host]; !ok && e.Revision >= 0 && !ls.now().Before(e.Hold) {
-					delete(sw.Hosts, host)
-				}
+		shown := sharedCopies(cfg, tabs, sessions)
+		maps.DeleteFunc(st.Layouts, func(name string, _ *syncEntry) bool { _, ok := shown[name]; return !ok })
+		for name, c := range shown {
+			if st.Layouts[name] == nil {
+				// Seen afresh, as at its opening: its panes are listed a few passes apart.
+				st.Layouts[name] = &syncEntry{Host: c.host, Key: c.key, Revision: -1, Hold: ls.now().Add(settleAfterTake)}
 			}
 		}
-		for name, w := range shown {
-			sw := st.Layouts[name]
-			opening := sw == nil || ls.now().Sub(sw.Seen) < openingFor
-			if sw == nil {
-				sw = &syncWorktree{Seen: ls.now(), Hosts: map[string]*syncEntry{}}
-				st.Layouts[name] = sw
-				for _, s := range sessions {
-					if s.SpaceName() == w.space && s.Tags["worktree"] == w.key && !s.Stale {
-						sw.Hosts[s.Host] = &syncEntry{Ref: w.ref(s.Host), Revision: -1, Opening: true}
-					}
-				}
-			}
-			for host := range w.hosts {
-				if sw.Hosts[host] == nil {
-					sw.Hosts[host] = &syncEntry{Ref: w.ref(host), Revision: -1, Opening: opening}
-				}
-			}
-		}
-		down := map[string]bool{}
-		for _, s := range sessions {
-			if s.Stale {
-				down[s.Host] = true
-			}
-		}
-		for _, name := range slices.Sorted(maps.Keys(st.Layouts)) {
-			for host, e := range st.Layouts[name].Hosts {
-				if down[host] || e.Base != nil && ls.now().Sub(e.Answered) > connectedFor {
-					e.drop()
-				}
-				if d := e.Diverged; d != nil {
-					d.Local = shown[name].hosts[host].layout
-					if d.Local.Members() == d.Remote.Members() {
-						e.agree(new(d.Remote))
-					}
-				}
-			}
-		}
-		resolved := map[LayoutRef]bool{}
-		for _, name := range slices.Sorted(maps.Keys(st.Layouts)) {
-			for host, e := range st.Layouts[name].Hosts {
-				if e.Diverged == nil || e.Diverged.Resolve == "" || down[host] {
-					continue
-				}
-				w := shown[name]
-				change := ls.resolve(e)
-				if !change.Empty() {
-					if err := ls.apply(cfg, w.session, w.hosts[host], change, sessions, cwd(name), anchor[name]); err != nil {
-						logs.Error(fmt.Sprintf("resolving the layout of %s", name), err)
-					}
-					resolved[e.Ref] = true
-				}
-			}
-		}
-		taken := ls.take(cfg, st, shown, down, sessions, cwd, anchor)
-		maps.Copy(taken, resolved)
+		taken := ls.take(cfg, st, shown, sessions, cwd, anchor)
 		for _, name := range slices.Sorted(maps.Keys(shown)) {
-			w := shown[name]
-			for _, host := range slices.Sorted(maps.Keys(w.hosts)) {
-				if !taken[w.ref(host)] && !down[host] {
-					ls.saveIfChanged(cfg, st.Layouts[name].Hosts[host], w.session, w.hosts[host])
-				}
+			if !taken[name] {
+				ls.saveIfChanged(st.Layouts[name], name, shown[name])
 			}
 		}
 	})
 	return cmp.Or(lockErr, err)
 }
 
-// take asks for the layouts changed since, when one is unknown or loadEvery has passed, of the hosts not
-// down, and takes each. With a base, one this kitty saved is the base as it is, and another's is merged
-// into the panes of its host. Without one, see decide. It is which layouts it changed, whose panes the pass
-// captured before it did, so they are not saved until the next.
-func (ls *layoutSync) take(cfg config.Config, st *syncState, shown map[string]sharedWorktree, down map[string]bool, sessions []ProviderSession, cwd func(string) string, anchor map[string]int) map[LayoutRef]bool {
-	type at struct {
-		name string
-		host string
+// take asks each host for its layouts saved since, when one is unknown or loadEvery has passed, and takes
+// each. One this kitty saved is the base as it is; another's is merged into the panes here against the
+// base, see mergeShared, or opened alongside them without one. A host that does not answer is asked again
+// at the next pass, its copies left as they are. It is which copies it changed, by kitty session, whose
+// panes the pass captured before it did, so they are not saved until the next.
+func (ls *layoutSync) take(cfg config.Config, st *syncState, shown map[string]sharedCopy, sessions []ProviderSession, cwd func(string) string, anchor map[string]int) map[string]bool {
+	byHost := map[string]map[string]string{}
+	for name, e := range st.Layouts {
+		if ls.now().Before(e.Hold) {
+			continue
+		}
+		if byHost[e.Host] == nil {
+			byHost[e.Host] = map[string]string{}
+		}
+		byHost[e.Host][e.Key] = name
 	}
-	var known []StoredLayout
-	byRef := map[LayoutRef]at{}
-	unknown := false
-	for _, name := range slices.Sorted(maps.Keys(st.Layouts)) {
-		for _, host := range slices.Sorted(maps.Keys(st.Layouts[name].Hosts)) {
-			if down[host] {
-				continue
-			}
-			e := st.Layouts[name].Hosts[host]
-			known = append(known, StoredLayout{LayoutRef: e.Ref, Revision: e.Revision})
-			byRef[e.Ref] = at{name, host}
+	taken := map[string]bool{}
+	for _, host := range slices.Sorted(maps.Keys(byHost)) {
+		names := byHost[host]
+		var known []CopyLayout
+		unknown := false
+		for _, key := range slices.Sorted(maps.Keys(names)) {
+			e := st.Layouts[names[key]]
+			known = append(known, CopyLayout{Key: key, Revision: e.Revision})
 			unknown = unknown || e.Revision < 0
 		}
-	}
-	taken := map[LayoutRef]bool{}
-	if len(known) == 0 || !unknown && ls.now().Sub(st.LastLoad) < loadEvery {
-		return taken
-	}
-	got, err := ls.load(cfg.Provider, known)
-	if err != nil {
-		logs.Error("loading the shared layouts", err)
-		return taken
-	}
-	st.LastLoad = ls.now()
-	for _, where := range byRef {
-		e := st.Layouts[where.name].Hosts[where.host]
-		if slices.Contains(got.Unreachable, where.host) {
-			e.drop()
-		} else {
-			e.Answered = ls.now()
-		}
-	}
-	for _, s := range got.Layouts {
-		where, ok := byRef[s.LayoutRef]
-		if !ok || slices.Contains(got.Unreachable, where.host) {
+		h := ls.host(host)
+		if h == nil || !unknown && ls.now().Sub(st.LastLoad[host]) < loadEvery {
 			continue
 		}
-		e := st.Layouts[where.name].Hosts[where.host]
-		w := shown[where.name]
-		var change sharedChange
-		switch {
-		case s.Revision == 0 || s.Layout == nil:
-			// Nothing saved: this machine's panes are saved as the first.
-			e.Revision, e.Base, e.Agreed, e.Diverged, e.Opening = 0, nil, nil, nil, false
+		got, err := h.LoadLayouts(known)
+		if err != nil {
+			logs.Debug("loading the layouts", "host", host, "err", err)
 			continue
-		case e.Base != nil && s.Layout.Kitty == ls.kitty:
-			e.agree(s.Layout)
-		case e.Base != nil:
-			change = mergeShared(e.Base, w.hosts[where.host].layout, *s.Layout)
-			e.agree(s.Layout)
-		default:
-			change = ls.decide(e, w.hosts[where.host].layout, s.Layout)
 		}
-		e.Revision, e.Pending = s.Revision, ""
-		if !change.Empty() {
-			if err := ls.apply(cfg, w.session, w.hosts[where.host], change, sessions, cwd(where.name), anchor[where.name]); err != nil {
-				logs.Error(fmt.Sprintf("taking the layout of %s saved on %s", where.name, s.Layout.Writer), err)
+		st.LastLoad[host] = ls.now()
+		for _, g := range got {
+			name, ok := names[g.Key]
+			if !ok {
+				continue
 			}
-			taken[s.LayoutRef] = true
-			e.Hold = ls.now().Add(settleAfterTake)
+			e, c := st.Layouts[name], shown[name]
+			var change sharedChange
+			switch {
+			case g.Revision == 0 || g.Layout == nil:
+				// Nothing saved: this machine's panes are saved as the first.
+				e.Base = nil
+			case g.Layout.Kitty == ls.kitty:
+				e.Base = g.Layout
+			default:
+				change = mergeShared(e.Base, c.layout, *g.Layout)
+				e.Base = g.Layout
+			}
+			e.Revision, e.Pending = g.Revision, ""
+			if !change.Empty() {
+				if err := ls.apply(cfg, name, c, change, sessions, cwd(name), anchor[name]); err != nil {
+					logs.Error(fmt.Sprintf("taking the layout of %s saved on %s", name, g.Layout.Writer), err)
+				}
+				taken[name] = true
+				e.Hold = ls.now().Add(settleAfterTake)
+			}
 		}
 	}
 	return taken
 }
 
-// decide is what taking remote, e's host's layout, does to local, its panes here, without a base: at the
-// worktree's opening, or after its host or this kitty was away. The same is agreed. At the opening what
-// remote has opens and nothing closes, as nothing says this machine closed what it does not show. Else
-// what they last agreed on says which side changed: only the host's is taken whole, as this machine's
-// panes are what they agreed; only this machine's is saved over the host's; both, or no agreement to go by,
-// is a divergence, which the user resolves.
-func (ls *layoutSync) decide(e *syncEntry, local SharedLayout, remote *SharedLayout) sharedChange {
-	lm, rm := local.Members(), remote.Members()
-	switch {
-	case lm == rm:
-		e.agree(remote)
-	case e.Opening:
-		e.agree(remote)
-		return mergeShared(nil, local, *remote)
-	case e.Agreed != nil && lm == e.Agreed.Members():
-		e.agree(remote)
-		return mergeShared(&local, local, *remote)
-	case e.Agreed != nil && rm == e.Agreed.Members():
-		e.agree(remote)
-	default:
-		since := ls.now()
-		if e.Diverged != nil {
-			since = e.Diverged.Since
-		}
-		e.Diverged = &sharedDivergence{Since: since, Local: local, Remote: *remote}
-	}
-	return sharedChange{}
-}
-
-// resolve resolves e's divergence as the user asked, agreeing on the host's layout as the base, and is what
-// it does to e's panes: UseLocal changes none, which differ from the base and so are saved at once;
-// UseRemote takes the host's layout whole; KeepBoth opens what it has that the panes do not, which are
-// saved once they settle.
-func (ls *layoutSync) resolve(e *syncEntry) sharedChange {
-	d := e.Diverged
-	e.agree(&d.Remote)
-	switch d.Resolve {
-	case UseLocal:
-		e.Pending = d.Local.Members()
-	case UseRemote:
-		e.Hold = ls.now().Add(settleAfterTake)
-		return mergeShared(&d.Local, d.Local, d.Remote)
-	case KeepBoth:
-		e.Hold = ls.now().Add(settleAfterTake)
-		return mergeShared(nil, d.Local, d.Remote)
-	}
-	return sharedChange{}
-}
-
-// Resolve asks the next pass to resolve the divergence of session's layout on host, as the provider names
-// it, as r. Nothing when it has not diverged.
-func (ls *layoutSync) Resolve(session, host string, r Resolution) error {
-	return ls.lock(syscall.LOCK_EX, func(st *syncState) {
-		if sw := st.Layouts[session]; sw != nil {
-			if e := sw.Hosts[host]; e != nil && e.Diverged != nil {
-				e.Diverged.Resolve = r
-			}
-		}
-	})
-}
-
-// Divergence is a worktree's layout on a host diverged from this machine's panes, as the sidebar shows it:
-// the worktree's kitty session, the host, as the provider names it, empty for this machine, and since when.
-type Divergence struct {
-	Session string    `json:"session"`
-	Host    string    `json:"host"`
-	Since   time.Time `json:"since"`
-	// LocalTabs and RemoteTabs are how many tabs each side has, and Saved when the host's was saved, by the
-	// clock of the machine that saved it, zero when it does not say.
-	LocalTabs  int       `json:"local_tabs"`
-	RemoteTabs int       `json:"remote_tabs"`
-	Saved      time.Time `json:"saved,omitzero"`
-	// Resolving is the user's pick, which the next pass applies.
-	Resolving Resolution `json:"resolving,omitempty"`
-}
-
-// divergences are the layouts the last pass found diverged, by session and host. The file is read without
-// the lock: a pass replaces it whole.
-func (ls *layoutSync) divergences() []Divergence {
-	b, err := os.ReadFile(ls.path)
-	if err != nil {
-		return nil
-	}
-	var st syncState
-	if err := json.Unmarshal(b, &st); err != nil {
-		return nil
-	}
-	var out []Divergence
-	for _, name := range slices.Sorted(maps.Keys(st.Layouts)) {
-		hosts := st.Layouts[name].Hosts
-		for _, host := range slices.Sorted(maps.Keys(hosts)) {
-			if d := hosts[host].Diverged; d != nil {
-				out = append(out, Divergence{Session: name, Host: host, Since: d.Since, LocalTabs: len(d.Local.Tabs),
-					RemoteTabs: len(d.Remote.Tabs), Saved: d.Remote.Saved, Resolving: d.Resolve})
-			}
-		}
-	}
-	return out
-}
-
-// Divergences are the diverged layouts of the kitty kspaces runs in.
-func Divergences() []Divergence { return newLayoutSync().divergences() }
-
-// ResolveLayout has the next pass of the kitty kspaces runs in resolve the divergence of session's layout
-// on host as r.
-func ResolveLayout(session, host string, r Resolution) error {
-	return newLayoutSync().Resolve(session, host, r)
-}
-
-// saveIfChanged saves w, panes of session's, as e's layout once they differ from its base and are as the
-// last pass saw them. A conflict leaves the revision unknown, so the next pass takes what was saved and
-// saves again after it.
-func (ls *layoutSync) saveIfChanged(cfg config.Config, e *syncEntry, session string, w sharedPanes) {
-	if e.Revision < 0 || e.Diverged != nil || ls.now().Before(e.Hold) {
+// saveIfChanged saves c, the panes of the copy whose kitty session is name, as e's layout on its host
+// once they differ from its base and are as the last pass saw them. A conflict leaves the revision
+// unknown, so the next pass takes what was saved and saves again after it.
+func (ls *layoutSync) saveIfChanged(e *syncEntry, name string, c sharedCopy) {
+	if e.Revision < 0 || ls.now().Before(e.Hold) {
 		e.Pending = ""
 		return
 	}
-	members := w.layout.Members()
-	if e.Base != nil && e.Base.Members() == members || e.Base == nil && len(w.layout.Tabs) == 0 {
+	members := c.layout.Members()
+	if e.Base != nil && e.Base.Members() == members || e.Base == nil && len(c.layout.Tabs) == 0 {
 		e.Pending = ""
 		return
 	}
@@ -605,28 +385,32 @@ func (ls *layoutSync) saveIfChanged(cfg config.Config, e *syncEntry, session str
 		e.Pending = members
 		return
 	}
-	l := w.layout
+	h := ls.host(e.Host)
+	if h == nil {
+		return
+	}
+	l := c.layout
 	l.Writer, l.Kitty, l.Saved = ls.writer, ls.kitty, ls.now()
-	rev, err := ls.save(cfg.Provider, e.Ref, e.Revision, l)
+	rev, err := h.SaveLayout(e.Key, e.Revision, l)
 	switch {
-	case errors.Is(err, errLayoutConflict):
+	case errors.Is(err, ErrLayoutConflict):
 		e.Revision = -1
 	case err != nil:
-		logs.Error(fmt.Sprintf("saving the layout of %s on %s", session, cmp.Or(e.Ref.Host, "this machine")), err)
+		logs.Error(fmt.Sprintf("saving the layout of %s on %s", name, cmp.Or(e.Host, "this machine")), err)
 	default:
-		e.Revision, e.Pending = rev, ""
-		e.agree(&l)
+		e.Revision, e.Pending, e.Base = rev, "", &l
 	}
 }
 
-// apply opens and closes w's panes, of kitty session session's, as change says: each session to open in a
-// split of the pane showing the one it splits, which it may have opened just before, else in a new tab of
-// session, by anchor, with --keep-focus so the tab that has focus keeps it; each to close by its window.
-// One that fails is logged and the rest still go.
-func (ls *layoutSync) apply(cfg config.Config, session string, w sharedPanes, change sharedChange, sessions []ProviderSession, cwd string, anchor int) error {
+// apply opens and closes c's panes, of kitty session session's, as change says, its sessions as c's host
+// names them: each session to open in a split of the pane showing the one it splits, which it may have
+// opened just before, else in a new tab of session, by anchor, with --keep-focus so the tab that has focus
+// keeps it; each to close by its window. A pane of another host's copy starts here in the home directory,
+// as the copy's directory is the host's. One that fails is logged and the rest still go.
+func (ls *layoutSync) apply(cfg config.Config, session string, c sharedCopy, change sharedChange, sessions []ProviderSession, cwd string, anchor int) error {
 	var errs []error
 	windows := map[string]int{}
-	maps.Copy(windows, w.at.Window)
+	maps.Copy(windows, c.at.Window)
 	for _, id := range change.Close {
 		if win, ok := windows[id]; ok {
 			if err := ls.k.Close(win); err != nil {
@@ -635,9 +419,11 @@ func (ls *layoutSync) apply(cfg config.Config, session string, w sharedPanes, ch
 			delete(windows, id)
 		}
 	}
+	home, _ := os.UserHomeDir()
 	for _, add := range change.Open {
-		s := ProviderSession{ID: add.Session, Name: add.Session}
-		if i := slices.IndexFunc(sessions, func(p ProviderSession) bool { return p.ID == add.Session }); i >= 0 {
+		id := fromHost(c.host, add.Session)
+		s := ProviderSession{ID: id, Name: id}
+		if i := slices.IndexFunc(sessions, func(p ProviderSession) bool { return p.ID == id }); i >= 0 {
 			s = sessions[i]
 		}
 		argv, dir, err := ls.open(cfg.Provider, s)
@@ -645,9 +431,9 @@ func (ls *layoutSync) apply(cfg config.Config, session string, w sharedPanes, ch
 			errs = append(errs, err)
 			continue
 		}
-		dir = cmp.Or(dir, s.Cwd, cwd)
-		if dir == "" {
-			dir, _ = os.UserHomeDir()
+		dir = cmp.Or(dir, s.Cwd, cwd, home)
+		if c.host != "" {
+			dir = home
 		}
 		at := slices.Concat([]string{kitty.Quote("--cwd=" + dir)}, inSession(session), []string{"--keep-focus"})
 		var args []string
@@ -672,14 +458,14 @@ func (ls *layoutSync) apply(cfg config.Config, session string, w sharedPanes, ch
 		for _, a := range argv {
 			args = append(args, kitty.Quote(a))
 		}
-		id, err := ls.k.Launch(session, args)
+		win, err := ls.k.Launch(session, args)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("opening %s: %w", s.Name, err))
 			continue
 		}
-		windows[add.Session] = id
+		windows[add.Session] = win
 		if add.SplitOf == "" && add.Layout != "" {
-			if err := ls.k.GotoLayout(id, add.Layout); err != nil {
+			if err := ls.k.GotoLayout(win, add.Layout); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -687,10 +473,10 @@ func (ls *layoutSync) apply(cfg config.Config, session string, w sharedPanes, ch
 	return errors.Join(errs...)
 }
 
-// shareLayouts runs a pass with sh's provider and windows, when the provider shares layouts. A pass another
-// sidebar is running is left to it.
+// shareLayouts runs a pass with sh's provider and windows, when the provider lists its sessions and opens
+// them, which is what a layout names. A pass another sidebar is running is left to it.
 func shareLayouts(ls *layoutSync, sh Shared, self int) {
-	if sh.Config == nil || sh.Provider == nil || !sh.Provider.Caps[CapLayouts] {
+	if sh.Config == nil || sh.Provider == nil || !sh.Provider.Caps[CapList] || !sh.Provider.Caps[CapOpen] {
 		return
 	}
 	snap := sh.View(self)

@@ -153,16 +153,16 @@ func (m *sidebar) openMenu(y int, ts ...interact.Target[*sidebar]) {
 // menuAtCursor opens the menu of the entry under the cursor, when it is on screen: a spaces row, or a
 // status entry under its first line as the last frame drew it.
 func (m *sidebar) menuAtCursor() {
-	ts := m.menuTargets(m.cursor)
+	t, ok := m.entryTarget(m.cursor)
 	switch {
-	case len(ts) == 0:
+	case !ok:
 	case m.cursor < len(m.rows):
 		if m.cursor >= m.offset {
-			m.openMenu(headerRows+m.cursor-m.offset, ts...)
+			m.openMenu(headerRows+m.cursor-m.offset, t)
 		}
 	default:
 		if zones := m.zones[fmt.Sprintf(entryZone, m.cursor)]; len(zones) > 0 {
-			m.openMenu(zones[0].Y, ts...)
+			m.openMenu(zones[0].Y, t)
 		}
 	}
 }

@@ -42,8 +42,6 @@ type Shared struct {
 	Git map[string]gitstate.State `json:"git,omitempty"`
 	// What the session provider says, which only the sidebar asks; nil without one, see Poller.sessions.
 	Provider *ProviderState `json:"provider,omitempty"`
-	// The worktrees' layouts diverged from their hosts', see layoutSync.
-	Diverged []Divergence `json:"diverged,omitempty"`
 	// What is known of the other hosts the config names, by name.
 	Remotes map[string]RemoteHost `json:"remotes,omitempty"`
 }
@@ -146,7 +144,6 @@ func (sh Shared) View(self int) Snapshot {
 	snap.Remotes, snap.Git = RemoteViewsOf(sh.Remotes)
 	snap.Git = withRemoteGit(sh.Git, snap.Git)
 	snap.Pending = placePending(snap.Spaces, sh.Pending)
-	snap.Diverged = sh.Diverged
 	snap.Detached = detachedBySpace(sh.Provider, toSet(sh.Kept))
 	if sh.Provider != nil {
 		snap.Caps, snap.ProviderSpaces, snap.Sessions = sh.Provider.Caps, sh.Provider.Spaces, sh.Provider.Sessions
@@ -191,11 +188,8 @@ type Poller struct {
 	// follow moves the windows of sessions whose space changed, see followSpaces, given the poll; nil for
 	// never.
 	follow func(sh Shared)
-	// share shares the worktrees' layouts through the provider, see layoutSync, given the poll; nil for
-	// never.
+	// share shares the copies' layouts through their hosts, see layoutSync, given the poll; nil for never.
 	share func(sh Shared)
-	// diverged are the layouts the last pass found diverged, see Divergences; nil for never.
-	diverged func() []Divergence
 	// remotes loads the other hosts, nil for none.
 	remotes *remotes
 }
@@ -216,9 +210,13 @@ func NewPoller() *Poller {
 	}
 	watch, self := &spaceWatch{}, kitty.SelfWindowID()
 	p.follow = func(sh Shared) { followSpaces(watch, sh, self) }
-	ls := newLayoutSync()
+	ls := newLayoutSync(func(name string) Host {
+		if name == "" {
+			return h
+		}
+		return p.remoteHost(name)
+	})
 	p.share = func(sh Shared) { shareLayouts(ls, sh, self) }
-	p.diverged = ls.divergences
 	if dial := remoteDialer(); dial != nil {
 		p.remotes = newRemotes(dial)
 	}
@@ -231,6 +229,15 @@ func (p *Poller) OnRemote(f func()) {
 	if p.remotes != nil {
 		p.remotes.changed = f
 	}
+}
+
+// remoteHost is the server of another host the config names, nil while it is not answering, see
+// remotes.host.
+func (p *Poller) remoteHost(name string) Host {
+	if p.remotes == nil {
+		return nil
+	}
+	return p.remotes.host(name)
 }
 
 // Close stops loading the other hosts.
@@ -298,12 +305,6 @@ func (p *Poller) poll(pushed *HostData) Shared {
 		}
 		if p.share != nil {
 			p.share(sh)
-		}
-		if p.diverged != nil {
-			sh.Diverged = p.diverged()
-			p.lastMu.Lock()
-			p.last.Diverged = sh.Diverged
-			p.lastMu.Unlock()
 		}
 	}
 	p.followDock(sh)

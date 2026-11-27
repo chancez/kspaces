@@ -163,16 +163,13 @@ PROVIDER shelve        {"session": ID}
 PROVIDER remove        {"session": ID}
 PROVIDER move          {"session": ID, "space": N}
 PROVIDER remove-space  {"space": N}
-PROVIDER save-layout   {"space": N, "host": H, "key": K, "revision": R, "layout": L}  prints {"revision": R} or {"conflict": true}
-PROVIDER load-layouts  {"layouts": [{"space": N, "host": H, "key": K, "revision": R}...]}  prints {"layouts": [{"space": N, "host": H, "key": K, "revision": R, "layout": L}...]}
 ```
 
 Every verb exits non-zero on failure, its stderr the error, which kspaces shows. A verb with no output
 prints nothing or `{}`.
 
 **Capabilities.** `capabilities` names what the provider does: `keep` (for `keep` and `forget`), `list`,
-`open`, `kill`, `shelve`, `remove`, `move`, `remove-space`, `layouts` (for `save-layout` and
-`load-layouts`, see [Shared layouts](#shared-layouts)) and `hosts`, which says a launch wrapper runs a window
+`open`, `kill`, `shelve`, `remove`, `move`, `remove-space` and `hosts`, which says a launch wrapper runs a window
 with the `kspaces_host` user variable on that host, see [Other hosts](#other-hosts). kspaces offers only what is named: a provider without
 `shelve` never shows Shelve. It is asked once per sidebar, and again at `r`. A provider that fails
 `capabilities` is taken to have `keep` alone, which is what a program written as a keeper does.
@@ -238,100 +235,56 @@ Without a provider, or one without `list`, there are no detached sessions and no
 
 ### Shared layouts
 
-With a provider that names `layouts`, a worktree's tabs are one state shared by every machine showing it,
-as a multiplexer's windows are by every client attached to them. Close a tab or a split on one machine and
-the other closes it; open one and the other opens it, showing the same session. It takes a few seconds,
-not at once: kspaces looks for a change at each refresh.
+With a provider that lists and opens sessions, a copy's tabs, see [the stories](stories.md), are one state
+shared by every machine showing it, as a multiplexer's windows are by every client attached to them. Close
+a tab or a split on one machine and the other closes it; open one and the other opens it, showing the same
+session. It takes a few seconds, not at once: kspaces looks for a change at each refresh.
 
-**What is shared** is one layout per worktree and host: the panes that show the provider's sessions on host
-`H` make the worktree's layout on `H`, which the provider stores on `H`. A tab showing sessions of two hosts
-is in both layouts, with each host's panes alone, and a pane opened from `H`'s layout splits from a pane
-showing one of `H`'s sessions. A pane showing none, such as a window running something outside the
-provider, stays this machine's own. A layout `L` is kspaces' own JSON, which the provider stores and gives
-back unread but for `sessions`:
+**What is shared** is the copy's layout: the panes of its kitty session that show the provider's sessions
+in its space on its host, `white`'s for `white:gr@dev`, this machine's for `gr@dev`. A pane showing another
+host's session, or none, such as a window running something outside the provider, stays this machine's
+own. The copy's host keeps the layout, on its [server](server.md), and is its only writer: a machine
+showing the copy saves its changes there, and takes those another saved. A layout is kspaces' own JSON:
 
 ```json
 {"version": 1, "writer": "laptop", "saved": "2026-11-25T21:52:55Z", "sessions": ["@a7k2m9x4", "@q3p8z1c0"],
  "tabs": [{"title": "", "layout": "splits", "panes": [{"session": 0}, {"session": 1, "split": "right", "of": 1, "size": 35}]}]}
 ```
 
-`sessions` holds the provider's ids of the sessions the panes show, each pane naming its session by index,
-and the provider rewrites them, so the stored layout names sessions as their host does and each machine is
-given them as it reaches that host: an id kspaces has as `server:@a7k2m9x4` is stored as `@a7k2m9x4`. A
-pane's `split`, `of` and `size` are a [layout](#layouts) pane's. `writer` is the machine that saved it, and `saved` when, by its clock. Nothing
-in it is a path, a kitty window id, or a command to run: a session is opened with `open`, and a command a
-pane ran is still running in its session.
+`sessions` holds the provider's ids of the sessions the panes show, as the host names them: an id kspaces
+has as `white:@a7k2m9x4` is kept as `@a7k2m9x4`, and each machine names it as it reaches the host. A pane's
+`split`, `of` and `size` are a [layout](#layouts) pane's. `writer` is the machine that saved it, and `saved`
+when, by its clock. Nothing in it is a path, a kitty window id, or a command to run: a session is opened
+with `open`, and a command a pane ran is still running in its session.
 
-**Keys and revisions.** `space` is the worktree's space and `key` its directory, empty for the space's main
-worktree, which the provider names as it likes; `cm space meta` keys of `kspaces/layout/KEY` are the cm
-provider's. Every save gives a key a new revision, and `revision` 0 is a key with nothing saved. `save-layout`
-writes only when the stored revision is `revision`, and else prints `{"conflict": true}`. `load-layouts`
-prints those of the asked-for layouts whose stored revision is not the one asked with, so asking with the
-revision last seen prints nothing while nothing changed, and in `unreachable` the hosts that did not
-answer: `{"layouts": [...], "unreachable": ["desktop"]}`.
+**Saving.** The sidebar saves a copy's layout once its panes have been the same for two refreshes in a row
+and differ from the layout it last saved or took, at the revision it last saw. Every save gives the layout
+a new revision; one at a revision no longer the latest, another machine having saved since, is refused,
+and the sidebar takes what was saved, then saves again.
 
-**Saving.** The sidebar that leads, one per kitty, saves a worktree's layout once the panes it shares have
-been the same for two refreshes in a row and differ from the layout it last saved or took, at the revision
-it last saw.
+**Taking another machine's.** At every other refresh the sidebar asks each host for the layouts of its
+copies saved since. One saved by another machine is taken as a three-way merge of the panes by session,
+against the layout last saved or taken: a session the other machine added opens, as a split of the pane it
+split from when this machine shows that one, else as a new tab of the copy's kitty session; a session it
+removed closes, its window marked `kspaces_keep` first so a watcher ending a window's session on close
+leaves it. A session this machine added or removed since stays as this machine has it, and is saved after
+the other's: not for ten seconds after taking a layout opened or closed panes, nor after first seeing the
+copy, as a window just opened is not its session's until the provider lists it, and saving before would
+close it on the other machine. Taking a layout never moves or resizes a window already there, and the tab
+that has focus keeps it.
 
-**Taking another machine's.** At every other refresh the leading sidebar loads the layouts of the worktrees
-it shows. One saved by another machine is taken as a three-way merge of the panes by session, against the
-layout last saved or taken: a session the other machine added opens, as a split of the pane it split from
-when this machine shows that one, else as a new tab of the worktree's kitty session; a session it removed
-closes, its window marked `kspaces_keep` first so a watcher ending a window's session on close leaves it,
-as what became of the session is the other machine's doing. A session this machine added or removed since
-stays as this machine has it, and is saved over the other's at a later refresh: not for ten seconds after
-taking a layout opened or closed panes, as a window just opened is not its session's until the provider
-lists it, and saving before would close it on the other machine. Taking a layout never
-moves or resizes a window already there, and the tab that has focus keeps it.
-
-**Opening a worktree** loads its layout on every host with sessions in it, by `list`'s `space`, `host` and
-`worktree` tag, though no pane here shows one yet, and takes each as one seen for the first time: what it
-holds opens, and nothing closes. Opening `gr@dev` on a laptop whose first pane is one of its own sessions
-so brings up the tabs a desktop left on its host. A host whose sessions appear once the worktree is open
-here is not loaded: they are listed under the worktree's detached row, and only opening the worktree again
-brings them up.
-
-**Apart.** The layout last saved or taken is the base of a merge only while its host answers. When the host
-stops answering, by `list` marking its sessions `stale` or `load-layouts` naming it `unreachable`, or once it
-has not answered a load for 30 seconds, as when this kitty did not run on a laptop asleep, the base is
-dropped, and the host's layout is neither saved nor loaded until it answers again. A merge against a base
-that old would mix changes made on both sides with no one asking.
-
-Coming back, the host's layout and this machine's panes of its sessions are compared afresh, by which
-sessions each tab shows. The same is agreed. Else kspaces keeps the layout the two last agreed on, which
-tells one side's change from both: when this machine's panes are still what they agreed, the host's layout
-is taken whole, opening and closing panes to match; when the host's is, this machine's panes are saved over
-it; when both changed, the worktree has **diverged** from the host. A host's layout first seen once the
-worktree has been open for ten seconds, as when a pane here attaches one of the host's sessions, has no
-agreement to go by, so any difference is a divergence too: rather than open every tab the host has, or save
-one pane over them. Only a worktree's opening takes a host's layout with nothing agreed, as adds alone.
-
-kspaces does not try to tell which change came first: a disconnected machine's clock and the host's are not
-one, and a pane closing as its session's host went away looks like a pane closed by hand. What the two
-agreed on is all it goes by, and with nothing that says, the user decides.
-
-A diverged layout is neither saved nor taken: each machine keeps showing its own version until the user
-resolves it, as a whole, from the worktree's row in [the sidebar](sidebar.md#shared-layouts). Use this machine's saves this machine's
-panes over the host's layout, which the other machines then take. Use the host's takes the host's layout
-here, opening and closing panes to match. Keep both opens what the host's layout has that this machine
-does not, and saves the two together, which the other machines then take. A pane closed in resolving
-only has its window closed, marked `kspaces_keep` first: its session keeps running. Should the two come to
-match again, by a change on either side, it is agreed again without asking.
-
-A save that conflicts loads the layout that won and takes it, then saves again. A provider that fails a
-verb is logged and asked again at the next refresh.
+**Apart.** A host that does not answer is not asked to save or load; its copies' panes stay as they are.
+Coming back, what was saved meanwhile is merged as any other machine's save, against the layout this machine
+last saved or took, and what this machine changed meanwhile is saved after it. As the host alone keeps the
+layout, there is nothing to pick between: no two versions to reconcile, only the latest and the changes
+since.
 
 What changes a layout is which sessions each tab shows. A split moved or resized is saved with the next
 change but is none itself, as taking a layout only opens and closes panes, and two screens size their
-splits apart. Only a worktree with windows here shares its layout: closing its last tab does not close
-the worktree on the other machines, and once it has none its layout is forgotten, so opening it again takes
-what is stored without closing anything it opened with. Likewise a worktree's layout on a host is
-forgotten once no pane here shows one of the host's sessions: closing the last does not close the host's
-panes on the other machines. Only a pane showing a session of its kitty
-session's space is shared: kitty's startup session, whatever its file is named, shows sessions in
-`default`, which is this machine's alone, and a window left in another space is that space's.
-One kitty's sidebars share one pass, under a lock, which keeps what it knows beside the git states' file.
+splits apart. Only a copy with windows here shares its layout: closing its last tab does not close it on
+the other machines, and once it has none here it is forgotten, so opening it again takes what is kept
+without closing anything it opened with. This machine's `default` is not shared, as kitty's startup session
+shows its sessions; another host's is, as `white:` is a copy as any other.
 
 ## Other hosts
 

@@ -51,18 +51,6 @@ func rowSessions(r spaces.Row) []spaces.Worktree {
 	return nil
 }
 
-// rowDiverged are the diverged layouts of the worktrees r stands for, see rowSessions; on the hosts tab,
-// only those of the host it is under.
-func (m *sidebar) rowDiverged(r spaces.Row) []spaces.Divergence {
-	var out []spaces.Divergence
-	for _, d := range m.diverged {
-		if rowHolds(r, d.Session) && (!r.ByHost || d.Host == r.Host) {
-			out = append(out, d)
-		}
-	}
-	return out
-}
-
 func rowHolds(r spaces.Row, session string) bool {
 	for _, wt := range rowSessions(r) {
 		if wt.Session == session {
@@ -77,8 +65,7 @@ func rowHolds(r spaces.Row, session string) bool {
 // name. The icon says what the row is, and is replaced by the most urgent status of its sessions' windows;
 // see look.RowIcon. A missing worktree has the gone marker and `gone` for its branch, faint only once its
 // session has no windows. A suspended session has the suspended marker, and one being suspended or closed
-// says so until it is. A worktree being created or removed has the pending marker, over its status. A row
-// whose worktrees' layouts diverged from a host's is marked so at its end.
+// says so until it is. A worktree being created or removed has the pending marker, over its status.
 func (m *sidebar) renderRow(i int) string {
 	r, width, th := m.rows[i], m.contentWidth(), m.th
 	switch {
@@ -140,18 +127,7 @@ func (m *sidebar) renderRow(i int) string {
 	}
 	faint := !open
 	head := append(append(caret, m.box(i)...), icon...)
-	// The divergence takes the very end, a space from what is before it, when it fits beside the head.
-	var mark []look.Span
-	if len(m.rowDiverged(r)) > 0 {
-		mark = look.Diverged()
-	}
-	end := width
-	if w := th.Width(mark...); w > 0 && w+1 < width-th.Width(head...) {
-		end -= w + 1
-	} else {
-		mark = nil
-	}
-	room := max(end-th.Width(head...), 0)
+	room := max(width-th.Width(head...), 0)
 	// The git state takes the right end, after a space, and the branch what is left between. A space whose
 	// own config is not in use says so there instead, on its own row.
 	gitRow := r.Worktree != nil && !r.Folded && !r.Other && !r.Absent()
@@ -170,7 +146,7 @@ func (m *sidebar) renderRow(i int) string {
 		}
 	}
 	spans := append(head, look.DimIf(faint, th.Cut(nameRoom, label)...)...)
-	rest := end - th.Width(spans...)
+	rest := width - th.Width(spans...)
 	var git []look.Span
 	switch {
 	case r.Main && !r.Other && (r.Space.Untrusted || r.Space.ConfigErr != nil):
@@ -188,12 +164,8 @@ func (m *sidebar) renderRow(i int) string {
 		spans = append(append(spans, look.Muted(" ")), th.Cut(rest-1, look.Branch(*r.Worktree))...)
 	}
 	if len(git) > 0 {
-		pad := look.Default(strings.Repeat(" ", max(end-th.Width(spans...)-th.Width(git...), 1)))
+		pad := look.Default(strings.Repeat(" ", max(width-th.Width(spans...)-th.Width(git...), 1)))
 		spans = append(append(spans, pad), git...)
-	}
-	if len(mark) > 0 {
-		pad := look.Default(strings.Repeat(" ", max(width-th.Width(spans...)-th.Width(mark...), 1)))
-		spans = append(append(spans, pad), mark...)
 	}
 	// A highlighted row is drawn on a surface across its whole width, so it reads as one bar. So is the row
 	// whose popup shows, heading it.

@@ -259,14 +259,6 @@ func (p *Place[M, S]) Bind(a *Action[M, S], help, desc string, keys ...string) {
 	p.keys.bind(a, help, desc, keys...)
 }
 
-// BindQuiet binds keys to a on the place's subjects, before the kind's keys, without describing them or
-// offering a in the place's menus: a key that only says why it does nothing on some subjects, which keeps
-// it from what the place binds it to after.
-func (p *Place[M, S]) BindQuiet(a *Action[M, S], keys ...string) {
-	p.keys.bind(a, "", "", keys...)
-	p.keys[len(p.keys)-1].quiet = true
-}
-
 // Bindings are the place's own keys, for help.
 func (p *Place[M, S]) Bindings() []key.Binding { return p.keys.bindings() }
 

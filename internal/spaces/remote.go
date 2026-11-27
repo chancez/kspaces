@@ -93,6 +93,18 @@ func (r *remotes) update(hosts map[string]config.HostSettings) map[string]Remote
 	return r.knownLocked()
 }
 
+// host is the server of the host named name, nil while it has not loaded or does not answer, which the
+// background loads ask again, less and less often, rather than every caller.
+func (r *remotes) host(name string) Host {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	h, ok := r.hosts[name]
+	if !ok || h.known.Data == nil || h.known.Err != "" {
+		return nil
+	}
+	return h.host
+}
+
 // known is what is known of each host now.
 func (r *remotes) known() map[string]RemoteHost {
 	r.mu.Lock()

@@ -68,8 +68,8 @@ JSON, one message per line, over the socket, or over ssh to another host:
 | `exit` | `{}` | `{}`, then the server exits |
 | `new-worktree` | `{"root", "branch", "base", "dir"}` | the host data with it |
 | `remove-worktree` | `{"path", "delete_branch", "force"}` | the host data without it |
-| `layout` | `{"copy"}` | `{"revision", "layout"}`, revision 0 for none |
-| `save-layout` | `{"copy", "revision", "layout"}` | `{"revision"}`, or an error when not the latest |
+| `load-layouts` | `{"layouts": [{"key", "revision"}...]}` | `{"layouts": [...]}`: those at another revision, 0 for none |
+| `save-layout` | `{"key", "revision", "layout"}` | `{"revision"}`, or an error when not the latest |
 
 The host data is the config, or why it could not be read; each space's name, root, worktrees and own
 config; the worktrees being created or removed; and each worktree's git state. The server loads it every
@@ -110,15 +110,14 @@ git there.
 
 ## Layouts
 
-Each host's server keeps the layouts of its copies, by copy, with a revision each, in its state directory.
-It is the only writer: a sidebar showing a copy captures its kitty session's tabs as now, and sends
-`save-layout` to the copy's host with the revision it last had. When another machine saved since, the save is
-refused; the sidebar takes the host's layout, applies it to its kitty session, and captures again. There is
-no divergence to resolve, so the per-host layouts, the merge, the divergence marker and its menu go, as do
-the provider's `save-layout` and `load-layouts`.
-
-A sidebar subscribes to the layouts of the copies it shows, and applies a newer one when it comes: tabs and
-panes added or removed on another machine show here.
+Each host's server keeps the layouts of its copies, by the copy's kitty session there, with a revision each,
+in its state directory. It is the only writer: a sidebar showing a copy captures its kitty session's tabs as
+before, and sends `save-layout` to the copy's host with the revision it last had. When another machine
+saved since, the save is refused; the sidebar takes the host's layout, merges it into its kitty session
+against the layout it last had, and saves again. Every few seconds it asks each host with `load-layouts`
+for those saved since, and merges them the same way. There is nothing to reconcile, as there is one
+version, the host's: the per-host layouts, the divergence, its marker and its menu go, as do the provider's
+`save-layout` and `load-layouts`. See [Shared layouts](kitty.md#shared-layouts).
 
 ## Steps
 
@@ -131,8 +130,8 @@ Each is a release of its own.
    copies from its server.
 3. **Remote copies.** `kspaces open HOST:...`, the hosts tab opening them, `kspaces_host`, the provider's
    `launch`, the ssh panes, and `new-worktree` and `remove-worktree`.
-4. **Layouts kept by their host.** `layout` and `save-layout`, and the per-host layouts and their divergence
-   removed.
+4. **Layouts kept by their host.** `load-layouts` and `save-layout`, and the per-host layouts and their
+   divergence removed.
 
 ## Not yet
 
