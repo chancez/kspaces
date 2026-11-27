@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"path/filepath"
@@ -29,6 +30,8 @@ type fakeHost struct {
 	last      string
 	subs      map[int]func(spaces.HostData)
 	next      int
+	// asked are the worktrees it was asked to create and remove.
+	asked []string
 }
 
 func (h *fakeHost) set(hd spaces.HostData) {
@@ -59,6 +62,23 @@ func (h *fakeHost) Load(fresh bool) (spaces.HostData, error) {
 		}
 	}
 	return hd, nil
+}
+
+func (h *fakeHost) NewWorktree(root, branch, base string) (spaces.Worktree, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.asked = append(h.asked, "new "+root+" "+branch+" "+base)
+	if branch == "taken" {
+		return spaces.Worktree{}, errors.New("a branch named 'taken' already exists")
+	}
+	return spaces.Worktree{Path: root + "/.worktrees/" + branch, Branch: branch, Session: "gr@" + branch}, nil
+}
+
+func (h *fakeHost) RemoveWorktree(path string, opts spaces.RemoveOptions) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.asked = append(h.asked, fmt.Sprintf("remove %s %+v", path, opts))
+	return nil
 }
 
 func (h *fakeHost) Refresh() error {
@@ -414,4 +434,29 @@ panes = [{ run = ["claude"] }, { split = "right", cwd = "{worktree}/docs" }]
 	if !reflect.DeepEqual(got, hd) {
 		t.Errorf("got\n%#v\nwant\n%#v", *got.Config, cfg)
 	}
+}
+
+// A client has the server's host create and remove worktrees, and hears why it could not.
+func TestClientWorktrees(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		h := &fakeHost{data: grData}
+		ln := newPipes()
+		defer ln.Close()
+		go New(h, "v1", "white").Serve(t.Context(), ln)
+		c := NewClient(ln.dial, "v1")
+		wt, err := c.NewWorktree("/src/gr", "dev", "main")
+		if want := (spaces.Worktree{Path: "/src/gr/.worktrees/dev", Branch: "dev", Session: "gr@dev"}); err != nil || wt != want {
+			t.Errorf("NewWorktree = %+v, %v; want %+v", wt, err, want)
+		}
+		if _, err := c.NewWorktree("/src/gr", "taken", ""); err == nil || err.Error() != "a branch named 'taken' already exists" {
+			t.Errorf("NewWorktree of a taken branch = %v", err)
+		}
+		if err := c.RemoveWorktree("/src/gr/.worktrees/dev", spaces.RemoveOptions{Force: true, DeleteBranch: true}); err != nil {
+			t.Fatal(err)
+		}
+		want := []string{"new /src/gr dev main", "new /src/gr taken ", "remove /src/gr/.worktrees/dev {Force:true DeleteBranch:true ForceBranch:false}"}
+		if !reflect.DeepEqual(h.asked, want) {
+			t.Errorf("asked %q, want %q", h.asked, want)
+		}
+	})
 }

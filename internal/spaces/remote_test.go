@@ -67,8 +67,10 @@ func (h *scriptedHost) Load(bool) (HostData, error) {
 	return HostData{Spaces: []sharedSpace{{Name: "homelab"}}}, err
 }
 
-func (h *scriptedHost) Refresh() error                         { return nil }
-func (h *scriptedHost) Subscribe(func(HostData)) (stop func()) { return func() {} }
+func (h *scriptedHost) NewWorktree(string, string, string) (Worktree, error) { return Worktree{}, nil }
+func (h *scriptedHost) RemoveWorktree(string, RemoveOptions) error           { return nil }
+func (h *scriptedHost) Refresh() error                                       { return nil }
+func (h *scriptedHost) Subscribe(func(HostData)) (stop func())               { return func() {} }
 func (h *scriptedHost) Close() error {
 	h.mu.Lock()
 	defer h.mu.Unlock()

@@ -447,7 +447,12 @@ func CanRemove(space Space, wt Worktree) error {
 // git branch -d when merged and -D only with opts.ForceBranch; a branch that cannot go keeps the worktree
 // too, but one git refuses after the worktree is removed is a *BranchError. The worktree is marked pending
 // throughout, see MarkPending.
-func RemoveWorktree(cfg config.Config, space Space, wt Worktree, opts RemoveOptions) (err error) {
+func RemoveWorktree(cfg config.Config, space Space, wt Worktree, opts RemoveOptions) error {
+	return removeWorktree(cfg, space, wt, opts, func() (ended, err error) { return endSession(cfg, wt.Session) })
+}
+
+// removeWorktree is RemoveWorktree, with end ending what runs in the worktree, see endSession.
+func removeWorktree(cfg config.Config, space Space, wt Worktree, opts RemoveOptions, end func() (ended, err error)) (err error) {
 	defer func(start time.Time) {
 		logs.Action("remove worktree", start, err, "space", space.Name, "dir", wt.Path, "force", opts.Force, "delete_branch", opts.DeleteBranch)
 	}(time.Now())
@@ -468,7 +473,7 @@ func RemoveWorktree(cfg config.Config, space Space, wt Worktree, opts RemoveOpti
 	}
 	// The worktree goes even when the provider fails to end one of its sessions: the removal was confirmed,
 	// and the error says which is left.
-	ended, err := endSession(cfg, wt.Session)
+	ended, err := end()
 	if err != nil {
 		return errors.Join(ended, err)
 	}

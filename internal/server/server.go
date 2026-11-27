@@ -247,6 +247,18 @@ func (c *serverConn) answer(msg message) (any, error) {
 		return h.Load(false)
 	case methodExit:
 		return struct{}{}, nil
+	case methodNewWorktree:
+		var p newWorktreeParams
+		if err := json.Unmarshal(msg.Params, &p); err != nil {
+			return nil, err
+		}
+		return h.NewWorktree(p.Root, p.Branch, p.Base)
+	case methodRemoveWorktree:
+		var p removeWorktreeParams
+		if err := json.Unmarshal(msg.Params, &p); err != nil {
+			return nil, err
+		}
+		return struct{}{}, h.RemoveWorktree(p.Path, spaces.RemoveOptions{Force: p.Force, DeleteBranch: p.DeleteBranch, ForceBranch: p.ForceBranch})
 	}
 	return nil, fmt.Errorf("no method %q", msg.Method)
 }

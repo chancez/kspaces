@@ -33,6 +33,11 @@ type Host interface {
 	Refresh() error
 	// Subscribe calls f with the host data whenever a load changes it, until stop.
 	Subscribe(f func(HostData)) (stop func())
+	// NewWorktree creates a worktree in the space at root on branch, from base when not empty, see
+	// CreateOnHost, and is it.
+	NewWorktree(root, branch, base string) (Worktree, error)
+	// RemoveWorktree removes the worktree at path, see RemoveOnHost.
+	RemoveWorktree(path string, opts RemoveOptions) error
 }
 
 var (
@@ -140,6 +145,28 @@ func (h *LocalHost) Refresh() error {
 		w.Refresh()
 	}
 	return nil
+}
+
+// NewWorktree creates the worktree on this host, see CreateOnHost, and loads.
+func (h *LocalHost) NewWorktree(root, branch, base string) (Worktree, error) {
+	cfg, err := config.Load()
+	if err != nil {
+		return Worktree{}, err
+	}
+	wt, err := CreateOnHost(cfg, root, branch, base)
+	h.Load(true)
+	return wt, err
+}
+
+// RemoveWorktree removes the worktree from this host, see RemoveOnHost, and loads.
+func (h *LocalHost) RemoveWorktree(path string, opts RemoveOptions) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	err = RemoveOnHost(cfg, path, opts)
+	h.Load(true)
+	return err
 }
 
 // Subscribe calls f with every load that changes the host data.

@@ -25,6 +25,10 @@ const (
 	methodRefresh   = "refresh"
 	methodSubscribe = "subscribe"
 	methodExit      = "exit"
+	// What the host does to its spaces for another machine, see spaces.CreateOnHost and
+	// spaces.RemoveOnHost.
+	methodNewWorktree    = "new-worktree"
+	methodRemoveWorktree = "remove-worktree"
 	// methodUpdate is the push of the host data to a client that subscribed.
 	methodUpdate = "update"
 )
@@ -39,4 +43,21 @@ type Hello struct {
 // loadParams are a load's: whether to load now rather than give the last.
 type loadParams struct {
 	Fresh bool `json:"fresh,omitempty"`
+}
+
+// newWorktreeParams are a new-worktree's: the space's root, the new branch, and what it starts from, empty
+// for the main worktree's branch.
+type newWorktreeParams struct {
+	Root   string `json:"root"`
+	Branch string `json:"branch"`
+	Base   string `json:"base,omitempty"`
+}
+
+// removeWorktreeParams are a remove-worktree's: the worktree's path and how to remove it, see
+// spaces.RemoveOptions.
+type removeWorktreeParams struct {
+	Path         string `json:"path"`
+	Force        bool   `json:"force,omitempty"`
+	DeleteBranch bool   `json:"delete_branch,omitempty"`
+	ForceBranch  bool   `json:"force_branch,omitempty"`
 }

@@ -68,6 +68,18 @@ func (c *Client) Refresh() error {
 	return c.call(methodRefresh, struct{}{}, nil)
 }
 
+// NewWorktree has the server's host create a worktree, see spaces.CreateOnHost.
+func (c *Client) NewWorktree(root, branch, base string) (spaces.Worktree, error) {
+	var wt spaces.Worktree
+	err := c.call(methodNewWorktree, newWorktreeParams{Root: root, Branch: branch, Base: base}, &wt)
+	return wt, err
+}
+
+// RemoveWorktree has the server's host remove a worktree, see spaces.RemoveOnHost.
+func (c *Client) RemoveWorktree(path string, opts spaces.RemoveOptions) error {
+	return c.call(methodRemoveWorktree, removeWorktreeParams{Path: path, Force: opts.Force, DeleteBranch: opts.DeleteBranch, ForceBranch: opts.ForceBranch}, nil)
+}
+
 // Exit asks the server to exit.
 func (c *Client) Exit() error {
 	return c.call(methodExit, struct{}{}, nil)
