@@ -92,7 +92,23 @@ type Config struct {
 	// The order of the groups spaces are in, see SpaceSettings.Group. A group it does not list comes
 	// after those it does, by name.
 	Groups []string `toml:"groups"`
+	// The other machines whose copies of their spaces the hosts tab lists, by name, see docs/server.md.
+	Hosts map[string]HostSettings `toml:"hosts"`
 }
+
+// HostSettings say how to reach another machine: over ssh, running kspaces there.
+type HostSettings struct {
+	// SSH is the ssh destination, the host's name when empty.
+	SSH string `toml:"ssh"`
+	// Kspaces is the kspaces to run there, kspaces on its PATH when empty.
+	Kspaces string `toml:"kspaces"`
+}
+
+// Destination is where ssh goes for the host named name.
+func (h HostSettings) Destination(name string) string { return cmp.Or(h.SSH, name) }
+
+// Command is the kspaces to run on the host.
+func (h HostSettings) Command() string { return cmp.Or(h.Kspaces, "kspaces") }
 
 // Sidebar is how the sidebar's dock is laid out, and where its forms and the picker open. kitty sizes the
 // dock, so kitty.conf's watcher reads Width rather than kspaces; kspaces checks it with the rest.
@@ -465,6 +481,15 @@ func merge(names []string, overlays []bool, parts []decoded) (Config, error) {
 		if err != nil {
 			return Config{}, err
 		}
+		for _, name := range slices.Sorted(maps.Keys(p.cfg.Hosts)) {
+			if err := once("hosts."+name, name, i, "defined", "define"); err != nil {
+				return Config{}, fmt.Errorf("hosts: %w", err)
+			}
+			if cfg.Hosts == nil {
+				cfg.Hosts = map[string]HostSettings{}
+			}
+			cfg.Hosts[name] = p.cfg.Hosts[name]
+		}
 		for _, name := range slices.Sorted(maps.Keys(p.cfg.Space)) {
 			s, from := cfg.Space[name], p.cfg.Space[name]
 			for _, key := range p.spaceKeys[name] {
@@ -529,7 +554,7 @@ func upsert[T any](have, add []T, key func(T) string) []T {
 }
 
 // listed are Config's keys merge lists one file's after another's, or merges by key, rather than sets.
-var listed = []string{"commands", "layouts", "groups", "space"}
+var listed = []string{"commands", "layouts", "groups", "space", "hosts"}
 
 // mergeSettings sets each setting of dst, a Config or a table of it at key, that md says src sets, after
 // set says it can be: the keys of tables, such as sidebar.width, each a setting.
