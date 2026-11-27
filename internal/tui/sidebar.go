@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -235,25 +236,37 @@ type remoteMsg struct{}
 // pushed polls with the host data pushed.
 func (m *sidebar) pushed(hd spaces.HostData) tea.Cmd {
 	p, self := m.poller, m.self
-	return func() tea.Msg { return p.Pushed(hd).View(self) }
+	return func() tea.Msg {
+		defer logPanic("sidebar poll")
+		return p.Pushed(hd).View(self)
+	}
 }
 
 // poll loads, on the timer.
 func (m *sidebar) poll() tea.Cmd {
 	p, self := m.poller, m.self
-	return func() tea.Msg { return p.Poll().View(self) }
+	return func() tea.Msg {
+		defer logPanic("sidebar poll")
+		return p.Poll().View(self)
+	}
 }
 
 // relist lists kitty's windows again into the latest poll, for kitty's focus moving.
 func (m *sidebar) relist() tea.Cmd {
 	p, self := m.poller, m.self
-	return func() tea.Msg { return p.Windows().View(self) }
+	return func() tea.Msg {
+		defer logPanic("sidebar poll")
+		return p.Windows().View(self)
+	}
 }
 
 // refresh loads, for the refresh key, and has git and gh asked again.
 func (m *sidebar) refresh() tea.Cmd {
 	p, self := m.poller, m.self
-	return func() tea.Msg { return p.Refresh().View(self) }
+	return func() tea.Msg {
+		defer logPanic("sidebar poll")
+		return p.Refresh().View(self)
+	}
 }
 
 func tick() tea.Cmd {
@@ -314,6 +327,7 @@ func (m *sidebar) openOrResumeCmd(wt spaces.Worktree, opts spaces.OpenOptions) t
 }
 
 func (m *sidebar) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	defer logPanic("sidebar update")
 	var start tea.Cmd
 	if _, ok := msg.(tea.MouseMsg); ok {
 		start = m.mouse.start()
@@ -570,6 +584,7 @@ func (m *sidebar) isOpen(wt *spaces.Worktree) bool {
 }
 
 func (m *sidebar) View() tea.View {
+	defer logPanic("sidebar view")
 	v := tea.NewView(m.render())
 	v.AltScreen = true
 	// All motion, not just drags, so resting the mouse on a status entry or a row can show it in full.
@@ -658,6 +673,15 @@ func (m *sidebar) frame() string {
 		b.WriteString(look.Fit(line, width))
 	}
 	return b.String()
+}
+
+// logPanic logs a panic in what, with its stack, and panics on: bubbletea ends the program on one and
+// prints the stack to the terminal it leaves, which kitty closes as it starts the sidebar again.
+func logPanic(what string) {
+	if r := recover(); r != nil {
+		logs.Error(what+" panicked", fmt.Errorf("%v\n%s", r, debug.Stack()))
+		panic(r)
+	}
 }
 
 // RunSidebar runs the sidebar, meant for a kitty dock, until it is quit.
