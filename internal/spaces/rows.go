@@ -1,7 +1,6 @@
 package spaces
 
 import (
-	"cmp"
 	"os"
 	"path/filepath"
 	"slices"
@@ -205,24 +204,16 @@ func mainSession(space Space) string {
 }
 
 // detachedUnder splits d, space's detached sessions, by the worktree each is in, by that worktree's
-// session: the linked or missing one its worktree tag names, when space has it, else the main one, as a
-// session from before tagging or from outside kspaces is. Another host's copy's sessions are named after
-// the host, see CopyName.
+// session, see homeOf, else the main one's.
 func detachedUnder(space Space, d Detached) map[string]Detached {
-	has := map[string]bool{}
-	host := ""
-	for _, wt := range slices.Concat(space.Worktrees, space.Missing) {
-		has[wt.Session] = true
-		host = cmp.Or(host, wt.Host)
-	}
 	out := map[string]Detached{}
 	for _, h := range d.Hosts {
 		by := map[string][]ProviderSession{}
 		var order []string
 		for _, s := range h.Sessions {
 			wt := mainSession(space)
-			if dir := s.Tags["worktree"]; dir != "" && has[copyOf(host, space.Name+"@"+dir)] {
-				wt = copyOf(host, space.Name+"@"+dir)
+			if home, ok := homeOf(space, s); ok {
+				wt = home.Session
 			}
 			if by[wt] == nil {
 				order = append(order, wt)

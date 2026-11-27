@@ -26,8 +26,17 @@ type OpenOptions struct {
 // saved file if that opens any, and otherwise opened with its default layout, see freshLayout, unless
 // opts.NoLayout, or with one tab in the worktree, or in the home directory for a session in no space. A
 // default layout that needs inputs is not opened: the tab is, and the error says so. A worktree another
-// process is creating or removing is refused, see MarkPending.
+// process is creating or removing is refused, see MarkPending. Opened from no windows, its provider
+// sessions no window shows then open in tabs of their own, see AdoptOrphans.
 func OpenWorktree(cfg config.Config, st kitty.State, wt Worktree, opts OpenOptions) error {
+	err := openWorktree(cfg, st, wt, opts)
+	if err == nil {
+		adoptAfter(cfg, st, wt)
+	}
+	return err
+}
+
+func openWorktree(cfg config.Config, st kitty.State, wt Worktree, opts OpenOptions) error {
 	if wt.Path != "" && wt.Host == "" {
 		if err := CheckPending(wt.Path); err != nil {
 			return err

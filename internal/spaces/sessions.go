@@ -6,7 +6,6 @@ import (
 	"maps"
 	"os"
 	"slices"
-	"strings"
 
 	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
@@ -93,24 +92,8 @@ func topicSpaces(st *ProviderState, spaces []Space) []string {
 // session in no space's own. A missing worktree is never one, as opening its session with no windows would
 // make it in a directory that is gone, unless it is the current session, which has windows.
 func OpenTarget(st kitty.State, space Space, s ProviderSession) Worktree {
-	if dir := s.Tags["worktree"]; dir != "" {
-		for _, wt := range space.Worktrees {
-			if wt.Session == space.Name+"@"+dir {
-				return wt
-			}
-		}
-	}
-	if s.Cwd != "" {
-		best := -1
-		for i, wt := range space.Worktrees {
-			if wt.Path != "" && (s.Cwd == wt.Path || strings.HasPrefix(s.Cwd, strings.TrimSuffix(wt.Path, "/")+"/")) &&
-				(best < 0 || len(wt.Path) > len(space.Worktrees[best].Path)) {
-				best = i
-			}
-		}
-		if best >= 0 {
-			return space.Worktrees[best]
-		}
+	if wt, ok := homeOf(Space{Name: space.Name, Worktrees: space.Worktrees}, s); ok {
+		return wt
 	}
 	for _, wt := range append(append([]Worktree{}, space.Worktrees...), space.Missing...) {
 		if st.Current != "" && wt.Session == st.Current {
