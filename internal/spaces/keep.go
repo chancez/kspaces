@@ -375,7 +375,9 @@ func unkeep(cfg config.Config, session string) error {
 }
 
 // CloseSessionAs closes session's windows, keeping it to open again as mode says, or not with mode empty,
-// after doing fate to the provider's sessions its windows show, see ApplyClosingFate. Shelving a session
+// after doing fate to the provider's sessions its windows show, see ApplyClosingFate, and to its
+// worktree's orphans, see localOrphans. A session with no windows, a running one, has its orphans alone
+// done fate to. Shelving a session
 // kept to open again suspends it, as KeepSession with KeepSuspended does, so opening it brings them back;
 // ending or leaving them keeps its file alone. Every way marks the windows kept, which tells a multiplexer's close watcher to leave
 // what is left of them alone: nothing, once ended. Without a fate, as without a choice in the form, it
@@ -398,12 +400,29 @@ func CloseSessionAs(cfg config.Config, session string, mode KeepMode, fate Fate)
 	}
 	keeps := fate == FateShelve && mode != "" && caps[CapKeep]
 	// Which sessions the windows show is asked first, before the windows are marked or any closes.
-	var sessions []ProviderSession
+	var sessions, orphans []ProviderSession
 	var listed error
-	if !keeps && fate != FateLeave {
-		sessions, listed = closingSessionsNow(cfg.Provider, caps, session, false)
+	shown := true
+	if fate != FateLeave && caps[CapList] {
+		var data []kitty.OSWindow
+		var st *ProviderState
+		if data, listed = kitty.ListWindows(); listed == nil {
+			st, listed = listSessions(cfg.Provider, allWindows(data))
+		}
+		if listed == nil {
+			shown = len(windowsOf(data, session)) > 0
+			orphans = localOrphans(cfg, session, st.Sessions)
+			if !keeps {
+				sessions = ClosingSessions(st, data, session, false)
+			}
+		}
 	}
-	end := func() error { return errors.Join(listed, ApplyFate(cfg.Provider, caps, fate, sessions)) }
+	end := func() error {
+		return errors.Join(listed, ApplyFate(cfg.Provider, caps, fate, sessions), ApplyFate(cfg.Provider, caps, fate, orphans))
+	}
+	if !shown {
+		return end()
+	}
 	if mode != "" {
 		return keepSession(cfg, session, mode, keeps, end)
 	}

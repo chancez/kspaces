@@ -26,7 +26,7 @@ func TestRemoveSpaceForm(t *testing.T) {
 	want := [][]string{
 		{"", "  Remove space gr", "", "  Takes /src/gr out of the spaces in the config. The repository stays as it is.",
 			"  Closes 2 kitty sessions and deletes the saved files: gr, gr@fix.", "",
-			"  sessions   < end           >  left/right change", "             Ends 1 session: build running make", "",
+			"  sessions   < end          >  left/right change", "             Ends 1 session: build running make", "",
 			"   Remove y    Cancel n", ""},
 		{"", "  Remove space notes", "", "  Removes the session provider's space notes.",
 			"  Closes 1 kitty session and deletes the saved files: notes.", "",

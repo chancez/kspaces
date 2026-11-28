@@ -379,7 +379,7 @@ func RunCleanup(ctx context.Context, cfg config.Config, root string, sessions []
 	for _, c := range f.items {
 		names = append(names, c.Worktree.Session)
 	}
-	closing := spaces.ClosingNow(cfg.Provider, names, false, true)
+	closing := spaces.ClosingNow(cfg, names, false, true)
 	f.sessions, f.fate = closing.Sessions, endsOnly(closing.Fates)
 	if err := runPopup(ctx, f); err != nil {
 		return fmt.Errorf("running the clean up form: %w", err)

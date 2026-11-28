@@ -232,15 +232,27 @@ func RunCloseSession(ctx context.Context, cfg config.Config, sessions []string, 
 		}
 		sessions = []string{st.Current}
 	}
-	windows := make([]int, len(sessions))
-	for i, s := range sessions {
-		if windows[i] = st.Windows[s]; windows[i] == 0 {
-			return fmt.Errorf("session %s has no windows open", s)
-		}
-	}
 	var closing spaces.Closing
 	if !suspend {
-		closing = spaces.ClosingNow(cfg.Provider, sessions, mode != "", false)
+		closing = spaces.ClosingNow(cfg, sessions, mode != "", false)
+	}
+	// A running session, with no windows, is closed by ending or shelving its sessions: leaving them
+	// running would leave it as it is.
+	windows := make([]int, len(sessions))
+	running := false
+	for i, s := range sessions {
+		if windows[i] = st.Windows[s]; windows[i] == 0 {
+			if len(closing.Sessions[s]) == 0 {
+				return fmt.Errorf("session %s has no windows open", s)
+			}
+			running = true
+		}
+	}
+	if running {
+		closing.Fates = slices.DeleteFunc(closing.Fates, func(f spaces.Fate) bool { return f == spaces.FateLeave })
+		if len(closing.Fates) == 0 {
+			return fmt.Errorf("the session provider can neither end nor shelve the sessions of %s", strings.Join(sessions, ", "))
+		}
 	}
 	choice := fateChoice{fates: closing.Fates}
 	logs.Debug("closing sessions", "sessions", sessions, "caps", closing.Caps, "fates", closing.Fates)

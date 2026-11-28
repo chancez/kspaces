@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/chancez/kspaces/internal/config"
 	"github.com/chancez/kspaces/internal/kitty"
 )
 
@@ -191,9 +192,11 @@ type Closing struct {
 }
 
 // ClosingNow is Closing for sessions, kitty's windows as they are, with worktree the space's sessions
-// tagged with each session's worktree too. A provider that cannot list now offers no choice but what it
-// keeps.
-func ClosingNow(provider []string, sessions []string, keeps, worktree bool) Closing {
+// tagged with each session's worktree too, else the orphans of each worktree of this machine's, see
+// orphansOf, which closing it decides the fate of as of its windows'. A provider that cannot list now
+// offers no choice but what it keeps.
+func ClosingNow(cfg config.Config, sessions []string, keeps, worktree bool) Closing {
+	provider := cfg.Provider
 	if len(provider) == 0 {
 		return Closing{}
 	}
@@ -210,6 +213,9 @@ func ClosingNow(provider []string, sessions []string, keeps, worktree bool) Clos
 		}
 		for _, s := range sessions {
 			c.Sessions[s] = ClosingSessions(st, data, s, worktree)
+			if !worktree && st != nil {
+				c.Sessions[s] = append(c.Sessions[s], localOrphans(cfg, s, st.Sessions)...)
+			}
 		}
 	}
 	c.Fates = Fates(caps, keeps)

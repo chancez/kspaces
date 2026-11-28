@@ -193,8 +193,14 @@ var (
 		desc:    "close session",
 		section: sectionSession,
 		remote:  true,
+		// A worktree closed here whose sessions still run is closed by ending or shelving them, on this
+		// machine; another host's copy's are its host's.
 		applies: func(snap spaces.Snapshot, r spaces.Row) bool {
-			return r.Worktree != nil && snap.Kitty.Windows[r.Worktree.Session] > 0
+			if r.Worktree == nil {
+				return false
+			}
+			running, _ := spaces.SessionCounts(r.Sessions)
+			return snap.Kitty.Windows[r.Worktree.Session] > 0 || running > 0 && r.Worktree.Host == "" && !r.Folded
 		},
 		ask: func(snap spaces.Snapshot, r spaces.Row) error {
 			return spaces.AskCloseSession(*snap.Config, snap.Kitty, r.Worktree.Session)

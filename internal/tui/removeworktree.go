@@ -226,7 +226,7 @@ func RunRemoveWorktree(ctx context.Context, cfg config.Config, path string, dele
 	if err != nil {
 		return err
 	}
-	closing := spaces.ClosingNow(cfg.Provider, []string{wt.Session}, false, true)
+	closing := spaces.ClosingNow(cfg, []string{wt.Session}, false, true)
 	f.sessions, f.fate = closing.Sessions[wt.Session], endsOnly(closing.Fates)
 	if err := runPopup(ctx, f); err != nil {
 		return fmt.Errorf("running the remove worktree form: %w", err)

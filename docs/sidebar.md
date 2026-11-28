@@ -334,7 +334,7 @@ group, New space, and Add repository.
 | Session | Run | `R` | run a configured command in the worktree's session, in a form; with `[[commands]]` configured |
 | Session | Open layout | `L` | add a configured layout's tabs, or one shell tab, to the worktree's session, in a form; with `[[layouts]]` configured |
 | Session | Save as layout | | save the session's tabs as a layout in kspaces.toml, in a form; on a worktree's session with windows open |
-| Session | Close session | `c` | close every window of the session, on a session with windows open; with the session saver, keeping it to open again |
+| Session | Close session | `c` | close every window of the session, on a session with windows open, or end or suspend a running worktree's sessions; with the session saver, keeping it to open again |
 | Session | Suspend session | `z` | stop what runs in the session's windows and close them, keeping them to resume, on a session with windows open; with the session saver |
 | Session | Reply | `t` | write to the window of a status entry without switching to it, in a form; on a status entry |
 | Session | Clear | `x` | drop a status entry's done and failed records without focusing its window; on a status entry with one |
@@ -526,10 +526,12 @@ confirm with `y` or `enter`, and cancel with `n` or `esc`.
 
 With a [session provider](kitty.md#session-providers) that can end or shelve them, Close session and
 Remove space have a `sessions` choice, `left` and `right`, `h` and `l`, or a click on its arrows, for what
-becomes of the provider's sessions the closing windows show: **end**, at first, which kills the running
-ones and removes the ended and shelved ones; **shelve**, which for Close suspends the session, exactly as
-Suspend session does, so opening it again brings them back, and otherwise is the provider's shelve; or
-**leave running**, which only closes the windows. It sits above what the form says the choice changes,
+becomes of the provider's sessions the closing windows show, and for Close those of the worktree no window
+shows, see [Session states](#session-states): **end**, at first, which kills the running ones and removes
+the ended and shelved ones; **suspend**, which for Close suspends the session, exactly as Suspend session
+does, so opening it again brings them back, and otherwise is the provider's shelve; or **keep running**,
+which only closes the windows, leaving the worktree running. A running worktree, with no windows, closes
+by ending or suspending its sessions alone. It sits above what the form says the choice changes,
 each name padded to the widest, so its arrows stay where they are as it changes. The line under it says
 how many sessions it does that to, and what a busy one runs, in the error
 color when ending or shelving stops it. Only what the provider allows is offered, and without a provider

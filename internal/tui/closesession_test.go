@@ -14,7 +14,7 @@ import (
 )
 
 // With a provider that can end its sessions, closing says how many of them it ends, and left and right
-// choose to shelve them, kept to open again, or leave them running, the form's words following.
+// choose to suspend them, kept to open again, or keep them running, the form's words following.
 func TestCloseFormSessions(t *testing.T) {
 	f := &closeSessionForm{th: look.New(true), cfg: config.Config{Provider: []string{"prov"}}, mode: spaces.KeepClosed,
 		sessions: []string{"gr@dev"}, windows: []int{2},
@@ -31,9 +31,9 @@ func TestCloseFormSessions(t *testing.T) {
 		f.Update(keyMsg("right"))
 	}
 	want := [][]string{
-		screen("Closes its 2 windows, and what runs in them. Opening it again restores its layout, with fresh\n  programs.", "end          ", "Ends 1 session: build running make"),
-		screen("Stops what runs in its 2 windows and closes them. Opening it again brings them back as they\n  were.", "shelve       ", "Shelves 1 session, to bring back later: build running make"),
-		screen("Closes 2 windows, leaving what runs in them running.", "leave running", "Leaves 1 session running"),
+		screen("Closes its 2 windows, and what runs in them. Opening it again restores its layout, with fresh\n  programs.", "end         ", "Ends 1 session: build running make"),
+		screen("Stops what runs in its 2 windows and closes them. Opening it again brings them back as they\n  were.", "suspend     ", "Shelves 1 session, to bring back later: build running make"),
+		screen("Closes 2 windows, leaving what runs in them running.", "keep running", "Leaves 1 session running"),
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("form:\n%q\nwant\n%q", got, want)

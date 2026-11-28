@@ -1,6 +1,7 @@
 package spaces
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -248,7 +249,8 @@ func TestCloseSessionAsShelveSuspends(t *testing.T) {
 	if err := CloseSessionAs(cfg, "cm@test", KeepClosed, FateShelve); err != nil {
 		t.Fatal(err)
 	}
-	want := "prov capabilities\nkitten ls\nkitten action\nprov capabilities\nprov list\nkitten set-user-vars\nprov keep\nkitten close-window\n"
+	// Listed first for the orphans of its worktree, which are shelved too.
+	want := "prov capabilities\nkitten ls\nprov list\nkitten ls\nkitten action\nprov capabilities\nprov list\nkitten set-user-vars\nprov keep\nkitten close-window\n"
 	if got := ran(); got != want {
 		t.Errorf("ran\n%s\nwant\n%s", got, want)
 	}
@@ -273,5 +275,37 @@ func TestEndingWindowsGoFirst(t *testing.T) {
 	}
 	if got, want := ran(), "prov capabilities\nkitten ls\nprov list\nprov kill\nkitten close-window\nkitten ls\n"; got != want {
 		t.Errorf("removing ran\n%s\nwant\n%s", got, want)
+	}
+}
+
+// Closing ends a worktree's orphans with what its windows show; a running worktree, with no windows, has
+// its orphans alone ended, and no windows to close.
+func TestCloseSessionAsOrphans(t *testing.T) {
+	var got [][]string
+	for _, ls := range []string{`[{"tabs": [{"windows": [{"id": 10, "session_name": "notes"}]}]}]`, `[]`} {
+		dir, provider := fakeProvider(t, map[string]string{
+			"capabilities": `{"capabilities": ["list", "kill"]}`,
+			"list": `{"sessions": [{"id": "a", "space": "notes", "state": "running", "windows": [10]},
+				{"id": "b", "space": "notes", "state": "running"}, {"id": "c", "space": "docs", "state": "running"}]}`,
+		}, nil)
+		kitten := fakeKittenLs(t, dir, ls)
+		if err := CloseSessionAs(config.Config{Provider: []string{"prov"}, SessionsDir: t.TempDir()}, "notes", "", FateEnd); err != nil {
+			t.Fatal(err)
+		}
+		kills := 0
+		for _, verb := range provider() {
+			if verb == "kill" {
+				kills++
+			}
+		}
+		last, _ := os.ReadFile(filepath.Join(dir, "kill.in"))
+		got = append(got, append([]string{fmt.Sprintf("%d kills, the last %s", kills, strings.TrimSpace(string(last)))}, kitten()...))
+	}
+	want := [][]string{
+		{`2 kills, the last {"session":"b"}`, "@ ls", "@ set-user-vars --match session:^notes$ kspaces_keep=close", "@ close-window --ignore-no-match --match session:^notes$"},
+		{`1 kills, the last {"session":"b"}`, "@ ls"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got  %q\nwant %q", got, want)
 	}
 }

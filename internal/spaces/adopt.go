@@ -81,6 +81,19 @@ func orphansOf(space Space, session string, sessions []ProviderSession, kept map
 	return out
 }
 
+// localOrphans are the orphans of this machine's worktree whose kitty session is session, among sessions,
+// none for another host's copy, whose sessions are its host's to end, see docs/stories.md.
+func localOrphans(cfg config.Config, session string, sessions []ProviderSession) []ProviderSession {
+	if host, _ := SplitCopy(session); host != "" {
+		return nil
+	}
+	space, err := spaceOfSession(cfg, session)
+	if err != nil {
+		return nil
+	}
+	return orphansOf(space, session, sessions, keptHandles(cfg.SessionsDir))
+}
+
 // adopter opens a worktree's orphans, see AdoptOrphans, with its seams.
 type adopter struct {
 	cfg     config.Config

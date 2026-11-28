@@ -41,7 +41,7 @@ func (c *fateChoice) cycle(delta int) {
 }
 
 // fateNames are the fates as the choice shows them.
-var fateNames = map[spaces.Fate]string{spaces.FateEnd: "end", spaces.FateShelve: "shelve", spaces.FateLeave: "leave running"}
+var fateNames = map[spaces.Fate]string{spaces.FateEnd: "end", spaces.FateShelve: "suspend", spaces.FateLeave: "keep running"}
 
 // Zones of the choice: the fate before, and the fate after, which a click goes to.
 // endsOnly is the choice for removing a worktree: ending what the provider runs there when fates, those the
@@ -59,7 +59,7 @@ const (
 	fateNextZone = "fate:next"
 )
 
-// lines are the choice's, width cells wide: `sessions   < end           >  left/right change`, the arrows and the name
+// lines are the choice's, width cells wide: `sessions   < end          >  left/right change`, the arrows and the name
 // marked for a click, then what the fate chosen does to sessions, in the error color when it ends a busy
 // one. A fate alone, as a topic space's End, is said as it is, with nothing to change. None without fates.
 func (c *fateChoice) lines(th *look.Theme, width int, sessions []spaces.ProviderSession) []string {
